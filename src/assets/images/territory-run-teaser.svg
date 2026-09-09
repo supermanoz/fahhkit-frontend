@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="territoryRunTitle">
+  <title id="territoryRunTitle">Territory Run game map preview</title>
+  <defs>
+    <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a1d14" />
+      <stop offset="55%" stop-color="#4a3527" />
+      <stop offset="100%" stop-color="#e8590c" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff8a3d" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#e8590c" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="mossGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6fd17f" />
+      <stop offset="100%" stop-color="#2e7d32" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe08a" />
+      <stop offset="100%" stop-color="#ffc94d" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#skyGrad)" />
+  <circle cx="1180" cy="220" r="360" fill="url(#glowGrad)" />
+  <circle cx="260" cy="700" r="300" fill="url(#glowGrad)" opacity="0.5" />
+
+  <!-- faint grid to read as "map" -->
+  <g stroke="#ffffff" stroke-opacity="0.05" stroke-width="1">
+    <path d="M0 150 H1600 M0 300 H1600 M0 450 H1600 M0 600 H1600 M0 750 H1600" />
+    <path d="M200 0 V900 M450 0 V900 M700 0 V900 M950 0 V900 M1200 0 V900 M1450 0 V900" />
+  </g>
+
+  <!-- rival territory (muted) -->
+  <path d="M120 560 C 90 480, 180 400, 280 420 C 360 435, 400 500, 360 570 C 420 600, 400 680, 320 690 C 240 700, 140 660, 120 560 Z"
+        fill="#3A2E6E" fill-opacity="0.35" stroke="#2B2140" stroke-width="6" />
+  <circle cx="230" cy="540" r="10" fill="#c9c2ff" stroke="#2B2140" stroke-width="3" />
+  <text x="250" y="546" font-family="Verdana, Arial, sans-serif" font-size="22" fill="#f0edff" font-weight="700">Aashish</text>
+
+  <!-- player's claimed territory (moss, glowing) -->
+  <path d="M760 260 C 700 200, 840 140, 940 190 C 1040 240, 1080 340, 1020 420 C 1120 460, 1120 580, 1010 620 C 900 660, 760 620, 720 520 C 660 460, 680 340, 760 260 Z"
+        fill="url(#mossGrad)" fill-opacity="0.55" stroke="#2B2140" stroke-width="7" />
+  <!-- dashed running trail tracing the loop -->
+  <path d="M760 260 C 700 200, 840 140, 940 190 C 1040 240, 1080 340, 1020 420 C 1120 460, 1120 580, 1010 620 C 900 660, 760 620, 720 520 C 660 460, 680 340, 760 260 Z"
+        fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="2 14" stroke-linecap="round" opacity="0.9" />
+
+  <!-- crown marking "your" territory -->
+  <g transform="translate(870,330)">
+    <polygon points="-22,10 -14,-14 0,2 14,-14 22,10" fill="url(#goldGrad)" stroke="#2B2140" stroke-width="4" stroke-linejoin="round" />
+    <rect x="-24" y="8" width="48" height="10" rx="4" fill="url(#goldGrad)" stroke="#2B2140" stroke-width="4" />
+  </g>
+  <circle cx="870" cy="400" r="12" fill="#fff" stroke="#2B2140" stroke-width="3" />
+  <text x="892" y="406" font-family="Verdana, Arial, sans-serif" font-size="24" fill="#fff" font-weight="700">You</text>
+
+  <!-- runner marker mid-loop with pulse -->
+  <circle cx="1015" cy="470" r="26" fill="#ffffff" fill-opacity="0.15">
+    <animate attributeName="r" values="18;30;18" dur="2.4s" repeatCount="indefinite" />
+    <animate attributeName="fill-opacity" values="0.35;0;0.35" dur="2.4s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="1015" cy="470" r="13" fill="#E63946" stroke="#2B2140" stroke-width="4" />
+
+  <!-- second rival parcel, smaller -->
+  <path d="M1240 640 C 1220 590, 1290 560, 1330 600 C 1370 640, 1350 700, 1300 710 C 1250 720, 1260 690, 1240 640 Z"
+        fill="#3A2E6E" fill-opacity="0.3" stroke="#2B2140" stroke-width="5" />
+
+  <!-- HUD chip echoing the product -->
+  <g transform="translate(64,64)">
+    <rect width="360" height="72" rx="24" fill="rgba(20,17,15,0.55)" stroke="rgba(255,255,255,0.25)" stroke-width="2" />
+    <circle cx="40" cy="36" r="18" fill="url(#goldGrad)" stroke="#2B2140" stroke-width="3" />
+    <text x="70" y="30" font-family="Verdana, Arial, sans-serif" font-size="18" fill="#ffe9d6" font-weight="700">Territory Run</text>
+    <text x="70" y="52" font-family="Verdana, Arial, sans-serif" font-size="14" fill="#e8d9cc">Claim the map, run for it</text>
+  </g>
+</svg>

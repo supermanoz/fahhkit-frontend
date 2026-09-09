@@ -12,6 +12,7 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 import bannerImage from '../assets/images/Fahhkit-Banner.jfif'
 import sundayRundayImage from '../assets/images/Sunday-Runday.jfif'
 import foundingMembersImage from '../assets/images/founding-members.jfif'
+import territoryRunImage from '../assets/images/territory-run-teaser.svg'
 import manojBasnetPhoto from '../assets/images/team/manojbasnet.jfif'
 import aryanDahalPhoto from '../assets/images/team/aryandahal.jfif'
 import aryanShahPhoto from '../assets/images/team/aryanshah.jfif'
@@ -45,6 +46,17 @@ function getSlides(isAuthed) {
       cta: (
         <Link to="/events" className="btn btn-white btn-lg">
           View Events
+        </Link>
+      ),
+    },
+    {
+      image: territoryRunImage,
+      title: 'Territory Run',
+      subtitle:
+        'Run a loop, claim the ground, defend it from the crew. Play it now.',
+      cta: (
+        <Link to="/game" className="btn btn-white btn-lg">
+          Play Territory Run
         </Link>
       ),
     },

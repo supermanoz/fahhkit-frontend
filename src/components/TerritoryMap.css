@@ -1,0 +1,211 @@
+.territory-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0806;
+  /* Only used while .territory-map-tilt carries .is-zooming below — a real
+     vanishing point is what makes that brief tilt read as "3D" rather than
+     a flat squish, without needing to keep it (or correct click math for
+     it) once the map settles back to its normal top-down view. */
+  perspective: 1100px;
+  perspective-origin: center center;
+}
+
+/* Flat/top-down by default. Only while a zoom is actually in progress
+   (pinch, scroll-wheel, +/- buttons, double-click — see ZoomTiltEffect in
+   TerritoryMap.jsx, which toggles .is-zooming on zoomstart/zoomend) does it
+   lay back into a brief 3D tilt, settling flat again the instant the zoom
+   ends. Kept purely as a transient flourish rather than a standing tilt,
+   since tap-to-draw only ever happens while flat. */
+.territory-map-tilt {
+  position: absolute;
+  inset: 0;
+  transform: none;
+  transform-origin: center center;
+  transition: transform 0.3s ease;
+}
+
+.territory-map-tilt.is-zooming {
+  transform: rotateX(22deg) scale(1.25);
+}
+
+.territory-map-tilt .leaflet-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Mint-green "grass" ground shows through while tiles load/pan, instead of
+   Leaflet's default grey — keeps the game-board feel even at the edges. */
+.territory-map .leaflet-container {
+  background: #bfe8c9;
+  cursor: crosshair;
+}
+
+/* Esri's street basemap is already more colorful than plain OSM, but this
+   pushes it further from "map app" toward "painted game world" — Pokémon
+   GO's terrain is far more saturated than any real cartographic style. */
+.territory-map-tiles {
+  filter: saturate(1.45) contrast(1.08) brightness(1.03);
+}
+
+.territory-map .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+}
+
+/* Darkens toward the edges of the screen so the limited view radius reads
+   as "the fog outside your reach", not just an arbitrary pan limit —
+   purely decorative, pointer-events stay off so it never blocks taps. */
+.territory-map-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 450;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    transparent 42%,
+    rgba(10, 8, 6, 0.45) 100%
+  );
+}
+
+/* --- Player avatar: Pokémon GO's most recognizable map element, and always
+   on screen (not just mid-run) so the game reads as "you're standing here"
+   from the moment it loads. --- */
+.territory-map-player-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.territory-map-player-avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.3),
+    0 3px 6px rgba(0, 0, 0, 0.35);
+  object-fit: cover;
+}
+
+/* Two rings offset in time read as a continuous "beeping" sonar sweep
+   rather than one ring pulsing with a visible gap between beats. */
+.territory-map-player-pulse {
+  position: absolute;
+  inset: -18px;
+  border-radius: 50%;
+  background: rgba(46, 134, 171, 0.35);
+  animation: territoryPulse 2s ease-out infinite;
+}
+
+.territory-map-player-pulse-b {
+  animation-delay: 1s;
+}
+
+@keyframes territoryPulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* --- Territory badges: read like Pokémon GO gyms planted on the map,
+   icon only — tap for the owner's name instead of a label crowding the
+   view. --- */
+.territory-badge-icon {
+  background: transparent;
+  border: none;
+}
+
+.territory-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #2b2140;
+  box-shadow: 0 3px 0 rgba(43, 33, 64, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Player-held ground gets a soft glow so it stands out from rival parcels
+   at a glance, without needing a legend. */
+.territory-poly-player {
+  filter: drop-shadow(0 0 6px rgba(46, 134, 171, 0.55));
+}
+
+/* --- Floating chunky controls, ink-outlined per the game's HUD language --- */
+.territory-map-locate,
+.territory-map-zoom button {
+  border: 3px solid #2b2140;
+  background: #fff;
+  color: #2b2140;
+  box-shadow: 0 3px 0 rgba(43, 33, 64, 0.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.territory-map-locate:active,
+.territory-map-zoom button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(43, 33, 64, 0.45);
+}
+
+.territory-map-locate {
+  position: absolute;
+  right: 14px;
+  bottom: 190px;
+  z-index: 500;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.territory-map-zoom {
+  position: absolute;
+  left: 14px;
+  bottom: 190px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.territory-map-zoom button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 0 0 2px;
+}
+
+.territory-map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: var(--card);
+}
+
+@media (max-width: 560px) {
+  .territory-map-locate,
+  .territory-map-zoom {
+    bottom: 210px;
+  }
+}

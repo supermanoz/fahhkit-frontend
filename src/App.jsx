@@ -25,6 +25,7 @@ import PaymentStatusPage from './pages/PaymentStatusPage'
 import EventRegistrantsPage from './pages/EventRegistrantsPage'
 import EventReportPage from './pages/EventReportPage'
 import DashboardPage from './pages/DashboardPage'
+import GamePage from './pages/GamePage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
 
 export default function App() {
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="/runs/track" element={<TrackRunPage />} />
         <Route path="/runs/:id" element={<RunDetailPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/game" element={<GamePage />} />
         <Route path="/payment-status" element={<PaymentStatusPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
