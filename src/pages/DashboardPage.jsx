@@ -54,7 +54,7 @@ export default function DashboardPage() {
           kmLogged: accomplishment?.kmLogged ?? 0,
           runningMonths: accomplishment?.runningMonths ?? 0,
         })
-        setEvents(allEvents || [])
+        setEvents(allEvents?.content || [])
       })
       .catch((err) =>
         setError(

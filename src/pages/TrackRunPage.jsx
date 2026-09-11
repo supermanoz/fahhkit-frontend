@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, canManageEvents, getJson } from '../api/client'
+import { ApiError, canManageEvents, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import TrackRunPanel from '../components/TrackRunPanel'
 import Navbar from '../components/Navbar'
@@ -25,9 +25,12 @@ export default function TrackRunPage() {
 
   useEffect(() => {
     if (userLoading || !allowed || !user?.id) return
-    getJson(`/v1/athlete/${user.id}/history`)
+    postJson(`/v1/athlete/${user.id}/history`, {
+      pageNumber: 1,
+      noOfRecords: 500,
+    })
       .then((data) => {
-        const eligible = (data || []).filter(
+        const eligible = (data?.content || []).filter(
           (entry) =>
             entry.eventType === 'ENDURANCE' && entry.paymentStatus === 'PAID'
         )

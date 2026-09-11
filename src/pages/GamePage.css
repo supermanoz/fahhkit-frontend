@@ -1,4 +1,23 @@
+/* Palette + cel-shading recipe documented in /style.md — CSS custom
+   properties here so TerritoryMap's own stylesheet (a DOM descendant of
+   .game-page) can reuse the same tokens without duplicating hex values. */
 .game-page {
+  --game-ink: #3d2b1a;
+  --game-wood: #c98f52;
+  --game-wood-dark: #9c6a34;
+  --game-wood-light: #e8c084;
+  --game-stone: #9a9d93;
+  --game-stone-dark: #6e7166;
+  --game-stone-light: #c4c7bc;
+  --game-gold: #f4c430;
+  --game-gold-dark: #c4900c;
+  --game-gold-light: #ffe08a;
+  --game-green: #6fa15e;
+  --game-green-dark: #46733a;
+  --game-green-light: #a4cf8e;
+  --game-cream: #f6ecd9;
+  --game-panel: rgba(44, 32, 20, 0.9);
+
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -13,7 +32,9 @@
 }
 
 /* --- Top bar: exit + HUD, bled to the screen edge like Pokémon GO's status
-   bar rather than boxed in a card below a header. --- */
+   bar rather than boxed in a card below a header. Carved-stone slab: flat
+   base color, one hard-edged shadow band for the shaded half, one chunky
+   offset drop shadow beneath the whole shape. --- */
 .game-exit-btn {
   position: absolute;
   top: 16px;
@@ -25,17 +46,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  color: #2b2140;
-  border: 3px solid #2b2140;
-  box-shadow: 0 3px 0 rgba(43, 33, 64, 0.45);
+  background: var(--game-stone);
+  color: var(--game-ink);
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 -6px 0 var(--game-stone-dark),
+    0 3px 0 var(--game-ink);
   text-decoration: none;
   font-size: 16px;
 }
 
 .game-exit-btn:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 rgba(43, 33, 64, 0.45);
+  box-shadow:
+    inset 0 -6px 0 var(--game-stone-dark),
+    0 1px 0 var(--game-ink);
 }
 
 .game-hud {
@@ -49,29 +74,56 @@
 
 .game-hud-stat {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
-  background: rgba(20, 17, 15, 0.75);
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  padding: 6px 12px;
-  color: #ffc94d;
-  min-width: 64px;
+  gap: 8px;
+  background: var(--game-panel);
+  border: 3px solid var(--game-ink);
+  border-radius: 999px;
+  padding: 4px 16px 4px 4px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    0 3px 0 var(--game-ink);
+}
+
+/* --- Resource medallion: a chunky, flat, cel-shaded coin/gem rather than a
+   glossy icon — one base color, one hard-edged shadow band, no gradient. --- */
+.game-hud-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2.5px solid var(--game-ink);
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 0 var(--game-ink);
+}
+
+.game-hud-icon-coin {
+  background: var(--game-gold);
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -7px 0 var(--game-gold-dark),
+    0 2px 0 var(--game-ink);
+}
+
+.game-hud-icon-flag {
+  background: var(--game-green);
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -7px 0 var(--game-green-dark),
+    0 2px 0 var(--game-ink);
 }
 
 .game-hud-value {
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 800;
-  color: #fff;
-}
-
-.game-hud-label {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--game-cream);
+  -webkit-text-stroke: 2.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
 }
 
 .game-page-banner {
@@ -85,17 +137,17 @@
 }
 
 /* --- Bottom action sheet, bled to the screen edge with rounded top
-   corners — Pokémon GO's bottom bar treatment. --- */
+   corners — Pokémon GO's bottom bar treatment, reskinned as a flat
+   dark-wood slab. --- */
 .game-controls {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 600;
-  background: rgba(10, 8, 6, 0.82);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 3px solid #2b2140;
+  background: var(--game-panel);
+  border-top: 3px solid var(--game-ink);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
   border-radius: 24px 24px 0 0;
   padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
   display: flex;
@@ -118,49 +170,526 @@
   flex-wrap: wrap;
   justify-content: center;
   font-weight: 700;
-  color: #fff;
+  color: var(--game-cream);
   font-size: 13px;
 }
 
 .game-controls-hint {
   margin: 0;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(246, 236, 217, 0.75);
   font-size: 12px;
 }
 
 .game-controls-hint-error {
-  color: #ff8a8a;
+  color: #e8895f;
   font-weight: 600;
+}
+
+/* Buttons inside the game are carved wood/gold slabs, not the site's
+   default orange-gradient buttons — scoped to .game-page so the rest of
+   the app is untouched. */
+.game-page .btn-primary {
+  background: var(--game-gold);
+  color: var(--game-ink);
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 -6px 0 var(--game-gold-dark),
+    0 3px 0 var(--game-ink);
+  text-shadow: none;
+}
+
+.game-page .btn-primary::after {
+  display: none;
+}
+
+.game-page .btn-primary:hover {
+  transform: none;
+  filter: none;
+}
+
+.game-page .btn-primary:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -6px 0 var(--game-gold-dark),
+    0 1px 0 var(--game-ink);
+}
+
+.game-page .btn-outline {
+  background: var(--game-wood);
+  color: var(--game-ink);
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 -6px 0 var(--game-wood-dark),
+    0 3px 0 var(--game-ink);
+}
+
+.game-page .btn-outline:hover {
+  border-color: var(--game-ink);
+  color: var(--game-ink);
+}
+
+.game-page .btn-outline:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -6px 0 var(--game-wood-dark),
+    0 1px 0 var(--game-ink);
+}
+
+.game-page .btn:disabled {
+  opacity: 0.55;
+  box-shadow: 0 3px 0 var(--game-ink);
 }
 
 .game-claim-toast {
   position: fixed;
   left: 50%;
-  bottom: 210px;
+  bottom: calc(var(--sheet-h, 90px) + 26px);
   transform: translateX(-50%);
   z-index: 1200;
   padding: 20px 28px;
   text-align: center;
   max-width: 90vw;
+  background: var(--game-panel);
+  border: 3px solid var(--game-ink);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    0 5px 0 var(--game-ink);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .game-claim-toast h3 {
   margin: 0 0 6px;
-  color: var(--brand);
+  color: var(--game-gold);
 }
 
 .game-claim-toast p {
   margin: 0 0 14px;
   font-weight: 600;
+  color: var(--game-cream);
+}
+
+/* --- Menu FAB: bottom-center pokéball. Tapping it fans three radial
+   options out above it (Pokémon GO's map-screen menu button) instead of
+   jumping straight to the sheet — .game-fab-wrap is the shared anchor so
+   the radial buttons and the scrim can all position off the same point. --- */
+.game-fab-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sheet-h, 90px) + 20px);
+  transform: translateX(-50%);
+  z-index: 700;
+  width: 60px;
+  height: 60px;
+}
+
+.game-menu-btn {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-gold);
+  color: var(--game-ink);
+  border: 4px solid var(--game-ink);
+  box-shadow:
+    inset 0 -9px 0 var(--game-gold-dark),
+    inset 0 3px 0 var(--game-gold-light),
+    0 5px 0 var(--game-ink);
+  font-size: 24px;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.game-menu-btn:active,
+.game-menu-btn.is-open {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 -9px 0 var(--game-gold-dark),
+    inset 0 3px 0 var(--game-gold-light),
+    0 1px 0 var(--game-ink);
+}
+
+/* Dims the map while the radial menu is fanned out, and lets a tap
+   anywhere outside the options collapse it (same feel as Pokémon GO's
+   menu button). Sits above the map/HUD but below the fab + its options. */
+.game-radial-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 650;
+  background: rgba(10, 8, 6, 0.35);
+}
+
+/* Each option is an icon "badge" — chunky cel-shaded circle, thick ink
+   outline, offset drop shadow — plus a wood nameplate pill below it, the
+   same carved-resource-icon language as the HUD coin/parcel badges (see
+   /style.md), not the plain dark hamburger-menu circles this replaced. */
+.game-radial-item {
+  position: absolute;
+  top: 0;
+  /* Wrap is 60px wide (see .game-fab-wrap); this item is 100px, so -20px
+     keeps its icon centered on the FAB's own center before the motion x/y
+     offset fans it out, regardless of how wide each item's label pill is. */
+  left: -20px;
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.game-radial-btn {
+  pointer-events: auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid var(--game-ink);
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.game-radial-btn.radial-gold {
+  background: var(--game-gold);
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -9px 0 var(--game-gold-dark),
+    inset 0 3px 0 var(--game-gold-light),
+    0 5px 0 var(--game-ink);
+}
+
+.game-radial-btn.radial-green {
+  background: var(--game-green);
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -9px 0 var(--game-green-dark),
+    inset 0 3px 0 var(--game-green-light),
+    0 5px 0 var(--game-ink);
+}
+
+.game-radial-btn.radial-wood {
+  background: var(--game-wood);
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -9px 0 var(--game-wood-dark),
+    inset 0 3px 0 var(--game-wood-light),
+    0 5px 0 var(--game-ink);
+}
+
+.game-radial-btn:active {
+  transform: translateY(4px);
+}
+
+.game-radial-btn.radial-gold:active {
+  box-shadow:
+    inset 0 -9px 0 var(--game-gold-dark),
+    inset 0 3px 0 var(--game-gold-light),
+    0 1px 0 var(--game-ink);
+}
+
+.game-radial-btn.radial-green:active {
+  box-shadow:
+    inset 0 -9px 0 var(--game-green-dark),
+    inset 0 3px 0 var(--game-green-light),
+    0 1px 0 var(--game-ink);
+}
+
+.game-radial-btn.radial-wood:active {
+  box-shadow:
+    inset 0 -9px 0 var(--game-wood-dark),
+    inset 0 3px 0 var(--game-wood-light),
+    0 1px 0 var(--game-ink);
+}
+
+.game-radial-label {
+  pointer-events: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--game-panel);
+  border: 2px solid var(--game-ink);
+  box-shadow: 0 2px 0 var(--game-ink);
+  color: var(--game-cream);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* --- Menu sheet: Territory / Shop drawer --- */
+.game-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(10, 8, 6, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.game-menu-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--game-panel);
+  border-top: 3px solid var(--game-ink);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 24px 24px 0 0;
+  padding: 14px 20px calc(24px + env(safe-area-inset-bottom));
+  color: var(--game-cream);
+}
+
+.game-menu-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(246, 236, 217, 0.3);
+  margin: 0 auto 14px;
+}
+
+.game-menu-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-wood);
+  border: 2px solid var(--game-ink);
+  color: var(--game-ink);
+  cursor: pointer;
+}
+
+.game-menu-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.game-menu-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 2px solid var(--game-ink);
+  background: rgba(246, 236, 217, 0.06);
+  color: rgba(246, 236, 217, 0.75);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.game-menu-tab.active {
+  background: var(--game-gold);
+  color: var(--game-ink);
+}
+
+.game-menu-panel {
+  min-height: 120px;
+}
+
+.game-menu-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px 0 20px;
+  border-bottom: 1px solid rgba(246, 236, 217, 0.18);
+  margin-bottom: 14px;
+}
+
+.game-menu-summary-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--game-gold);
+}
+
+.game-menu-summary-label {
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.7);
+  margin-top: 4px;
+}
+
+.game-menu-empty {
+  text-align: center;
+  color: rgba(246, 236, 217, 0.65);
+  font-size: 13px;
+  padding: 12px 0 4px;
+}
+
+.game-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-menu-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(246, 236, 217, 0.06);
+  border-radius: 12px;
+  border: 1px solid rgba(246, 236, 217, 0.12);
+}
+
+.game-menu-list-area {
+  font-weight: 700;
+  color: var(--game-cream);
+  font-size: 14px;
+}
+
+.game-menu-list-meta {
+  font-size: 11px;
+  color: rgba(246, 236, 217, 0.6);
+}
+
+.game-menu-leaderboard {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-menu-leaderboard li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(246, 236, 217, 0.06);
+  border-radius: 12px;
+  border: 1px solid rgba(246, 236, 217, 0.12);
+}
+
+.game-menu-leaderboard li.is-player {
+  background: rgba(224, 165, 55, 0.16);
+  border-color: var(--game-gold);
+}
+
+.game-menu-leaderboard-rank {
+  font-weight: 800;
+  color: rgba(246, 236, 217, 0.6);
+  font-size: 13px;
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.game-menu-leaderboard-name {
+  flex: 1;
+  font-weight: 700;
+  color: var(--game-cream);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-menu-leaderboard-area {
+  font-weight: 700;
+  color: var(--game-gold);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.game-menu-shop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 10px 6px;
+  gap: 8px;
+}
+
+.game-menu-shop-icon {
+  font-size: 34px;
+  color: var(--game-gold);
+}
+
+.game-menu-shop-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin: 0;
+}
+
+.game-menu-shop-balance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(246, 236, 217, 0.75);
+  font-size: 13px;
+  margin: 0;
 }
 
 @media (max-width: 560px) {
   .game-hud-stat {
-    min-width: 52px;
-    padding: 5px 8px;
+    padding: 3px 12px 3px 3px;
+    gap: 6px;
   }
 
-  .game-claim-toast {
-    bottom: 230px;
+  .game-hud-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .game-hud-value {
+    font-size: 16px;
+  }
+
+  .game-fab-wrap {
+    width: 56px;
+    height: 56px;
+  }
+
+  .game-menu-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+  }
+
+  .game-radial-item {
+    left: -17px;
+    width: 90px;
+    gap: 10px;
+  }
+
+  .game-radial-btn {
+    width: 52px;
+    height: 52px;
+    font-size: 21px;
+  }
+
+  .game-radial-label {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+
+  .game-menu-tab {
+    font-size: 11px;
+    padding: 8px 4px;
+    gap: 4px;
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, canManageEvents, getJson } from '../api/client'
+import { ApiError, canManageEvents, postJson } from '../api/client'
 import { getRuns } from '../api/runs'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import Navbar from '../components/Navbar'
@@ -28,13 +28,19 @@ export default function HistoryPage() {
     // has a history entry for, so joining the two by eventId here means the
     // history page can show each run right alongside the event it belongs to,
     // instead of a disconnected "My Runs" list.
-    Promise.all([getJson(`/v1/athlete/${user.id}/history`), getRuns()])
+    Promise.all([
+      postJson(`/v1/athlete/${user.id}/history`, {
+        pageNumber: 1,
+        noOfRecords: 500,
+      }),
+      getRuns(),
+    ])
       .then(([historyData, runsData]) => {
         const runsByEventId = new Map(
-          (runsData || []).map((run) => [run.eventId, run])
+          (runsData?.content || []).map((run) => [run.eventId, run])
         )
         setHistory(
-          (historyData || []).map((item) => ({
+          (historyData?.content || []).map((item) => ({
             ...item,
             run: runsByEventId.get(item.eventId) || null,
           }))

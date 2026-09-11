@@ -2,6 +2,7 @@
 // this yet (no territory/club/coin endpoints exist), so everything here
 // lives in localStorage on this device — it's a real, playable loop, just
 // not synced anywhere.
+import polygonClipping from 'polygon-clipping'
 import { haversineDistance } from './run'
 
 const STORAGE_KEY = 'fahhkit_territory_game_v1'
@@ -27,15 +28,22 @@ export function boundsForRadius(center, radiusMeters) {
   ]
 }
 
-// Distinct from the site's UI chrome palette (brand orange) on purpose, so
-// territory fills never get mistaken for a button or banner.
-export const PLAYER_COLOR = '#2E86AB'
-const RIVAL_COLORS = ['#6A4C93', '#C1666B', '#1B998B']
+// Gold ties the player's ground to the same "gold = you" language as the
+// HUD coin/avatar/menu button (see style.md); rivals get an earthy,
+// Clash-of-Clans-style variety instead so parcels stay easy to tell apart
+// at a glance. Keep in sync with the pulse/glow colors in TerritoryMap.css.
+export const PLAYER_COLOR = '#E0A537'
+const RIVAL_COLORS = ['#4E7A3A', '#B5651D', '#5C7A8A']
 const RIVAL_NAMES = ['Aashish', 'Prakriti', 'Sudip']
 
 // Small fixed offsets (in degrees, roughly tens of meters at this latitude)
 // around a center point, turned into a lopsided loop rather than a perfect
-// circle so it reads as a hand-run route, not a drawn shape.
+// circle so it reads as a hand-run route, not a drawn shape. Territories
+// never overlap on the board (see evaluateClaim), so these three are laid
+// out in their own clear patch of ground - the middle one used to dip into
+// both neighbors' loops (a leftover from when these were eyeballed without
+// checking each other), shifted south here to clear both while keeping its
+// exact shape and area.
 const RIVAL_SHAPES = [
   [
     [0.0009, -0.0016],
@@ -46,11 +54,11 @@ const RIVAL_SHAPES = [
     [-0.0004, -0.001],
   ],
   [
-    [-0.0014, 0.0011],
-    [-0.0006, 0.0018],
-    [0.0004, 0.0014],
-    [0.0006, 0.0004],
-    [-0.0004, -0.0002],
+    [-0.0029, 0.0011],
+    [-0.0021, 0.0018],
+    [-0.0011, 0.0014],
+    [-0.0009, 0.0004],
+    [-0.0019, -0.0002],
   ],
   [
     [0.0004, 0.0022],
@@ -62,7 +70,7 @@ const RIVAL_SHAPES = [
 ]
 
 function seedRivalTerritories() {
-  return RIVAL_SHAPES.map((shape, i) => {
+  const territories = RIVAL_SHAPES.map((shape, i) => {
     const points = shape.map(([dLat, dLng]) => ({
       lat: DEFAULT_CENTER.lat + dLat,
       lng: DEFAULT_CENTER.lng + dLng,
@@ -77,6 +85,10 @@ function seedRivalTerritories() {
       claimedAt: new Date().toISOString(),
     }
   })
+  // Belt-and-suspenders: these hand-picked offsets are laid out to already
+  // clear each other, but resolving overlaps here too means a future edit
+  // to RIVAL_SHAPES can't accidentally reintroduce one.
+  return resolveOverlaps(territories)
 }
 
 function defaultState() {
@@ -92,7 +104,10 @@ export function loadGameState() {
     if (!raw) return defaultState()
     const parsed = JSON.parse(raw)
     if (!parsed || !Array.isArray(parsed.territories)) return defaultState()
-    return parsed
+    // Re-resolve on every load, not just at seed time — heals a device
+    // whose localStorage already has overlapping parcels saved from before
+    // this existed. A no-op once the state is already clean.
+    return { ...parsed, territories: resolveOverlaps(parsed.territories) }
   } catch {
     return defaultState()
   }
@@ -157,224 +172,166 @@ export function pointInPolygon(point, polygonPoints) {
   return inside
 }
 
-function segmentsIntersect(p1, p2, p3, p4) {
-  const orientation = (a, b, c) => {
-    const val =
-      (b.lng - a.lng) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lng - a.lng)
-    if (Math.abs(val) < 1e-15) return 0
-    return val > 0 ? 1 : 2
-  }
-  const onSegment = (a, b, c) =>
-    Math.min(a.lng, c.lng) <= b.lng &&
-    b.lng <= Math.max(a.lng, c.lng) &&
-    Math.min(a.lat, c.lat) <= b.lat &&
-    b.lat <= Math.max(a.lat, c.lat)
-
-  const o1 = orientation(p1, p2, p3)
-  const o2 = orientation(p1, p2, p4)
-  const o3 = orientation(p3, p4, p1)
-  const o4 = orientation(p3, p4, p2)
-
-  if (o1 !== o2 && o3 !== o4) return true
-  if (o1 === 0 && onSegment(p1, p3, p2)) return true
-  if (o2 === 0 && onSegment(p1, p4, p2)) return true
-  if (o3 === 0 && onSegment(p3, p1, p4)) return true
-  if (o4 === 0 && onSegment(p3, p2, p4)) return true
-  return false
+// Converts our {lat,lng} loop into the [x,y] ring shape polygon-clipping
+// expects (a GeoJSON-style Polygon is Ring[], and a Ring is Position[]) —
+// using [lng, lat] order doesn't matter here since the library treats them
+// as opaque x/y, but it's the GeoJSON convention.
+function toGeom(points) {
+  return [points.map((p) => [p.lng, p.lat])]
 }
 
-// True if the two loops share any ground at all — either one contains a
-// vertex of the other, or their edges actually cross. Covers full
-// containment, partial clipping, and edge-touching cases, which is enough
-// to reason about for the hand-drawn, non-self-intersecting loops this game
-// produces (there's no backend geometry engine to defer to — the FahhKit
-// API has no territory/polygon logic at all yet — so this client-side check
-// is the only thing standing between claims and overlapping parcels).
-export function polygonsOverlap(a, b) {
-  if (a.some((p) => pointInPolygon(p, b))) return true
-  if (b.some((p) => pointInPolygon(p, a))) return true
-  for (let i = 0; i < a.length; i++) {
-    const a1 = a[i]
-    const a2 = a[(i + 1) % a.length]
-    for (let j = 0; j < b.length; j++) {
-      const b1 = b[j]
-      const b2 = b[(j + 1) % b.length]
-      if (segmentsIntersect(a1, a2, b1, b2)) return true
+function ringToPoints(ring) {
+  // polygon-clipping always returns closed rings (first === last point);
+  // drop the repeated closing vertex to match this game's point-array shape.
+  return ring.slice(0, -1).map(([lng, lat]) => ({ lat, lng }))
+}
+
+// polygon-clipping's boolean ops return a MultiPolygon (Polygon[], each
+// itself Ring[] with the outer boundary first and any holes after). This
+// game's data model only ever holds one simple ring per territory, so on
+// the rare shape that splits or gets a hole, keep just the biggest outer
+// ring and drop the rest — an acceptable simplification for a run/loop
+// game where that split is a genuine edge case, not the common path.
+function largestRing(multiPolygon) {
+  let best = null
+  let bestArea = -1
+  for (const polygon of multiPolygon) {
+    const points = ringToPoints(polygon[0])
+    const area = polygonAreaSqMeters(points)
+    if (area > bestArea) {
+      bestArea = area
+      best = points
     }
   }
-  return false
+  return best
 }
 
-// The single source of truth for whether a drawn loop can be claimed —
-// enforces that territories never overlap on the board:
+// True if the two loops share any ground at all — full containment,
+// partial clipping, and edge-touching all count. Backed by polygon-clipping
+// (a well-tested implementation of the Martinez-Rueda-Feito algorithm)
+// rather than a hand-rolled segment-intersection check, since getting this
+// wrong on a concave, hand-drawn loop is exactly the kind of edge case a
+// from-scratch implementation tends to miss.
+export function polygonsOverlap(a, b) {
+  const hit = polygonClipping.intersection(toGeom(a), toGeom(b))
+  // A shared edge/vertex with no real interior overlap can come back as a
+  // sliver of near-zero area — 1 sq cm is well below anything meaningful
+  // at this game's scale, so it doesn't count as "sharing ground".
+  return hit.some(
+    (polygon) => polygonAreaSqMeters(ringToPoints(polygon[0])) > 0.0001
+  )
+}
+
+// Merges two overlapping (or touching) simple polygons into one outer
+// boundary — used when a new run touches ground the player already owns.
+export function unionPolygons(a, b) {
+  const result = polygonClipping.union(toGeom(a), toGeom(b))
+  return largestRing(result) || a
+}
+
+// Removes whatever ground `cutter` covers from `subject`, so the two never
+// visually overlap — used both to keep the hand-placed rival seed shapes
+// from overlapping each other (see resolveOverlaps) and, live, to crop
+// whichever side of a claim loses a disputed patch of ground to the other
+// (see evaluateClaim). Returns null if `cutter` swallows `subject` whole.
+export function subtractPolygon(subject, cutter) {
+  const result = polygonClipping.difference(toGeom(subject), toGeom(cutter))
+  return largestRing(result)
+}
+
+// Enforces "territories never overlap on the board" for a whole parcel
+// list: sorts by area so the bigger parcel always keeps the disputed
+// ground, and clips (or, if fully swallowed, drops) every smaller one that
+// overlaps it. Only needed to self-heal the hand-placed rival seed shapes
+// (and any older saved game state) — live claims already resolve their own
+// overlaps through evaluateClaim below.
+export function resolveOverlaps(territories) {
+  const ordered = [...territories].sort((a, b) => b.area - a.area)
+  const kept = []
+  for (const territory of ordered) {
+    let points = territory.points
+    for (const bigger of kept) {
+      if (!points || !polygonsOverlap(points, bigger.points)) continue
+      points = subtractPolygon(points, bigger.points)
+    }
+    if (!points || points.length < 3) continue
+    kept.push({ ...territory, points, area: polygonAreaSqMeters(points) })
+  }
+  return kept
+}
+
+// The single source of truth for whether a drawn loop can be claimed, and
+// what it actually ends up claiming:
 //  - touching ground you already hold merges it into one bigger parcel
-//    (see unionPolygons) instead of refusing the claim
-//  - touching a rival's ground is only allowed when the loop fully
-//    swallows it (every one of the rival's points falls inside the loop),
-//    which counts as conquering it outright; a partial clip is refused
+//    (see unionPolygons)
+//  - fully swallowing a rival's parcel (every one of its points falls
+//    inside the loop) conquers it outright — the rival parcel is removed
+//  - clipping only *part* of a rival's parcel is allowed (you can run
+//    around a rival's territory), and whoever has more ground keeps the
+//    disputed patch: if the loop is bigger, the rival's parcel is cropped
+//    down to exclude it; if the rival is bigger, the loop itself is cropped
+//    down to exclude the rival's ground before it's ever claimed
 //  - anything not touching existing ground claims cleanly
+// Returns `{ ok: false, reason: 'engulfed' }` only in the edge case where
+// the loop ends up with nothing left to claim (it sat entirely inside one
+// bigger rival parcel).
 export function evaluateClaim(loopPoints, territories) {
-  const conquers = []
   const merges = []
+  const conquers = []
+  const shrinkTargets = []
+  const loopArea = polygonAreaSqMeters(loopPoints)
+  let claimShape = loopPoints
+
+  // Pass 1: resolve merges and full conquers, and crop the loop itself
+  // down against every rival parcel bigger than it — bigger ground always
+  // wins the disputed patch, decided once against the run's own total area
+  // rather than the shrinking claim shape, so processing order can't change
+  // the outcome.
   for (const t of territories) {
     if (!polygonsOverlap(loopPoints, t.points)) continue
     if (t.ownerId === 'player') {
       merges.push(t)
       continue
     }
-    const fullyEnclosed = t.points.every((p) => pointInPolygon(p, loopPoints))
-    if (!fullyEnclosed) {
-      return { ok: false, reason: 'partial', blocker: t }
-    }
-    conquers.push(t)
-  }
-  return { ok: true, conquers, merges }
-}
-
-function pointKey(p) {
-  return `${p.lat.toFixed(9)}:${p.lng.toFixed(9)}`
-}
-
-// Andrew's monotone chain — used only as a last-resort fallback if the
-// boundary-stitching union below can't close a clean ring (degenerate
-// touching cases). Overclaims a little (fills any concave notch between
-// the two shapes) but is always a valid simple polygon, so the game never
-// breaks on an edge case it hasn't been tested against.
-function convexHull(points) {
-  const pts = [...points].sort((a, b) => a.lng - b.lng || a.lat - b.lat)
-  const cross = (o, a, b) =>
-    (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng)
-  const lower = []
-  for (const p of pts) {
-    while (
-      lower.length >= 2 &&
-      cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0
-    ) {
-      lower.pop()
-    }
-    lower.push(p)
-  }
-  const upper = []
-  for (let i = pts.length - 1; i >= 0; i--) {
-    const p = pts[i]
-    while (
-      upper.length >= 2 &&
-      cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0
-    ) {
-      upper.pop()
-    }
-    upper.push(p)
-  }
-  lower.pop()
-  upper.pop()
-  return [...lower, ...upper]
-}
-
-// Proper (bounded) segment intersection, returning the point plus how far
-// along each segment it falls (0-1) so callers can order multiple
-// intersections along the same edge.
-function segmentIntersectionPoint(p1, p2, p3, p4) {
-  const d1x = p2.lng - p1.lng
-  const d1y = p2.lat - p1.lat
-  const d2x = p4.lng - p3.lng
-  const d2y = p4.lat - p3.lat
-  const denom = d1x * d2y - d1y * d2x
-  if (Math.abs(denom) < 1e-15) return null
-  const t = ((p3.lng - p1.lng) * d2y - (p3.lat - p1.lat) * d2x) / denom
-  const u = ((p3.lng - p1.lng) * d1y - (p3.lat - p1.lat) * d1x) / denom
-  const eps = 1e-9
-  if (t < -eps || t > 1 + eps || u < -eps || u > 1 + eps) return null
-  return { lat: p1.lat + t * d1y, lng: p1.lng + t * d1x, t }
-}
-
-// Splits `ring`'s edges wherever they cross `otherRing`, inserting the
-// crossing points as extra vertices — the first step of boundary-stitching
-// two polygons together (Weiler-Atherton style) so the merge follows only
-// the outer edge of whichever shape is "outside" at each segment.
-function augmentRingWithIntersections(ring, otherRing) {
-  const augmented = []
-  for (let i = 0; i < ring.length; i++) {
-    const p1 = ring[i]
-    const p2 = ring[(i + 1) % ring.length]
-    augmented.push(p1)
-    const hits = []
-    for (let j = 0; j < otherRing.length; j++) {
-      const q1 = otherRing[j]
-      const q2 = otherRing[(j + 1) % otherRing.length]
-      const hit = segmentIntersectionPoint(p1, p2, q1, q2)
-      if (hit) hits.push(hit)
-    }
-    hits.sort((a, b) => a.t - b.t)
-    for (const hit of hits) {
-      augmented.push({ lat: hit.lat, lng: hit.lng })
-    }
-  }
-  return augmented
-}
-
-// Merges two overlapping simple polygons into one outer boundary. There's
-// no backend geometry engine to defer to for this (the FahhKit API has no
-// territory/polygon logic at all), so this keeps the ring segments of each
-// polygon that fall outside the other and stitches them together at their
-// crossing points — the standard approach for polygon union.
-export function unionPolygons(a, b) {
-  if (a.every((p) => pointInPolygon(p, b))) return b
-  if (b.every((p) => pointInPolygon(p, a))) return a
-
-  const augA = augmentRingWithIntersections(a, b)
-  const augB = augmentRingWithIntersections(b, a)
-
-  function keptSegments(ring, otherRing) {
-    const kept = []
-    for (let i = 0; i < ring.length; i++) {
-      const start = ring[i]
-      const end = ring[(i + 1) % ring.length]
-      const mid = {
-        lat: (start.lat + end.lat) / 2,
-        lng: (start.lng + end.lng) / 2,
-      }
-      if (!pointInPolygon(mid, otherRing)) {
-        kept.push([start, end])
-      }
-    }
-    return kept
-  }
-
-  const segments = [...keptSegments(augA, b), ...keptSegments(augB, a)]
-  if (segments.length === 0) return convexHull([...a, ...b])
-
-  const byStart = new Map()
-  for (const seg of segments) {
-    const key = pointKey(seg[0])
-    if (!byStart.has(key)) byStart.set(key, [])
-    byStart.get(key).push(seg)
-  }
-
-  const used = new Set()
-  const firstKey = pointKey(segments[0][0])
-  let current = segments[0]
-  const ring = [current[0]]
-  used.add(current)
-
-  while (true) {
-    ring.push(current[1])
-    if (pointKey(current[1]) === firstKey) break
-    const candidates = (byStart.get(pointKey(current[1])) || []).filter(
-      (s) => !used.has(s)
+    const rivalFullyInsideLoop = t.points.every((p) =>
+      pointInPolygon(p, loopPoints)
     )
-    if (candidates.length === 0) break
-    current = candidates[0]
-    used.add(current)
-    if (ring.length > a.length + b.length + 4) break // safety valve
+    if (rivalFullyInsideLoop) {
+      conquers.push(t)
+      continue
+    }
+    if (loopArea <= t.area) {
+      claimShape = claimShape && subtractPolygon(claimShape, t.points)
+    } else {
+      shrinkTargets.push(t)
+    }
   }
 
-  if (
-    ring.length >= 4 &&
-    pointKey(ring[0]) === pointKey(ring[ring.length - 1])
-  ) {
-    return ring.slice(0, -1)
+  if (!claimShape) {
+    return { ok: false, reason: 'engulfed' }
   }
-  return convexHull([...a, ...b])
+
+  // Pass 2: every smaller rival parcel this loop touched loses whatever
+  // sliver the FINAL claim shape (after pass 1's crops) actually covers —
+  // using the shape the player ends up with, not the raw drawn loop, so a
+  // patch already ceded to a bigger rival in pass 1 can't also be carved
+  // out of a smaller one here.
+  const shrinks = []
+  for (const t of shrinkTargets) {
+    if (!polygonsOverlap(claimShape, t.points)) continue
+    const shrunkPoints = subtractPolygon(t.points, claimShape)
+    if (shrunkPoints) {
+      shrinks.push({
+        territory: t,
+        points: shrunkPoints,
+        area: polygonAreaSqMeters(shrunkPoints),
+      })
+    } else {
+      conquers.push(t)
+    }
+  }
+
+  return { ok: true, claimShape, conquers, merges, shrinks }
 }
 
 export function formatArea(sqMeters) {

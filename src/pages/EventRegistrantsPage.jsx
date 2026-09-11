@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { ApiError, canManageEvents, getJson } from '../api/client'
+import { ApiError, canManageEvents, getJson, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { formatName } from '../utils/format'
 import { formatDate } from '../utils/events'
@@ -15,15 +15,24 @@ const STATUS_LABELS = {
   CANCELLED: 'Cancelled',
 }
 
+const PAGE_SIZE = 20
+
 export default function EventRegistrantsPage() {
   const { id } = useParams()
   const { user, loading: userLoading } = useCurrentUser()
   const [event, setEvent] = useState(null)
   const [registrants, setRegistrants] = useState([])
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const allowed = canManageEvents(user)
+
+  const totalPages = Math.max(1, Math.ceil(registrants.length / PAGE_SIZE))
+  const pagedRegistrants = registrants.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  )
 
   const report = useMemo(() => {
     const paid = registrants.filter((r) => r.paymentStatus === 'PAID').length
@@ -50,23 +59,27 @@ export default function EventRegistrantsPage() {
     }
     Promise.all([
       getJson(`/v1/event/${id}`),
-      getJson(`/v1/event/${id}/registrations`),
-      getJson('/v1/athlete/find'),
+      postJson(`/v1/event/${id}/registrations`, {
+        pageNumber: 1,
+        noOfRecords: 500,
+      }),
+      postJson('/v1/athlete/find', { pageNumber: 1, noOfRecords: 500 }),
     ])
       .then(([eventData, registrantsData, athletesData]) => {
         setEvent(eventData)
         // Only athletes can be applicants for an event — admins/moderators are excluded
         // even if one of them happens to have a registration row.
         const athleteById = new Map(
-          (athletesData || []).map((a) => [a.userId, a])
+          (athletesData?.content || []).map((a) => [a.userId, a])
         )
-        const applicants = (registrantsData || [])
+        const applicants = (registrantsData?.content || [])
           .filter((r) => athleteById.has(r.userId))
           .map((r) => ({
             ...r,
             mobileNumber: athleteById.get(r.userId).mobileNumber,
           }))
         setRegistrants(applicants)
+        setPage(1)
       })
       .catch((err) =>
         setError(
@@ -131,7 +144,7 @@ export default function EventRegistrantsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registrants.map((registrant) => (
+                  {pagedRegistrants.map((registrant) => (
                     <tr key={registrant.registrationId}>
                       <td className="registrant-name-cell">
                         {formatName(registrant.fullName)}
@@ -160,6 +173,30 @@ export default function EventRegistrantsPage() {
                   ))}
                 </tbody>
               </table>
+
+              {totalPages > 1 && (
+                <div className="registrant-table-pagination">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    Previous
+                  </button>
+                  <span className="registrant-table-pagination-info">
+                    Page {page} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
 
             <aside

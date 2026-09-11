@@ -227,6 +227,21 @@
   color: var(--brand-dark);
 }
 
+.event-report-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 14px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.event-report-table-pagination-info {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .event-report-status.status-paid {
   background: var(--success-bg);
   color: var(--success);

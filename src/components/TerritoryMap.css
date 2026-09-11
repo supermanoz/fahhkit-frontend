@@ -12,12 +12,14 @@
   perspective-origin: center center;
 }
 
-/* Flat/top-down by default. Only while a zoom is actually in progress
-   (pinch, scroll-wheel, +/- buttons, double-click — see ZoomTiltEffect in
-   TerritoryMap.jsx, which toggles .is-zooming on zoomstart/zoomend) does it
-   lay back into a brief 3D tilt, settling flat again the instant the zoom
-   ends. Kept purely as a transient flourish rather than a standing tilt,
-   since tap-to-draw only ever happens while flat. */
+/* Flat/top-down by default. Briefly tilts during any zoom gesture
+   (.is-zooming, toggled on zoomstart/zoomend) and settles into a standing
+   tilt once the player is zoomed in close (.is-close-in, toggled by zoom
+   level — see CLOSE_IN_TILT_ZOOM in TerritoryMap.jsx) so building-3d
+   extrusions in the basemap read as real buildings. .is-close-in is always
+   forced off during manualMode (tap-to-draw), since this is a CSS transform
+   on the whole map rather than a real perspective camera — Leaflet's
+   click-to-latlng math only stays accurate while flat. */
 .territory-map-tilt {
   position: absolute;
   inset: 0;
@@ -26,7 +28,8 @@
   transition: transform 0.3s ease;
 }
 
-.territory-map-tilt.is-zooming {
+.territory-map-tilt.is-zooming,
+.territory-map-tilt.is-close-in {
   transform: rotateX(22deg) scale(1.25);
 }
 
@@ -42,9 +45,10 @@
   cursor: crosshair;
 }
 
-/* Esri's street basemap is already more colorful than plain OSM, but this
-   pushes it further from "map app" toward "painted game world" — Pokémon
-   GO's terrain is far more saturated than any real cartographic style. */
+/* The vector basemap's stock "Liberty" palette is already fairly colorful,
+   but this pushes it further from "map app" toward "painted game world" —
+   Pokémon GO's terrain is far more saturated than any real cartographic
+   style. */
 .territory-map-tiles {
   filter: saturate(1.45) contrast(1.08) brightness(1.03);
 }
@@ -84,10 +88,10 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 3px solid #fff;
+  border: 3px solid var(--game-cream, #f6ecd9);
   box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.3),
-    0 3px 6px rgba(0, 0, 0, 0.35);
+    0 0 0 2px var(--game-ink, #3d2b1a),
+    0 3px 0 rgba(0, 0, 0, 0.35);
   object-fit: cover;
 }
 
@@ -97,7 +101,7 @@
   position: absolute;
   inset: -18px;
   border-radius: 50%;
-  background: rgba(46, 134, 171, 0.35);
+  background: rgba(224, 165, 55, 0.35);
   animation: territoryPulse 2s ease-out infinite;
 }
 
@@ -128,8 +132,8 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 3px solid #2b2140;
-  box-shadow: 0 3px 0 rgba(43, 33, 64, 0.45);
+  border: 3px solid var(--game-ink, #3d2b1a);
+  box-shadow: 0 3px 0 var(--game-ink, #3d2b1a);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,16 +144,19 @@
 /* Player-held ground gets a soft glow so it stands out from rival parcels
    at a glance, without needing a legend. */
 .territory-poly-player {
-  filter: drop-shadow(0 0 6px rgba(46, 134, 171, 0.55));
+  filter: drop-shadow(0 0 6px rgba(224, 165, 55, 0.55));
 }
 
-/* --- Floating chunky controls, ink-outlined per the game's HUD language --- */
+/* --- Floating chunky controls: carved-stone slabs, one flat base color plus
+   one hard-edged shadow band, per the game's cel-shaded HUD language. --- */
 .territory-map-locate,
 .territory-map-zoom button {
-  border: 3px solid #2b2140;
-  background: #fff;
-  color: #2b2140;
-  box-shadow: 0 3px 0 rgba(43, 33, 64, 0.45);
+  border: 3px solid var(--game-ink, #3d2b1a);
+  background: var(--game-stone, #9a9d93);
+  color: var(--game-ink, #3d2b1a);
+  box-shadow:
+    inset 0 -5px 0 var(--game-stone-dark, #6e7166),
+    0 3px 0 var(--game-ink, #3d2b1a);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -162,13 +169,18 @@
 .territory-map-locate:active,
 .territory-map-zoom button:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 rgba(43, 33, 64, 0.45);
+  box-shadow:
+    inset 0 -5px 0 var(--game-stone-dark, #6e7166),
+    0 1px 0 var(--game-ink, #3d2b1a);
 }
 
+/* Anchored to --sheet-h (set on .game-page — see GamePage.jsx), the bottom
+   action sheet's real measured height, so this stays correctly placed on
+   every device/content state instead of a guessed fixed pixel value. */
 .territory-map-locate {
   position: absolute;
   right: 14px;
-  bottom: 190px;
+  bottom: calc(var(--sheet-h, 90px) + 20px);
   z-index: 500;
   width: 46px;
   height: 46px;
@@ -176,10 +188,32 @@
   font-size: 18px;
 }
 
+/* Visible feedback when the locate button's geolocation call fails —
+   without this a permission denial or timeout made the button look
+   completely broken, since the failure was only ever logged to the
+   console. */
+.territory-map-locate-error {
+  position: absolute;
+  right: 14px;
+  bottom: calc(var(--sheet-h, 90px) + 74px);
+  z-index: 500;
+  max-width: 200px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--game-panel, rgba(44, 32, 20, 0.9));
+  border: 2px solid var(--game-ink, #3d2b1a);
+  color: var(--game-cream, #f6ecd9);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: right;
+  box-shadow: 0 3px 0 var(--game-ink, #3d2b1a);
+}
+
 .territory-map-zoom {
   position: absolute;
   left: 14px;
-  bottom: 190px;
+  bottom: calc(var(--sheet-h, 90px) + 86px);
   z-index: 500;
   display: flex;
   flex-direction: column;
@@ -204,8 +238,9 @@
 }
 
 @media (max-width: 560px) {
-  .territory-map-locate,
-  .territory-map-zoom {
-    bottom: 210px;
+  .territory-map-locate {
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
   }
 }

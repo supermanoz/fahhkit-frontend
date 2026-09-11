@@ -182,3 +182,18 @@
   padding: 6px 14px;
   font-size: 12px;
 }
+
+.registrant-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 14px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.registrant-table-pagination-info {
+  color: var(--muted);
+  font-size: 13px;
+}

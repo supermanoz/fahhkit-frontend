@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+  FaArrowRight,
+  FaMapMarkedAlt,
+  FaRoute,
+  FaShieldAlt,
+  FaUsers,
+} from 'react-icons/fa'
 import Navbar from '../components/Navbar'
 import Carousel from '../components/Carousel'
 import SectionTitle from '../components/SectionTitle'
@@ -7,7 +14,7 @@ import { eventToSlide } from '../components/NextEventBanner'
 import SponsorCarousel from '../components/SponsorCarousel'
 import TeamCarousel from '../components/TeamCarousel'
 import Footer from '../components/Footer'
-import { getJson } from '../api/client'
+import { getJson, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import bannerImage from '../assets/images/Fahhkit-Banner.jfif'
 import sundayRundayImage from '../assets/images/Sunday-Runday.jfif'
@@ -51,13 +58,35 @@ function getSlides(isAuthed) {
     },
     {
       image: territoryRunImage,
-      title: 'Territory Run',
-      subtitle:
-        'Run a loop, claim the ground, defend it from the crew. Play it now.',
-      cta: (
-        <Link to="/game" className="btn btn-white btn-lg">
-          Play Territory Run
-        </Link>
+      content: (
+        <div className="territory-slide">
+          <span className="territory-slide-eyebrow">
+            <FaMapMarkedAlt aria-hidden="true" />
+            Coming Soon...
+          </span>
+          <h2 className="territory-slide-title">Run Conquer</h2>
+          <p className="territory-slide-subtitle">
+            Run a loop, claim the ground, defend it from the crew.
+          </p>
+          <ul className="territory-slide-features">
+            <li>
+              <FaRoute aria-hidden="true" />
+              Run to claim
+            </li>
+            <li>
+              <FaShieldAlt aria-hidden="true" />
+              Defend it
+            </li>
+            <li>
+              <FaUsers aria-hidden="true" />
+              vs. the crew
+            </li>
+          </ul>
+          <Link to="/game" className="btn btn-white btn-lg territory-slide-cta">
+            View Live Demo
+            <FaArrowRight aria-hidden="true" />
+          </Link>
+        </div>
       ),
     },
   ]
@@ -113,15 +142,15 @@ const TEAM = [
   },
   {
     name: 'Aryan Shah',
-    role: 'Co-Founder & Community Lead',
+    role: 'Community Lead',
     photo: aryanShahPhoto,
     bio: 'The friendly face who welcomes every new member and keeps the group chat alive between events.',
   },
   {
     name: 'Ritesh Chand',
-    role: 'Co-Founder & Team Member',
+    role: 'Graphic Designer',
     photo: riteshChandPhoto,
-    bio: 'Shows up rain or shine and brings the energy that keeps the crew moving.',
+    bio: 'The eye behind the posters, banners, and race-day graphics that make FahhKit look as good as it runs.',
   },
 ]
 
@@ -138,8 +167,8 @@ export default function LandingPage() {
   )
 
   useEffect(() => {
-    getJson('/v1/event/upcoming')
-      .then((data) => setEvents((data || []).slice(0, 3)))
+    postJson('/v1/event/upcoming', { pageNumber: 1, noOfRecords: 3 })
+      .then((data) => setEvents(data?.content || []))
       .catch(() => {})
   }, [])
 

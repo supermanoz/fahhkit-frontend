@@ -4,6 +4,7 @@ import {
   ApiError,
   canManageEvents,
   getJson,
+  postJson,
   resolveFileUrl,
 } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
@@ -33,11 +34,14 @@ export default function AthleteProfilePage() {
     }
     Promise.all([
       getJson(`/v1/user/${userId}/details`),
-      getJson(`/v1/athlete/${userId}/history`),
+      postJson(`/v1/athlete/${userId}/history`, {
+        pageNumber: 1,
+        noOfRecords: 500,
+      }),
     ])
       .then(([profileData, historyData]) => {
         setProfile(profileData)
-        setHistory(historyData || [])
+        setHistory(historyData?.content || [])
       })
       .catch((err) =>
         setError(

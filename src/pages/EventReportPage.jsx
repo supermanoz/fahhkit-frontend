@@ -29,6 +29,8 @@ const GENDER_LABELS = {
   OTHERS: 'Others',
 }
 
+const PAGE_SIZE = 20
+
 function calculateAge(birthDate) {
   if (!birthDate) return null
   const dob = new Date(birthDate)
@@ -47,10 +49,17 @@ export default function EventReportPage() {
   const { user, loading: userLoading } = useCurrentUser()
   const [event, setEvent] = useState(null)
   const [registrants, setRegistrants] = useState([])
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const allowed = canManageEvents(user)
+
+  const totalPages = Math.max(1, Math.ceil(registrants.length / PAGE_SIZE))
+  const pagedRegistrants = registrants.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  )
 
   useEffect(() => {
     if (userLoading || !allowed) {
@@ -59,8 +68,11 @@ export default function EventReportPage() {
     }
     Promise.all([
       getJson(`/v1/event/${id}`),
-      getJson(`/v1/event/${id}/registrations`),
-      getJson('/v1/athlete/find'),
+      postJson(`/v1/event/${id}/registrations`, {
+        pageNumber: 1,
+        noOfRecords: 500,
+      }),
+      postJson('/v1/athlete/find', { pageNumber: 1, noOfRecords: 500 }),
       // /v1/athlete/find doesn't carry gender/birthDate — those live on the
       // base User record, so a second bulk lookup is needed to enrich the
       // report with demographics.
@@ -74,12 +86,12 @@ export default function EventReportPage() {
       .then(([eventData, registrantsData, athletesData, athleteUsersPage]) => {
         setEvent(eventData)
         const athleteById = new Map(
-          (athletesData || []).map((a) => [a.userId, a])
+          (athletesData?.content || []).map((a) => [a.userId, a])
         )
         const userById = new Map(
           (athleteUsersPage?.content || []).map((u) => [u.id, u])
         )
-        const applicants = (registrantsData || [])
+        const applicants = (registrantsData?.content || [])
           .filter((r) => athleteById.has(r.userId))
           .map((r) => ({
             ...r,
@@ -88,6 +100,7 @@ export default function EventReportPage() {
             birthDate: userById.get(r.userId)?.birthDate || null,
           }))
         setRegistrants(applicants)
+        setPage(1)
       })
       .catch((err) =>
         setError(
@@ -369,7 +382,7 @@ export default function EventReportPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {registrants.map((registrant) => (
+                      {pagedRegistrants.map((registrant) => (
                         <tr key={registrant.registrationId}>
                           <td className="event-report-name-cell">
                             {formatName(registrant.fullName)}
@@ -394,6 +407,32 @@ export default function EventReportPage() {
                       ))}
                     </tbody>
                   </table>
+
+                  {totalPages > 1 && (
+                    <div className="event-report-table-pagination">
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                      >
+                        Previous
+                      </button>
+                      <span className="event-report-table-pagination-info">
+                        Page {page} of {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() =>
+                          setPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={page >= totalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </section>

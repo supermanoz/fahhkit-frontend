@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getJson } from '../api/client'
+import { postJson } from '../api/client'
 import { useCurrentUser } from './useCurrentUser'
 
 const EVENT_WINDOW_MS = 60 * 60 * 1000 // an event is "live" for 1 hour after its start time
@@ -21,9 +21,12 @@ export function useLiveRegisteredEvent() {
     }
     let cancelled = false
     function load() {
-      getJson(`/v1/athlete/${user.id}/history`)
+      postJson(`/v1/athlete/${user.id}/history`, {
+        pageNumber: 1,
+        noOfRecords: 500,
+      })
         .then((data) => {
-          if (!cancelled) setHistory(data || [])
+          if (!cancelled) setHistory(data?.content || [])
         })
         .catch(() => {})
     }

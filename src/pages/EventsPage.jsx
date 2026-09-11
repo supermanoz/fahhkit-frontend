@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   ApiError,
   canManageEvents,
-  getJson,
   postJson,
   resolveFileUrl,
 } from '../api/client'
@@ -47,8 +46,11 @@ export default function EventsPage() {
 
   useEffect(() => {
     if (userLoading) return
-    getJson(showAllEvents ? '/v1/event/moderator/all' : '/v1/event/upcoming')
-      .then((data) => setEvents(data || []))
+    postJson(showAllEvents ? '/v1/event/moderator/all' : '/v1/event/upcoming', {
+      pageNumber: 1,
+      noOfRecords: 500,
+    })
+      .then((data) => setEvents(data?.content || []))
       .catch((err) => {
         setError(
           err instanceof ApiError

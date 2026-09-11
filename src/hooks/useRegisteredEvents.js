@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getJson } from '../api/client'
+import { postJson } from '../api/client'
 import { useCurrentUser } from './useCurrentUser'
 
 // Map of eventId -> { paymentStatus, registrationId } for the current user's own
@@ -16,11 +16,14 @@ export function useEventRegistrationStatuses() {
       setStatuses(new Map())
       return
     }
-    getJson(`/v1/athlete/${user.id}/history`)
+    postJson(`/v1/athlete/${user.id}/history`, {
+      pageNumber: 1,
+      noOfRecords: 500,
+    })
       .then((data) =>
         setStatuses(
           new Map(
-            (data || []).map((h) => [
+            (data?.content || []).map((h) => [
               h.eventId,
               {
                 paymentStatus: h.paymentStatus,
