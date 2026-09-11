@@ -1,57 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="territoryRunTitle">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 700" width="1920" height="700" role="img" aria-labelledby="territoryRunTitle">
   <title id="territoryRunTitle">Territory Run</title>
   <defs>
-    <linearGradient id="skyGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#23201d" />
-      <stop offset="55%" stop-color="#4a3527" />
-      <stop offset="100%" stop-color="#e8590c" />
-    </linearGradient>
-    <radialGradient id="glowA" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ff8a3d" stop-opacity="0.35" />
-      <stop offset="100%" stop-color="#ff8a3d" stop-opacity="0" />
+    <!-- Centered radially (not cornered) so the brightest tone survives
+         background-size:cover's crop no matter how wide or narrow the
+         carousel ends up being — cover always keeps the center pixel. -->
+    <radialGradient id="vignette" cx="50%" cy="44%" r="85%">
+      <stop offset="0%" stop-color="#4a3323" />
+      <stop offset="45%" stop-color="#241a12" />
+      <stop offset="100%" stop-color="#100b07" />
     </radialGradient>
-    <radialGradient id="glowB" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#000000" stop-opacity="0.32" />
-      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    <radialGradient id="spotlight" cx="50%" cy="42%" r="40%">
+      <stop offset="0%" stop-color="#ffb15c" stop-opacity="0.4" />
+      <stop offset="60%" stop-color="#ffb15c" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#ffb15c" stop-opacity="0" />
     </radialGradient>
-    <linearGradient id="routeGrad" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="#ffb15c" stop-opacity="0.15" />
-      <stop offset="50%" stop-color="#ffb15c" stop-opacity="0.65" />
-      <stop offset="100%" stop-color="#ffe0b3" stop-opacity="0.85" />
+    <linearGradient id="routeGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4c430" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#ffe8c2" stop-opacity="0.9" />
     </linearGradient>
+    <pattern id="dotGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#f4c430" fill-opacity="0.12" />
+    </pattern>
   </defs>
 
-  <rect width="1600" height="900" fill="url(#skyGrad)" />
-  <circle cx="1260" cy="200" r="480" fill="url(#glowA)" />
-  <circle cx="180" cy="760" r="420" fill="url(#glowB)" />
+  <rect width="1920" height="700" fill="url(#vignette)" />
+  <rect width="1920" height="700" fill="url(#dotGrid)" />
+  <ellipse cx="960" cy="294" rx="560" ry="320" fill="url(#spotlight)" />
 
-  <!-- sparse pin-point texture, faint — hints at a map without reading as clutter -->
-  <g fill="#ffffff" fill-opacity="0.14">
-    <circle cx="120" cy="140" r="2.5" />
-    <circle cx="240" cy="90" r="1.8" />
-    <circle cx="90" cy="320" r="2" />
-    <circle cx="1480" cy="620" r="2.5" />
-    <circle cx="1400" cy="760" r="1.8" />
-    <circle cx="1530" cy="500" r="2" />
-    <circle cx="1360" cy="120" r="1.6" />
-    <circle cx="60" cy="560" r="1.6" />
-  </g>
-
-  <!-- a single, quiet running route sketched across the frame -->
+  <!-- a short, quiet running loop kept inside the safe center band that
+       survives cover-crop at every viewport width, mobile through
+       ultrawide -->
   <path
-    d="M120 640 C 380 720, 560 480, 820 500 C 1080 520, 1140 260, 1420 220"
+    d="M780 420 C 860 380, 900 340, 960 340 C 1020 340, 1080 300, 1140 300"
     fill="none"
     stroke="url(#routeGrad)"
-    stroke-width="3.5"
+    stroke-width="4"
     stroke-linecap="round"
     stroke-dasharray="1 20"
   />
+  <circle cx="780" cy="420" r="6" fill="#ffe0b3" fill-opacity="0.6" />
 
-  <circle cx="120" cy="640" r="6" fill="#ffe0b3" fill-opacity="0.55" />
-
-  <circle cx="1420" cy="220" r="22" fill="#ffb15c" fill-opacity="0.18">
-    <animate attributeName="r" values="16;26;16" dur="2.8s" repeatCount="indefinite" />
-    <animate attributeName="fill-opacity" values="0.3;0.05;0.3" dur="2.8s" repeatCount="indefinite" />
+  <circle cx="1140" cy="300" r="20" fill="#f4c430" fill-opacity="0.22">
+    <animate attributeName="r" values="14;24;14" dur="2.8s" repeatCount="indefinite" />
+    <animate attributeName="fill-opacity" values="0.32;0.08;0.32" dur="2.8s" repeatCount="indefinite" />
   </circle>
-  <circle cx="1420" cy="220" r="7" fill="#ffe0b3" />
+  <circle cx="1140" cy="300" r="6" fill="#ffe8c2" />
 </svg>
