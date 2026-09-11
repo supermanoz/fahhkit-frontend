@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# copied from node_modules/maplibre-gl at build/dev start — see vite.config.js
+public/mlgl
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

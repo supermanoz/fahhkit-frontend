@@ -10,8 +10,21 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import L from 'leaflet'
+import { setWorkerUrl } from 'maplibre-gl'
 import '@maplibre/maplibre-gl-leaflet'
 import { FaCrosshairs } from 'react-icons/fa'
+
+// maplibre-gl resolves its worker script relative to wherever Vite's
+// production build happens to place its own chunk, and that chunk isn't
+// next to the worker file it needs (nor the "maplibre-gl-shared.mjs"
+// helper the worker itself imports) — every request 404s and, since
+// Netlify's SPA rewrite catches the missing path, comes back as text/html
+// instead of a real 404, so the basemap silently never renders, leaving
+// just the polygons/markers on a blank background. The vite.config.js
+// `copyMaplibreWorker` plugin copies both files verbatim into
+// public/mlgl (so their relative import of each other still resolves) —
+// this just has to point maplibre-gl at the copy before it creates one.
+setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
 import {
   VIEW_RADIUS_METERS,
   boundsForRadius,
