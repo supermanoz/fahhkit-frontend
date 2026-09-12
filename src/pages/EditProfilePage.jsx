@@ -17,6 +17,7 @@ import {
 } from '../constants/validation'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import PasswordField from '../components/PasswordField'
 import './EditProfilePage.css'
 
 const INITIAL_FORM = {
@@ -288,10 +289,9 @@ export default function EditProfilePage() {
               <div className="grid">
                 <div className="field full">
                   <label htmlFor="oldPassword">Current Password</label>
-                  <input
+                  <PasswordField
                     id="oldPassword"
                     name="oldPassword"
-                    type="password"
                     autoComplete="current-password"
                     value={passwordForm.oldPassword}
                     onChange={handlePasswordFieldChange}
@@ -300,10 +300,9 @@ export default function EditProfilePage() {
                 </div>
                 <div className="field">
                   <label htmlFor="newPassword">New Password</label>
-                  <input
+                  <PasswordField
                     id="newPassword"
                     name="newPassword"
-                    type="password"
                     autoComplete="new-password"
                     value={passwordForm.newPassword}
                     onChange={handlePasswordFieldChange}
@@ -314,10 +313,9 @@ export default function EditProfilePage() {
                   <label htmlFor="confirmNewPassword">
                     Confirm New Password
                   </label>
-                  <input
+                  <PasswordField
                     id="confirmNewPassword"
                     name="confirmNewPassword"
-                    type="password"
                     autoComplete="new-password"
                     value={passwordForm.confirmNewPassword}
                     onChange={handlePasswordFieldChange}

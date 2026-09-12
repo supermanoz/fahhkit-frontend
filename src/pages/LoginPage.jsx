@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { postJson, getJson, setToken, setUser, ApiError } from '../api/client'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import PasswordField from '../components/PasswordField'
 import './LoginPage.css'
 
 const INITIAL_FORM = { mobileNumber: '', password: '' }
@@ -96,10 +97,9 @@ export default function LoginPage() {
             </div>
             <div className="field">
               <label htmlFor="password">Password</label>
-              <input
+              <PasswordField
                 id="password"
                 name="password"
-                type="password"
                 autoComplete="current-password"
                 value={form.password}
                 onChange={handleChange}

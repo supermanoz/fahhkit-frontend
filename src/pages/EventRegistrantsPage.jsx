@@ -15,71 +15,91 @@ const STATUS_LABELS = {
   CANCELLED: 'Cancelled',
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
+
+// Only athletes can be applicants for an event — admins/moderators are
+// excluded even if one of them happens to have a registration row. This
+// join-filter (rather than fetching every registrant and every athlete to
+// cross-reference client-side) is what lets the table below page through
+// the backend 30 at a time instead of pulling the whole roster up front.
+const ATHLETE_ONLY_FILTER = [
+  { field: 'userType', value: 'ATHLETE', type: 'object', object: 'user' },
+]
 
 export default function EventRegistrantsPage() {
   const { id } = useParams()
   const { user, loading: userLoading } = useCurrentUser()
   const [event, setEvent] = useState(null)
   const [registrants, setRegistrants] = useState([])
+  const [athleteById, setAthleteById] = useState(new Map())
+  const [stats, setStats] = useState({ paid: 0, pending: 0 })
   const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [tableLoading, setTableLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const allowed = canManageEvents(user)
 
-  const totalPages = Math.max(1, Math.ceil(registrants.length / PAGE_SIZE))
-  const pagedRegistrants = registrants.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE
-  )
-
   const report = useMemo(() => {
-    const paid = registrants.filter((r) => r.paymentStatus === 'PAID').length
-    const pending = registrants.filter(
-      (r) => r.paymentStatus === 'PENDING'
-    ).length
-    const failedOrCancelled = registrants.filter(
-      (r) => r.paymentStatus === 'FAILED' || r.paymentStatus === 'CANCELLED'
-    ).length
     const entryFee = Number(event?.entryFee) || 0
     return {
-      total: registrants.length,
-      paid,
-      pending,
-      failedOrCancelled,
-      revenue: paid * entryFee,
+      total: stats.paid + stats.pending,
+      paid: stats.paid,
+      pending: stats.pending,
+      // /v1/event/{id}/registrations only ever returns PENDING/PAID rows —
+      // a FAILED/CANCELLED attempt never became a real registrant — so this
+      // bucket is always empty.
+      failedOrCancelled: 0,
+      revenue: stats.paid * entryFee,
     }
-  }, [registrants, event])
+  }, [stats, event])
 
+  // A new event id invalidates whatever page we were on for the old one.
+  useEffect(() => {
+    setPage(1)
+  }, [id])
+
+  // Event details, the athlete roster (for mobile numbers), and the
+  // paid/pending counts — loaded once per event, independent of which page
+  // of the registrant table is showing.
   useEffect(() => {
     if (userLoading || !allowed) {
       setLoading(false)
       return
     }
+    setLoading(true)
     Promise.all([
       getJson(`/v1/event/${id}`),
+      postJson('/v1/athlete/find', { pageNumber: 1, noOfRecords: 500 }),
       postJson(`/v1/event/${id}/registrations`, {
         pageNumber: 1,
-        noOfRecords: 500,
+        noOfRecords: 1,
+        actionType: 'FILTER',
+        search: [
+          ...ATHLETE_ONLY_FILTER,
+          { field: 'paymentStatus', value: 'PAID', type: 'exact' },
+        ],
       }),
-      postJson('/v1/athlete/find', { pageNumber: 1, noOfRecords: 500 }),
+      postJson(`/v1/event/${id}/registrations`, {
+        pageNumber: 1,
+        noOfRecords: 1,
+        actionType: 'FILTER',
+        search: [
+          ...ATHLETE_ONLY_FILTER,
+          { field: 'paymentStatus', value: 'PENDING', type: 'exact' },
+        ],
+      }),
     ])
-      .then(([eventData, registrantsData, athletesData]) => {
+      .then(([eventData, athletesData, paidPage, pendingPage]) => {
         setEvent(eventData)
-        // Only athletes can be applicants for an event — admins/moderators are excluded
-        // even if one of them happens to have a registration row.
-        const athleteById = new Map(
-          (athletesData?.content || []).map((a) => [a.userId, a])
+        setAthleteById(
+          new Map((athletesData?.content || []).map((a) => [a.userId, a]))
         )
-        const applicants = (registrantsData?.content || [])
-          .filter((r) => athleteById.has(r.userId))
-          .map((r) => ({
-            ...r,
-            mobileNumber: athleteById.get(r.userId).mobileNumber,
-          }))
-        setRegistrants(applicants)
-        setPage(1)
+        setStats({
+          paid: paidPage?.totalElements ?? 0,
+          pending: pendingPage?.totalElements ?? 0,
+        })
       })
       .catch((err) =>
         setError(
@@ -90,6 +110,32 @@ export default function EventRegistrantsPage() {
       )
       .finally(() => setLoading(false))
   }, [id, userLoading, allowed])
+
+  // The actual table — fetched 30 rows at a time, refetched on every page
+  // change, instead of loading every registrant up front and paging through
+  // them in memory.
+  useEffect(() => {
+    if (userLoading || !allowed) return
+    setTableLoading(true)
+    postJson(`/v1/event/${id}/registrations`, {
+      pageNumber: page,
+      noOfRecords: PAGE_SIZE,
+      actionType: 'FILTER',
+      search: ATHLETE_ONLY_FILTER,
+    })
+      .then((data) => {
+        setRegistrants(data?.content || [])
+        setTotalPages(Math.max(1, data?.totalPages || 1))
+      })
+      .catch((err) =>
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'Could not load registrants. Please try again.'
+        )
+      )
+      .finally(() => setTableLoading(false))
+  }, [id, page, userLoading, allowed])
 
   if (userLoading) {
     return (
@@ -124,13 +170,13 @@ export default function EventRegistrantsPage() {
 
         {error && <div className="banner error">{error}</div>}
         {loading && <p className="event-registrants-muted">Loading...</p>}
-        {!loading && !error && registrants.length === 0 && (
+        {!loading && !error && !tableLoading && report.total === 0 && (
           <p className="event-registrants-muted">
             No one has registered for this event yet.
           </p>
         )}
 
-        {!loading && !error && registrants.length > 0 && (
+        {!loading && !error && (tableLoading || report.total > 0) && (
           <div className="event-registrants-body">
             <div className="registrant-table-wrap">
               <table className="registrant-table">
@@ -144,12 +190,25 @@ export default function EventRegistrantsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedRegistrants.map((registrant) => (
+                  {tableLoading && registrants.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="event-registrants-muted registrant-table-loading-cell"
+                      >
+                        Loading...
+                      </td>
+                    </tr>
+                  )}
+                  {registrants.map((registrant) => (
                     <tr key={registrant.registrationId}>
                       <td className="registrant-name-cell">
                         {formatName(registrant.fullName)}
                       </td>
-                      <td>{registrant.mobileNumber || '—'}</td>
+                      <td>
+                        {athleteById.get(registrant.userId)?.mobileNumber ||
+                          '—'}
+                      </td>
                       <td>
                         <span
                           className={`registrant-status status-${(registrant.paymentStatus || '').toLowerCase()}`}
@@ -180,18 +239,20 @@ export default function EventRegistrantsPage() {
                     type="button"
                     className="btn btn-outline"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
+                    disabled={page <= 1 || tableLoading}
                   >
                     Previous
                   </button>
                   <span className="registrant-table-pagination-info">
-                    Page {page} of {totalPages}
+                    {tableLoading
+                      ? 'Loading…'
+                      : `Page ${page} of ${totalPages}`}
                   </span>
                   <button
                     type="button"
                     className="btn btn-outline"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
+                    disabled={page >= totalPages || tableLoading}
                   >
                     Next
                   </button>

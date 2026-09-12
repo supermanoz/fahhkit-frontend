@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { postJson, setToken, clearToken, ApiError } from '../api/client'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import PasswordField from '../components/PasswordField'
 import './UpdatePasswordPage.css'
 
 export default function UpdatePasswordPage() {
@@ -123,10 +124,9 @@ export default function UpdatePasswordPage() {
             {!oldPasswordKnown && (
               <div className="field">
                 <label htmlFor="oldPassword">Emailed Password</label>
-                <input
+                <PasswordField
                   id="oldPassword"
                   name="oldPassword"
-                  type="password"
                   autoComplete="current-password"
                   value={form.oldPassword}
                   onChange={handleChange}
@@ -136,10 +136,9 @@ export default function UpdatePasswordPage() {
             )}
             <div className="field">
               <label htmlFor="newPassword">New Password</label>
-              <input
+              <PasswordField
                 id="newPassword"
                 name="newPassword"
-                type="password"
                 autoComplete="new-password"
                 value={form.newPassword}
                 onChange={handleChange}
@@ -148,10 +147,9 @@ export default function UpdatePasswordPage() {
             </div>
             <div className="field">
               <label htmlFor="confirmNewPassword">Confirm New Password</label>
-              <input
+              <PasswordField
                 id="confirmNewPassword"
                 name="confirmNewPassword"
-                type="password"
                 autoComplete="new-password"
                 value={form.confirmNewPassword}
                 onChange={handleChange}
