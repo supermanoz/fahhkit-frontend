@@ -44,7 +44,7 @@ export default function DashboardPage() {
         search: [{ field: 'userType', value: 'ATHLETE', type: 'exact' }],
       }),
       postJson('/v1/user/moderator/find', { pageNumber: 1, noOfRecords: 1 }),
-      getJson('/v1/event/moderator/all'),
+      postJson('/v1/event/moderator/all', { pageNumber: 1, noOfRecords: 500 }),
     ])
       .then(([accomplishment, athletePage, moderatorPage, allEvents]) => {
         setStats({
