@@ -30,7 +30,7 @@ import {
   boundsForRadius,
   formatArea,
 } from '../utils/territoryGame'
-import { DEFAULT_AVATAR_ID, getAvatarById } from '../constants/avatars'
+import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
 
@@ -86,9 +86,10 @@ function PokemonStyleBaseLayer() {
 // recognizable piece of Pokémon GO's map, and the thing that sells "you are
 // standing in this game world" better than any tile styling can. Always
 // visible (not just mid-run), since the game should show where you are the
-// instant it opens. Built per-avatar (see the Shop's avatar picker) rather
-// than as one fixed icon; the avatar art itself is still placeholder art
-// for testing.
+// instant it opens. Uses the athlete's real profile picture when set (the
+// backend's cosmetics are borders/colors layered on that photo, not a
+// separate avatar character — see the Shop tab) and falls back to a
+// generic placeholder icon otherwise.
 function buildPlayerMarkerIcon(avatarSrc) {
   return L.divIcon({
     className: 'territory-map-player-icon',
@@ -105,9 +106,8 @@ function buildPlayerMarkerIcon(avatarSrc) {
 // planted at the centroid — no name floating on the map. Tapping it still
 // reveals who holds it via a popup, so the information isn't lost, just not
 // cluttering the default view.
-function territoryBadgeIcon(t) {
-  const isPlayer = t.ownerId === 'player'
-  const emoji = isPlayer ? '👑' : '🚩'
+function territoryBadgeIcon(t, isMine) {
+  const emoji = isMine ? '👑' : '🚩'
   return L.divIcon({
     className: 'territory-badge-icon',
     html: `<div class="territory-badge" style="background:${t.color}">${emoji}</div>`,
@@ -141,30 +141,19 @@ function InvalidateSizeOnMount() {
 }
 
 // Flies the map to whichever owner's parcels the player tapped in the
-// leaderboard. Depends only on highlightKey (not the territories array
+// leaderboard. Depends only on highlightOwnerId (not the territories array
 // itself, which gets a new reference on every render) so it doesn't refly
-// mid-run every time gameState updates for an unrelated reason.
-function FocusHighlight({ highlightKey, territories }) {
+// mid-run every time the parcel list refreshes for an unrelated reason.
+function FocusHighlight({ highlightOwnerId, territories }) {
   const map = useMap()
   useEffect(() => {
-    if (!highlightKey) return
-    const matches = territories.filter(
-      (t) => (t.ownerId === 'player' ? 'player' : t.ownerName) === highlightKey
-    )
+    if (!highlightOwnerId) return
+    const matches = territories.filter((t) => t.ownerId === highlightOwnerId)
     if (matches.length === 0) return
     const bounds = L.latLngBounds(matches.flatMap((t) => toLatLngs(t.points)))
     map.flyToBounds(bounds, { padding: [70, 70], maxZoom: 19 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, highlightKey])
-  return null
-}
-
-function ClickCapture({ enabled, onMapClick }) {
-  useMapEvents({
-    click(e) {
-      if (enabled) onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng })
-    },
-  })
+  }, [map, highlightOwnerId])
   return null
 }
 
@@ -175,13 +164,8 @@ const CLOSE_IN_TILT_ZOOM = 18
 // The map stays flat/top-down until the player zooms in close, at which
 // point it settles into a standing 3D tilt (rather than just a brief
 // flourish mid-zoom) so building-3d extrusions in the basemap actually read
-// as buildings instead of flat footprints. It's forced back flat whenever
-// manualMode is on, though: this is a CSS transform on the whole map (see
-// .territory-map-tilt), not a real perspective camera, so Leaflet's own
-// click-to-latlng math (used by ClickCapture for tap-to-draw) only stays
-// accurate while flat — a permanent tilt during drawing would place taps
-// somewhere other than where the player visually tapped.
-function ZoomTiltEffect({ tiltRef, manualMode }) {
+// as buildings instead of flat footprints.
+function ZoomTiltEffect({ tiltRef }) {
   const map = useMapEvents({
     zoomstart() {
       tiltRef.current?.classList.add('is-zooming')
@@ -195,14 +179,14 @@ function ZoomTiltEffect({ tiltRef, manualMode }) {
   })
 
   function syncCloseInTilt() {
-    const closeIn = map.getZoom() >= CLOSE_IN_TILT_ZOOM && !manualMode
+    const closeIn = map.getZoom() >= CLOSE_IN_TILT_ZOOM
     tiltRef.current?.classList.toggle('is-close-in', closeIn)
   }
 
   useEffect(() => {
     syncCloseInTilt()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualMode])
+  }, [])
 
   return null
 }
@@ -234,11 +218,9 @@ function CaptureMapInstance({ onReady }) {
   return null
 }
 
-// Floating "locate me" FAB, styled after Pokémon GO's compass button —
-// stopping propagation keeps a click from also registering as a
-// tap-to-draw point on the map underneath it. Rendered as a sibling of the
-// tilted map div (not a MapContainer child) so the persistent close-in tilt
-// (see ZoomTiltEffect) never warps it.
+// Floating "locate me" FAB, styled after Pokémon GO's compass button.
+// Rendered as a sibling of the tilted map div (not a MapContainer child) so
+// the persistent close-in tilt (see ZoomTiltEffect) never warps it.
 function locateErrorMessage(error) {
   if (error.code === error.PERMISSION_DENIED) {
     return 'Location permission denied — enable it in your browser settings.'
@@ -345,17 +327,15 @@ export default function TerritoryMap({
   playerLocation,
   territories,
   livePath,
-  manualMode,
-  onMapClick,
-  highlightKey,
+  currentUserId,
+  highlightOwnerId,
   avatarSrc,
 }) {
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
   const [mapInstance, setMapInstance] = useState(null)
   const playerMarkerIcon = useMemo(
-    () =>
-      buildPlayerMarkerIcon(avatarSrc || getAvatarById(DEFAULT_AVATAR_ID).src),
+    () => buildPlayerMarkerIcon(avatarSrc || defaultAvatarImage),
     [avatarSrc]
   )
 
@@ -372,10 +352,8 @@ export default function TerritoryMap({
           <PokemonStyleBaseLayer />
 
           {territories.map((t) => {
-            const isPlayer = t.ownerId === 'player'
-            const isHighlighted =
-              highlightKey &&
-              (isPlayer ? 'player' : t.ownerName) === highlightKey
+            const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
+            const isHighlighted = highlightOwnerId === t.ownerId
             return (
               <Polygon
                 key={t.id}
@@ -384,10 +362,10 @@ export default function TerritoryMap({
                   color: isHighlighted ? '#FFFFFF' : '#2B2140',
                   weight: isHighlighted ? 4 : 3,
                   fillColor: t.color,
-                  fillOpacity: isHighlighted ? 0.65 : isPlayer ? 0.5 : 0.35,
+                  fillOpacity: isHighlighted ? 0.65 : isMine ? 0.5 : 0.35,
                   className: isHighlighted
                     ? 'territory-poly-highlight'
-                    : isPlayer
+                    : isMine
                       ? 'territory-poly-player'
                       : undefined,
                 }}
@@ -395,21 +373,22 @@ export default function TerritoryMap({
             )
           })}
 
-          {territories.map((t) => (
-            <Marker
-              key={`${t.id}-badge`}
-              position={polygonCentroid(t.points)}
-              icon={territoryBadgeIcon(t)}
-            >
-              <Popup>
-                <strong>
-                  {t.ownerId === 'player' ? t.ownerName || 'You' : t.ownerName}
-                </strong>
-                <br />
-                {formatArea(t.area)}
-              </Popup>
-            </Marker>
-          ))}
+          {territories.map((t) => {
+            const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
+            return (
+              <Marker
+                key={`${t.id}-badge`}
+                position={polygonCentroid(t.points)}
+                icon={territoryBadgeIcon(t, isMine)}
+              >
+                <Popup>
+                  <strong>{isMine ? 'You' : t.ownerName}</strong>
+                  <br />
+                  {formatArea(t.area)}
+                </Popup>
+              </Marker>
+            )
+          })}
 
           {livePath.length > 0 && (
             <Polyline
@@ -440,14 +419,13 @@ export default function TerritoryMap({
             />
           )}
 
-          <ClickCapture enabled={manualMode} onMapClick={onMapClick} />
           <FocusHighlight
-            highlightKey={highlightKey}
+            highlightOwnerId={highlightOwnerId}
             territories={territories}
           />
           <InvalidateSizeOnMount />
           <ViewRadiusLimiter center={center} />
-          <ZoomTiltEffect tiltRef={tiltRef} manualMode={manualMode} />
+          <ZoomTiltEffect tiltRef={tiltRef} />
           <CaptureMapInstance onReady={setMapInstance} />
         </MapContainer>
       </div>
