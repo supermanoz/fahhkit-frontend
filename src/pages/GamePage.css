@@ -735,6 +735,123 @@
   margin: 0;
 }
 
+.game-menu-avatars-title {
+  width: 100%;
+  text-align: left;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--game-cream);
+  margin: 0;
+}
+
+.game-menu-avatars-subtitle,
+.game-menu-avatars-hint {
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  color: rgba(246, 236, 217, 0.6);
+  margin: 2px 0 0;
+}
+
+.game-menu-avatars-hint {
+  margin: -8px 0 12px;
+  color: var(--game-gold);
+}
+
+.game-menu-avatar-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.game-menu-avatar-card {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: rgba(246, 236, 217, 0.06);
+  border: 2px solid rgba(246, 236, 217, 0.16);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.game-menu-avatar-card:hover {
+  background: rgba(246, 236, 217, 0.1);
+}
+
+.game-menu-avatar-card.is-selected {
+  background: rgba(224, 165, 55, 0.16);
+  border-color: var(--game-gold);
+  cursor: default;
+}
+
+.game-menu-avatar-card.is-locked {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.game-menu-avatar-card.is-locked img {
+  filter: grayscale(0.6);
+}
+
+.game-menu-avatar-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.game-menu-avatar-name {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--game-cream);
+}
+
+.game-menu-avatar-tag {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--game-gold);
+}
+
+.game-avatar-confirm-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.game-avatar-confirm-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--game-cream);
+}
+
+.game-avatar-confirm-option img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  object-fit: cover;
+}
+
+.game-avatar-confirm-arrow {
+  font-size: 18px;
+  color: var(--game-gold);
+}
+
 .game-store-list {
   width: 100%;
 }

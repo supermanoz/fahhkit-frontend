@@ -7,6 +7,7 @@ import {
   FaCheck,
   FaCoins,
   FaFlag,
+  FaLock,
   FaStore,
   FaTimes,
   FaTrophy,
@@ -48,6 +49,13 @@ import {
   toLocalDateTimeString,
 } from '../utils/run'
 import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
+import {
+  AVATARS,
+  COMING_SOON_AVATARS,
+  getAvatarById,
+  loadAvatarId,
+  saveAvatarId,
+} from '../constants/avatars'
 import './GamePage.css'
 
 function formatMeters(meters) {
@@ -97,7 +105,7 @@ const EVENT_TYPE_TITLES = {
 }
 
 export default function GamePage() {
-  const { user } = useCurrentUser()
+  const { user, isAuthed, loading: userLoading } = useCurrentUser()
   const tracker = useRunTracker()
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
@@ -120,6 +128,10 @@ export default function GamePage() {
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   const [confirmEntry, setConfirmEntry] = useState(null)
   const [storeChoice, setStoreChoice] = useState(null)
+  const [avatarId, setAvatarId] = useState(
+    () => loadAvatarId() || AVATARS[0].id
+  )
+  const [avatarChoice, setAvatarChoice] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [runResult, setRunResult] = useState(null)
@@ -145,6 +157,10 @@ export default function GamePage() {
   }, [])
 
   useEffect(() => {
+    if (!isAuthed) {
+      setLocating(false)
+      return
+    }
     if (!('geolocation' in navigator)) {
       setLocating(false)
       return
@@ -166,12 +182,13 @@ export default function GamePage() {
       { enableHighAccuracy: true, timeout: 4500 }
     )
     return () => clearTimeout(timeout)
-  }, [])
+  }, [isAuthed])
 
   // A standing "where am I" watch, independent of whether a run is being
   // tracked — Pokémon GO always shows your position on the map, not just
   // while a loop is actively being recorded.
   useEffect(() => {
+    if (!isAuthed) return
     if (!('geolocation' in navigator)) return
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -184,7 +201,7 @@ export default function GamePage() {
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     )
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [])
+  }, [isAuthed])
 
   const playerLocation =
     tracker.status === 'tracking' && tracker.path.length > 0
@@ -221,11 +238,11 @@ export default function GamePage() {
   // Loads once we roughly know where the player is - re-running on every
   // liveLocation tick would hammer the API on every GPS fix.
   useEffect(() => {
-    if (locating) return
+    if (locating || !isAuthed) return
     refreshProfile()
     refreshNearbyParcels()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locating])
+  }, [locating, isAuthed])
 
   async function loadLeaderboard() {
     setLeaderboardError(null)
@@ -401,8 +418,52 @@ export default function GamePage() {
     (pendingRun.points.length < LOOP_MIN_POINTS ||
       draftArea < LOOP_MIN_AREA_SQ_METERS)
 
+  const currentAvatar = getAvatarById(avatarId)
+  // A STICKER is the one real Store category that's actually an avatar-shaped
+  // image (the others are borders/colors/backgrounds meant to layer onto a
+  // profile picture, not stand in for one) — equipping one takes priority
+  // over the local placeholder picker below since it's a real, owned item.
+  const equippedSticker = ownedItems.find(
+    (o) => o.equipped && o.storeItem.category === 'STICKER'
+  )
   const avatarSrc =
-    resolveFileUrl(user?.profilePictureUrl) || defaultAvatarImage
+    (equippedSticker && resolveFileUrl(equippedSticker.storeItem.assetUrl)) ||
+    currentAvatar?.src ||
+    resolveFileUrl(user?.profilePictureUrl) ||
+    defaultAvatarImage
+
+  function handleChooseAvatar(avatar) {
+    setAvatarId(avatar.id)
+    saveAvatarId(avatar.id)
+    setAvatarChoice(null)
+  }
+
+  // Territories, runs, and Fahhcoin are all tied to a real account server-side
+  // — nothing here works signed out, so the game itself never renders until
+  // login is confirmed. userLoading gates this so a page refresh with a still-
+  // valid token doesn't flash the gate before useCurrentUser() resolves.
+  if (!userLoading && !isAuthed) {
+    return (
+      <div className="game-page">
+        <div className="game-confirm-overlay" style={{ position: 'fixed' }}>
+          <div className="game-confirm-card">
+            <p>
+              Sign in to play Territory Run — claiming ground, GPS runs, and
+              Fahhcoin are for logged-in athletes only.
+            </p>
+            <div className="game-confirm-actions">
+              <Link to="/" className="btn btn-outline">
+                Back to Home
+              </Link>
+              <Link to="/login" className="btn btn-primary">
+                Sign In
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="game-page" style={{ '--sheet-h': `${controlsHeight}px` }}>
@@ -830,6 +891,63 @@ export default function GamePage() {
 
               {menuTab === 'shop' && (
                 <div className="game-menu-panel game-menu-shop">
+                  <p className="game-menu-avatars-title">
+                    Choose your map avatar
+                  </p>
+                  <p className="game-menu-avatars-subtitle">
+                    Own a Sticker below? Equip it to use as your map avatar
+                    instead of these.
+                  </p>
+                  <div className="game-menu-avatar-grid">
+                    {AVATARS.map((avatar) => {
+                      const isSelected = avatar.id === avatarId
+                      return (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
+                          onClick={() => setAvatarChoice(avatar)}
+                          disabled={isSelected}
+                        >
+                          <img src={avatar.src} alt={avatar.name} />
+                          <span className="game-menu-avatar-name">
+                            {avatar.name}
+                          </span>
+                          <span className="game-menu-avatar-tag">
+                            {isSelected ? (
+                              <>
+                                <FaCheck /> Equipped
+                              </>
+                            ) : (
+                              'Free'
+                            )}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {COMING_SOON_AVATARS.map((avatar) => (
+                      <div
+                        key={avatar.id}
+                        className="game-menu-avatar-card is-locked"
+                      >
+                        <img src={avatar.src} alt={avatar.name} />
+                        <span className="game-menu-avatar-name">
+                          {avatar.name}
+                        </span>
+                        <span className="game-menu-avatar-tag">
+                          <FaLock /> Coming Soon
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {equippedSticker && (
+                    <p className="game-menu-avatars-hint">
+                      Your equipped Sticker ({equippedSticker.storeItem.name})
+                      is showing on the map instead — unequip it below to switch
+                      back to a free avatar.
+                    </p>
+                  )}
+
                   {storeError ? (
                     <p className="game-menu-empty">{storeError}</p>
                   ) : storeCatalog.length === 0 ? (
@@ -869,7 +987,9 @@ export default function GamePage() {
                               <span className="game-menu-list-meta">
                                 {owned
                                   ? owned.equipped
-                                    ? 'Equipped'
+                                    ? item.category === 'STICKER'
+                                      ? 'Equipped · your map avatar'
+                                      : 'Equipped'
                                     : 'Owned'
                                   : `${item.priceFahhcoin} Fahhcoin`}
                               </span>
@@ -1039,6 +1159,55 @@ export default function GamePage() {
                   onClick={() => handlePurchase(storeChoice)}
                 >
                   Buy
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {avatarChoice && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setAvatarChoice(null)}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p>Set this avatar?</p>
+              <div className="game-avatar-confirm-compare">
+                <div className="game-avatar-confirm-option">
+                  <img src={currentAvatar?.src || defaultAvatarImage} alt="" />
+                  <span>{currentAvatar?.name || 'Current'}</span>
+                </div>
+                <span className="game-avatar-confirm-arrow">→</span>
+                <div className="game-avatar-confirm-option">
+                  <img src={avatarChoice.src} alt={avatarChoice.name} />
+                  <span>{avatarChoice.name}</span>
+                </div>
+              </div>
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setAvatarChoice(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => handleChooseAvatar(avatarChoice)}
+                >
+                  Set This Avatar
                 </button>
               </div>
             </motion.div>
