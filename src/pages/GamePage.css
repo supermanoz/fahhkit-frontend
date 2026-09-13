@@ -270,6 +270,79 @@
   color: var(--game-cream);
 }
 
+.game-highlight-toast {
+  position: fixed;
+  left: 50%;
+  top: 20px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  padding: 16px 22px;
+  text-align: center;
+  max-width: 90vw;
+  background: var(--game-panel);
+  border: 3px solid var(--game-ink);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    0 5px 0 var(--game-ink);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.game-highlight-toast h3 {
+  margin: 0 0 4px;
+  color: var(--game-gold);
+  font-size: 16px;
+}
+
+.game-highlight-toast p {
+  margin: 0 0 12px;
+  font-weight: 600;
+  color: var(--game-cream);
+  font-size: 13px;
+}
+
+.game-highlight-toast-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.game-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(10, 8, 6, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.game-confirm-card {
+  max-width: 320px;
+  text-align: center;
+  padding: 22px 24px;
+  background: var(--game-panel);
+  border: 3px solid var(--game-ink);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    0 5px 0 var(--game-ink);
+}
+
+.game-confirm-card p {
+  margin: 0 0 16px;
+  font-weight: 700;
+  color: var(--game-cream);
+}
+
+.game-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
 /* --- Menu FAB: bottom-center pokéball. Tapping it fans three radial
    options out above it (Pokémon GO's map-screen menu button) instead of
    jumping straight to the sheet — .game-fab-wrap is the shared anchor so
@@ -506,6 +579,15 @@
   min-height: 120px;
 }
 
+.game-menu-player-name {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--game-gold);
+  margin: 0;
+  padding-top: 4px;
+}
+
 .game-menu-summary {
   display: flex;
   flex-direction: column;
@@ -589,6 +671,16 @@
   border-color: var(--game-gold);
 }
 
+.game-menu-leaderboard li:hover {
+  background: rgba(246, 236, 217, 0.1);
+}
+
+.game-menu-leaderboard-row {
+  all: unset;
+  display: contents;
+  cursor: pointer;
+}
+
 .game-menu-leaderboard-rank {
   font-weight: 800;
   color: rgba(246, 236, 217, 0.6);
@@ -641,6 +733,109 @@
   color: rgba(246, 236, 217, 0.75);
   font-size: 13px;
   margin: 0;
+}
+
+.game-menu-avatars-title {
+  width: 100%;
+  text-align: left;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--game-cream);
+  margin: 0;
+}
+
+.game-menu-avatar-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.game-menu-avatar-card {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: rgba(246, 236, 217, 0.06);
+  border: 2px solid rgba(246, 236, 217, 0.16);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.game-menu-avatar-card:hover {
+  background: rgba(246, 236, 217, 0.1);
+}
+
+.game-menu-avatar-card.is-selected {
+  background: rgba(224, 165, 55, 0.16);
+  border-color: var(--game-gold);
+  cursor: default;
+}
+
+.game-menu-avatar-card.is-locked {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.game-menu-avatar-card.is-locked img {
+  filter: grayscale(0.6);
+}
+
+.game-menu-avatar-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.game-menu-avatar-name {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--game-cream);
+}
+
+.game-menu-avatar-tag {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--game-gold);
+}
+
+.game-avatar-confirm-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.game-avatar-confirm-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--game-cream);
+}
+
+.game-avatar-confirm-option img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  object-fit: cover;
+}
+
+.game-avatar-confirm-arrow {
+  font-size: 18px;
+  color: var(--game-gold);
 }
 
 @media (max-width: 560px) {

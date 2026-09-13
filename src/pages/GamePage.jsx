@@ -4,8 +4,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   FaArrowLeft,
   FaBars,
+  FaCheck,
   FaCoins,
   FaFlag,
+  FaLock,
   FaStore,
   FaTimes,
   FaTrophy,
@@ -28,6 +30,11 @@ import {
   saveGameState,
   unionPolygons,
 } from '../utils/territoryGame'
+import {
+  AVATARS,
+  COMING_SOON_AVATARS,
+  getAvatarById,
+} from '../constants/avatars'
 import './GamePage.css'
 
 function formatMeters(meters) {
@@ -73,6 +80,9 @@ export default function GamePage() {
   const [claimResult, setClaimResult] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTab, setMenuTab] = useState('me')
+  const [highlightedEntry, setHighlightedEntry] = useState(null)
+  const [confirmEntry, setConfirmEntry] = useState(null)
+  const [avatarChoice, setAvatarChoice] = useState(null)
   const [radialOpen, setRadialOpen] = useState(false)
   const tracker = useTerritoryRun()
 
@@ -170,6 +180,7 @@ export default function GamePage() {
   )
   const totalAreaHeld = playerTerritories.reduce((sum, t) => sum + t.area, 0)
   const playerName = user?.fullName || 'You'
+  const currentAvatar = getAvatarById(gameState.avatarId)
 
   // Rivals all share ownerId 'rival' (see territoryGame.js), so grouping by
   // name is what keeps them as separate leaderboard rows instead of one
@@ -273,6 +284,8 @@ export default function GamePage() {
           livePath={tracker.path}
           manualMode={tracker.mode === 'manual'}
           onMapClick={tracker.addManualPoint}
+          highlightKey={highlightedEntry?.key ?? null}
+          avatarSrc={currentAvatar.src}
         />
       )}
 
@@ -342,10 +355,6 @@ export default function GamePage() {
           <FaBars />
         </button>
       </div>
-
-      {tracker.gpsError && (
-        <div className="banner error game-page-banner">{tracker.gpsError}</div>
-      )}
 
       <div className="game-controls" ref={controlsRef}>
         {tracker.mode === 'idle' && tracker.path.length === 0 && (
@@ -467,6 +476,48 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {highlightedEntry && (
+          <motion.div
+            className="game-highlight-toast glass-card"
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+          >
+            <h3>
+              {highlightedEntry.isPlayer
+                ? 'Your territory'
+                : `${highlightedEntry.name}'s territory`}
+            </h3>
+            <p>
+              {formatArea(highlightedEntry.area)} across{' '}
+              {highlightedEntry.parcels} parcel
+              {highlightedEntry.parcels === 1 ? '' : 's'}
+            </p>
+            <div className="game-highlight-toast-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  setHighlightedEntry(null)
+                  setMenuTab('leaderboard')
+                  setMenuOpen(true)
+                }}
+              >
+                Back to Leaderboard
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setHighlightedEntry(null)}
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {menuOpen && (
           <motion.div
             className="game-menu-overlay"
@@ -534,15 +585,21 @@ export default function GamePage() {
                           key={entry.key}
                           className={entry.isPlayer ? 'is-player' : ''}
                         >
-                          <span className="game-menu-leaderboard-rank">
-                            #{i + 1}
-                          </span>
-                          <span className="game-menu-leaderboard-name">
-                            {entry.name}
-                          </span>
-                          <span className="game-menu-leaderboard-area">
-                            {formatArea(entry.area)}
-                          </span>
+                          <button
+                            type="button"
+                            className="game-menu-leaderboard-row"
+                            onClick={() => setConfirmEntry(entry)}
+                          >
+                            <span className="game-menu-leaderboard-rank">
+                              #{i + 1}
+                            </span>
+                            <span className="game-menu-leaderboard-name">
+                              {entry.name}
+                            </span>
+                            <span className="game-menu-leaderboard-area">
+                              {formatArea(entry.area)}
+                            </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -552,6 +609,9 @@ export default function GamePage() {
 
               {menuTab === 'me' && (
                 <div className="game-menu-panel">
+                  {user?.fullName && (
+                    <p className="game-menu-player-name">{user.fullName}</p>
+                  )}
                   <div className="game-menu-summary">
                     <span className="game-menu-summary-value">
                       {formatArea(totalAreaHeld)}
@@ -587,14 +647,201 @@ export default function GamePage() {
 
               {menuTab === 'shop' && (
                 <div className="game-menu-panel game-menu-shop">
+                  <p className="game-menu-avatars-title">Choose your avatar</p>
+                  <div className="game-menu-avatar-grid">
+                    {AVATARS.map((avatar) => {
+                      const isSelected = avatar.id === currentAvatar.id
+                      return (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
+                          onClick={() => setAvatarChoice(avatar)}
+                          disabled={isSelected}
+                        >
+                          <img src={avatar.src} alt={avatar.name} />
+                          <span className="game-menu-avatar-name">
+                            {avatar.name}
+                          </span>
+                          <span className="game-menu-avatar-tag">
+                            {isSelected ? (
+                              <>
+                                <FaCheck /> Equipped
+                              </>
+                            ) : (
+                              'Free'
+                            )}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {COMING_SOON_AVATARS.length > 0 && (
+                    <div className="game-menu-avatar-grid">
+                      {COMING_SOON_AVATARS.map((avatar) => (
+                        <div
+                          key={avatar.id}
+                          className="game-menu-avatar-card is-locked"
+                        >
+                          <img src={avatar.src} alt={avatar.name} />
+                          <span className="game-menu-avatar-name">
+                            {avatar.name}
+                          </span>
+                          <span className="game-menu-avatar-tag">
+                            <FaLock /> Coming Soon
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <FaStore className="game-menu-shop-icon" />
-                  <p className="game-menu-shop-title">Shop is coming soon</p>
+                  <p className="game-menu-shop-title">More gear coming soon</p>
                   <p className="game-menu-shop-balance">
                     <FaCoins />
                     {gameState.coinBalance} Fahhcoin saved up for when it opens
                   </p>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {confirmEntry && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setConfirmEntry(null)}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p>
+                View {confirmEntry.isPlayer ? 'your' : `${confirmEntry.name}'s`}{' '}
+                territory on the map?
+              </p>
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setConfirmEntry(null)}
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setHighlightedEntry(confirmEntry)
+                    setConfirmEntry(null)
+                    setMenuOpen(false)
+                  }}
+                >
+                  Yes, view it
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {tracker.gpsError && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={tracker.clearGpsError}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p>{tracker.gpsError}</p>
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    tracker.clearGpsError()
+                    tracker.startManual()
+                  }}
+                >
+                  Tap to Draw Instead
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={tracker.startGps}
+                >
+                  Try Again
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {avatarChoice && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setAvatarChoice(null)}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p>Set this avatar?</p>
+              <div className="game-avatar-confirm-compare">
+                <div className="game-avatar-confirm-option">
+                  <img src={currentAvatar.src} alt={currentAvatar.name} />
+                  <span>{currentAvatar.name}</span>
+                </div>
+                <span className="game-avatar-confirm-arrow">→</span>
+                <div className="game-avatar-confirm-option">
+                  <img src={avatarChoice.src} alt={avatarChoice.name} />
+                  <span>{avatarChoice.name}</span>
+                </div>
+              </div>
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setAvatarChoice(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    persist({ ...gameState, avatarId: avatarChoice.id })
+                    setAvatarChoice(null)
+                  }}
+                >
+                  Set This Avatar
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

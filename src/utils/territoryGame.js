@@ -4,6 +4,7 @@
 // not synced anywhere.
 import polygonClipping from 'polygon-clipping'
 import { haversineDistance } from './run'
+import { DEFAULT_AVATAR_ID } from '../constants/avatars'
 
 const STORAGE_KEY = 'fahhkit_territory_game_v1'
 
@@ -95,6 +96,7 @@ function defaultState() {
   return {
     territories: seedRivalTerritories(),
     coinBalance: 0,
+    avatarId: DEFAULT_AVATAR_ID,
   }
 }
 

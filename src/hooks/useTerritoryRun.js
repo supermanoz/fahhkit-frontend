@@ -1,6 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
 import { haversineDistance } from '../utils/run'
 
+// Consumer GPS drifts a few meters even standing still, and watchPosition
+// keeps firing on that drift — without a floor, every tick while idle reads
+// as "distance covered." Points closer together than this are treated as
+// noise and dropped rather than added to the path/distance.
+const MIN_MOVEMENT_METERS = 4
+
 // mode: 'idle' | 'gps' | 'manual'
 // A standalone tracker for the Territory Run game — deliberately not
 // useRunTracker, which is wired to backend createRun() and requires an
@@ -20,11 +26,7 @@ export function useTerritoryRun() {
     }
   }, [])
 
-  const startGps = useCallback(() => {
-    if (!('geolocation' in navigator)) {
-      setGpsError('Your browser doesn’t support GPS tracking.')
-      return
-    }
+  const beginWatch = useCallback(() => {
     setGpsError(null)
     setPath([])
     setDistance(0)
@@ -39,7 +41,9 @@ export function useTerritoryRun() {
         setPath((prev) => {
           const last = prev[prev.length - 1]
           if (last) {
-            setDistance((d) => d + haversineDistance(last, point))
+            const moved = haversineDistance(last, point)
+            if (moved < MIN_MOVEMENT_METERS) return prev
+            setDistance((d) => d + moved)
           }
           return [...prev, point]
         })
@@ -56,6 +60,38 @@ export function useTerritoryRun() {
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     )
   }, [clearWatch])
+
+  const startGps = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      setGpsError('Your browser doesn’t support GPS tracking.')
+      return
+    }
+
+    // Check permission state up front so a site the player already blocked
+    // shows the "location not enabled" prompt immediately, instead of
+    // silently doing nothing until watchPosition's own error callback (or
+    // its 15s timeout) eventually fires. Not all browsers support querying
+    // the geolocation permission, so fall straight through to the native
+    // prompt when they don't.
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((status) => {
+          if (status.state === 'denied') {
+            setGpsError(
+              'Location is turned off for this site — enable it in your browser settings, then try again.'
+            )
+            return
+          }
+          beginWatch()
+        })
+        .catch(beginWatch)
+    } else {
+      beginWatch()
+    }
+  }, [beginWatch])
+
+  const clearGpsError = useCallback(() => setGpsError(null), [])
 
   const startManual = useCallback(() => {
     setGpsError(null)
@@ -96,6 +132,7 @@ export function useTerritoryRun() {
     path,
     distance,
     gpsError,
+    clearGpsError,
     startGps,
     startManual,
     addManualPoint,

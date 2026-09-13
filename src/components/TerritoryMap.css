@@ -103,6 +103,11 @@
   border-radius: 50%;
   background: rgba(224, 165, 55, 0.35);
   animation: territoryPulse 2s ease-out infinite;
+  /* The ring scales up to 1.8x and overflows well past the marker's own
+     40x40 box, overlapping nearby territory flags. The Marker is already
+     interactive={false} in TerritoryMap.jsx, but this belt-and-suspenders
+     so the ring never eats a click meant for a flag underneath it. */
+  pointer-events: none;
 }
 
 .territory-map-player-pulse-b {
@@ -145,6 +150,23 @@
    at a glance, without needing a legend. */
 .territory-poly-player {
   filter: drop-shadow(0 0 6px rgba(224, 165, 55, 0.55));
+}
+
+/* Pulsing white glow for whichever parcel the player tapped in the
+   leaderboard, so "viewing their territory" reads as more than just a
+   camera pan. */
+.territory-poly-highlight {
+  animation: territory-highlight-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes territory-highlight-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.95));
+  }
 }
 
 /* --- Floating chunky controls: carved-stone slabs, one flat base color plus

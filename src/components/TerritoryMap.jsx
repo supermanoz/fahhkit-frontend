@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapContainer,
   Polygon,
@@ -30,7 +30,7 @@ import {
   boundsForRadius,
   formatArea,
 } from '../utils/territoryGame'
-import playerAvatarImage from '../assets/images/player-avatar.svg'
+import { DEFAULT_AVATAR_ID, getAvatarById } from '../constants/avatars'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
 
@@ -86,17 +86,20 @@ function PokemonStyleBaseLayer() {
 // recognizable piece of Pokémon GO's map, and the thing that sells "you are
 // standing in this game world" better than any tile styling can. Always
 // visible (not just mid-run), since the game should show where you are the
-// instant it opens. The avatar art here is a placeholder for testing;
-// production art would replace this one image.
-const playerMarkerIcon = L.divIcon({
-  className: 'territory-map-player-icon',
-  html:
-    '<span class="territory-map-player-pulse"></span>' +
-    '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
-    `<img class="territory-map-player-avatar" src="${playerAvatarImage}" alt="" />`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-})
+// instant it opens. Built per-avatar (see the Shop's avatar picker) rather
+// than as one fixed icon; the avatar art itself is still placeholder art
+// for testing.
+function buildPlayerMarkerIcon(avatarSrc) {
+  return L.divIcon({
+    className: 'territory-map-player-icon',
+    html:
+      '<span class="territory-map-player-pulse"></span>' +
+      '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
+      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" />`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  })
+}
 
 // Territories read as Pokémon GO gyms: just a colored, ink-outlined badge
 // planted at the centroid — no name floating on the map. Tapping it still
@@ -134,6 +137,25 @@ function InvalidateSizeOnMount() {
     const t = setTimeout(() => map.invalidateSize(), 100)
     return () => clearTimeout(t)
   }, [map])
+  return null
+}
+
+// Flies the map to whichever owner's parcels the player tapped in the
+// leaderboard. Depends only on highlightKey (not the territories array
+// itself, which gets a new reference on every render) so it doesn't refly
+// mid-run every time gameState updates for an unrelated reason.
+function FocusHighlight({ highlightKey, territories }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!highlightKey) return
+    const matches = territories.filter(
+      (t) => (t.ownerId === 'player' ? 'player' : t.ownerName) === highlightKey
+    )
+    if (matches.length === 0) return
+    const bounds = L.latLngBounds(matches.flatMap((t) => toLatLngs(t.points)))
+    map.flyToBounds(bounds, { padding: [70, 70], maxZoom: 19 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, highlightKey])
   return null
 }
 
@@ -325,10 +347,17 @@ export default function TerritoryMap({
   livePath,
   manualMode,
   onMapClick,
+  highlightKey,
+  avatarSrc,
 }) {
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
   const [mapInstance, setMapInstance] = useState(null)
+  const playerMarkerIcon = useMemo(
+    () =>
+      buildPlayerMarkerIcon(avatarSrc || getAvatarById(DEFAULT_AVATAR_ID).src),
+    [avatarSrc]
+  )
 
   return (
     <div className="territory-map">
@@ -344,16 +373,23 @@ export default function TerritoryMap({
 
           {territories.map((t) => {
             const isPlayer = t.ownerId === 'player'
+            const isHighlighted =
+              highlightKey &&
+              (isPlayer ? 'player' : t.ownerName) === highlightKey
             return (
               <Polygon
                 key={t.id}
                 positions={toLatLngs(t.points)}
                 pathOptions={{
-                  color: '#2B2140',
-                  weight: 3,
+                  color: isHighlighted ? '#FFFFFF' : '#2B2140',
+                  weight: isHighlighted ? 4 : 3,
                   fillColor: t.color,
-                  fillOpacity: isPlayer ? 0.5 : 0.35,
-                  className: isPlayer ? 'territory-poly-player' : undefined,
+                  fillOpacity: isHighlighted ? 0.65 : isPlayer ? 0.5 : 0.35,
+                  className: isHighlighted
+                    ? 'territory-poly-highlight'
+                    : isPlayer
+                      ? 'territory-poly-player'
+                      : undefined,
                 }}
               />
             )
@@ -400,10 +436,15 @@ export default function TerritoryMap({
               position={[playerLocation.lat, playerLocation.lng]}
               icon={playerMarkerIcon}
               zIndexOffset={1000}
+              interactive={false}
             />
           )}
 
           <ClickCapture enabled={manualMode} onMapClick={onMapClick} />
+          <FocusHighlight
+            highlightKey={highlightKey}
+            territories={territories}
+          />
           <InvalidateSizeOnMount />
           <ViewRadiusLimiter center={center} />
           <ZoomTiltEffect tiltRef={tiltRef} manualMode={manualMode} />
