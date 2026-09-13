@@ -1,7 +1,13 @@
 import specterAvatar from '../assets/images/player-avatar-specter.png'
 import blazeAvatar from '../assets/images/player-avatar-blaze.png'
-import lunaAvatar from '../assets/images/player-avatar-luna.png'
-import roninAvatar from '../assets/images/player-avatar-ronin.png'
+import cyberwoolAvatar from '../assets/images/player-avatar-cyberwool.png'
+import nightwatchAvatar from '../assets/images/player-avatar-nightwatch.png'
+import shroudAvatar from '../assets/images/player-avatar-shroud.png'
+import vanguardAvatar from '../assets/images/player-avatar-vanguard.png'
+import twinfadeAvatar from '../assets/images/player-avatar-twinfade.png'
+import neonAvatar from '../assets/images/player-avatar-neon.png'
+import warheadAvatar from '../assets/images/player-avatar-warhead.png'
+import wraithAvatar from '../assets/images/player-avatar-wraith.png'
 
 // Map-marker avatar choice. Local-only (localStorage), not synced to the
 // backend — the Store's real cosmetic categories (StoreItemCategoryConstant)
@@ -13,13 +19,18 @@ import roninAvatar from '../assets/images/player-avatar-ronin.png'
 export const AVATARS = [
   { id: 'specter', name: 'Specter', src: specterAvatar },
   { id: 'blaze', name: 'Blaze', src: blazeAvatar },
-  { id: 'luna', name: 'Luna', src: lunaAvatar },
+  { id: 'cyberwool', name: 'Cyberwool', src: cyberwoolAvatar },
+  { id: 'nightwatch', name: 'Nightwatch', src: nightwatchAvatar },
+  { id: 'shroud', name: 'Shroud', src: shroudAvatar },
+  { id: 'vanguard', name: 'Vanguard', src: vanguardAvatar },
+  { id: 'twinfade', name: 'Twinfade', src: twinfadeAvatar },
+  { id: 'neon', name: 'Neon', src: neonAvatar },
+  { id: 'warhead', name: 'Warhead', src: warheadAvatar },
+  { id: 'wraith', name: 'Wraith', src: wraithAvatar },
 ]
 
 // Shown in the shop but not selectable yet.
-export const COMING_SOON_AVATARS = [
-  { id: 'ronin', name: 'Ronin', src: roninAvatar },
-]
+export const COMING_SOON_AVATARS = []
 
 const STORAGE_KEY = 'fahhkit_territory_avatar_id'
 
