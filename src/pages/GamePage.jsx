@@ -16,7 +16,7 @@ import {
 import TerritoryMap from '../components/TerritoryMap'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
-import { ApiError, resolveFileUrl } from '../api/client'
+import { ApiError, isAdmin, resolveFileUrl } from '../api/client'
 import { createRun } from '../api/runs'
 import {
   findIndividualLeaderboard,
@@ -45,7 +45,9 @@ import {
 import {
   MIN_VALID_RUN_DISTANCE_METERS,
   MIN_VALID_RUN_DURATION_SECONDS,
+  calculatePaceMinPerKm,
   formatDuration,
+  formatPace,
   toLocalDateTimeString,
 } from '../utils/run'
 import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
@@ -104,6 +106,25 @@ const EVENT_TYPE_TITLES = {
   REJECTED: 'That loop was rejected.',
 }
 
+// One run can produce several territory events at once (e.g. capturing a
+// smaller rival parcel and claiming the leftover ring of the loop as new
+// ground in the same pass) — this picks one title that covers the whole
+// set rather than only naming whichever event happened to be newest.
+function summarizeRunEvents(events) {
+  const types = new Set(events.map((e) => e.eventType))
+  const totalArea = events.reduce(
+    (sum, e) => sum + Math.abs(e.areaDeltaSqMeters || 0),
+    0
+  )
+  const title =
+    types.size === 1
+      ? EVENT_TYPE_TITLES[events[0].eventType] || 'Territory updated!'
+      : types.has('CAPTURED')
+        ? 'Territory captured and claimed!'
+        : 'Territory updated!'
+  return { title, totalArea }
+}
+
 export default function GamePage() {
   const { user, isAuthed, loading: userLoading } = useCurrentUser()
   const tracker = useRunTracker()
@@ -136,6 +157,18 @@ export default function GamePage() {
   const [saveError, setSaveError] = useState(null)
   const [runResult, setRunResult] = useState(null)
   const [gpsErrorDismissed, setGpsErrorDismissed] = useState(false)
+
+  // TEMP: admin-only tap-to-draw, purely for testing without needing a real
+  // GPS trace. The backend has no "submit a shape directly" endpoint — this
+  // still goes through the same POST /v1/run path a real run does, just with
+  // synthetic points spaced far enough apart in time to clear the anti-cheat
+  // sustained-speed check rather than a real device's GPS timestamps. Revert
+  // by deleting this block and the isAdminUser-gated button below once real
+  // device testing covers this instead.
+  const [manualMode, setManualMode] = useState(false)
+  const [manualPoints, setManualPoints] = useState([])
+  const [manualDraft, setManualDraft] = useState(null)
+  const isAdminUser = isAdmin(user)
 
   // The bottom action sheet's height changes with its content (idle vs.
   // tracking vs. draft-run-with-stats) and with the device's own safe-area
@@ -296,6 +329,76 @@ export default function GamePage() {
     tracker.clearPendingRun()
   }
 
+  // TEMP: admin-only manual loop, see the state declaration above.
+  function handleStartManual() {
+    setManualPoints([])
+    setManualMode(true)
+  }
+
+  function handleMapTap(point) {
+    if (!manualMode) return
+    setManualPoints((prev) => [...prev, point])
+  }
+
+  function handleCancelManual() {
+    setManualMode(false)
+    setManualPoints([])
+  }
+
+  // A jogging pace, comfortably under the backend's 7 m/s sustained-speed
+  // anti-cheat ceiling — spacing points by a FIXED duration regardless of
+  // loop size (an earlier version of this) implied a sprint/vehicle pace on
+  // any loop bigger than a couple hundred meters and got silently rejected
+  // as implausible. Duration has to scale with distance instead.
+  const MANUAL_DRAFT_PACE_MPS = 3
+
+  function handleCloseManualLoop() {
+    if (manualPoints.length < 2) return
+    // A real run closes itself because the runner physically ends up back
+    // near where they started - tapped vertices have no such tendency (the
+    // last tap of a decagon is just as far from the first as any other
+    // vertex), so the server's 25m closure-gap check fails almost every
+    // time without this. Appending an explicit duplicate of the first point
+    // as the last point guarantees a 0m gap regardless of where the tapping
+    // actually stopped.
+    const closedPoints = [...manualPoints, manualPoints[0]]
+    const distance = loopPerimeterMeters(manualPoints)
+    const durationSeconds = Math.max(
+      MIN_VALID_RUN_DURATION_SECONDS + 5,
+      Math.ceil(distance / MANUAL_DRAFT_PACE_MPS)
+    )
+    const durationMs = durationSeconds * 1000
+    const now = Date.now()
+    const spacingMs = durationMs / Math.max(1, closedPoints.length - 1)
+    const startedAt = new Date(now - durationMs)
+    const endedAt = new Date(now)
+    const points = closedPoints.map((p, i) => ({
+      lat: p.lat,
+      lng: p.lng,
+      accuracy: 5,
+      speed: null,
+      elevation: null,
+      timestamp: startedAt.getTime() + i * spacingMs,
+    }))
+    setManualDraft({
+      points,
+      distance,
+      duration: durationSeconds,
+      startedAt,
+      endedAt,
+    })
+    setManualMode(false)
+    setManualPoints([])
+  }
+
+  function discardDraft() {
+    if (manualDraft) {
+      setManualDraft(null)
+    } else {
+      tracker.clearPendingRun()
+    }
+  }
+
   async function attemptSubmit(pendingRun) {
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
@@ -323,7 +426,7 @@ export default function GamePage() {
         startedAt: toLocalDateTimeString(pendingRun.startedAt),
         endedAt: toLocalDateTimeString(pendingRun.endedAt),
       })
-      tracker.clearPendingRun()
+      discardDraft()
       setSaving(false)
       pollForTerritoryResult(submittedAt)
     } catch (err) {
@@ -346,11 +449,16 @@ export default function GamePage() {
       await new Promise((resolve) => setTimeout(resolve, RESULT_POLL_DELAY_MS))
       try {
         const page = await findMyTerritoryEvents(1, 5)
-        const fresh = (page?.content || []).find(
+        // A single run can produce more than one event in the same pass —
+        // e.g. capturing a smaller rival parcel AND claiming the remainder
+        // of the loop as new ground — so this collects every event from
+        // this run, not just the newest one, rather than silently dropping
+        // half the result.
+        const fresh = (page?.content || []).filter(
           (event) => new Date(event.occurredAt) >= submittedAt
         )
-        if (fresh) {
-          setRunResult({ phase: 'done', event: fresh })
+        if (fresh.length > 0) {
+          setRunResult({ phase: 'done', events: fresh })
           refreshProfile()
           refreshNearbyParcels()
           return
@@ -410,7 +518,7 @@ export default function GamePage() {
           : null
   const showGpsError = Boolean(gpsStatusMessage) && !gpsErrorDismissed
 
-  const pendingRun = tracker.pendingRun
+  const pendingRun = tracker.pendingRun || manualDraft
   const draftArea = pendingRun ? polygonAreaSqMeters(pendingRun.points) : 0
   const draftPerimeter = pendingRun ? loopPerimeterMeters(pendingRun.points) : 0
   const draftLooksThin =
@@ -476,10 +584,12 @@ export default function GamePage() {
           center={center}
           playerLocation={playerLocation}
           territories={nearbyParcels}
-          livePath={tracker.path}
+          livePath={manualMode ? manualPoints : tracker.path}
           currentUserId={user?.id}
           highlightOwnerId={highlightedOwnerId}
           avatarSrc={avatarSrc}
+          manualMode={manualMode}
+          onMapClick={handleMapTap}
         />
       )}
 
@@ -553,23 +663,65 @@ export default function GamePage() {
       </div>
 
       <div className="game-controls" ref={controlsRef}>
-        {tracker.status === 'idle' && !pendingRun && (
+        {tracker.status === 'idle' && !pendingRun && !manualMode && (
           <div className="game-controls-actions">
             <button
               type="button"
               className="btn btn-primary btn-lg"
               onClick={handleStartRun}
             >
-              Start GPS Run
+              Start Conquering
             </button>
+            {isAdminUser && (
+              <button
+                type="button"
+                className="btn btn-outline btn-lg"
+                onClick={handleStartManual}
+              >
+                Tap to Draw Territory
+              </button>
+            )}
           </div>
+        )}
+
+        {manualMode && (
+          <>
+            <div className="game-controls-stats">
+              <span>{manualPoints.length} points</span>
+              <span>Tap the map to add points</span>
+            </div>
+            <div className="game-controls-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-lg"
+                onClick={handleCloseManualLoop}
+                disabled={manualPoints.length < LOOP_MIN_POINTS}
+              >
+                Close Loop
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-lg"
+                onClick={handleCancelManual}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
         )}
 
         {tracker.status === 'tracking' && (
           <>
             <div className="game-controls-stats">
-              <span>{tracker.path.length} points</span>
-              <span>{formatMeters(tracker.distance)} covered</span>
+              <span>{formatMeters(tracker.distance)}</span>
+              <span>
+                {formatPace(
+                  calculatePaceMinPerKm(
+                    tracker.distance,
+                    tracker.elapsedSeconds
+                  )
+                )}
+              </span>
               <span>{formatDuration(tracker.elapsedSeconds)}</span>
             </div>
             <div className="game-controls-actions">
@@ -609,7 +761,7 @@ export default function GamePage() {
               <button
                 type="button"
                 className="btn btn-outline btn-lg"
-                onClick={() => tracker.clearPendingRun()}
+                onClick={discardDraft}
                 disabled={saving}
               >
                 Discard
@@ -672,25 +824,29 @@ export default function GamePage() {
                 <p>Checking your territory…</p>
               </>
             )}
-            {runResult.phase === 'done' && (
-              <>
-                <h3>
-                  {EVENT_TYPE_TITLES[runResult.event.eventType] ||
-                    'Territory updated!'}
-                </h3>
-                <p>
-                  {formatArea(Math.abs(runResult.event.areaDeltaSqMeters || 0))}{' '}
-                  {runResult.event.areaDeltaSqMeters >= 0 ? 'claimed' : 'lost'}
-                </p>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setRunResult(null)}
-                >
-                  Nice
-                </button>
-              </>
-            )}
+            {runResult.phase === 'done' &&
+              (() => {
+                const { title, totalArea } = summarizeRunEvents(
+                  runResult.events
+                )
+                return (
+                  <>
+                    <h3>{title}</h3>
+                    <p>
+                      {formatArea(totalArea)} affected across{' '}
+                      {runResult.events.length} update
+                      {runResult.events.length === 1 ? '' : 's'}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => setRunResult(null)}
+                    >
+                      Nice
+                    </button>
+                  </>
+                )
+              })()}
             {runResult.phase === 'timeout' && (
               <>
                 <h3>Run saved!</h3>

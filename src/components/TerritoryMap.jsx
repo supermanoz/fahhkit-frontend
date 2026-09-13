@@ -25,11 +25,7 @@ import { FaCrosshairs } from 'react-icons/fa'
 // public/mlgl (so their relative import of each other still resolves) —
 // this just has to point maplibre-gl at the copy before it creates one.
 setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
-import {
-  VIEW_RADIUS_METERS,
-  boundsForRadius,
-  formatArea,
-} from '../utils/territoryGame'
+import { formatArea } from '../utils/territoryGame'
 import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
@@ -157,15 +153,32 @@ function FocusHighlight({ highlightOwnerId, territories }) {
   return null
 }
 
-// Zoom level (out of the 16-19 range ViewRadiusLimiter allows) at which the
-// map settles into its tilted "close-up" view, Google Maps/Pokémon GO style.
-const CLOSE_IN_TILT_ZOOM = 18
+// TEMP: admin-only tap-to-draw (see GamePage.jsx). Registers a plain
+// Leaflet click handler rather than anything territory-specific, so it can
+// go away with a one-line deletion once real device testing replaces it.
+function ClickCapture({ enabled, onMapClick }) {
+  useMapEvents({
+    click(e) {
+      if (enabled) onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng })
+    },
+  })
+  return null
+}
+
+// Zoom level (the max of the 16-19 range ZoomRangeLimiter allows) at which
+// the map settles into its tilted "close-up" view, Google Maps/Pokémon GO
+// style — only at the very last zoom step (scrolled or pinched all the way
+// in), not partway through zooming closer.
+const CLOSE_IN_TILT_ZOOM = 19
 
 // The map stays flat/top-down until the player zooms in close, at which
 // point it settles into a standing 3D tilt (rather than just a brief
 // flourish mid-zoom) so building-3d extrusions in the basemap actually read
-// as buildings instead of flat footprints.
-function ZoomTiltEffect({ tiltRef }) {
+// as buildings instead of flat footprints. Forced back flat whenever
+// manualMode is on: this is a CSS transform on the whole map, not a real
+// perspective camera, so Leaflet's own click-to-latlng math (used by
+// ClickCapture for tap-to-draw) only stays accurate while flat.
+function ZoomTiltEffect({ tiltRef, manualMode }) {
   const map = useMapEvents({
     zoomstart() {
       tiltRef.current?.classList.add('is-zooming')
@@ -179,31 +192,28 @@ function ZoomTiltEffect({ tiltRef }) {
   })
 
   function syncCloseInTilt() {
-    const closeIn = map.getZoom() >= CLOSE_IN_TILT_ZOOM
+    const closeIn = map.getZoom() >= CLOSE_IN_TILT_ZOOM && !manualMode
     tiltRef.current?.classList.toggle('is-close-in', closeIn)
   }
 
   useEffect(() => {
     syncCloseInTilt()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [manualMode])
 
   return null
 }
 
-// Fences the view to a patch of world around the player instead of the
-// whole map — hard-stops panning at the edge of the radius and refuses to
-// zoom out past it, the way Pokémon GO keeps you tethered to where you
-// actually are rather than free-roaming the map from your couch.
-function ViewRadiusLimiter({ center }) {
+// Keeps zoom within a sane range (close enough to read the map, not so far
+// out it's the whole city) without fencing where the player can pan to —
+// the map view itself is free to explore now, unlike the pan-locked-to-a-
+// radius behavior this used to also do.
+function ZoomRangeLimiter() {
   const map = useMap()
   useEffect(() => {
-    const bounds = boundsForRadius(center, VIEW_RADIUS_METERS)
-    map.setMaxBounds(bounds)
     map.setMinZoom(16)
     map.setMaxZoom(19)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, center.lat, center.lng])
+  }, [map])
   return null
 }
 
@@ -330,6 +340,8 @@ export default function TerritoryMap({
   currentUserId,
   highlightOwnerId,
   avatarSrc,
+  manualMode,
+  onMapClick,
 }) {
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
@@ -347,7 +359,6 @@ export default function TerritoryMap({
           zoom={17}
           scrollWheelZoom
           zoomControl={false}
-          maxBoundsViscosity={1}
         >
           <PokemonStyleBaseLayer />
 
@@ -423,9 +434,10 @@ export default function TerritoryMap({
             highlightOwnerId={highlightOwnerId}
             territories={territories}
           />
+          <ClickCapture enabled={Boolean(manualMode)} onMapClick={onMapClick} />
           <InvalidateSizeOnMount />
-          <ViewRadiusLimiter center={center} />
-          <ZoomTiltEffect tiltRef={tiltRef} />
+          <ZoomRangeLimiter />
+          <ZoomTiltEffect tiltRef={tiltRef} manualMode={manualMode} />
           <CaptureMapInstance onReady={setMapInstance} />
         </MapContainer>
       </div>
