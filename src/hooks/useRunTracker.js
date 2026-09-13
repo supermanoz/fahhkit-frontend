@@ -16,6 +16,10 @@ export function useRunTracker() {
   const [status, setStatus] = useState('idle')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [distance, setDistance] = useState(0)
+  // Mirrors pointsRef as render-visible state, {lat,lng} only — for callers
+  // that draw the live trail on a map (e.g. GamePage). TrackRunPanel doesn't
+  // use this; it's additive and doesn't change tracking/save behavior.
+  const [path, setPath] = useState([])
   const [backgroundGapSeconds, setBackgroundGapSeconds] = useState(null)
   // A finished run that hasn't been saved to the server yet (e.g. the POST failed
   // because there was no connection) — kept in localStorage until it succeeds, so
@@ -113,6 +117,7 @@ export function useRunTracker() {
 
         const previous = pointsRef.current[pointsRef.current.length - 1]
         pointsRef.current = [...pointsRef.current, point]
+        setPath(pointsRef.current)
         if (previous) {
           distanceRef.current += haversineDistance(previous, point)
           setDistance(distanceRef.current)
@@ -168,6 +173,7 @@ export function useRunTracker() {
     distanceRef.current = saved.distance || 0
     startedAtRef.current = new Date(saved.startedAt)
     eventIdRef.current = saved.eventId ?? null
+    setPath(pointsRef.current)
     setDistance(distanceRef.current)
     setElapsedSeconds(
       Math.round((Date.now() - startedAtRef.current.getTime()) / 1000)
@@ -198,6 +204,7 @@ export function useRunTracker() {
       distanceRef.current = 0
       fixCountRef.current = 0
       lastAccuracyRef.current = null
+      setPath([])
       setDistance(0)
       setElapsedSeconds(0)
       setBackgroundGapSeconds(null)
@@ -262,12 +269,14 @@ export function useRunTracker() {
     setPendingRun(null)
     setDistance(0)
     setElapsedSeconds(0)
+    setPath([])
   }, [])
 
   return {
     status,
     elapsedSeconds,
     distance,
+    path,
     start,
     stop,
     backgroundGapSeconds,

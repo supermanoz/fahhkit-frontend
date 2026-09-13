@@ -7,7 +7,6 @@ import {
   FaCheck,
   FaCoins,
   FaFlag,
-  FaLock,
   FaStore,
   FaTimes,
   FaTrophy,
@@ -15,37 +14,46 @@ import {
 } from 'react-icons/fa'
 import TerritoryMap from '../components/TerritoryMap'
 import { useCurrentUser } from '../hooks/useCurrentUser'
-import { useTerritoryRun } from '../hooks/useTerritoryRun'
+import { useRunTracker } from '../hooks/useRunTracker'
+import { ApiError, resolveFileUrl } from '../api/client'
+import { createRun } from '../api/runs'
+import {
+  findIndividualLeaderboard,
+  findMyParcels,
+  findMyTerritoryEvents,
+  findParcelsNear,
+  getTerritoryProfile,
+} from '../api/territory'
+import {
+  equipStoreItem,
+  getOwnedStoreItems,
+  getStoreCatalog,
+  purchaseStoreItem,
+  unequipStoreItem,
+} from '../api/store'
 import {
   DEFAULT_CENTER,
-  MIN_LOOP_PERIMETER_METERS,
-  MIN_LOOP_POINTS,
-  PLAYER_COLOR,
-  coinsForClaim,
-  evaluateClaim,
+  LOOP_MIN_AREA_SQ_METERS,
+  LOOP_MIN_POINTS,
+  VIEW_RADIUS_METERS,
   formatArea,
-  loadGameState,
   loopPerimeterMeters,
   polygonAreaSqMeters,
-  saveGameState,
-  unionPolygons,
+  toDisplayParcel,
 } from '../utils/territoryGame'
 import {
-  AVATARS,
-  COMING_SOON_AVATARS,
-  getAvatarById,
-} from '../constants/avatars'
+  MIN_VALID_RUN_DISTANCE_METERS,
+  MIN_VALID_RUN_DURATION_SECONDS,
+  formatDuration,
+  toLocalDateTimeString,
+} from '../utils/run'
+import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
 import './GamePage.css'
 
 function formatMeters(meters) {
   if (!meters) return '0 m'
   if (meters < 1000) return `${Math.round(meters)} m`
   return `${(meters / 1000).toFixed(2)} km`
-}
-
-function claimBlockMessage(check) {
-  if (!check || check.ok) return null
-  return "That loop sits entirely inside a bigger rival's territory — there's no ground left to claim. Try a bigger loop, or route around it."
 }
 
 // Pokémon GO-style fan-out: tapping the pokéball FAB pops these three
@@ -71,23 +79,54 @@ const RADIAL_ITEMS = [
   },
 ]
 
+// Territory processing runs asynchronously on the server after POST /v1/run
+// returns (see TerritoryRunCompletionListener) — there's no endpoint to ask
+// "what happened to run X" directly, so this polls for any territory event
+// that lands after the submit timestamp and gives up after ~15s. Loop
+// geometry that never closes produces no event at all (a normal outcome,
+// not an error), so a timeout here isn't necessarily bad news.
+const RESULT_POLL_ATTEMPTS = 6
+const RESULT_POLL_DELAY_MS = 2500
+
+const EVENT_TYPE_TITLES = {
+  CLAIMED: 'Territory claimed!',
+  CAPTURED: "You captured a rival's ground!",
+  SPLIT: "You cropped a rival's edge!",
+  MERGED: 'Territory expanded!',
+  REJECTED: 'That loop was rejected.',
+}
+
 export default function GamePage() {
   const { user } = useCurrentUser()
-  const [gameState, setGameState] = useState(loadGameState)
+  const tracker = useRunTracker()
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
-  const [claimResult, setClaimResult] = useState(null)
+
+  const [profile, setProfile] = useState(null)
+  const [myParcels, setMyParcels] = useState([])
+  const [nearbyParcels, setNearbyParcels] = useState([])
+  const [leaderboard, setLeaderboard] = useState([])
+  const [leaderboardError, setLeaderboardError] = useState(null)
+  const [storeCatalog, setStoreCatalog] = useState([])
+  const [ownedItems, setOwnedItems] = useState([])
+  const [storeError, setStoreError] = useState(null)
+  const [storeActionError, setStoreActionError] = useState(null)
+
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTab, setMenuTab] = useState('me')
+  const [radialOpen, setRadialOpen] = useState(false)
+
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   const [confirmEntry, setConfirmEntry] = useState(null)
-  const [avatarChoice, setAvatarChoice] = useState(null)
-  const [radialOpen, setRadialOpen] = useState(false)
-  const tracker = useTerritoryRun()
+  const [storeChoice, setStoreChoice] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
+  const [runResult, setRunResult] = useState(null)
+  const [gpsErrorDismissed, setGpsErrorDismissed] = useState(false)
 
   // The bottom action sheet's height changes with its content (idle vs.
-  // tracking vs. draft-loop-with-hint) and with the device's own safe-area
+  // tracking vs. draft-run-with-stats) and with the device's own safe-area
   // inset - measuring it directly instead of guessing a fixed pixel offset
   // is what lets the floating action row (avatar/menu/locate) sit exactly
   // N px above it on every device, rather than needing hand-tuned
@@ -98,10 +137,6 @@ export default function GamePage() {
   useEffect(() => {
     const el = controlsRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
-    // ResizeObserver's entry.contentRect is the content box only - it
-    // excludes .game-controls' own padding and border-top, undershooting
-    // the sheet's real visual height. offsetHeight includes both, which is
-    // what --sheet-h needs to actually clear the sheet's rounded top edge.
     const observer = new ResizeObserver(() => {
       setControlsHeight(el.offsetHeight)
     })
@@ -152,123 +187,222 @@ export default function GamePage() {
   }, [])
 
   const playerLocation =
-    tracker.mode === 'gps' && tracker.path.length > 0
+    tracker.status === 'tracking' && tracker.path.length > 0
       ? tracker.path[tracker.path.length - 1]
       : liveLocation || center
 
-  const perimeter = loopPerimeterMeters(tracker.path)
-  const isTracking = tracker.mode === 'gps' || tracker.mode === 'manual'
-  const hasDraftLoop = tracker.mode === 'idle' && tracker.path.length > 0
-  const geometryReady =
-    hasDraftLoop &&
-    tracker.path.length >= MIN_LOOP_POINTS &&
-    perimeter >= MIN_LOOP_PERIMETER_METERS
+  async function refreshProfile() {
+    try {
+      const [profileData, myParcelsPage] = await Promise.all([
+        getTerritoryProfile(),
+        findMyParcels(1, 100),
+      ])
+      setProfile(profileData)
+      setMyParcels(myParcelsPage?.content || [])
+    } catch {
+      // Leave whatever's already loaded in place - a background refresh
+      // failing isn't worth surfacing as an error.
+    }
+  }
 
-  const claimCheck = geometryReady
-    ? evaluateClaim(tracker.path, gameState.territories)
-    : null
-  const canClaim = geometryReady && Boolean(claimCheck?.ok)
-  // A bigger rival crops the loop down before it's ever claimed, so the
-  // preview should show what you'll actually walk away with, not the raw
-  // drawn shape.
-  const claimableArea = claimCheck?.ok
-    ? polygonAreaSqMeters(claimCheck.claimShape)
-    : polygonAreaSqMeters(tracker.path)
+  async function refreshNearbyParcels() {
+    try {
+      const parcels = await findParcelsNear(
+        playerLocation.lat,
+        playerLocation.lng,
+        VIEW_RADIUS_METERS
+      )
+      setNearbyParcels((parcels || []).map((p) => toDisplayParcel(p, user?.id)))
+    } catch {
+      // The map just shows no parcels for this view - not fatal.
+    }
+  }
 
-  const playerTerritories = gameState.territories.filter(
-    (t) => t.ownerId === 'player'
-  )
-  const totalAreaHeld = playerTerritories.reduce((sum, t) => sum + t.area, 0)
-  const playerName = user?.fullName || 'You'
-  const currentAvatar = getAvatarById(gameState.avatarId)
+  // Loads once we roughly know where the player is - re-running on every
+  // liveLocation tick would hammer the API on every GPS fix.
+  useEffect(() => {
+    if (locating) return
+    refreshProfile()
+    refreshNearbyParcels()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locating])
 
-  // Rivals all share ownerId 'rival' (see territoryGame.js), so grouping by
-  // name is what keeps them as separate leaderboard rows instead of one
-  // combined "rival" blob.
-  const leaderboard = Object.values(
-    gameState.territories.reduce((acc, t) => {
-      const isPlayer = t.ownerId === 'player'
-      const key = isPlayer ? 'player' : t.ownerName
-      if (!acc[key]) {
-        acc[key] = {
-          key,
-          isPlayer,
-          name: isPlayer ? playerName : t.ownerName,
-          area: 0,
-          parcels: 0,
-        }
-      }
-      acc[key].area += t.area
-      acc[key].parcels += 1
-      return acc
-    }, {})
-  ).sort((a, b) => b.area - a.area)
+  async function loadLeaderboard() {
+    setLeaderboardError(null)
+    try {
+      const page = await findIndividualLeaderboard(1, 20)
+      setLeaderboard(page?.content || [])
+    } catch (err) {
+      setLeaderboardError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not load the leaderboard.'
+      )
+    }
+  }
 
-  function persist(nextState) {
-    setGameState(nextState)
-    saveGameState(nextState)
+  async function loadStore() {
+    setStoreError(null)
+    try {
+      const [catalogPage, owned] = await Promise.all([
+        getStoreCatalog(1, 50),
+        getOwnedStoreItems(),
+      ])
+      setStoreCatalog(catalogPage?.content || [])
+      setOwnedItems(owned || [])
+    } catch (err) {
+      setStoreError(
+        err instanceof ApiError ? err.message : 'Could not load the shop.'
+      )
+    }
   }
 
   function openMenu(tab) {
-    setMenuTab(tab)
+    switchTab(tab)
     setMenuOpen(true)
     setRadialOpen(false)
   }
 
-  function handleClaim() {
-    if (!canClaim) return
-    const conquered = claimCheck.conquers
-    const merges = claimCheck.merges
-    const shrinks = claimCheck.shrinks
-    // The loop itself may already be cropped down (evaluateClaim clips it
-    // against any rival parcel bigger than it) — coins are paid on that
-    // actual ground, not the raw drawn loop or the post-merge total,
-    // otherwise re-tracing the same ground next to already-held land (or
-    // routing through a bigger rival's territory) would farm coins for area
-    // you don't end up owning.
-    const runArea = polygonAreaSqMeters(claimCheck.claimShape)
-    const coins = coinsForClaim(runArea, conquered.length)
-
-    const mergedPoints = merges.reduce(
-      (acc, t) => unionPolygons(acc, t.points),
-      claimCheck.claimShape
-    )
-    const finalArea = polygonAreaSqMeters(mergedPoints)
-
-    const newTerritory = {
-      id: `player-${Date.now()}`,
-      ownerId: 'player',
-      ownerName: playerName,
-      color: PLAYER_COLOR,
-      points: mergedPoints,
-      area: finalArea,
-      claimedAt: new Date().toISOString(),
-    }
-
-    const removedIds = new Set([...conquered, ...merges].map((t) => t.id))
-    const shrunkById = new Map(shrinks.map((s) => [s.territory.id, s]))
-    const remaining = gameState.territories
-      .filter((t) => !removedIds.has(t.id))
-      .map((t) => {
-        const shrunk = shrunkById.get(t.id)
-        return shrunk ? { ...t, points: shrunk.points, area: shrunk.area } : t
-      })
-
-    persist({
-      territories: [...remaining, newTerritory],
-      coinBalance: gameState.coinBalance + coins,
-    })
-    setClaimResult({
-      area: runArea,
-      coins,
-      merged: merges.length > 0,
-      conqueredNames: conquered.map((t) => t.ownerName),
-      shrunkNames: shrinks.map((s) => s.territory.ownerName),
-    })
-    tracker.reset()
+  function switchTab(tab) {
+    setMenuTab(tab)
+    if (tab === 'leaderboard' && leaderboard.length === 0) loadLeaderboard()
+    if (tab === 'shop' && storeCatalog.length === 0) loadStore()
   }
 
-  const blockMessage = claimBlockMessage(claimCheck)
+  function handleStartRun() {
+    setGpsErrorDismissed(false)
+    tracker.start(null)
+  }
+
+  function handleCancelTracking() {
+    tracker.stop()
+    tracker.clearPendingRun()
+  }
+
+  async function attemptSubmit(pendingRun) {
+    if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
+      setSaveError({
+        title: "That's a warm-up, not a run 😅",
+        message: `Only ${formatMeters(pendingRun.distance)} covered — runs need at least ${MIN_VALID_RUN_DISTANCE_METERS}m to count. Say fk it and go again.`,
+      })
+      return
+    }
+    if (pendingRun.duration < MIN_VALID_RUN_DURATION_SECONDS) {
+      setSaveError({
+        title: "That's a warm-up, not a run 😅",
+        message: `Only ${formatDuration(pendingRun.duration)} on the clock — runs need at least ${MIN_VALID_RUN_DURATION_SECONDS}s to count. Say fk it and go again.`,
+      })
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    const submittedAt = new Date()
+    try {
+      await createRun({
+        eventId: null,
+        points: pendingRun.points,
+        distance: pendingRun.distance,
+        duration: pendingRun.duration,
+        startedAt: toLocalDateTimeString(pendingRun.startedAt),
+        endedAt: toLocalDateTimeString(pendingRun.endedAt),
+      })
+      tracker.clearPendingRun()
+      setSaving(false)
+      pollForTerritoryResult(submittedAt)
+    } catch (err) {
+      // Deliberately not clearing the pending run - it stays saved (see
+      // useRunTracker) so "Retry Save" works even after closing the app.
+      setSaveError({
+        title: "Couldn't save that run",
+        message:
+          err instanceof ApiError
+            ? err.message
+            : 'Could not save this run. Please try again.',
+      })
+      setSaving(false)
+    }
+  }
+
+  async function pollForTerritoryResult(submittedAt) {
+    setRunResult({ phase: 'processing' })
+    for (let attempt = 0; attempt < RESULT_POLL_ATTEMPTS; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, RESULT_POLL_DELAY_MS))
+      try {
+        const page = await findMyTerritoryEvents(1, 5)
+        const fresh = (page?.content || []).find(
+          (event) => new Date(event.occurredAt) >= submittedAt
+        )
+        if (fresh) {
+          setRunResult({ phase: 'done', event: fresh })
+          refreshProfile()
+          refreshNearbyParcels()
+          return
+        }
+      } catch {
+        // A transient failure here shouldn't cut the wait short - just try again.
+      }
+    }
+    setRunResult({ phase: 'timeout' })
+    refreshProfile()
+    refreshNearbyParcels()
+  }
+
+  async function handlePurchase(item) {
+    setStoreActionError(null)
+    try {
+      await purchaseStoreItem(item.id)
+      await loadStore()
+      refreshProfile()
+      setStoreChoice(null)
+    } catch (err) {
+      setStoreActionError(
+        err instanceof ApiError ? err.message : 'Could not complete purchase.'
+      )
+    }
+  }
+
+  async function handleEquip(item, isEquipped) {
+    setStoreActionError(null)
+    try {
+      if (isEquipped) {
+        await unequipStoreItem(item.id)
+      } else {
+        await equipStoreItem(item.id)
+      }
+      await loadStore()
+    } catch (err) {
+      setStoreActionError(
+        err instanceof ApiError ? err.message : 'Could not update that item.'
+      )
+    }
+  }
+
+  const isMyEntry = (entry) => entry.userId === user?.id
+  const highlightedOwnerId = highlightedEntry?.userId ?? null
+  const highlightHasVisibleParcels =
+    highlightedEntry &&
+    nearbyParcels.some((p) => p.ownerId === highlightedEntry.userId)
+
+  const gpsStatusMessage =
+    tracker.status === 'permission-denied'
+      ? 'Location is turned off for this site — enable it in your browser settings, then try again.'
+      : tracker.status === 'unsupported'
+        ? 'Your browser doesn’t support GPS tracking.'
+        : tracker.status === 'error'
+          ? 'Could not get your location right now. Try again in a moment.'
+          : null
+  const showGpsError = Boolean(gpsStatusMessage) && !gpsErrorDismissed
+
+  const pendingRun = tracker.pendingRun
+  const draftArea = pendingRun ? polygonAreaSqMeters(pendingRun.points) : 0
+  const draftPerimeter = pendingRun ? loopPerimeterMeters(pendingRun.points) : 0
+  const draftLooksThin =
+    pendingRun &&
+    (pendingRun.points.length < LOOP_MIN_POINTS ||
+      draftArea < LOOP_MIN_AREA_SQ_METERS)
+
+  const avatarSrc =
+    resolveFileUrl(user?.profilePictureUrl) || defaultAvatarImage
 
   return (
     <div className="game-page" style={{ '--sheet-h': `${controlsHeight}px` }}>
@@ -280,12 +414,11 @@ export default function GamePage() {
         <TerritoryMap
           center={center}
           playerLocation={playerLocation}
-          territories={gameState.territories}
+          territories={nearbyParcels}
           livePath={tracker.path}
-          manualMode={tracker.mode === 'manual'}
-          onMapClick={tracker.addManualPoint}
-          highlightKey={highlightedEntry?.key ?? null}
-          avatarSrc={currentAvatar.src}
+          currentUserId={user?.id}
+          highlightOwnerId={highlightedOwnerId}
+          avatarSrc={avatarSrc}
         />
       )}
 
@@ -298,13 +431,15 @@ export default function GamePage() {
           <span className="game-hud-icon game-hud-icon-coin">
             <FaCoins />
           </span>
-          <span className="game-hud-value">{gameState.coinBalance}</span>
+          <span className="game-hud-value">
+            {profile?.fahhcoinBalance ?? 0}
+          </span>
         </div>
         <div className="game-hud-stat" aria-label="Parcels held">
           <span className="game-hud-icon game-hud-icon-flag">
             <FaFlag />
           </span>
-          <span className="game-hud-value">{playerTerritories.length}</span>
+          <span className="game-hud-value">{profile?.parcelCount ?? 0}</span>
         </div>
       </div>
 
@@ -357,47 +492,37 @@ export default function GamePage() {
       </div>
 
       <div className="game-controls" ref={controlsRef}>
-        {tracker.mode === 'idle' && tracker.path.length === 0 && (
+        {tracker.status === 'idle' && !pendingRun && (
           <div className="game-controls-actions">
             <button
               type="button"
               className="btn btn-primary btn-lg"
-              onClick={tracker.startGps}
+              onClick={handleStartRun}
             >
               Start GPS Run
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-lg"
-              onClick={tracker.startManual}
-            >
-              Tap to Draw Territory
             </button>
           </div>
         )}
 
-        {isTracking && (
+        {tracker.status === 'tracking' && (
           <>
             <div className="game-controls-stats">
               <span>{tracker.path.length} points</span>
               <span>{formatMeters(tracker.distance)} covered</span>
-              {tracker.mode === 'manual' && (
-                <span>Tap the map to add points</span>
-              )}
+              <span>{formatDuration(tracker.elapsedSeconds)}</span>
             </div>
             <div className="game-controls-actions">
               <button
                 type="button"
                 className="btn btn-primary btn-lg"
-                onClick={tracker.finish}
-                disabled={tracker.path.length < MIN_LOOP_POINTS}
+                onClick={() => tracker.stop()}
               >
                 Close Loop
               </button>
               <button
                 type="button"
                 className="btn btn-outline btn-lg"
-                onClick={tracker.reset}
+                onClick={handleCancelTracking}
               >
                 Cancel
               </button>
@@ -405,38 +530,34 @@ export default function GamePage() {
           </>
         )}
 
-        {hasDraftLoop && (
+        {pendingRun && (
           <>
             <div className="game-controls-stats">
-              <span>Loop area: {formatArea(claimableArea)}</span>
-              <span>Perimeter: {formatMeters(perimeter)}</span>
+              <span>Loop area: {formatArea(draftArea)}</span>
+              <span>Perimeter: {formatMeters(draftPerimeter)}</span>
             </div>
             <div className="game-controls-actions">
               <button
                 type="button"
                 className="btn btn-primary btn-lg"
-                onClick={handleClaim}
-                disabled={!canClaim}
+                onClick={() => attemptSubmit(pendingRun)}
+                disabled={saving}
               >
-                Claim Territory
+                {saving ? 'Submitting…' : 'Submit Run'}
               </button>
               <button
                 type="button"
                 className="btn btn-outline btn-lg"
-                onClick={tracker.reset}
+                onClick={() => tracker.clearPendingRun()}
+                disabled={saving}
               >
                 Discard
               </button>
             </div>
-            {!geometryReady && (
+            {draftLooksThin && (
               <p className="game-controls-hint">
-                Needs at least {MIN_LOOP_POINTS} points and a{' '}
-                {MIN_LOOP_PERIMETER_METERS}m+ loop to claim.
-              </p>
-            )}
-            {geometryReady && blockMessage && (
-              <p className="game-controls-hint game-controls-hint-error">
-                {blockMessage}
+                This loop looks short or small — the server may not count it as
+                closed territory. Bigger, cleanly closed loops score best.
               </p>
             )}
           </>
@@ -444,33 +565,87 @@ export default function GamePage() {
       </div>
 
       <AnimatePresence>
-        {claimResult && (
+        {saveError && (
           <motion.div
             className="game-claim-toast glass-card"
             initial={{ opacity: 0, y: 40, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
           >
-            <h3>
-              {claimResult.conqueredNames.length > 0
-                ? `You conquered ${claimResult.conqueredNames.join(' & ')}'s territory!`
-                : claimResult.shrunkNames.length > 0
-                  ? `You cropped ${claimResult.shrunkNames.join(' & ')}'s edge!`
-                  : claimResult.merged
-                    ? 'Territory expanded!'
-                    : 'Territory claimed!'}
-            </h3>
-            <p>
-              {formatArea(claimResult.area)} claimed · +{claimResult.coins}{' '}
-              Fahhcoin
-            </p>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setClaimResult(null)}
-            >
-              Nice
-            </button>
+            <h3>{saveError.title}</h3>
+            <p>{saveError.message}</p>
+            <div className="game-highlight-toast-actions">
+              {pendingRun && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => attemptSubmit(pendingRun)}
+                  disabled={saving}
+                >
+                  Retry Save
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setSaveError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {runResult && (
+          <motion.div
+            className="game-claim-toast glass-card"
+            initial={{ opacity: 0, y: 40, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+          >
+            {runResult.phase === 'processing' && (
+              <>
+                <h3>Run submitted!</h3>
+                <p>Checking your territory…</p>
+              </>
+            )}
+            {runResult.phase === 'done' && (
+              <>
+                <h3>
+                  {EVENT_TYPE_TITLES[runResult.event.eventType] ||
+                    'Territory updated!'}
+                </h3>
+                <p>
+                  {formatArea(Math.abs(runResult.event.areaDeltaSqMeters || 0))}{' '}
+                  {runResult.event.areaDeltaSqMeters >= 0 ? 'claimed' : 'lost'}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setRunResult(null)}
+                >
+                  Nice
+                </button>
+              </>
+            )}
+            {runResult.phase === 'timeout' && (
+              <>
+                <h3>Run saved!</h3>
+                <p>
+                  If your loop closed cleanly, territory should show up here
+                  shortly — check back in a bit if you don’t see it yet.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setRunResult(null)}
+                >
+                  OK
+                </button>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -484,15 +659,16 @@ export default function GamePage() {
             exit={{ opacity: 0, y: -20, scale: 0.9 }}
           >
             <h3>
-              {highlightedEntry.isPlayer
+              {isMyEntry(highlightedEntry)
                 ? 'Your territory'
-                : `${highlightedEntry.name}'s territory`}
+                : `${highlightedEntry.fullName}'s territory`}
             </h3>
-            <p>
-              {formatArea(highlightedEntry.area)} across{' '}
-              {highlightedEntry.parcels} parcel
-              {highlightedEntry.parcels === 1 ? '' : 's'}
-            </p>
+            <p>{formatArea(highlightedEntry.areaSqMeters)} held</p>
+            {!highlightHasVisibleParcels && (
+              <p className="game-controls-hint">
+                Nothing of theirs is in view right now — try exploring the map.
+              </p>
+            )}
             <div className="game-highlight-toast-actions">
               <button
                 type="button"
@@ -549,7 +725,7 @@ export default function GamePage() {
                 <button
                   type="button"
                   className={`game-menu-tab ${menuTab === 'leaderboard' ? 'active' : ''}`}
-                  onClick={() => setMenuTab('leaderboard')}
+                  onClick={() => switchTab('leaderboard')}
                 >
                   <FaTrophy />
                   Leaderboard
@@ -557,7 +733,7 @@ export default function GamePage() {
                 <button
                   type="button"
                   className={`game-menu-tab ${menuTab === 'me' ? 'active' : ''}`}
-                  onClick={() => setMenuTab('me')}
+                  onClick={() => switchTab('me')}
                 >
                   <FaUser />
                   Me
@@ -565,7 +741,7 @@ export default function GamePage() {
                 <button
                   type="button"
                   className={`game-menu-tab ${menuTab === 'shop' ? 'active' : ''}`}
-                  onClick={() => setMenuTab('shop')}
+                  onClick={() => switchTab('shop')}
                 >
                   <FaStore />
                   Shop
@@ -574,16 +750,18 @@ export default function GamePage() {
 
               {menuTab === 'leaderboard' && (
                 <div className="game-menu-panel">
-                  {leaderboard.length === 0 ? (
+                  {leaderboardError ? (
+                    <p className="game-menu-empty">{leaderboardError}</p>
+                  ) : leaderboard.length === 0 ? (
                     <p className="game-menu-empty">
                       No territory claimed yet — be the first.
                     </p>
                   ) : (
                     <ul className="game-menu-leaderboard">
-                      {leaderboard.map((entry, i) => (
+                      {leaderboard.map((entry) => (
                         <li
-                          key={entry.key}
-                          className={entry.isPlayer ? 'is-player' : ''}
+                          key={entry.userId}
+                          className={isMyEntry(entry) ? 'is-player' : ''}
                         >
                           <button
                             type="button"
@@ -591,13 +769,13 @@ export default function GamePage() {
                             onClick={() => setConfirmEntry(entry)}
                           >
                             <span className="game-menu-leaderboard-rank">
-                              #{i + 1}
+                              #{entry.rank}
                             </span>
                             <span className="game-menu-leaderboard-name">
-                              {entry.name}
+                              {isMyEntry(entry) ? 'You' : entry.fullName}
                             </span>
                             <span className="game-menu-leaderboard-area">
-                              {formatArea(entry.area)}
+                              {formatArea(entry.areaSqMeters)}
                             </span>
                           </button>
                         </li>
@@ -614,29 +792,34 @@ export default function GamePage() {
                   )}
                   <div className="game-menu-summary">
                     <span className="game-menu-summary-value">
-                      {formatArea(totalAreaHeld)}
+                      {formatArea(profile?.totalAreaSqMeters)}
                     </span>
                     <span className="game-menu-summary-label">
-                      held across {playerTerritories.length} parcel
-                      {playerTerritories.length === 1 ? '' : 's'}
+                      held across {profile?.parcelCount ?? 0} parcel
+                      {profile?.parcelCount === 1 ? '' : 's'}
                     </span>
                   </div>
-                  {playerTerritories.length === 0 ? (
+                  {profile?.level != null && (
+                    <p className="game-menu-summary-label">
+                      Level {profile.level} · {profile.xp ?? 0} XP
+                      {profile.clubName ? ` · ${profile.clubName}` : ''}
+                    </p>
+                  )}
+                  {myParcels.length === 0 ? (
                     <p className="game-menu-empty">
-                      Claim your first loop to see it here.
+                      Finish a GPS run that closes a loop to see territory here.
                     </p>
                   ) : (
                     <ul className="game-menu-list">
-                      {[...playerTerritories]
-                        .sort((a, b) => b.area - a.area)
-                        .map((t) => (
-                          <li key={t.id}>
+                      {[...myParcels]
+                        .sort((a, b) => b.areaSqMeters - a.areaSqMeters)
+                        .map((p) => (
+                          <li key={p.id}>
                             <span className="game-menu-list-area">
-                              {formatArea(t.area)}
+                              {formatArea(p.areaSqMeters)}
                             </span>
                             <span className="game-menu-list-meta">
-                              claimed{' '}
-                              {new Date(t.claimedAt).toLocaleDateString()}
+                              score {Math.round(p.currentScore || 0)}
                             </span>
                           </li>
                         ))}
@@ -647,60 +830,88 @@ export default function GamePage() {
 
               {menuTab === 'shop' && (
                 <div className="game-menu-panel game-menu-shop">
-                  <p className="game-menu-avatars-title">Choose your avatar</p>
-                  <div className="game-menu-avatar-grid">
-                    {AVATARS.map((avatar) => {
-                      const isSelected = avatar.id === currentAvatar.id
-                      return (
-                        <button
-                          key={avatar.id}
-                          type="button"
-                          className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => setAvatarChoice(avatar)}
-                          disabled={isSelected}
-                        >
-                          <img src={avatar.src} alt={avatar.name} />
-                          <span className="game-menu-avatar-name">
-                            {avatar.name}
-                          </span>
-                          <span className="game-menu-avatar-tag">
-                            {isSelected ? (
-                              <>
-                                <FaCheck /> Equipped
-                              </>
+                  {storeError ? (
+                    <p className="game-menu-empty">{storeError}</p>
+                  ) : storeCatalog.length === 0 ? (
+                    <>
+                      <FaStore className="game-menu-shop-icon" />
+                      <p className="game-menu-shop-title">
+                        Nothing in the shop yet
+                      </p>
+                    </>
+                  ) : (
+                    <ul className="game-menu-list game-store-list">
+                      {storeCatalog.map((item) => {
+                        const owned = ownedItems.find(
+                          (o) => o.storeItem.id === item.id
+                        )
+                        return (
+                          <li key={item.id} className="game-store-item">
+                            <span
+                              className="game-store-item-swatch"
+                              style={
+                                item.colorValue
+                                  ? { background: item.colorValue }
+                                  : undefined
+                              }
+                            >
+                              {item.assetUrl && (
+                                <img
+                                  src={resolveFileUrl(item.assetUrl)}
+                                  alt={item.name}
+                                />
+                              )}
+                            </span>
+                            <span className="game-store-item-info">
+                              <span className="game-menu-list-area">
+                                {item.name}
+                              </span>
+                              <span className="game-menu-list-meta">
+                                {owned
+                                  ? owned.equipped
+                                    ? 'Equipped'
+                                    : 'Owned'
+                                  : `${item.priceFahhcoin} Fahhcoin`}
+                              </span>
+                            </span>
+                            {owned ? (
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() =>
+                                  handleEquip(item, owned.equipped)
+                                }
+                              >
+                                {owned.equipped ? (
+                                  'Unequip'
+                                ) : (
+                                  <>
+                                    <FaCheck /> Equip
+                                  </>
+                                )}
+                              </button>
                             ) : (
-                              'Free'
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => setStoreChoice(item)}
+                              >
+                                Buy
+                              </button>
                             )}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {COMING_SOON_AVATARS.length > 0 && (
-                    <div className="game-menu-avatar-grid">
-                      {COMING_SOON_AVATARS.map((avatar) => (
-                        <div
-                          key={avatar.id}
-                          className="game-menu-avatar-card is-locked"
-                        >
-                          <img src={avatar.src} alt={avatar.name} />
-                          <span className="game-menu-avatar-name">
-                            {avatar.name}
-                          </span>
-                          <span className="game-menu-avatar-tag">
-                            <FaLock /> Coming Soon
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
                   )}
-
-                  <FaStore className="game-menu-shop-icon" />
-                  <p className="game-menu-shop-title">More gear coming soon</p>
+                  {storeActionError && (
+                    <p className="game-controls-hint game-controls-hint-error">
+                      {storeActionError}
+                    </p>
+                  )}
                   <p className="game-menu-shop-balance">
                     <FaCoins />
-                    {gameState.coinBalance} Fahhcoin saved up for when it opens
+                    {profile?.fahhcoinBalance ?? 0} Fahhcoin
                   </p>
                 </div>
               )}
@@ -726,7 +937,10 @@ export default function GamePage() {
               onClick={(e) => e.stopPropagation()}
             >
               <p>
-                View {confirmEntry.isPlayer ? 'your' : `${confirmEntry.name}'s`}{' '}
+                View{' '}
+                {isMyEntry(confirmEntry)
+                  ? 'your'
+                  : `${confirmEntry.fullName}'s`}{' '}
                 territory on the map?
               </p>
               <div className="game-confirm-actions">
@@ -755,13 +969,13 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {tracker.gpsError && (
+        {showGpsError && (
           <motion.div
             className="game-confirm-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={tracker.clearGpsError}
+            onClick={() => setGpsErrorDismissed(true)}
           >
             <motion.div
               className="game-confirm-card"
@@ -770,22 +984,19 @@ export default function GamePage() {
               exit={{ opacity: 0, scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <p>{tracker.gpsError}</p>
+              <p>{gpsStatusMessage}</p>
               <div className="game-confirm-actions">
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => {
-                    tracker.clearGpsError()
-                    tracker.startManual()
-                  }}
+                  onClick={() => setGpsErrorDismissed(true)}
                 >
-                  Tap to Draw Instead
+                  Dismiss
                 </button>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={tracker.startGps}
+                  onClick={handleStartRun}
                 >
                   Try Again
                 </button>
@@ -796,13 +1007,13 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {avatarChoice && (
+        {storeChoice && (
           <motion.div
             className="game-confirm-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setAvatarChoice(null)}
+            onClick={() => setStoreChoice(null)}
           >
             <motion.div
               className="game-confirm-card"
@@ -811,35 +1022,23 @@ export default function GamePage() {
               exit={{ opacity: 0, scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <p>Set this avatar?</p>
-              <div className="game-avatar-confirm-compare">
-                <div className="game-avatar-confirm-option">
-                  <img src={currentAvatar.src} alt={currentAvatar.name} />
-                  <span>{currentAvatar.name}</span>
-                </div>
-                <span className="game-avatar-confirm-arrow">→</span>
-                <div className="game-avatar-confirm-option">
-                  <img src={avatarChoice.src} alt={avatarChoice.name} />
-                  <span>{avatarChoice.name}</span>
-                </div>
-              </div>
+              <p>
+                Buy {storeChoice.name} for {storeChoice.priceFahhcoin} Fahhcoin?
+              </p>
               <div className="game-confirm-actions">
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => setAvatarChoice(null)}
+                  onClick={() => setStoreChoice(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => {
-                    persist({ ...gameState, avatarId: avatarChoice.id })
-                    setAvatarChoice(null)
-                  }}
+                  onClick={() => handlePurchase(storeChoice)}
                 >
-                  Set This Avatar
+                  Buy
                 </button>
               </div>
             </motion.div>
