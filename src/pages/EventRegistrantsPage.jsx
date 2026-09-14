@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ApiError, canManageEvents, getJson, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
@@ -14,6 +14,13 @@ const STATUS_LABELS = {
   FAILED: 'Failed',
   CANCELLED: 'Cancelled',
 }
+
+// Mods/admins can only manually move a registration to one of these two
+// statuses — everything else (PENDING/FAILED) is Khalti-driven.
+const UPDATABLE_STATUSES = [
+  { value: 'PAID', label: 'Paid' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+]
 
 const PAGE_SIZE = 30
 
@@ -38,8 +45,96 @@ export default function EventRegistrantsPage() {
   const [loading, setLoading] = useState(true)
   const [tableLoading, setTableLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [editingRegistrant, setEditingRegistrant] = useState(null)
+  const [statusForm, setStatusForm] = useState({
+    paymentStatus: '',
+    remarks: '',
+  })
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [statusError, setStatusError] = useState(null)
 
   const allowed = canManageEvents(user)
+
+  const fetchStats = useCallback(() => {
+    return Promise.all([
+      postJson(`/v1/event/${id}/registrations`, {
+        pageNumber: 1,
+        noOfRecords: 1,
+        actionType: 'FILTER',
+        search: [
+          ...ATHLETE_ONLY_FILTER,
+          { field: 'paymentStatus', value: 'PAID', type: 'exact' },
+        ],
+      }),
+      postJson(`/v1/event/${id}/registrations`, {
+        pageNumber: 1,
+        noOfRecords: 1,
+        actionType: 'FILTER',
+        search: [
+          ...ATHLETE_ONLY_FILTER,
+          { field: 'paymentStatus', value: 'PENDING', type: 'exact' },
+        ],
+      }),
+    ]).then(([paidPage, pendingPage]) => {
+      setStats({
+        paid: paidPage?.totalElements ?? 0,
+        pending: pendingPage?.totalElements ?? 0,
+      })
+    })
+  }, [id])
+
+  function openStatusModal(registrant) {
+    setStatusError(null)
+    setStatusForm({ paymentStatus: '', remarks: '' })
+    setEditingRegistrant(registrant)
+  }
+
+  function closeStatusModal() {
+    if (statusSaving) return
+    setEditingRegistrant(null)
+  }
+
+  async function handleStatusSubmit(e) {
+    e.preventDefault()
+    if (!editingRegistrant) return
+    if (!statusForm.paymentStatus) {
+      setStatusError('Please select a status.')
+      return
+    }
+    if (!statusForm.remarks.trim()) {
+      setStatusError('Remarks are required before updating the status.')
+      return
+    }
+    setStatusError(null)
+    setStatusSaving(true)
+    try {
+      const updated = await postJson(
+        '/v1/event/registration/update-payment-status',
+        {
+          registrationId: editingRegistrant.registrationId,
+          paymentStatus: statusForm.paymentStatus,
+          remarks: statusForm.remarks.trim(),
+        }
+      )
+      setRegistrants((prev) =>
+        prev.map((r) =>
+          r.registrationId === editingRegistrant.registrationId
+            ? { ...r, ...updated }
+            : r
+        )
+      )
+      setEditingRegistrant(null)
+      fetchStats().catch(() => {})
+    } catch (err) {
+      setStatusError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not update payment status. Please try again.'
+      )
+    } finally {
+      setStatusSaving(false)
+    }
+  }
 
   const report = useMemo(() => {
     const entryFee = Number(event?.entryFee) || 0
@@ -72,34 +167,13 @@ export default function EventRegistrantsPage() {
     Promise.all([
       getJson(`/v1/event/${id}`),
       postJson('/v1/athlete/find', { pageNumber: 1, noOfRecords: 500 }),
-      postJson(`/v1/event/${id}/registrations`, {
-        pageNumber: 1,
-        noOfRecords: 1,
-        actionType: 'FILTER',
-        search: [
-          ...ATHLETE_ONLY_FILTER,
-          { field: 'paymentStatus', value: 'PAID', type: 'exact' },
-        ],
-      }),
-      postJson(`/v1/event/${id}/registrations`, {
-        pageNumber: 1,
-        noOfRecords: 1,
-        actionType: 'FILTER',
-        search: [
-          ...ATHLETE_ONLY_FILTER,
-          { field: 'paymentStatus', value: 'PENDING', type: 'exact' },
-        ],
-      }),
+      fetchStats(),
     ])
-      .then(([eventData, athletesData, paidPage, pendingPage]) => {
+      .then(([eventData, athletesData]) => {
         setEvent(eventData)
         setAthleteById(
           new Map((athletesData?.content || []).map((a) => [a.userId, a]))
         )
-        setStats({
-          paid: paidPage?.totalElements ?? 0,
-          pending: pendingPage?.totalElements ?? 0,
-        })
       })
       .catch((err) =>
         setError(
@@ -109,7 +183,7 @@ export default function EventRegistrantsPage() {
         )
       )
       .finally(() => setLoading(false))
-  }, [id, userLoading, allowed])
+  }, [id, userLoading, allowed, fetchStats])
 
   // The actual table — fetched 30 rows at a time, refetched on every page
   // change, instead of loading every registrant up front and paging through
@@ -185,6 +259,7 @@ export default function EventRegistrantsPage() {
                     <th>Name</th>
                     <th>Mobile Number</th>
                     <th>Payment Status</th>
+                    <th>Remarks</th>
                     <th>Registered</th>
                     <th></th>
                   </tr>
@@ -193,7 +268,7 @@ export default function EventRegistrantsPage() {
                   {tableLoading && registrants.length === 0 && (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="event-registrants-muted registrant-table-loading-cell"
                       >
                         Loading...
@@ -209,24 +284,36 @@ export default function EventRegistrantsPage() {
                         {athleteById.get(registrant.userId)?.mobileNumber ||
                           '—'}
                       </td>
-                      <td>
+                      <td className="registrant-payment-cell">
                         <span
                           className={`registrant-status status-${(registrant.paymentStatus || '').toLowerCase()}`}
                         >
                           {STATUS_LABELS[registrant.paymentStatus] ||
                             registrant.paymentStatus}
                         </span>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => openStatusModal(registrant)}
+                        >
+                          Update
+                        </button>
+                      </td>
+                      <td className="registrant-remarks-cell">
+                        {registrant.remarks || '—'}
                       </td>
                       <td className="registrant-meta-cell">
                         {formatDate(registrant.registeredDate)}
                       </td>
                       <td>
-                        <Link
-                          to={`/athletes/${registrant.userId}`}
-                          className="btn btn-outline"
-                        >
-                          View Profile
-                        </Link>
+                        <div className="registrant-actions">
+                          <Link
+                            to={`/athletes/${registrant.userId}`}
+                            className="btn btn-outline"
+                          >
+                            View Profile
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -300,6 +387,84 @@ export default function EventRegistrantsPage() {
           </div>
         )}
       </div>
+
+      {editingRegistrant && (
+        <div className="status-update-overlay" onClick={closeStatusModal}>
+          <form
+            className="status-update-modal glass-card"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleStatusSubmit}
+          >
+            <h2>Update Payment Status</h2>
+            <p className="status-update-subject">
+              {formatName(editingRegistrant.fullName)} &middot; currently{' '}
+              <strong>
+                {STATUS_LABELS[editingRegistrant.paymentStatus] ||
+                  editingRegistrant.paymentStatus}
+              </strong>
+            </p>
+
+            {statusError && <div className="banner error">{statusError}</div>}
+
+            <div className="field">
+              <label htmlFor="status-update-status">New Status</label>
+              <select
+                id="status-update-status"
+                value={statusForm.paymentStatus}
+                onChange={(e) =>
+                  setStatusForm((f) => ({
+                    ...f,
+                    paymentStatus: e.target.value,
+                  }))
+                }
+                required
+              >
+                <option value="">Select status</option>
+                {UPDATABLE_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="status-update-remarks">
+                Remarks <span className="opt">(required)</span>
+              </label>
+              <textarea
+                id="status-update-remarks"
+                rows={3}
+                value={statusForm.remarks}
+                onChange={(e) =>
+                  setStatusForm((f) => ({ ...f, remarks: e.target.value }))
+                }
+                placeholder="Why is this status being changed?"
+                required
+              />
+            </div>
+
+            <div className="status-update-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={closeStatusModal}
+                disabled={statusSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={statusSaving}
+              >
+                {statusSaving ? 'Saving...' : 'Save Status'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <Footer />
     </div>
   )
