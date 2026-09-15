@@ -4,22 +4,22 @@
   height: 100%;
   overflow: hidden;
   background: #0a0806;
-  /* Only used while .territory-map-tilt carries .is-zooming below — a real
-     vanishing point is what makes that brief tilt read as "3D" rather than
-     a flat squish, without needing to keep it (or correct click math for
-     it) once the map settles back to its normal top-down view. */
+  /* Only used while .territory-map-tilt carries .is-close-in below — a real
+     vanishing point is what makes that tilt read as "3D" rather than a flat
+     squish, without needing to keep it (or correct click math for it) once
+     the map settles back to its normal top-down view. */
   perspective: 1100px;
   perspective-origin: center center;
 }
 
-/* Flat/top-down by default. Briefly tilts during any zoom gesture
-   (.is-zooming, toggled on zoomstart/zoomend) and settles into a standing
-   tilt once the player is zoomed in close (.is-close-in, toggled by zoom
-   level — see CLOSE_IN_TILT_ZOOM in TerritoryMap.jsx) so building-3d
-   extrusions in the basemap read as real buildings. .is-close-in is always
-   forced off during manualMode (tap-to-draw), since this is a CSS transform
-   on the whole map rather than a real perspective camera — Leaflet's
-   click-to-latlng math only stays accurate while flat. */
+/* Flat/top-down until the player is zoomed in close (.is-close-in, toggled
+   by zoom level — see CLOSE_IN_TILT_ZOOM in TerritoryMap.jsx), at which
+   point it settles into a standing tilt so building-3d extrusions in the
+   basemap read as real buildings. Mid-zoom gestures at any other level stay
+   flat — no tilt flourish while scrolling/pinching through the rest of the
+   range. Always forced off during manualMode (tap-to-draw), since this is a
+   CSS transform on the whole map rather than a real perspective camera —
+   Leaflet's click-to-latlng math only stays accurate while flat. */
 .territory-map-tilt {
   position: absolute;
   inset: 0;
@@ -28,7 +28,6 @@
   transition: transform 0.3s ease;
 }
 
-.territory-map-tilt.is-zooming,
 .territory-map-tilt.is-close-in {
   transform: rotateX(22deg) scale(1.25);
 }
@@ -48,9 +47,15 @@
 /* The vector basemap's stock "Liberty" palette is already fairly colorful,
    but this pushes it further from "map app" toward "painted game world" —
    Pokémon GO's terrain is far more saturated than any real cartographic
-   style. */
+   style. Promoted to its own GPU compositing layer (will-change) because a
+   CSS filter on a live WebGL canvas otherwise gets recomposited through the
+   main thread on every frame — during a fast pan that shows up as visible
+   tearing/lag behind the polygon overlays until the drag stops and the
+   browser catches up. */
 .territory-map-tiles {
   filter: saturate(1.45) contrast(1.08) brightness(1.03);
+  will-change: filter, transform;
+  transform: translateZ(0);
 }
 
 .territory-map .leaflet-control-attribution {
@@ -152,6 +157,13 @@
   filter: drop-shadow(0 0 6px rgba(224, 165, 55, 0.55));
 }
 
+/* Tapping a claimed parcel views that owner's whole territory (see
+   handleParcelClick in GamePage.jsx) - the pointer cursor is the only hint
+   that the filled shape (not just its badge marker) is itself tappable. */
+.territory-poly-clickable {
+  cursor: pointer;
+}
+
 /* Pulsing white glow for whichever parcel the player tapped in the
    leaderboard, so "viewing their territory" reads as more than just a
    camera pan. */
@@ -171,8 +183,7 @@
 
 /* --- Floating chunky controls: carved-stone slabs, one flat base color plus
    one hard-edged shadow band, per the game's cel-shaded HUD language. --- */
-.territory-map-locate,
-.territory-map-zoom button {
+.territory-map-locate {
   border: 3px solid var(--game-ink, #3d2b1a);
   background: var(--game-stone, #9a9d93);
   color: var(--game-ink, #3d2b1a);
@@ -188,8 +199,7 @@
     box-shadow 0.1s ease;
 }
 
-.territory-map-locate:active,
-.territory-map-zoom button:active {
+.territory-map-locate:active {
   transform: translateY(2px);
   box-shadow:
     inset 0 -5px 0 var(--game-stone-dark, #6e7166),
@@ -230,25 +240,6 @@
   line-height: 1.4;
   text-align: right;
   box-shadow: 0 3px 0 var(--game-ink, #3d2b1a);
-}
-
-.territory-map-zoom {
-  position: absolute;
-  left: 14px;
-  bottom: calc(var(--sheet-h, 90px) + 86px);
-  z-index: 500;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.territory-map-zoom button {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  font-size: 20px;
-  font-weight: 700;
-  padding: 0 0 2px;
 }
 
 .territory-map-loading {

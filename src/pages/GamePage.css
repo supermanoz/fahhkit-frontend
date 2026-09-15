@@ -63,6 +63,34 @@
     0 1px 0 var(--game-ink);
 }
 
+.game-mute-btn {
+  position: absolute;
+  top: 68px;
+  left: 16px;
+  z-index: 600;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-stone);
+  color: var(--game-ink);
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 -6px 0 var(--game-stone-dark),
+    0 3px 0 var(--game-ink);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.game-mute-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -6px 0 var(--game-stone-dark),
+    0 1px 0 var(--game-ink);
+}
+
 .game-hud {
   position: absolute;
   top: 16px;
@@ -84,6 +112,21 @@
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.1),
     0 3px 0 var(--game-ink);
+}
+
+.game-hud-stat-clickable {
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.game-hud-stat-clickable:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* --- Resource medallion: a chunky, flat, cel-shaded coin/gem rather than a
@@ -244,7 +287,6 @@
   position: fixed;
   left: 50%;
   bottom: calc(var(--sheet-h, 90px) + 26px);
-  transform: translateX(-50%);
   z-index: 1200;
   padding: 20px 28px;
   text-align: center;
@@ -264,17 +306,29 @@
   color: var(--game-gold);
 }
 
+.game-claim-toast-run-stats {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(246, 236, 217, 0.65);
+}
+
 .game-claim-toast p {
   margin: 0 0 14px;
   font-weight: 600;
   color: var(--game-cream);
 }
 
+.game-claim-toast-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
 .game-highlight-toast {
   position: fixed;
   left: 50%;
   top: 20px;
-  transform: translateX(-50%);
   z-index: 1200;
   padding: 16px 22px;
   text-align: center;
@@ -341,6 +395,35 @@
   display: flex;
   gap: 10px;
   justify-content: center;
+}
+
+.game-run-viewer {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+}
+
+.game-run-viewer-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-stone);
+  color: var(--game-ink);
+  border: 3px solid var(--game-ink);
+  box-shadow: 0 3px 0 var(--game-ink);
+  cursor: pointer;
+}
+
+.game-run-viewer-close:active {
+  transform: translateY(2px);
+  box-shadow: none;
 }
 
 /* --- Menu FAB: bottom-center pokéball. Tapping it fans three radial
@@ -610,6 +693,15 @@
   margin-top: 4px;
 }
 
+.game-menu-section-title {
+  width: 100%;
+  text-align: left;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--game-cream);
+  margin: 18px 0 8px;
+}
+
 .game-menu-empty {
   text-align: center;
   color: rgba(246, 236, 217, 0.65);
@@ -634,6 +726,16 @@
   background: rgba(246, 236, 217, 0.06);
   border-radius: 12px;
   border: 1px solid rgba(246, 236, 217, 0.12);
+}
+
+.game-menu-list li:hover {
+  background: rgba(246, 236, 217, 0.1);
+}
+
+.game-menu-list-row {
+  all: unset;
+  display: contents;
+  cursor: pointer;
 }
 
 .game-menu-list-area {

@@ -12,12 +12,15 @@ import {
   FaTimes,
   FaTrophy,
   FaUser,
+  FaVolumeMute,
+  FaVolumeUp,
 } from 'react-icons/fa'
 import TerritoryMap from '../components/TerritoryMap'
+import ShareRunCarousel from '../components/ShareRunCarousel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { ApiError, isAdmin, resolveFileUrl } from '../api/client'
-import { createRun } from '../api/runs'
+import { createRun, getRun, getRuns } from '../api/runs'
 import {
   findIndividualLeaderboard,
   findMyParcels,
@@ -46,11 +49,19 @@ import {
   MIN_VALID_RUN_DISTANCE_METERS,
   MIN_VALID_RUN_DURATION_SECONDS,
   calculatePaceMinPerKm,
+  formatDistance,
   formatDuration,
   formatPace,
+  formatRunDate,
   toLocalDateTimeString,
 } from '../utils/run'
-import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
+import {
+  SHARE_VARIANTS,
+  downloadBlob,
+  exportShareCardBlob,
+} from '../utils/shareCanvas'
+import { playClickSound, playMilestoneChime } from '../utils/gameSound'
+import defaultAvatarImage from '../assets/images/player-avatar-wind.png'
 import {
   AVATARS,
   COMING_SOON_AVATARS,
@@ -98,6 +109,9 @@ const RADIAL_ITEMS = [
 const RESULT_POLL_ATTEMPTS = 6
 const RESULT_POLL_DELAY_MS = 2500
 
+const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
+const MILESTONE_METERS = 1000
+
 const EVENT_TYPE_TITLES = {
   CLAIMED: 'Territory claimed!',
   CAPTURED: "You captured a rival's ground!",
@@ -134,6 +148,9 @@ export default function GamePage() {
 
   const [profile, setProfile] = useState(null)
   const [myParcels, setMyParcels] = useState([])
+  const [myRuns, setMyRuns] = useState([])
+  const [viewingRun, setViewingRun] = useState(null)
+  const [loadingRunId, setLoadingRunId] = useState(null)
   const [nearbyParcels, setNearbyParcels] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
   const [leaderboardError, setLeaderboardError] = useState(null)
@@ -157,6 +174,28 @@ export default function GamePage() {
   const [saveError, setSaveError] = useState(null)
   const [runResult, setRunResult] = useState(null)
   const [gpsErrorDismissed, setGpsErrorDismissed] = useState(false)
+  // The run just submitted, kept around so "Download Map" in the result
+  // toast has something to export — createRun's response (RunSummaryResponse)
+  // has no points, so this is built from the local pendingRun data plus the
+  // id/avgPace the backend hands back.
+  const [completedRun, setCompletedRun] = useState(null)
+  const [downloadingMap, setDownloadingMap] = useState(false)
+
+  // Background music mute, remembered across sessions like the avatar
+  // choice — nobody wants the game to start blaring music again after they
+  // muted it and closed the tab.
+  const [musicMuted, setMusicMuted] = useState(() => {
+    try {
+      return localStorage.getItem(MUSIC_MUTED_KEY) === 'true'
+    } catch {
+      return false
+    }
+  })
+  const musicRef = useRef(null)
+  // Last 1km-multiple the player was alerted for during the current tracked
+  // run — a ref (not state) since it's read/written from inside an effect
+  // and should never itself trigger a re-render.
+  const lastMilestoneRef = useRef(0)
 
   // TEMP: admin-only tap-to-draw, purely for testing without needing a real
   // GPS trace. The backend has no "submit a shape directly" endpoint — this
@@ -277,6 +316,64 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locating, isAuthed])
 
+  // Background music, looped for as long as the game is open. Browsers block
+  // audio.play() before any user gesture on the page, so the first attempt
+  // here (on mount) commonly rejects silently — a one-time listener on the
+  // document retries it the moment the player taps/clicks anything at all,
+  // which is the earliest a real gesture could exist.
+  useEffect(() => {
+    if (!isAuthed) return
+    const audio = musicRef.current
+    if (!audio) return
+    audio.volume = 0.35
+    audio.muted = musicMuted
+
+    function tryPlay() {
+      audio.play().catch(() => {})
+    }
+    tryPlay()
+
+    document.addEventListener('pointerdown', tryPlay, { once: true })
+    return () => document.removeEventListener('pointerdown', tryPlay)
+  }, [isAuthed, musicMuted])
+
+  function toggleMusicMuted() {
+    setMusicMuted((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(MUSIC_MUTED_KEY, String(next))
+      } catch {
+        // Preference just won't persist past reload.
+      }
+      return next
+    })
+  }
+
+  // Plays a rising chime every time a tracked run crosses a new 1km
+  // multiple — lastMilestoneRef resets to 0 whenever tracking (re)starts so
+  // a second run in the same session alerts from km 1 again, not wherever
+  // the previous run left off.
+  useEffect(() => {
+    if (tracker.status !== 'tracking') {
+      lastMilestoneRef.current = 0
+      return
+    }
+    const reached = Math.floor(tracker.distance / MILESTONE_METERS)
+    if (reached > lastMilestoneRef.current) {
+      lastMilestoneRef.current = reached
+      playMilestoneChime()
+    }
+  }, [tracker.status, tracker.distance])
+
+  // Delegated click-to-sound: capture phase so it fires even for buttons
+  // that stopPropagation() on their own click handler (e.g. LocateButton),
+  // and one listener here covers every button in the page instead of
+  // wiring a sound effect into each individual onClick.
+  function handleGameClick(e) {
+    const btn = e.target.closest('button')
+    if (btn && !btn.disabled) playClickSound()
+  }
+
   async function loadLeaderboard() {
     setLeaderboardError(null)
     try {
@@ -313,10 +410,42 @@ export default function GamePage() {
     setRadialOpen(false)
   }
 
+  // Territory runs are just runs with no eventId (see attemptSubmit below) —
+  // getRuns() returns every run type, so this filters down to the ones this
+  // game itself created rather than ones logged against an ENDURANCE event
+  // elsewhere in the app (see TrackRunPanel.jsx).
+  async function loadMyRuns() {
+    try {
+      const page = await getRuns()
+      const territoryRuns = (page?.content || [])
+        .filter((r) => r.eventId == null)
+        .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
+      setMyRuns(territoryRuns)
+    } catch {
+      // Leave whatever's already loaded in place - same as refreshProfile.
+    }
+  }
+
+  // Fetches the one field the runs list doesn't carry - points - so the
+  // share-card carousel (built for RunDetailPage, reused here as-is) has a
+  // route to draw.
+  async function handleViewRun(runId) {
+    setLoadingRunId(runId)
+    try {
+      const detail = await getRun(runId)
+      setViewingRun(detail)
+    } catch {
+      // Leave the list as-is; the row just stops showing a loading state.
+    } finally {
+      setLoadingRunId(null)
+    }
+  }
+
   function switchTab(tab) {
     setMenuTab(tab)
     if (tab === 'leaderboard' && leaderboard.length === 0) loadLeaderboard()
     if (tab === 'shop' && storeCatalog.length === 0) loadStore()
+    if (tab === 'me' && myRuns.length === 0) loadMyRuns()
   }
 
   function handleStartRun() {
@@ -338,6 +467,44 @@ export default function GamePage() {
   function handleMapTap(point) {
     if (!manualMode) return
     setManualPoints((prev) => [...prev, point])
+  }
+
+  // Tapping a claimed parcel directly on the map is a stronger signal than
+  // tapping a leaderboard row (the player already has it in view), so this
+  // skips the "view on map?" confirm dialog and goes straight to the same
+  // highlight/focus toast the leaderboard flow produces.
+  function handleParcelClick(parcel) {
+    setHighlightedEntry({
+      userId: parcel.ownerId,
+      fullName: parcel.ownerName,
+      areaSqMeters: parcel.area,
+    })
+  }
+
+  // Tapping your own avatar marker on the map - purely a "yeah, that's me"
+  // flex, reusing the same highlight/focus flow (gold outline + pulsing
+  // glow on whatever of your territory is in view) rather than a bespoke
+  // effect just for this entry point.
+  function handleSelfClick() {
+    setHighlightedEntry({
+      userId: user?.id,
+      fullName: user?.fullName,
+      areaSqMeters: profile?.totalAreaSqMeters,
+    })
+  }
+
+  // Tapping one of your own parcels in the "Me" tab list — same direct
+  // highlight/focus flow as handleParcelClick above (no confirm dialog,
+  // since picking a specific row is already an explicit choice), just
+  // sourced from the paginated my-parcels list instead of the map.
+  function handleViewMyParcel(parcel) {
+    setHighlightedEntry({
+      userId: user?.id,
+      fullName: user?.fullName,
+      areaSqMeters: parcel.areaSqMeters,
+      parcelId: parcel.id,
+    })
+    setMenuOpen(false)
   }
 
   function handleCancelManual() {
@@ -399,6 +566,44 @@ export default function GamePage() {
     }
   }
 
+  // Exports and saves the map-snapshot share card straight to the device —
+  // no picker screen first. Athletes just finished a run and want the file,
+  // not another UI to navigate; the other share-card styles (transparent
+  // route, brand gradient) still live on the run's detail page for anyone
+  // who wants to post it.
+  // Distance/pace/time strip shown on every phase of the post-run toast —
+  // the run's own stats, independent of whatever the territory-processing
+  // phase (still checking / done / timed out) has to say.
+  function renderCompletedRunStats() {
+    if (!completedRun) return null
+    return (
+      <p className="game-claim-toast-run-stats">
+        {formatDistance(completedRun.distance)} ·{' '}
+        {formatPace(completedRun.avgPace)} ·{' '}
+        {formatDuration(completedRun.duration)}
+      </p>
+    )
+  }
+
+  async function handleDownloadMap() {
+    if (!completedRun) return
+    setDownloadingMap(true)
+    try {
+      const blob = await exportShareCardBlob({
+        points: completedRun.points,
+        distance: completedRun.distance,
+        duration: completedRun.duration,
+        pace: completedRun.avgPace,
+        variant: SHARE_VARIANTS.MAP,
+        mimeType: 'image/jpeg',
+        quality: 0.92,
+      })
+      downloadBlob(blob, `fahhkit-run-${completedRun.id}-map.jpg`)
+    } finally {
+      setDownloadingMap(false)
+    }
+  }
+
   async function attemptSubmit(pendingRun) {
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
@@ -418,13 +623,20 @@ export default function GamePage() {
     setSaveError(null)
     const submittedAt = new Date()
     try {
-      await createRun({
+      const created = await createRun({
         eventId: null,
         points: pendingRun.points,
         distance: pendingRun.distance,
         duration: pendingRun.duration,
         startedAt: toLocalDateTimeString(pendingRun.startedAt),
         endedAt: toLocalDateTimeString(pendingRun.endedAt),
+      })
+      setCompletedRun({
+        id: created.id,
+        points: pendingRun.points,
+        distance: pendingRun.distance,
+        duration: pendingRun.duration,
+        avgPace: created.avgPace,
       })
       discardDraft()
       setSaving(false)
@@ -506,7 +718,9 @@ export default function GamePage() {
   const highlightedOwnerId = highlightedEntry?.userId ?? null
   const highlightHasVisibleParcels =
     highlightedEntry &&
-    nearbyParcels.some((p) => p.ownerId === highlightedEntry.userId)
+    (highlightedEntry.parcelId
+      ? nearbyParcels.some((p) => p.id === highlightedEntry.parcelId)
+      : nearbyParcels.some((p) => p.ownerId === highlightedEntry.userId))
 
   const gpsStatusMessage =
     tracker.status === 'permission-denied'
@@ -574,7 +788,16 @@ export default function GamePage() {
   }
 
   return (
-    <div className="game-page" style={{ '--sheet-h': `${controlsHeight}px` }}>
+    <div
+      className="game-page"
+      style={{ '--sheet-h': `${controlsHeight}px` }}
+      onClickCapture={handleGameClick}
+    >
+      <audio
+        ref={musicRef}
+        src={`${import.meta.env.BASE_URL}audio/territory-theme.mp3`}
+        loop
+      />
       {locating ? (
         <div className="territory-map-loading game-page-map-slot">
           Finding your location…
@@ -587,15 +810,27 @@ export default function GamePage() {
           livePath={manualMode ? manualPoints : tracker.path}
           currentUserId={user?.id}
           highlightOwnerId={highlightedOwnerId}
+          highlightParcelId={highlightedEntry?.parcelId ?? null}
           avatarSrc={avatarSrc}
           manualMode={manualMode}
           onMapClick={handleMapTap}
+          onParcelClick={handleParcelClick}
+          onSelfClick={handleSelfClick}
         />
       )}
 
       <Link to="/" className="game-exit-btn" aria-label="Exit to home">
         <FaArrowLeft />
       </Link>
+
+      <button
+        type="button"
+        className="game-mute-btn"
+        onClick={toggleMusicMuted}
+        aria-label={musicMuted ? 'Unmute music' : 'Mute music'}
+      >
+        {musicMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+      </button>
 
       <div className="game-hud">
         <div className="game-hud-stat" aria-label="Fahhcoin balance">
@@ -606,12 +841,20 @@ export default function GamePage() {
             {profile?.fahhcoinBalance ?? 0}
           </span>
         </div>
-        <div className="game-hud-stat" aria-label="Parcels held">
+        <button
+          type="button"
+          className="game-hud-stat game-hud-stat-clickable"
+          aria-label="Parcels held - view your territories"
+          onClick={() => {
+            switchTab('me')
+            setMenuOpen(true)
+          }}
+        >
           <span className="game-hud-icon game-hud-icon-flag">
             <FaFlag />
           </span>
           <span className="game-hud-value">{profile?.parcelCount ?? 0}</span>
-        </div>
+        </button>
       </div>
 
       {radialOpen && (
@@ -781,9 +1024,9 @@ export default function GamePage() {
         {saveError && (
           <motion.div
             className="game-claim-toast glass-card"
-            initial={{ opacity: 0, y: 40, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
           >
             <h3>{saveError.title}</h3>
             <p>{saveError.message}</p>
@@ -814,13 +1057,14 @@ export default function GamePage() {
         {runResult && (
           <motion.div
             className="game-claim-toast glass-card"
-            initial={{ opacity: 0, y: 40, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
           >
             {runResult.phase === 'processing' && (
               <>
                 <h3>Run submitted!</h3>
+                {renderCompletedRunStats()}
                 <p>Checking your territory…</p>
               </>
             )}
@@ -832,24 +1076,38 @@ export default function GamePage() {
                 return (
                   <>
                     <h3>{title}</h3>
+                    {renderCompletedRunStats()}
                     <p>
                       {formatArea(totalArea)} affected across{' '}
                       {runResult.events.length} update
                       {runResult.events.length === 1 ? '' : 's'}
                     </p>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => setRunResult(null)}
-                    >
-                      Nice
-                    </button>
+                    <div className="game-claim-toast-actions">
+                      {completedRun && (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={handleDownloadMap}
+                          disabled={downloadingMap}
+                        >
+                          {downloadingMap ? 'Preparing...' : 'Download Map'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setRunResult(null)}
+                      >
+                        Nice
+                      </button>
+                    </div>
                   </>
                 )
               })()}
             {runResult.phase === 'timeout' && (
               <>
                 <h3>Run saved!</h3>
+                {renderCompletedRunStats()}
                 <p>
                   If your loop closed cleanly, territory should show up here
                   shortly — check back in a bit if you don’t see it yet.
@@ -871,9 +1129,9 @@ export default function GamePage() {
         {highlightedEntry && (
           <motion.div
             className="game-highlight-toast glass-card"
-            initial={{ opacity: 0, y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            initial={{ opacity: 0, x: '-50%', y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: -20, scale: 0.9 }}
           >
             <h3>
               {isMyEntry(highlightedEntry)
@@ -1032,14 +1290,49 @@ export default function GamePage() {
                         .sort((a, b) => b.areaSqMeters - a.areaSqMeters)
                         .map((p) => (
                           <li key={p.id}>
-                            <span className="game-menu-list-area">
-                              {formatArea(p.areaSqMeters)}
-                            </span>
-                            <span className="game-menu-list-meta">
-                              score {Math.round(p.currentScore || 0)}
-                            </span>
+                            <button
+                              type="button"
+                              className="game-menu-list-row"
+                              onClick={() => handleViewMyParcel(p)}
+                            >
+                              <span className="game-menu-list-area">
+                                {formatArea(p.areaSqMeters)}
+                              </span>
+                              <span className="game-menu-list-meta">
+                                score {Math.round(p.currentScore || 0)}
+                              </span>
+                            </button>
                           </li>
                         ))}
+                    </ul>
+                  )}
+
+                  <p className="game-menu-section-title">Your territory runs</p>
+                  {myRuns.length === 0 ? (
+                    <p className="game-menu-empty">
+                      Finish a GPS run to see its map here.
+                    </p>
+                  ) : (
+                    <ul className="game-menu-list">
+                      {myRuns.map((r) => (
+                        <li key={r.id}>
+                          <button
+                            type="button"
+                            className="game-menu-list-row"
+                            onClick={() => handleViewRun(r.id)}
+                            disabled={loadingRunId === r.id}
+                          >
+                            <span className="game-menu-list-area">
+                              {formatRunDate(r.startedAt)}
+                            </span>
+                            <span className="game-menu-list-meta">
+                              {loadingRunId === r.id
+                                ? 'Loading…'
+                                : `${formatDistance(r.distance)} · ${formatDuration(r.duration)}`}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
                     </ul>
                   )}
                 </div>
@@ -1239,6 +1532,36 @@ export default function GamePage() {
                   Yes, view it
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viewingRun && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setViewingRun(null)}
+          >
+            <motion.div
+              className="game-run-viewer"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="game-run-viewer-close"
+                aria-label="Close"
+                onClick={() => setViewingRun(null)}
+              >
+                <FaTimes />
+              </button>
+              <ShareRunCarousel run={viewingRun} />
             </motion.div>
           </motion.div>
         )}

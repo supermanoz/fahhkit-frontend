@@ -11,6 +11,15 @@ import { useWakeLock } from './useWakeLock'
 // Below this, a brief tab switch or notification check isn't worth warning about.
 const BACKGROUND_GAP_THRESHOLD_MS = 10000
 
+// Some devices/browsers deliver more than one geolocation fix per second for
+// the same moment (e.g. GPS and network/fused providers both reporting, or
+// the OS just re-delivering) — accepting every raw watchPosition callback as
+// its own point double(or more)-counts that stretch of ground, inflating
+// distance with noise instead of real movement. Throttling to at most one
+// accepted point per MIN_POINT_INTERVAL_MS collapses those redundant fixes;
+// a real run never needs sub-2.5s point density anyway.
+const MIN_POINT_INTERVAL_MS = 2500
+
 // status: idle | tracking | permission-denied | unsupported | error
 export function useRunTracker() {
   const [status, setStatus] = useState('idle')
@@ -116,6 +125,13 @@ export function useRunTracker() {
         }
 
         const previous = pointsRef.current[pointsRef.current.length - 1]
+        if (
+          previous &&
+          point.timestamp - previous.timestamp < MIN_POINT_INTERVAL_MS
+        ) {
+          return
+        }
+
         pointsRef.current = [...pointsRef.current, point]
         setPath(pointsRef.current)
         if (previous) {

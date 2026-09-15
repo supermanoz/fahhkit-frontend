@@ -25,15 +25,16 @@ import { FaCrosshairs } from 'react-icons/fa'
 // public/mlgl (so their relative import of each other still resolves) —
 // this just has to point maplibre-gl at the copy before it creates one.
 setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
-import { formatArea } from '../utils/territoryGame'
-import defaultAvatarImage from '../assets/images/player-avatar-specter.png'
+import { PLAYER_COLOR, formatArea } from '../utils/territoryGame'
+import defaultAvatarImage from '../assets/images/player-avatar-wind.png'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
 
 // A free, keyless vector basemap (OpenFreeMap) instead of a raster tile
-// provider — lets us drop every text/icon label ourselves (see
-// hideSymbolLayers below) rather than hoping a provider ships a
-// "no labels" raster variant with global coverage. "Liberty" carries real
+// provider — lets us drop most text/icon labels ourselves, keeping only
+// major place names (see hideSymbolLayers below), rather than hoping a
+// provider ships a labels-optional raster variant with global coverage
+// and the specific big-places-only cut we want. "Liberty" carries real
 // road/park/water color (unlike the grayscale-leaning "Positron" style),
 // which is what actually reads as Pokémon GO's saturated terrain once the
 // filter in TerritoryMap.css punches it up further.
@@ -41,13 +42,55 @@ const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 
 // OpenMapTiles-schema styles put every label AND every POI icon on "symbol"
 // type layers — hiding just that one layer type strips all text/pins while
-// leaving roads, water, parks, and building footprints untouched.
+// leaving roads, water, parks, and building footprints untouched. A few of
+// those layers are kept visible (see IMPORTANT_PLACE_LABEL_IDS) so named
+// places still read on the map instead of it going label-free entirely.
+//
+// Ids come from the "liberty" style's place layers, one per class:
+// label_country_{1,2,3}/label_state/label_city(_capital)/label_town/
+// label_village for places that already get their own dedicated layer. The
+// generic idea, from largest to smallest: keep anything that's a real,
+// commonly-referred-to place name (a country/state/city/town/village, or —
+// checked against OSM directly for e.g. Kathmandu's Maitidevi and
+// Baneshwor, which both turned out to be place=neighbourhood/suburb — a
+// named locality within a city), and only cut things too fine-grained or
+// too rural to matter on a game map (hamlets, isolated dwellings, and the
+// quarter/borough tags some cities double up with neighbourhood).
+const IMPORTANT_PLACE_LABEL_IDS = new Set([
+  'label_city',
+  'label_city_capital',
+  'label_state',
+  'label_country_3',
+  'label_country_2',
+  'label_country_1',
+  'label_town',
+  'label_village',
+  'label_other',
+])
+
+// label_other is a catch-all for every place class without its own layer —
+// suburb and neighbourhood (what Maitidevi/Baneshwor are tagged as) belong
+// there, but so do hamlet, isolated_dwelling, and quarter, which are what
+// this list is deliberately leaving out.
+const LABEL_OTHER_ALLOWED_CLASSES = ['suburb', 'neighbourhood']
+
 function hideSymbolLayers(glMap) {
   const style = glMap.getStyle()
   if (!style) return
   for (const layer of style.layers) {
-    if (layer.type === 'symbol') {
-      glMap.setLayoutProperty(layer.id, 'visibility', 'none')
+    if (layer.type !== 'symbol') continue
+    const visible = IMPORTANT_PLACE_LABEL_IDS.has(layer.id)
+    glMap.setLayoutProperty(
+      layer.id,
+      'visibility',
+      visible ? 'visible' : 'none'
+    )
+    if (layer.id === 'label_other' && visible) {
+      glMap.setFilter('label_other', [
+        'in',
+        ['get', 'class'],
+        ['literal', LABEL_OTHER_ALLOWED_CLASSES],
+      ])
     }
   }
 }
@@ -140,16 +183,21 @@ function InvalidateSizeOnMount() {
 // leaderboard. Depends only on highlightOwnerId (not the territories array
 // itself, which gets a new reference on every render) so it doesn't refly
 // mid-run every time the parcel list refreshes for an unrelated reason.
-function FocusHighlight({ highlightOwnerId, territories }) {
+function FocusHighlight({ highlightOwnerId, highlightParcelId, territories }) {
   const map = useMap()
   useEffect(() => {
     if (!highlightOwnerId) return
-    const matches = territories.filter((t) => t.ownerId === highlightOwnerId)
+    // A specific parcel (picked from the "Me" tab list) flies to just that
+    // one shape instead of every parcel the owner has in view, so tapping
+    // different rows in the list actually goes to different places.
+    const matches = highlightParcelId
+      ? territories.filter((t) => t.id === highlightParcelId)
+      : territories.filter((t) => t.ownerId === highlightOwnerId)
     if (matches.length === 0) return
     const bounds = L.latLngBounds(matches.flatMap((t) => toLatLngs(t.points)))
     map.flyToBounds(bounds, { padding: [70, 70], maxZoom: 19 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, highlightOwnerId])
+  }, [map, highlightOwnerId, highlightParcelId])
   return null
 }
 
@@ -165,27 +213,23 @@ function ClickCapture({ enabled, onMapClick }) {
   return null
 }
 
-// Zoom level (the max of the 16-19 range ZoomRangeLimiter allows) at which
+// Zoom level (the max of the 14-19 range ZoomRangeLimiter allows) at which
 // the map settles into its tilted "close-up" view, Google Maps/Pokémon GO
 // style — only at the very last zoom step (scrolled or pinched all the way
 // in), not partway through zooming closer.
 const CLOSE_IN_TILT_ZOOM = 19
 
 // The map stays flat/top-down until the player zooms in close, at which
-// point it settles into a standing 3D tilt (rather than just a brief
-// flourish mid-zoom) so building-3d extrusions in the basemap actually read
-// as buildings instead of flat footprints. Forced back flat whenever
-// manualMode is on: this is a CSS transform on the whole map, not a real
-// perspective camera, so Leaflet's own click-to-latlng math (used by
-// ClickCapture for tap-to-draw) only stays accurate while flat.
+// point it settles into a standing 3D tilt so building-3d extrusions in the
+// basemap actually read as buildings instead of flat footprints. Only that
+// close-in state tilts — mid-zoom gestures at any other level stay flat, so
+// scrolling/pinching through the rest of the range doesn't wobble the whole
+// map. Forced back flat whenever manualMode is on: this is a CSS transform
+// on the whole map, not a real perspective camera, so Leaflet's own
+// click-to-latlng math (used by ClickCapture for tap-to-draw) only stays
+// accurate while flat.
 function ZoomTiltEffect({ tiltRef, manualMode }) {
   const map = useMapEvents({
-    zoomstart() {
-      tiltRef.current?.classList.add('is-zooming')
-    },
-    zoomend() {
-      tiltRef.current?.classList.remove('is-zooming')
-    },
     zoom() {
       syncCloseInTilt()
     },
@@ -211,15 +255,15 @@ function ZoomTiltEffect({ tiltRef, manualMode }) {
 function ZoomRangeLimiter() {
   const map = useMap()
   useEffect(() => {
-    map.setMinZoom(16)
+    map.setMinZoom(14)
     map.setMaxZoom(19)
   }, [map])
   return null
 }
 
 // Captures the Leaflet map instance for controls that render outside
-// MapContainer (see LocateButton/ZoomControls below) and so can't reach it
-// via useMap() themselves.
+// MapContainer (see LocateButton below) and so can't reach it via useMap()
+// themselves.
 function CaptureMapInstance({ onReady }) {
   const map = useMap()
   useEffect(() => {
@@ -298,40 +342,6 @@ function LocateButton({ map }) {
   )
 }
 
-// Pokémon GO has no visible zoom buttons at all (pinch/scroll only) — but a
-// mouse-and-trackpad desktop audience benefits from an explicit control, so
-// this keeps one, just restyled as a chunky ink-outlined game piece instead
-// of Leaflet's flat default. Rendered outside the tilted map div for the
-// same reason as LocateButton above.
-function ZoomControls({ map }) {
-  return (
-    <div className="territory-map-zoom">
-      <button
-        type="button"
-        aria-label="Zoom in"
-        onClick={(e) => {
-          e.stopPropagation()
-          map.zoomIn()
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        +
-      </button>
-      <button
-        type="button"
-        aria-label="Zoom out"
-        onClick={(e) => {
-          e.stopPropagation()
-          map.zoomOut()
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        −
-      </button>
-    </div>
-  )
-}
-
 export default function TerritoryMap({
   center,
   playerLocation,
@@ -339,9 +349,12 @@ export default function TerritoryMap({
   livePath,
   currentUserId,
   highlightOwnerId,
+  highlightParcelId,
   avatarSrc,
   manualMode,
   onMapClick,
+  onParcelClick,
+  onSelfClick,
 }) {
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
@@ -364,21 +377,37 @@ export default function TerritoryMap({
 
           {territories.map((t) => {
             const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
-            const isHighlighted = highlightOwnerId === t.ownerId
+            const isHighlighted = highlightParcelId
+              ? t.id === highlightParcelId
+              : highlightOwnerId === t.ownerId
             return (
               <Polygon
                 key={t.id}
                 positions={toLatLngs(t.points)}
                 pathOptions={{
-                  color: isHighlighted ? '#FFFFFF' : '#2B2140',
-                  weight: isHighlighted ? 4 : 3,
+                  color: isHighlighted
+                    ? '#FFFFFF'
+                    : isMine
+                      ? PLAYER_COLOR
+                      : '#2B2140',
+                  weight: isHighlighted ? 4 : isMine ? 4 : 3,
                   fillColor: t.color,
                   fillOpacity: isHighlighted ? 0.65 : isMine ? 0.5 : 0.35,
                   className: isHighlighted
-                    ? 'territory-poly-highlight'
+                    ? 'territory-poly-highlight territory-poly-clickable'
                     : isMine
-                      ? 'territory-poly-player'
-                      : undefined,
+                      ? 'territory-poly-player territory-poly-clickable'
+                      : 'territory-poly-clickable',
+                }}
+                eventHandlers={{
+                  click: (e) => {
+                    // Manual (admin tap-to-draw) taps need to reach
+                    // ClickCapture at the map level instead - letting a
+                    // parcel click here also add a draw point.
+                    if (manualMode) return
+                    L.DomEvent.stopPropagation(e)
+                    onParcelClick?.(t)
+                  },
                 }}
               />
             )
@@ -426,12 +455,23 @@ export default function TerritoryMap({
               position={[playerLocation.lat, playerLocation.lng]}
               icon={playerMarkerIcon}
               zIndexOffset={1000}
-              interactive={false}
+              interactive={Boolean(onSelfClick)}
+              eventHandlers={
+                onSelfClick
+                  ? {
+                      click: (e) => {
+                        L.DomEvent.stopPropagation(e)
+                        onSelfClick()
+                      },
+                    }
+                  : undefined
+              }
             />
           )}
 
           <FocusHighlight
             highlightOwnerId={highlightOwnerId}
+            highlightParcelId={highlightParcelId}
             territories={territories}
           />
           <ClickCapture enabled={Boolean(manualMode)} onMapClick={onMapClick} />
@@ -442,12 +482,7 @@ export default function TerritoryMap({
         </MapContainer>
       </div>
       <div className="territory-map-vignette" aria-hidden="true" />
-      {mapInstance && (
-        <>
-          <LocateButton map={mapInstance} />
-          <ZoomControls map={mapInstance} />
-        </>
-      )}
+      {mapInstance && <LocateButton map={mapInstance} />}
     </div>
   )
 }

@@ -1,13 +1,13 @@
-import specterAvatar from '../assets/images/player-avatar-specter.png'
+import windAvatar from '../assets/images/player-avatar-wind.png'
 import blazeAvatar from '../assets/images/player-avatar-blaze.png'
-import cyberwoolAvatar from '../assets/images/player-avatar-cyberwool.png'
-import nightwatchAvatar from '../assets/images/player-avatar-nightwatch.png'
-import shroudAvatar from '../assets/images/player-avatar-shroud.png'
-import vanguardAvatar from '../assets/images/player-avatar-vanguard.png'
-import twinfadeAvatar from '../assets/images/player-avatar-twinfade.png'
-import neonAvatar from '../assets/images/player-avatar-neon.png'
-import warheadAvatar from '../assets/images/player-avatar-warhead.png'
-import wraithAvatar from '../assets/images/player-avatar-wraith.png'
+import boltAvatar from '../assets/images/player-avatar-bolt.png'
+import novaAvatar from '../assets/images/player-avatar-nova.png'
+import stormAvatar from '../assets/images/player-avatar-storm.png'
+import turboAvatar from '../assets/images/player-avatar-turbo.png'
+import flashAvatar from '../assets/images/player-avatar-flash.png'
+import pulseAvatar from '../assets/images/player-avatar-pulse.png'
+import cometAvatar from '../assets/images/player-avatar-comet.png'
+import cycloneAvatar from '../assets/images/player-avatar-cyclone.png'
 
 // Map-marker avatar choice. Local-only (localStorage), not synced to the
 // backend — the Store's real cosmetic categories (StoreItemCategoryConstant)
@@ -16,17 +16,21 @@ import wraithAvatar from '../assets/images/player-avatar-wraith.png'
 // "avatar character" category. This picker just decides which placeholder
 // character shows on your own map marker when you haven't got (or don't
 // want to use) a profile picture there.
+//
+// Every character is named after a synonym for "fast" — Territory Run is a
+// running game, so the roster should read that way even though the
+// characters themselves are just cosmetic art, not stat-bearing.
 export const AVATARS = [
-  { id: 'specter', name: 'Specter', src: specterAvatar },
+  { id: 'wind', name: 'Wind', src: windAvatar },
   { id: 'blaze', name: 'Blaze', src: blazeAvatar },
-  { id: 'cyberwool', name: 'Cyberwool', src: cyberwoolAvatar },
-  { id: 'nightwatch', name: 'Nightwatch', src: nightwatchAvatar },
-  { id: 'shroud', name: 'Shroud', src: shroudAvatar },
-  { id: 'vanguard', name: 'Vanguard', src: vanguardAvatar },
-  { id: 'twinfade', name: 'Twinfade', src: twinfadeAvatar },
-  { id: 'neon', name: 'Neon', src: neonAvatar },
-  { id: 'warhead', name: 'Warhead', src: warheadAvatar },
-  { id: 'wraith', name: 'Wraith', src: wraithAvatar },
+  { id: 'bolt', name: 'Bolt', src: boltAvatar },
+  { id: 'nova', name: 'Nova', src: novaAvatar },
+  { id: 'storm', name: 'Storm', src: stormAvatar },
+  { id: 'turbo', name: 'Turbo', src: turboAvatar },
+  { id: 'flash', name: 'Flash', src: flashAvatar },
+  { id: 'pulse', name: 'Pulse', src: pulseAvatar },
+  { id: 'comet', name: 'Comet', src: cometAvatar },
+  { id: 'cyclone', name: 'Cyclone', src: cycloneAvatar },
 ]
 
 // Shown in the shop but not selectable yet.

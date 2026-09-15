@@ -18,10 +18,11 @@ export const LOOP_MIN_POINTS = 10
 export const LOOP_MIN_AREA_SQ_METERS = 100
 export const LOOP_CLOSURE_THRESHOLD_METERS = 25
 
-// How far from the player the map lets you look — a fenced-in patch of
-// world instead of the whole city, the way Pokémon GO keeps you tethered
-// close to your own position rather than free-panning the map.
-export const VIEW_RADIUS_METERS = 400
+// Radius around the player that findParcelsNear queries for territory to
+// show on the map. The view itself isn't fenced to this (see
+// ZoomRangeLimiter in TerritoryMap.jsx) — panning further out just shows an
+// empty map past this radius until the player moves and it re-queries.
+export const VIEW_RADIUS_METERS = 2000
 
 export function boundsForRadius(center, radiusMeters) {
   const dLat = radiusMeters / 111320
@@ -116,6 +117,9 @@ export function loopPerimeterMeters(points) {
 
 export function formatArea(sqMeters) {
   if (!sqMeters) return '0 m²'
-  if (sqMeters >= 10000) return `${(sqMeters / 10000).toFixed(2)} ha`
+  if (sqMeters >= 10000) {
+    const km = sqMeters / 1_000_000
+    return `${km.toFixed(km < 1 ? 3 : 2)} km`
+  }
   return `${Math.round(sqMeters).toLocaleString()} m²`
 }
