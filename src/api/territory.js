@@ -10,6 +10,12 @@ export function getTerritoryProfile() {
   return getJson('/v1/territory/profile')
 }
 
+// Another player's public game profile (e.g. viewed from the leaderboard) - same shape as
+// getTerritoryProfile() except fahhcoinBalance is always null (a wallet balance is private).
+export function getTerritoryProfileByUserId(userId) {
+  return getJson(`/v1/territory/profile/${userId}`)
+}
+
 export function findMyParcels(pageNumber = 1, noOfRecords = 100) {
   return postJson('/v1/territory/parcel/find', { pageNumber, noOfRecords })
 }
@@ -30,6 +36,13 @@ export function findMyTerritoryEvents(pageNumber = 1, noOfRecords = 20) {
 
 export function findIndividualLeaderboard(pageNumber = 1, noOfRecords = 20) {
   return postJson('/v1/leaderboard/individual/find', {
+    pageNumber,
+    noOfRecords,
+  })
+}
+
+export function findClubLeaderboard(pageNumber = 1, noOfRecords = 20) {
+  return postJson('/v1/leaderboard/club/find', {
     pageNumber,
     noOfRecords,
   })

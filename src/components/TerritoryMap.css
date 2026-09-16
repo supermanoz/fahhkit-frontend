@@ -78,6 +78,30 @@
   );
 }
 
+/* Claim-acknowledged flourish (see TapEffect.jsx) — a lap around the
+   specific territory polygon just tapped. A screen-space overlay, not a
+   Leaflet layer, positioned/sized to the polygon's own container-pixel
+   bounding box (not a Leaflet pane, so it never eats a tap meant for the
+   map underneath). */
+.territory-tap-effect {
+  position: absolute;
+  z-index: 550;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.territory-tap-effect-border {
+  fill: none;
+  stroke: var(--game-gold, #f4c430);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 5px rgba(244, 196, 48, 0.7));
+}
+
+.territory-tap-effect-spark {
+  fill: var(--game-gold, #f4c430);
+  filter: drop-shadow(0 0 5px rgba(244, 196, 48, 0.9));
+}
+
 /* --- Player avatar: Pokémon GO's most recognizable map element, and always
    on screen (not just mid-run) so the game reads as "you're standing here"
    from the moment it loads. --- */
@@ -240,14 +264,6 @@
   line-height: 1.4;
   text-align: right;
   box-shadow: 0 3px 0 var(--game-ink, #3d2b1a);
-}
-
-.territory-map-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  background: var(--card);
 }
 
 @media (max-width: 560px) {

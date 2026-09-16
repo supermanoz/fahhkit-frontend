@@ -115,11 +115,12 @@ export function loopPerimeterMeters(points) {
   return total
 }
 
+// Always km² (never raw m²) so area reads consistently everywhere it's shown. Precision scales
+// with magnitude so a just-claimed small parcel (LOOP_MIN_AREA_SQ_METERS = 100 m² = 0.0001 km²)
+// still shows a nonzero number instead of rounding away to "0.00 km²".
 export function formatArea(sqMeters) {
-  if (!sqMeters) return '0 m²'
-  if (sqMeters >= 10000) {
-    const km = sqMeters / 1_000_000
-    return `${km.toFixed(km < 1 ? 3 : 2)} km`
-  }
-  return `${Math.round(sqMeters).toLocaleString()} m²`
+  if (!sqMeters) return '0 km²'
+  const km = sqMeters / 1_000_000
+  const decimals = km < 0.01 ? 4 : km < 1 ? 3 : 2
+  return `${km.toFixed(decimals)} km²`
 }

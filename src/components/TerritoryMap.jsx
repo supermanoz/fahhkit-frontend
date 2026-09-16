@@ -27,6 +27,7 @@ import { FaCrosshairs } from 'react-icons/fa'
 setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
 import { PLAYER_COLOR, formatArea } from '../utils/territoryGame'
 import defaultAvatarImage from '../assets/images/player-avatar-wind.png'
+import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
 
@@ -34,11 +35,10 @@ import './TerritoryMap.css'
 // provider — lets us drop most text/icon labels ourselves, keeping only
 // major place names (see hideSymbolLayers below), rather than hoping a
 // provider ships a labels-optional raster variant with global coverage
-// and the specific big-places-only cut we want. "Liberty" carries real
-// road/park/water color (unlike the grayscale-leaning "Positron" style),
-// which is what actually reads as Pokémon GO's saturated terrain once the
-// filter in TerritoryMap.css punches it up further.
-const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
+// and the specific big-places-only cut we want. Fallback only - GamePage.jsx
+// always passes mapStyleUrl (see constants/mapStyles.js, MAP_STYLES[0] is
+// the actual default, currently "Positron").
+const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
 
 // OpenMapTiles-schema styles put every label AND every POI icon on "symbol"
 // type layers — hiding just that one layer type strips all text/pins while
@@ -98,12 +98,12 @@ function hideSymbolLayers(glMap) {
 // Renders the vector basemap via MapLibre GL (through the maplibre-gl-leaflet
 // bridge) so it lives in the same tile pane a raster TileLayer would have
 // used, underneath all the Polygon/Marker overlays below.
-function PokemonStyleBaseLayer() {
+function PokemonStyleBaseLayer({ styleUrl, onReady }) {
   const map = useMap()
 
   useEffect(() => {
     const glLayer = L.maplibreGL({
-      style: BASEMAP_STYLE_URL,
+      style: styleUrl || BASEMAP_STYLE_URL,
       className: 'territory-map-tiles',
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -112,11 +112,18 @@ function PokemonStyleBaseLayer() {
     const glMap = glLayer.getMaplibreMap()
     glMap.on('styledata', () => hideSymbolLayers(glMap))
     hideSymbolLayers(glMap)
+    // "idle" fires once every source has actually finished loading tiles -
+    // the point at which the basemap visually looks complete, not just
+    // "style applied." Gates GamePage's loading screen.
+    glMap.once('idle', () => onReady?.())
 
     return () => {
       map.removeLayer(glLayer)
     }
-  }, [map])
+    // Re-created (not just re-styled) on a style change - simplest way to
+    // fully swap a maplibre-gl-leaflet layer's style without fighting its
+    // own internal style-diffing.
+  }, [map, styleUrl, onReady])
 
   return null
 }
@@ -145,11 +152,12 @@ function buildPlayerMarkerIcon(avatarSrc) {
 // planted at the centroid — no name floating on the map. Tapping it still
 // reveals who holds it via a popup, so the information isn't lost, just not
 // cluttering the default view.
-function territoryBadgeIcon(t, isMine) {
+function territoryBadgeIcon(t, isMine, playerColor) {
   const emoji = isMine ? '👑' : '🚩'
+  const background = isMine ? playerColor || PLAYER_COLOR : t.color
   return L.divIcon({
     className: 'territory-badge-icon',
-    html: `<div class="territory-badge" style="background:${t.color}">${emoji}</div>`,
+    html: `<div class="territory-badge" style="background:${background}">${emoji}</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   })
@@ -211,6 +219,58 @@ function ClickCapture({ enabled, onMapClick }) {
     },
   })
   return null
+}
+
+// One claimed parcel's polygon. Needs useMap() (not just the lat/lng click
+// handler react-leaflet's Polygon already gets) to project the polygon's
+// own points into container-pixel space for the tap flourish (see
+// TapEffect.jsx) — that's the one thing plain eventHandlers can't give us.
+function TerritoryPolygon({
+  t,
+  isMine,
+  isHighlighted,
+  playerColor,
+  manualMode,
+  onParcelClick,
+  onTapEffect,
+}) {
+  const map = useMap()
+  return (
+    <Polygon
+      positions={toLatLngs(t.points)}
+      pathOptions={{
+        color: isHighlighted
+          ? '#FFFFFF'
+          : isMine
+            ? playerColor || PLAYER_COLOR
+            : '#2B2140',
+        weight: isHighlighted ? 4 : isMine ? 4 : 3,
+        fillColor: isMine ? playerColor || PLAYER_COLOR : t.color,
+        fillOpacity: isHighlighted ? 0.65 : isMine ? 0.5 : 0.35,
+        className: isHighlighted
+          ? 'territory-poly-highlight territory-poly-clickable'
+          : isMine
+            ? 'territory-poly-player territory-poly-clickable'
+            : 'territory-poly-clickable',
+      }}
+      eventHandlers={{
+        click: (e) => {
+          // Manual (admin tap-to-draw) taps need to reach ClickCapture at
+          // the map level instead - letting a parcel click here also add a
+          // draw point.
+          if (manualMode) return
+          L.DomEvent.stopPropagation(e)
+          onTapEffect(
+            t.points.map((p) => {
+              const point = map.latLngToContainerPoint([p.lat, p.lng])
+              return { x: point.x, y: point.y }
+            })
+          )
+          onParcelClick?.(t)
+        },
+      }}
+    />
+  )
 }
 
 // Zoom level (the max of the 14-19 range ZoomRangeLimiter allows) at which
@@ -342,6 +402,14 @@ function LocateButton({ map }) {
   )
 }
 
+// Leaflet's default SVG renderer only buffers a small padding (10% of the
+// viewport) beyond what's visible, so panning/dragging (a "hover" drag on a
+// touch device) past that buffer visibly clips territory polygons until the
+// gesture ends and Leaflet redraws around the new center. A much larger
+// padding keeps a wide buffer of polygons pre-rendered around the visible
+// area so ordinary pans don't visibly crop anything before the redraw.
+const territoryRenderer = L.svg({ padding: 2 })
+
 export default function TerritoryMap({
   center,
   playerLocation,
@@ -351,10 +419,13 @@ export default function TerritoryMap({
   highlightOwnerId,
   highlightParcelId,
   avatarSrc,
+  playerColor,
+  trailColor,
+  mapStyleUrl,
   manualMode,
   onMapClick,
   onParcelClick,
-  onSelfClick,
+  onMapReady,
 }) {
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
@@ -364,6 +435,16 @@ export default function TerritoryMap({
     [avatarSrc]
   )
 
+  const [activeTapEffects, setActiveTapEffects] = useState([])
+  const nextTapEffectIdRef = useRef(0)
+  function handleTapEffect(points) {
+    const id = nextTapEffectIdRef.current++
+    setActiveTapEffects((effects) => [...effects, { id, points }])
+  }
+  function clearTapEffect(id) {
+    setActiveTapEffects((effects) => effects.filter((e) => e.id !== id))
+  }
+
   return (
     <div className="territory-map">
       <div className="territory-map-tilt" ref={tiltRef}>
@@ -372,8 +453,9 @@ export default function TerritoryMap({
           zoom={17}
           scrollWheelZoom
           zoomControl={false}
+          renderer={territoryRenderer}
         >
-          <PokemonStyleBaseLayer />
+          <PokemonStyleBaseLayer styleUrl={mapStyleUrl} onReady={onMapReady} />
 
           {territories.map((t) => {
             const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
@@ -381,34 +463,15 @@ export default function TerritoryMap({
               ? t.id === highlightParcelId
               : highlightOwnerId === t.ownerId
             return (
-              <Polygon
+              <TerritoryPolygon
                 key={t.id}
-                positions={toLatLngs(t.points)}
-                pathOptions={{
-                  color: isHighlighted
-                    ? '#FFFFFF'
-                    : isMine
-                      ? PLAYER_COLOR
-                      : '#2B2140',
-                  weight: isHighlighted ? 4 : isMine ? 4 : 3,
-                  fillColor: t.color,
-                  fillOpacity: isHighlighted ? 0.65 : isMine ? 0.5 : 0.35,
-                  className: isHighlighted
-                    ? 'territory-poly-highlight territory-poly-clickable'
-                    : isMine
-                      ? 'territory-poly-player territory-poly-clickable'
-                      : 'territory-poly-clickable',
-                }}
-                eventHandlers={{
-                  click: (e) => {
-                    // Manual (admin tap-to-draw) taps need to reach
-                    // ClickCapture at the map level instead - letting a
-                    // parcel click here also add a draw point.
-                    if (manualMode) return
-                    L.DomEvent.stopPropagation(e)
-                    onParcelClick?.(t)
-                  },
-                }}
+                t={t}
+                isMine={isMine}
+                isHighlighted={isHighlighted}
+                playerColor={playerColor}
+                manualMode={manualMode}
+                onParcelClick={onParcelClick}
+                onTapEffect={handleTapEffect}
               />
             )
           })}
@@ -419,7 +482,7 @@ export default function TerritoryMap({
               <Marker
                 key={`${t.id}-badge`}
                 position={polygonCentroid(t.points)}
-                icon={territoryBadgeIcon(t, isMine)}
+                icon={territoryBadgeIcon(t, isMine, playerColor)}
               >
                 <Popup>
                   <strong>{isMine ? 'You' : t.ownerName}</strong>
@@ -433,7 +496,7 @@ export default function TerritoryMap({
           {livePath.length > 0 && (
             <Polyline
               positions={toLatLngs(livePath)}
-              pathOptions={{ color: '#E63946', weight: 4 }}
+              pathOptions={{ color: trailColor || '#E63946', weight: 4 }}
             />
           )}
 
@@ -455,17 +518,12 @@ export default function TerritoryMap({
               position={[playerLocation.lat, playerLocation.lng]}
               icon={playerMarkerIcon}
               zIndexOffset={1000}
-              interactive={Boolean(onSelfClick)}
-              eventHandlers={
-                onSelfClick
-                  ? {
-                      click: (e) => {
-                        L.DomEvent.stopPropagation(e)
-                        onSelfClick()
-                      },
-                    }
-                  : undefined
-              }
+              // Tapping your own avatar shows nothing - interactive so the
+              // tap doesn't fall through to a territory badge/polygon it
+              // happens to be sitting on and pop that up instead.
+              eventHandlers={{
+                click: (e) => L.DomEvent.stopPropagation(e),
+              }}
             />
           )}
 
@@ -480,6 +538,13 @@ export default function TerritoryMap({
           <ZoomTiltEffect tiltRef={tiltRef} manualMode={manualMode} />
           <CaptureMapInstance onReady={setMapInstance} />
         </MapContainer>
+        {activeTapEffects.map((effect) => (
+          <TapEffect
+            key={effect.id}
+            points={effect.points}
+            onDone={() => clearTapEffect(effect.id)}
+          />
+        ))}
       </div>
       <div className="territory-map-vignette" aria-hidden="true" />
       {mapInstance && <LocateButton map={mapInstance} />}

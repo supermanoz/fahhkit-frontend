@@ -1,7 +1,7 @@
 import { getJson, postJson, deleteJson } from './client'
 
-export function getRuns() {
-  return postJson('/v1/run/find', { pageNumber: 1, noOfRecords: 500 })
+export function getRuns(pageNumber = 1, noOfRecords = 500) {
+  return postJson('/v1/run/find', { pageNumber, noOfRecords })
 }
 
 export function getRun(id) {

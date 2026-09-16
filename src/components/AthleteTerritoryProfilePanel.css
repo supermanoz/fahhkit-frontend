@@ -1,0 +1,17 @@
+.athlete-profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1350;
+  background: var(--game-panel);
+  overflow-y: auto;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.athlete-profile-close {
+  position: fixed;
+}
+
+.athlete-profile-content {
+  max-width: 480px;
+  margin: 32px auto 0;
+}

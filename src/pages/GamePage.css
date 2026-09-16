@@ -26,9 +26,58 @@
   background: #0a0806;
 }
 
-.game-page-map-slot {
-  width: 100%;
-  height: 100%;
+/* --- Loading screen: shown from page-open until the basemap has actually
+   finished rendering tiles (see TerritoryMap.jsx's PokemonStyleBaseLayer,
+   "idle" event) - the map/HUD/controls are all mounted and doing their
+   thing underneath this the whole time, so the reveal is instant once the
+   overlay lifts rather than things popping in piecemeal. --- */
+.game-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #0a0806;
+}
+
+.game-loading-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-panel);
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 -6px 0 rgba(0, 0, 0, 0.3),
+    0 3px 0 var(--game-ink);
+}
+
+.game-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 4px solid rgba(246, 236, 217, 0.15);
+  border-top-color: var(--game-gold);
+  animation: game-loading-spin 0.9s linear infinite;
+}
+
+@keyframes game-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.game-loading-text {
+  margin: 0;
+  color: var(--game-cream);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
 }
 
 /* --- Top bar: exit + HUD, bled to the screen edge like Pokémon GO's status
@@ -579,37 +628,22 @@
   white-space: nowrap;
 }
 
-/* --- Menu sheet: Territory / Shop drawer --- */
-.game-menu-overlay {
+/* --- Menu sheet: Territory / Shop drawer - fullscreen, not a partial-height
+   bottom sheet, so there's room for avatar/shade/map/emoji pickers in the
+   Shop tab. The slide-up motion variant in GamePage.jsx (y: '100%' -> 0) is
+   relative to the element's own box, so it still animates correctly now
+   that the box is the full viewport. --- */
+.game-menu-sheet {
   position: fixed;
   inset: 0;
   z-index: 1300;
-  background: rgba(10, 8, 6, 0.55);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.game-menu-sheet {
-  position: relative;
   width: 100%;
-  max-width: 560px;
-  max-height: 70vh;
+  height: 100%;
+  height: 100dvh;
   overflow-y: auto;
   background: var(--game-panel);
-  border-top: 3px solid var(--game-ink);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
-  border-radius: 24px 24px 0 0;
   padding: 14px 20px calc(24px + env(safe-area-inset-bottom));
   color: var(--game-cream);
-}
-
-.game-menu-handle {
-  width: 40px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(246, 236, 217, 0.3);
-  margin: 0 auto 14px;
 }
 
 .game-menu-close {
@@ -654,6 +688,34 @@
 }
 
 .game-menu-tab.active {
+  background: var(--game-gold);
+  color: var(--game-ink);
+}
+
+/* Solo/Club toggle inside the Leaderboard tab - same recipe as
+   .game-menu-tabs, just smaller since it's a sub-choice within one tab. */
+.game-menu-subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.game-menu-subtab {
+  flex: 1;
+  padding: 7px;
+  border-radius: 10px;
+  border: 2px solid var(--game-ink);
+  background: rgba(246, 236, 217, 0.06);
+  color: rgba(246, 236, 217, 0.75);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.game-menu-subtab.active {
   background: var(--game-gold);
   color: var(--game-ink);
 }
@@ -734,7 +796,11 @@
 
 .game-menu-list-row {
   all: unset;
-  display: contents;
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
   cursor: pointer;
 }
 
@@ -779,7 +845,11 @@
 
 .game-menu-leaderboard-row {
   all: unset;
-  display: contents;
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
   cursor: pointer;
 }
 
@@ -907,6 +977,11 @@
   height: 48px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+.game-menu-emoji-glyph {
+  font-size: 28px;
+  line-height: 1;
 }
 
 .game-menu-avatar-name {
