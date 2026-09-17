@@ -10,6 +10,7 @@ import {
 } from '../constants/validation'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import TermsAgreement from '../components/TermsAgreement'
 import './RegisterPage.css'
 
 const INITIAL_FORM = {
@@ -37,6 +38,7 @@ export default function RegisterPage() {
   // a link straight into UpdatePasswordPage), never shown here, so this page
   // just confirms the email was sent instead of routing to that form itself.
   const [registeredEmail, setRegisteredEmail] = useState(null)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -59,6 +61,7 @@ export default function RegisterPage() {
       const data = await postForm('/v1/athlete/signup', formData)
       setRegisteredEmail(data?.email || form.email)
       setForm(INITIAL_FORM)
+      setAgreedToTerms(false)
       e.target.reset()
     } catch (err) {
       const message =
@@ -311,10 +314,17 @@ export default function RegisterPage() {
                   </div>
                 </fieldset>
 
+                <TermsAgreement
+                  id="signup-terms-agreement"
+                  to="/terms/signup"
+                  checked={agreedToTerms}
+                  onChange={setAgreedToTerms}
+                />
+
                 <button
                   type="submit"
                   className="btn btn-primary btn-block"
-                  disabled={submitting}
+                  disabled={submitting || !agreedToTerms}
                 >
                   {submitting ? 'Registering...' : 'Register'}
                 </button>

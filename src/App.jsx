@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import TermsPage from './pages/TermsPage'
 import UpdatePasswordPage from './pages/UpdatePasswordPage'
 import EditProfilePage from './pages/EditProfilePage'
 import EventsPage from './pages/EventsPage'
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/terms/:type" element={<TermsPage />} />
         <Route path="/update-password" element={<UpdatePasswordPage />} />
         <Route
           path="/update-password/:phone/:password"
