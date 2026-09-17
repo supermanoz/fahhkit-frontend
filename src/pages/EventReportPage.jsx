@@ -7,7 +7,16 @@ import { EVENT_TYPE_LABELS, formatDate } from '../utils/events'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import DonutChart from '../components/DonutChart'
+import MiniBarChart from '../components/charts/MiniBarChart'
 import './EventReportPage.css'
+
+const AGE_BUCKETS = [
+  { label: 'Under 20', test: (age) => age < 20 },
+  { label: '20–29', test: (age) => age >= 20 && age < 30 },
+  { label: '30–39', test: (age) => age >= 30 && age < 40 },
+  { label: '40–49', test: (age) => age >= 40 && age < 50 },
+  { label: '50+', test: (age) => age >= 50 },
+]
 
 const STATUS_LABELS = {
   PAID: 'Paid',
@@ -130,6 +139,10 @@ export default function EventReportPage() {
     const averageAge = ages.length
       ? Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length)
       : null
+    const ageDistribution = AGE_BUCKETS.map((bucket) => ({
+      label: bucket.label,
+      value: ages.filter(bucket.test).length,
+    }))
     return {
       total: registrants.length,
       paid,
@@ -140,6 +153,7 @@ export default function EventReportPage() {
       women,
       others,
       averageAge,
+      ageDistribution,
     }
   }, [registrants, event])
 
@@ -359,6 +373,25 @@ export default function EventReportPage() {
                     )}
                   </div>
                 </div>
+
+                {report.averageAge != null && (
+                  <div
+                    className="event-report-chart-card event-report-age-chart glass-card"
+                    data-aos="fade-up"
+                  >
+                    <div className="event-report-age-chart-header">
+                      <h3>Age Distribution</h3>
+                      <p className="event-report-muted">
+                        Average age: {report.averageAge}
+                      </p>
+                    </div>
+                    <MiniBarChart
+                      data={report.ageDistribution}
+                      color="var(--brand)"
+                      height={180}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

@@ -10,19 +10,21 @@ import cometAvatar from '../assets/images/player-avatar-comet.png'
 import cycloneAvatar from '../assets/images/player-avatar-cyclone.png'
 
 // Map-marker avatar choice. Local-only (localStorage), not synced to the
-// backend — the Store's real cosmetic categories (StoreItemCategoryConstant)
-// are STICKER/AVATAR_BORDER/TERRITORY_SHADE/TRAIL_COLOR/PROFILE_BACKGROUND,
-// borders/colors layered on the athlete's real profile picture, with no
-// "avatar character" category. This picker just decides which placeholder
-// character shows on your own map marker when you haven't got (or don't
-// want to use) a profile picture there.
+// backend — free placeholders, not real Store inventory. The Store does
+// have a real, server-synced "avatar character" category (HERO, an
+// assetUrl image, alongside AVATAR_BORDER/TERRITORY_SHADE/TRAIL_COLOR/
+// PROFILE_BACKGROUND/TERRITORY_EMOJI/PHRASE — see StoreItemCategoryConstant)
+// - GamePage.jsx's equippedHero takes priority over this picker whenever
+// the athlete owns and has equipped one. This picker just decides which
+// free placeholder character shows on your own map marker when you haven't
+// got (or don't want to use) a HERO or profile picture there.
 //
 // Every character is named after a synonym for "fast" — Territory Run is a
 // running game, so the roster should read that way even though the
 // characters themselves are just cosmetic art, not stat-bearing.
 export const AVATARS = [
-  { id: 'wind', name: 'Wind', src: windAvatar },
   { id: 'blaze', name: 'Blaze', src: blazeAvatar },
+  { id: 'wind', name: 'Wind', src: windAvatar },
   { id: 'bolt', name: 'Bolt', src: boltAvatar },
   { id: 'nova', name: 'Nova', src: novaAvatar },
   { id: 'storm', name: 'Storm', src: stormAvatar },

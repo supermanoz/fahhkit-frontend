@@ -8,6 +8,7 @@ import {
   FaCoins,
   FaFlag,
   FaLock,
+  FaPlay,
   FaStore,
   FaTimes,
   FaTrophy,
@@ -37,6 +38,7 @@ import {
   purchaseStoreItem,
   unequipStoreItem,
 } from '../api/store'
+import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
 import {
   DEFAULT_CENTER,
   LOOP_MIN_AREA_SQ_METERS,
@@ -63,7 +65,9 @@ import {
   exportShareCardBlob,
 } from '../utils/shareCanvas'
 import { playClickSound, playMilestoneChime } from '../utils/gameSound'
-import defaultAvatarImage from '../assets/images/player-avatar-wind.png'
+import { isBlazeHero } from '../utils/hero'
+import HeroSprite from '../components/HeroSprite'
+import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import {
   AVATARS,
   COMING_SOON_AVATARS,
@@ -91,26 +95,39 @@ function formatMeters(meters) {
   return `${(meters / 1000).toFixed(2)} km`
 }
 
-// Pokémon GO-style fan-out: tapping the pokéball FAB pops these three
-// options up in an arc instead of jumping straight to a menu, so the
-// x/y offsets below are the whole point, not incidental styling.
+// Pokémon GO-style fan-out: tapping the pokéball FAB pops these options up
+// in an arc instead of jumping straight to a menu, so the x/y offsets below
+// are the whole point, not incidental styling. Leaderboard/Me/Shop form the
+// top arc; "Start Conquering" sits centered below them, closer to the FAB,
+// as the primary action. It isn't a menu tab like the other three (see its
+// onClick special-case below) - it starts a run directly, moved in here off
+// the map's persistent bottom bar so the idle map reads clean with just the
+// FAB showing.
 const RADIAL_ITEMS = [
   {
     tab: 'leaderboard',
     label: 'Leaderboard',
     Icon: FaTrophy,
     tone: 'gold',
-    x: -92,
-    y: -112,
+    x: -119,
+    y: -107,
   },
-  { tab: 'me', label: 'Me', Icon: FaUser, tone: 'green', x: 0, y: -160 },
+  { tab: 'me', label: 'Me', Icon: FaUser, tone: 'green', x: 0, y: -198 },
   {
     tab: 'shop',
     label: 'Shop',
     Icon: FaStore,
     tone: 'wood',
-    x: 92,
-    y: -112,
+    x: 119,
+    y: -107,
+  },
+  {
+    tab: 'conquer',
+    label: 'Start Conquering',
+    Icon: FaPlay,
+    tone: 'red',
+    x: 0,
+    y: -95,
   },
 ]
 
@@ -180,6 +197,11 @@ export default function GamePage() {
   const [ownedItems, setOwnedItems] = useState([])
   const [storeError, setStoreError] = useState(null)
   const [storeActionError, setStoreActionError] = useState(null)
+  const [coinShopOpen, setCoinShopOpen] = useState(false)
+  const [coinBundles, setCoinBundles] = useState([])
+  const [coinBundlesError, setCoinBundlesError] = useState(null)
+  const [buyingBundleAmount, setBuyingBundleAmount] = useState(null)
+  const [coinBuyError, setCoinBuyError] = useState(null)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTab, setMenuTab] = useState('me')
@@ -456,6 +478,40 @@ export default function GamePage() {
     switchTab(tab)
     setMenuOpen(true)
     setRadialOpen(false)
+  }
+
+  async function loadCoinBundles() {
+    setCoinBundlesError(null)
+    try {
+      const bundles = await getFahhcoinBundles()
+      setCoinBundles(bundles || [])
+    } catch (err) {
+      setCoinBundlesError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not load Fahhcoin packages.'
+      )
+    }
+  }
+
+  function openCoinShop() {
+    setCoinBuyError(null)
+    setCoinShopOpen(true)
+    if (coinBundles.length === 0) loadCoinBundles()
+  }
+
+  async function handleBuyCoins(bundle) {
+    setCoinBuyError(null)
+    setBuyingBundleAmount(bundle.fahhcoinAmount)
+    try {
+      const payment = await initiateCoinPurchase(bundle.fahhcoinAmount)
+      window.location.href = payment.paymentUrl
+    } catch (err) {
+      setCoinBuyError(
+        err instanceof ApiError ? err.message : 'Could not start payment.'
+      )
+      setBuyingBundleAmount(null)
+    }
   }
 
   // Territory runs are just runs with no eventId (see attemptSubmit below) —
@@ -782,18 +838,30 @@ export default function GamePage() {
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
   const currentAreaEmoji = getAreaEmojiById(areaEmojiId)
-  // A STICKER is the one real Store category that's actually an avatar-shaped
+  // HERO is the one real Store category that's actually an avatar-shaped
   // image (the others are borders/colors/backgrounds meant to layer onto a
   // profile picture, not stand in for one) — equipping one takes priority
   // over the local placeholder picker below since it's a real, owned item.
-  const equippedSticker = ownedItems.find(
-    (o) => o.equipped && o.storeItem.category === 'STICKER'
+  const equippedHero = ownedItems.find(
+    (o) => o.equipped && o.storeItem.category === 'HERO'
   )
   const avatarSrc =
-    (equippedSticker && resolveFileUrl(equippedSticker.storeItem.assetUrl)) ||
+    (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
     currentAvatar?.src ||
     resolveFileUrl(user?.profilePictureUrl) ||
     defaultAvatarImage
+  // Blaze is the one hero with an animated run-cycle sprite (HeroSprite)
+  // instead of a flat image, whether it's the real equipped Store Hero or
+  // just the free local avatars.js pick.
+  const showBlazeHeroSprite = isBlazeHero(
+    equippedHero ? equippedHero.storeItem.name : currentAvatar?.name
+  )
+  const equippedProfileBackground = ownedItems.find(
+    (o) => o.equipped && o.storeItem.category === 'PROFILE_BACKGROUND'
+  )
+  const equippedPhrase = ownedItems.find(
+    (o) => o.equipped && o.storeItem.category === 'PHRASE'
+  )
 
   // TERRITORY_SHADE/TRAIL_COLOR are buy/equip-able like every other Store
   // category, but only take effect once threaded into TerritoryMap here -
@@ -910,14 +978,19 @@ export default function GamePage() {
       </button>
 
       <div className="game-hud">
-        <div className="game-hud-stat" aria-label="Fahhcoin balance">
+        <button
+          type="button"
+          className="game-hud-stat game-hud-stat-clickable"
+          aria-label="Fahhcoin balance - buy more Fahhcoin"
+          onClick={openCoinShop}
+        >
           <span className="game-hud-icon game-hud-icon-coin">
             <FaCoins />
           </span>
           <span className="game-hud-value">
             {profile?.fahhcoinBalance ?? 0}
           </span>
-        </div>
+        </button>
         <button
           type="button"
           className="game-hud-stat game-hud-stat-clickable"
@@ -961,7 +1034,14 @@ export default function GamePage() {
                 <button
                   type="button"
                   className={`game-radial-btn radial-${item.tone}`}
-                  onClick={() => openMenu(item.tab)}
+                  onClick={() => {
+                    if (item.tab === 'conquer') {
+                      setRadialOpen(false)
+                      handleStartRun()
+                      return
+                    }
+                    openMenu(item.tab)
+                  }}
                   aria-label={item.label}
                 >
                   <item.Icon />
@@ -983,16 +1063,11 @@ export default function GamePage() {
       </div>
 
       <div className="game-controls" ref={controlsRef}>
-        {tracker.status === 'idle' && !pendingRun && !manualMode && (
-          <div className="game-controls-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-lg"
-              onClick={handleStartRun}
-            >
-              Start Conquering
-            </button>
-            {isAdminUser && (
+        {tracker.status === 'idle' &&
+          !pendingRun &&
+          !manualMode &&
+          isAdminUser && (
+            <div className="game-controls-actions">
               <button
                 type="button"
                 className="btn btn-outline btn-lg"
@@ -1000,9 +1075,8 @@ export default function GamePage() {
               >
                 Tap to Draw Territory
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
         {manualMode && (
           <>
@@ -1033,16 +1107,29 @@ export default function GamePage() {
         {tracker.status === 'tracking' && (
           <>
             <div className="game-controls-stats">
-              <span>{formatMeters(tracker.distance)}</span>
-              <span>
-                {formatPace(
-                  calculatePaceMinPerKm(
-                    tracker.distance,
-                    tracker.elapsedSeconds
-                  )
-                )}
+              <span className="game-stat">
+                <span className="game-stat-value">
+                  {formatMeters(tracker.distance)}
+                </span>
+                <span className="game-stat-label">Distance</span>
               </span>
-              <span>{formatDuration(tracker.elapsedSeconds)}</span>
+              <span className="game-stat">
+                <span className="game-stat-value">
+                  {formatPace(
+                    calculatePaceMinPerKm(
+                      tracker.distance,
+                      tracker.elapsedSeconds
+                    )
+                  )}
+                </span>
+                <span className="game-stat-label">Pace</span>
+              </span>
+              <span className="game-stat">
+                <span className="game-stat-value">
+                  {formatDuration(tracker.elapsedSeconds)}
+                </span>
+                <span className="game-stat-label">Time</span>
+              </span>
             </div>
             <div className="game-controls-actions">
               <button
@@ -1369,9 +1456,34 @@ export default function GamePage() {
             )}
 
             {menuTab === 'me' && (
-              <div className="game-menu-panel">
+              <div
+                className="game-menu-panel"
+                style={
+                  equippedProfileBackground?.storeItem?.assetUrl
+                    ? {
+                        backgroundImage: `url(${resolveFileUrl(equippedProfileBackground.storeItem.assetUrl)})`,
+                      }
+                    : undefined
+                }
+              >
+                <div className="game-menu-hero">
+                  {showBlazeHeroSprite ? (
+                    <HeroSprite size={260} />
+                  ) : (
+                    <img
+                      className="game-menu-hero-img"
+                      src={avatarSrc}
+                      alt=""
+                    />
+                  )}
+                </div>
                 {user?.fullName && (
                   <p className="game-menu-player-name">{user.fullName}</p>
+                )}
+                {equippedPhrase && (
+                  <p className="game-menu-phrase">
+                    “{equippedPhrase.storeItem.name}”
+                  </p>
                 )}
                 <div className="game-menu-summary">
                   <span className="game-menu-summary-value">
@@ -1499,9 +1611,9 @@ export default function GamePage() {
                     </div>
                   ))}
                 </div>
-                {equippedSticker && (
+                {equippedHero && (
                   <p className="game-menu-avatars-hint">
-                    Your equipped Sticker ({equippedSticker.storeItem.name}) is
+                    Your equipped Hero ({equippedHero.storeItem.name}) is
                     showing on the map instead — unequip it below to switch back
                     to a free avatar.
                   </p>
@@ -1598,7 +1710,7 @@ export default function GamePage() {
                             <span className="game-menu-list-meta">
                               {owned
                                 ? owned.equipped
-                                  ? item.category === 'STICKER'
+                                  ? item.category === 'HERO'
                                     ? 'Equipped · your map avatar'
                                     : 'Equipped'
                                   : 'Owned'
@@ -1724,6 +1836,74 @@ export default function GamePage() {
                   Try Again
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {coinShopOpen && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setCoinShopOpen(false)}
+          >
+            <motion.div
+              className="game-confirm-card game-coin-shop-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="game-run-viewer-close"
+                aria-label="Close"
+                onClick={() => setCoinShopOpen(false)}
+              >
+                <FaTimes />
+              </button>
+              <p className="game-menu-avatars-title">Buy Fahhcoin</p>
+              {coinBundlesError ? (
+                <p className="game-menu-empty">{coinBundlesError}</p>
+              ) : coinBundles.length === 0 ? (
+                <p className="game-menu-empty">Loading packages…</p>
+              ) : (
+                <ul className="game-menu-list game-coin-bundle-list">
+                  {coinBundles.map((bundle) => (
+                    <li key={bundle.fahhcoinAmount} className="game-store-item">
+                      <span className="game-hud-icon game-hud-icon-coin">
+                        <FaCoins />
+                      </span>
+                      <span className="game-store-item-info">
+                        <span className="game-menu-list-area">
+                          {bundle.fahhcoinAmount} Fahhcoin
+                        </span>
+                        <span className="game-menu-list-meta">
+                          Rs. {bundle.priceNpr}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => handleBuyCoins(bundle)}
+                        disabled={buyingBundleAmount === bundle.fahhcoinAmount}
+                      >
+                        {buyingBundleAmount === bundle.fahhcoinAmount
+                          ? 'Redirecting…'
+                          : 'Buy'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {coinBuyError && (
+                <p className="game-controls-hint game-controls-hint-error">
+                  {coinBuyError}
+                </p>
+              )}
             </motion.div>
           </motion.div>
         )}

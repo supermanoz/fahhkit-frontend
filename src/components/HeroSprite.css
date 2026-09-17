@@ -1,0 +1,6 @@
+.hero-sprite {
+  background-repeat: no-repeat;
+  background-size: 500% 500%;
+  image-rendering: -webkit-optimize-contrast;
+  will-change: background-position;
+}

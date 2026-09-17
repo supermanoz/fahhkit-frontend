@@ -74,6 +74,20 @@ const IMPORTANT_PLACE_LABEL_IDS = new Set([
 // this list is deliberately leaving out.
 const LABEL_OTHER_ALLOWED_CLASSES = ['suburb', 'neighbourhood']
 
+// OpenMapTiles' "name" field holds whatever the local OSM convention is -
+// Devanagari script for places in Nepal (e.g. "काठमाडौं" for Kathmandu) -
+// and these styles' default text-field expressions show that local name
+// first. The game is English-facing, so every visible label is forced onto
+// name:en (falling back to name:latin, then the raw name where neither
+// translation exists) instead of whatever script the style would otherwise
+// pick.
+const LATIN_LABEL_TEXT_FIELD = [
+  'coalesce',
+  ['get', 'name:en'],
+  ['get', 'name:latin'],
+  ['get', 'name'],
+]
+
 function hideSymbolLayers(glMap) {
   const style = glMap.getStyle()
   if (!style) return
@@ -85,6 +99,9 @@ function hideSymbolLayers(glMap) {
       'visibility',
       visible ? 'visible' : 'none'
     )
+    if (visible && layer.layout?.['text-field']) {
+      glMap.setLayoutProperty(layer.id, 'text-field', LATIN_LABEL_TEXT_FIELD)
+    }
     if (layer.id === 'label_other' && visible) {
       glMap.setFilter('label_other', [
         'in',

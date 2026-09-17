@@ -31,9 +31,41 @@ const STATUS_CONTENT = {
   },
 }
 
+// Fahhcoin top-ups (CoinPurchaseController) share this same redirect page
+// with event registration payments, but resolve to a `purchaseId` +
+// `status` pair instead of a `registrationId` — and the coin-purchase
+// backend has no GET-by-id lookup, so the already-resolved `status` query
+// param is all there is to show here (no follow-up fetch needed/possible).
+const COIN_STATUS_CONTENT = {
+  PAID: {
+    kind: 'success',
+    title: 'Fahhcoin added!',
+    message: 'Your payment went through and your balance is topped up.',
+  },
+  PENDING: {
+    kind: 'success',
+    title: 'Payment pending',
+    message:
+      "We're still confirming your payment with Khalti. This can take a moment — check back shortly.",
+  },
+  FAILED: {
+    kind: 'error',
+    title: "Payment didn't go through",
+    message: 'Your payment could not be completed. You can try again below.',
+  },
+  CANCELLED: {
+    kind: 'error',
+    title: 'Payment cancelled',
+    message:
+      'You cancelled the payment before it completed. You can try again below.',
+  },
+}
+
 export default function PaymentStatusPage() {
   const [searchParams] = useSearchParams()
   const registrationId = searchParams.get('registrationId')
+  const purchaseId = searchParams.get('purchaseId')
+  const coinStatus = searchParams.get('status')
   const [registration, setRegistration] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -42,6 +74,12 @@ export default function PaymentStatusPage() {
   const [showEmailPopup, setShowEmailPopup] = useState(false)
 
   useEffect(() => {
+    // Coin-purchase redirects carry everything needed (status) in the URL
+    // itself - nothing to fetch, just stop the "checking..." spinner.
+    if (purchaseId) {
+      setLoading(false)
+      return
+    }
     if (!registrationId) {
       setError('Missing registration details.')
       setLoading(false)
@@ -63,7 +101,7 @@ export default function PaymentStatusPage() {
         )
       )
       .finally(() => setLoading(false))
-  }, [registrationId])
+  }, [registrationId, purchaseId])
 
   async function handleRetry() {
     setRetryError(null)
@@ -86,6 +124,7 @@ export default function PaymentStatusPage() {
   const content = registration
     ? STATUS_CONTENT[registration.paymentStatus]
     : null
+  const coinContent = purchaseId ? COIN_STATUS_CONTENT[coinStatus] : null
 
   return (
     <div className="payment-status-page">
@@ -124,6 +163,36 @@ export default function PaymentStatusPage() {
             </p>
           )}
           {error && <div className="banner error">{error}</div>}
+
+          {!loading && purchaseId && coinContent && (
+            <>
+              <h1>{coinContent.title}</h1>
+              <p>{coinContent.message}</p>
+
+              <dl className="payment-status-meta">
+                <div>
+                  <dt>Purchase</dt>
+                  <dd>Fahhcoin top-up</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{coinStatus}</dd>
+                </div>
+              </dl>
+
+              <div className="payment-status-actions">
+                <Link to="/game" className="btn btn-primary">
+                  Back to Territory Run
+                </Link>
+              </div>
+            </>
+          )}
+
+          {!loading && purchaseId && !coinContent && (
+            <div className="banner error">
+              Could not resolve that payment&apos;s status.
+            </div>
+          )}
 
           {!loading && registration && content && (
             <>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { ApiError, getJson, isAdmin, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
@@ -6,7 +6,31 @@ import { EVENT_TYPE_LABELS, formatDate } from '../utils/events'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import DonutChart from '../components/DonutChart'
+import MiniBarChart from '../components/charts/MiniBarChart'
 import './DashboardPage.css'
+
+// Buckets events by calendar month so the dashboard can show a trend of
+// how event volume is moving, not just a single cumulative total.
+function groupEventsByMonth(events) {
+  const byMonth = new Map()
+  events.forEach((event) => {
+    if (!event.date) return
+    const d = new Date(event.date)
+    if (Number.isNaN(d.getTime())) return
+    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`
+    const label = d.toLocaleString(undefined, {
+      month: 'short',
+      year: '2-digit',
+    })
+    byMonth.set(key, {
+      key,
+      label,
+      value: (byMonth.get(key)?.value || 0) + 1,
+      sort: d.getFullYear() * 12 + d.getMonth(),
+    })
+  })
+  return [...byMonth.values()].sort((a, b) => a.sort - b.sort).slice(-6)
+}
 
 const EVENT_STATUS_LABELS = {
   DRAFT: 'Draft',
@@ -29,6 +53,8 @@ export default function DashboardPage() {
   const [error, setError] = useState(null)
 
   const allowed = isAdmin(user)
+
+  const eventsByMonth = useMemo(() => groupEventsByMonth(events), [events])
 
   useEffect(() => {
     if (userLoading || !allowed) {
@@ -165,6 +191,21 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
+
+            {eventsByMonth.length > 1 && (
+              <div
+                className="dashboard-chart-card glass-card dashboard-trend-card"
+                data-aos="fade-up"
+              >
+                <div className="dashboard-trend-header">
+                  <h2>Events per Month</h2>
+                  <p className="dashboard-muted">
+                    Event volume over the last {eventsByMonth.length} months.
+                  </p>
+                </div>
+                <MiniBarChart data={eventsByMonth} color="var(--brand)" />
+              </div>
+            )}
 
             <section className="dashboard-events-section" data-aos="fade-up">
               <h2>Events</h2>

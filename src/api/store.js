@@ -1,9 +1,10 @@
 import { getJson, postJson } from './client'
 
 // Cosmetics store (see StoreController in the FahhKit backend). Categories
-// are STICKER, AVATAR_BORDER, TERRITORY_SHADE, TRAIL_COLOR,
-// PROFILE_BACKGROUND — there's no standalone "avatar character" category,
-// these layer onto the athlete's real profile picture.
+// are HERO, AVATAR_BORDER, TERRITORY_SHADE, TRAIL_COLOR, PROFILE_BACKGROUND,
+// TERRITORY_EMOJI, PHRASE — HERO is the real, server-synced avatar
+// character (an assetUrl image); the rest layer onto the athlete's real
+// profile picture instead of standing in for one.
 
 export function getStoreCatalog(pageNumber = 1, noOfRecords = 50) {
   return postJson('/v1/store/catalog/find', { pageNumber, noOfRecords })

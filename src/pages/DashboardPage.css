@@ -171,3 +171,18 @@
     align-items: flex-start;
   }
 }
+
+.dashboard-trend-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.dashboard-trend-header h2 {
+  margin: 0 0 2px;
+  font-size: 18px;
+}
+
+.dashboard-trend-header p {
+  margin: 0;
+}

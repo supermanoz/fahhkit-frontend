@@ -1,0 +1,26 @@
+.mini-bar-chart {
+  width: 100%;
+}
+
+.mini-bar-tooltip {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.mini-bar-tooltip-label {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.mini-bar-tooltip-value {
+  color: var(--text);
+  font-weight: 800;
+  font-size: 15px;
+}
