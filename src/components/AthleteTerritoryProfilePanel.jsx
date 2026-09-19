@@ -65,8 +65,8 @@ export default function AthleteTerritoryProfilePanel({
                 {areaEmoji} {formatArea(profile.totalAreaSqMeters)}
               </span>
               <span className="game-menu-summary-label">
-                held across {profile.parcelCount ?? 0} parcel
-                {profile.parcelCount === 1 ? '' : 's'}
+                held across {profile.parcelCount ?? 0} territor
+                {profile.parcelCount === 1 ? 'y' : 'ies'}
               </span>
             </div>
 

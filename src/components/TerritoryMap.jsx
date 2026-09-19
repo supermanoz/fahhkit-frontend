@@ -26,7 +26,11 @@ import { FaCrosshairs } from 'react-icons/fa'
 // this just has to point maplibre-gl at the copy before it creates one.
 setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
 import { PLAYER_COLOR, formatArea } from '../utils/territoryGame'
-import defaultAvatarImage from '../assets/images/player-avatar-wind.png'
+// Same fallback image GamePage.jsx uses (its own defaultAvatarImage) - this
+// used to be a different local avatar (Wind), so a broken avatarSrc (e.g.
+// the account's equipped Hero's assetUrl 404ing) showed one character on
+// the map and a different one in the Me panel instead of matching.
+import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
@@ -56,6 +60,13 @@ const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
 // named locality within a city), and only cut things too fine-grained or
 // too rural to matter on a game map (hamlets, isolated dwellings, and the
 // quarter/borough tags some cities double up with neighbourhood).
+//
+// This is specific to positron/liberty/bright (the only MAP_STYLES options
+// - see constants/mapStyles.js). Dark mode is a CSS filter over one of
+// those same three, not OpenFreeMap's own separate "dark" style, which
+// uses a completely different layer-id/field schema and whose own layers
+// reference a sprite image missing from its sprite sheet badly enough to
+// stall the renderer - so there's no second schema to account for here.
 const IMPORTANT_PLACE_LABEL_IDS = new Set([
   'label_city',
   'label_city_capital',
@@ -115,13 +126,13 @@ function hideSymbolLayers(glMap) {
 // Renders the vector basemap via MapLibre GL (through the maplibre-gl-leaflet
 // bridge) so it lives in the same tile pane a raster TileLayer would have
 // used, underneath all the Polygon/Marker overlays below.
-function PokemonStyleBaseLayer({ styleUrl, onReady }) {
+function PokemonStyleBaseLayer({ styleUrl, darkMode, onReady }) {
   const map = useMap()
 
   useEffect(() => {
     const glLayer = L.maplibreGL({
       style: styleUrl || BASEMAP_STYLE_URL,
-      className: 'territory-map-tiles',
+      className: `territory-map-tiles${darkMode ? ' is-dark-mode' : ''}`,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
@@ -137,10 +148,18 @@ function PokemonStyleBaseLayer({ styleUrl, onReady }) {
     return () => {
       map.removeLayer(glLayer)
     }
-    // Re-created (not just re-styled) on a style change - simplest way to
-    // fully swap a maplibre-gl-leaflet layer's style without fighting its
-    // own internal style-diffing.
-  }, [map, styleUrl, onReady])
+    // Re-created (not just re-styled) on a style OR dark-mode change -
+    // simplest way to fully swap a maplibre-gl-leaflet layer's className
+    // without fighting its own internal style-diffing. Dark mode is a CSS
+    // filter on this same className (see TerritoryMap.css .is-dark-mode),
+    // not a separate vector style - OpenFreeMap's own "dark" style shares
+    // the underlying tiles but uses a different layer-id/field schema than
+    // positron/liberty/bright (breaking the English-label logic above) and
+    // its own layers reference a "wood-pattern" sprite image that doesn't
+    // exist in that style's sprite sheet, which pinned the render thread
+    // hard enough to make the page unresponsive. Filtering a known-good
+    // light style avoids both problems entirely.
+  }, [map, styleUrl, darkMode, onReady])
 
   return null
 }
@@ -153,13 +172,20 @@ function PokemonStyleBaseLayer({ styleUrl, onReady }) {
 // backend's cosmetics are borders/colors layered on that photo, not a
 // separate avatar character — see the Shop tab) and falls back to a
 // generic placeholder icon otherwise.
-function buildPlayerMarkerIcon(avatarSrc) {
+// avatarSrc is frequently a server-hosted URL (equipped Store Hero, or a
+// profile picture) rather than one of the bundled local placeholders - if
+// that request ever fails (server hiccup, an equipped item whose asset got
+// deleted, a stale/expired URL), the <img> just renders broken with nothing
+// else on the marker, which is what made the avatar appear to "vanish" after
+// the game had been open a while. onerror falls back to a guaranteed-local
+// bundled image and clears itself so it can't loop.
+function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
   return L.divIcon({
     className: 'territory-map-player-icon',
     html:
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
-      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" />`,
+      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
   })
@@ -439,6 +465,7 @@ export default function TerritoryMap({
   playerColor,
   trailColor,
   mapStyleUrl,
+  darkMode,
   manualMode,
   onMapClick,
   onParcelClick,
@@ -448,7 +475,11 @@ export default function TerritoryMap({
   const tiltRef = useRef(null)
   const [mapInstance, setMapInstance] = useState(null)
   const playerMarkerIcon = useMemo(
-    () => buildPlayerMarkerIcon(avatarSrc || defaultAvatarImage),
+    () =>
+      buildPlayerMarkerIcon(
+        avatarSrc || defaultAvatarImage,
+        defaultAvatarImage
+      ),
     [avatarSrc]
   )
 
@@ -472,7 +503,11 @@ export default function TerritoryMap({
           zoomControl={false}
           renderer={territoryRenderer}
         >
-          <PokemonStyleBaseLayer styleUrl={mapStyleUrl} onReady={onMapReady} />
+          <PokemonStyleBaseLayer
+            styleUrl={mapStyleUrl}
+            darkMode={darkMode}
+            onReady={onMapReady}
+          />
 
           {territories.map((t) => {
             const isMine = Boolean(currentUserId) && t.ownerId === currentUserId

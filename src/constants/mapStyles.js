@@ -24,6 +24,31 @@ export const MAP_STYLES = [
   },
 ]
 
+// A separate quick-toggle from the MAP_STYLES picker above (see GamePage's
+// mute/exit-style dark-mode button) - a CSS filter applied over whichever
+// light style is otherwise selected (see TerritoryMap.css .is-dark-mode),
+// not a separate MAP_STYLES entry or OpenFreeMap's own "dark" vector style
+// (which uses a different layer-id schema that breaks the English-only
+// place-label logic, and whose own layers reference a sprite image missing
+// from its sprite sheet - severely degrading render performance).
+const MAP_DARK_MODE_KEY = 'fahhkit_territory_map_dark_mode'
+
+export function loadMapDarkMode() {
+  try {
+    return localStorage.getItem(MAP_DARK_MODE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+export function saveMapDarkMode(enabled) {
+  try {
+    localStorage.setItem(MAP_DARK_MODE_KEY, String(enabled))
+  } catch {
+    // Preference just won't persist past reload.
+  }
+}
+
 const STORAGE_KEY = 'fahhkit_territory_map_style_id'
 
 export function getMapStyleById(id) {

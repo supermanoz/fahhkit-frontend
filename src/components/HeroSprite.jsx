@@ -30,7 +30,26 @@ export default function HeroSprite({ size = 96 }) {
       rafId = requestAnimationFrame(tick)
     }
     rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
+
+    // Browsers suspend requestAnimationFrame entirely while the tab/window
+    // is hidden (switching browser tabs, minimizing, backgrounding the
+    // app), then resume it on their own schedule - which can leave this
+    // stuck presenting whatever frame it landed on rather than visibly
+    // resuming the run cycle. Forcing a fresh rAF loop on visibilitychange
+    // (instead of trusting the browser's own resume timing) guarantees the
+    // animation is always moving again the instant the tab is visible.
+    function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible') return
+      cancelAnimationFrame(rafId)
+      lastTickRef.current = 0
+      rafId = requestAnimationFrame(tick)
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   const col = frame % SHEET_COLS

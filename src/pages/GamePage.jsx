@@ -2,20 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  FaArrowLeft,
-  FaBars,
   FaCheck,
   FaCoins,
   FaFlag,
+  FaListUl,
   FaLock,
+  FaMoon,
   FaPlay,
   FaStore,
+  FaSun,
   FaTimes,
   FaTrophy,
   FaUser,
-  FaVolumeMute,
-  FaVolumeUp,
 } from 'react-icons/fa'
+import { BsVolumeMuteFill, BsVolumeUpFill } from 'react-icons/bs'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
@@ -45,6 +45,7 @@ import {
   LOOP_MIN_POINTS,
   VIEW_RADIUS_METERS,
   formatArea,
+  levelProgress,
   loopPerimeterMeters,
   polygonAreaSqMeters,
   toDisplayParcel,
@@ -68,6 +69,7 @@ import { playClickSound, playMilestoneChime } from '../utils/gameSound'
 import { isBlazeHero } from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
+import woodSignBanner from '../assets/images/wood-sign-banner.png'
 import {
   AVATARS,
   COMING_SOON_AVATARS,
@@ -78,7 +80,9 @@ import {
 import {
   MAP_STYLES,
   getMapStyleById,
+  loadMapDarkMode,
   loadMapStyleId,
+  saveMapDarkMode,
   saveMapStyleId,
 } from '../constants/mapStyles'
 import {
@@ -93,6 +97,23 @@ function formatMeters(meters) {
   if (!meters) return '0 m'
   if (meters < 1000) return `${Math.round(meters)} m`
   return `${(meters / 1000).toFixed(2)} km`
+}
+
+// Chunky fletched-dart back arrow (per reference art) instead of a thin
+// line-style chevron - a solid notched-tail shape rendered in currentColor
+// so it just inherits the exit button's existing ink color/sizing.
+function BackArrowIcon(props) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="currentColor"
+      {...props}
+    >
+      <path d="M4 12 L18 3 L14.5 12 L18 21 Z" />
+    </svg>
+  )
 }
 
 // Pokémon GO-style fan-out: tapping the pokéball FAB pops these options up
@@ -242,6 +263,18 @@ export default function GamePage() {
     }
   })
   const musicRef = useRef(null)
+
+  // Map basemap dark mode - a quick top-level toggle independent of the
+  // Shop's Map style picker (MAP_STYLES), which stays whatever light style
+  // the player picked there. Persisted the same way as the music mute.
+  const [mapDarkMode, setMapDarkMode] = useState(() => loadMapDarkMode())
+  function toggleMapDarkMode() {
+    setMapDarkMode((prev) => {
+      const next = !prev
+      saveMapDarkMode(next)
+      return next
+    })
+  }
   // Last 1km-multiple the player was alerted for during the current tracked
   // run — a ref (not state) since it's read/written from inside an effect
   // and should never itself trigger a re-render.
@@ -357,12 +390,33 @@ export default function GamePage() {
     }
   }
 
+  // ownedItems drives which avatar shows (equippedHero takes priority over
+  // the free Blaze sprite/local avatar pick - see avatarSrc/
+  // showBlazeHeroSprite below), not just the Shop tab's own equip/buy UI.
+  // It used to only load lazily the first time the player opened Shop,
+  // which meant the map/Me avatar could visibly change mid-session - Blaze's
+  // sprite showing at first (ownedItems still empty, so no equippedHero to
+  // find) and then flipping to a static image the moment Shop's data
+  // happened to load. Fetching it upfront here means that decision is
+  // correct and stable from the very first render instead of depending on
+  // tab-visit order.
+  async function refreshOwnedItems() {
+    try {
+      const owned = await getOwnedStoreItems()
+      setOwnedItems(owned || [])
+    } catch {
+      // Equip state just isn't known yet - avatar picks fall back to the
+      // free local avatar/Blaze sprite until this succeeds.
+    }
+  }
+
   // Loads once we roughly know where the player is - re-running on every
   // liveLocation tick would hammer the API on every GPS fix.
   useEffect(() => {
     if (locating || !isAuthed) return
     refreshProfile()
     refreshNearbyParcels()
+    refreshOwnedItems()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locating, isAuthed])
 
@@ -874,10 +928,24 @@ export default function GamePage() {
     (o) => o.equipped && o.storeItem.category === 'TRAIL_COLOR'
   )?.storeItem.colorValue
 
-  function handleChooseAvatar(avatar) {
+  async function handleChooseAvatar(avatar) {
     setAvatarId(avatar.id)
     saveAvatarId(avatar.id)
     setAvatarChoice(null)
+    // A free avatar and an equipped Store Hero both feed avatarSrc above,
+    // with the Hero always winning - so picking a free avatar while one is
+    // equipped would silently do nothing visually unless it's unequipped
+    // here too (every account starts with a zero-cost "Default Hero"
+    // equipped, so this fires the very first time anyone touches Avatar).
+    if (equippedHero) {
+      try {
+        await unequipStoreItem(equippedHero.storeItem.id)
+        await refreshOwnedItems()
+      } catch {
+        // The local avatar pick above still applies even if this background
+        // cleanup call fails - not worth surfacing a separate error for it.
+      }
+    }
   }
 
   // Map style and area emoji are purely cosmetic/local, so unlike the avatar
@@ -946,6 +1014,7 @@ export default function GamePage() {
           playerColor={equippedShade}
           trailColor={equippedTrailColor}
           mapStyleUrl={currentMapStyle?.styleUrl}
+          darkMode={mapDarkMode}
           manualMode={manualMode}
           onMapClick={handleMapTap}
           onParcelClick={handleParcelClick}
@@ -965,7 +1034,7 @@ export default function GamePage() {
       )}
 
       <Link to="/" className="game-exit-btn" aria-label="Exit to home">
-        <FaArrowLeft />
+        <BackArrowIcon />
       </Link>
 
       <button
@@ -974,7 +1043,18 @@ export default function GamePage() {
         onClick={toggleMusicMuted}
         aria-label={musicMuted ? 'Unmute music' : 'Mute music'}
       >
-        {musicMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+        {musicMuted ? <BsVolumeMuteFill /> : <BsVolumeUpFill />}
+      </button>
+
+      <button
+        type="button"
+        className="game-map-theme-btn"
+        onClick={toggleMapDarkMode}
+        aria-label={
+          mapDarkMode ? 'Switch map to light mode' : 'Switch map to dark mode'
+        }
+      >
+        {mapDarkMode ? <FaSun /> : <FaMoon />}
       </button>
 
       <div className="game-hud">
@@ -984,26 +1064,24 @@ export default function GamePage() {
           aria-label="Fahhcoin balance - buy more Fahhcoin"
           onClick={openCoinShop}
         >
-          <span className="game-hud-icon game-hud-icon-coin">
-            <FaCoins />
-          </span>
           <span className="game-hud-value">
             {profile?.fahhcoinBalance ?? 0}
           </span>
+          <span className="game-hud-icon game-hud-icon-coin" />
         </button>
         <button
           type="button"
           className="game-hud-stat game-hud-stat-clickable"
-          aria-label="Parcels held - view your territories"
+          aria-label="Territories held - view your territories"
           onClick={() => {
             switchTab('me')
             setMenuOpen(true)
           }}
         >
+          <span className="game-hud-value">{profile?.parcelCount ?? 0}</span>
           <span className="game-hud-icon game-hud-icon-flag">
             <FaFlag />
           </span>
-          <span className="game-hud-value">{profile?.parcelCount ?? 0}</span>
         </button>
       </div>
 
@@ -1013,6 +1091,26 @@ export default function GamePage() {
           onClick={() => setRadialOpen(false)}
         />
       )}
+
+      <AnimatePresence>
+        {radialOpen && (
+          <motion.div
+            className="game-menu-banner"
+            initial={{ opacity: 0, y: -18, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+          >
+            <img src={woodSignBanner} alt="" className="game-menu-banner-img" />
+            <div className="game-menu-banner-text">
+              <span className="game-menu-banner-title">Territory Run</span>
+              <span className="game-menu-banner-subtitle">
+                Claim it. Run it. Own it.
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="game-fab-wrap">
         <AnimatePresence>
@@ -1046,7 +1144,6 @@ export default function GamePage() {
                 >
                   <item.Icon />
                 </button>
-                <span className="game-radial-label">{item.label}</span>
               </motion.div>
             ))}
         </AnimatePresence>
@@ -1058,7 +1155,7 @@ export default function GamePage() {
           aria-label={radialOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={radialOpen}
         >
-          <FaBars />
+          <FaListUl />
         </button>
       </div>
 
@@ -1474,9 +1571,30 @@ export default function GamePage() {
                       className="game-menu-hero-img"
                       src={avatarSrc}
                       alt=""
+                      onError={(e) => {
+                        // avatarSrc can point at a server-hosted asset
+                        // (equipped Hero / profile picture) that can fail to
+                        // load - fall back to a bundled local image that
+                        // can't 404 instead of leaving a broken-image glyph.
+                        e.currentTarget.onerror = null
+                        e.currentTarget.src =
+                          currentAvatar?.src || defaultAvatarImage
+                      }}
                     />
                   )}
                 </div>
+                <img
+                  className="game-menu-profile-pic"
+                  src={
+                    resolveFileUrl(user?.profilePictureUrl) ||
+                    defaultAvatarImage
+                  }
+                  alt=""
+                  onError={(e) => {
+                    e.currentTarget.onerror = null
+                    e.currentTarget.src = defaultAvatarImage
+                  }}
+                />
                 {user?.fullName && (
                   <p className="game-menu-player-name">{user.fullName}</p>
                 )}
@@ -1485,21 +1603,58 @@ export default function GamePage() {
                     “{equippedPhrase.storeItem.name}”
                   </p>
                 )}
+                {profile?.level != null &&
+                  (() => {
+                    const { into, span, pct } = levelProgress(
+                      profile.level,
+                      profile.xp ?? 0
+                    )
+                    return (
+                      <>
+                        <div className="game-level-track">
+                          <span className="game-level-badge">
+                            {profile.level}
+                          </span>
+                          <div className="game-xp-bar">
+                            <div
+                              className="game-xp-bar-fill"
+                              style={{ width: `${Math.round(pct * 100)}%` }}
+                            >
+                              <span className="game-xp-bar-marker" />
+                            </div>
+                          </div>
+                        </div>
+                        <span className="game-xp-bar-text">
+                          {into} / {span} XP
+                        </span>
+                      </>
+                    )
+                  })()}
                 <div className="game-menu-summary">
                   <span className="game-menu-summary-value">
                     {formatArea(profile?.totalAreaSqMeters)}
                   </span>
-                  <span className="game-menu-summary-label">
-                    held across {profile?.parcelCount ?? 0} parcel
-                    {profile?.parcelCount === 1 ? '' : 's'}
+                  <span
+                    className="game-menu-parcel-flags"
+                    aria-label={`${profile?.parcelCount ?? 0} territor${profile?.parcelCount === 1 ? 'y' : 'ies'} held`}
+                  >
+                    {Array.from({
+                      length: Math.min(profile?.parcelCount ?? 0, 8),
+                    }).map((_, i) => (
+                      <FaFlag key={i} />
+                    ))}
+                    {(profile?.parcelCount ?? 0) > 8 && (
+                      <span className="game-menu-parcel-flags-more">
+                        +{profile.parcelCount - 8}
+                      </span>
+                    )}
                   </span>
+                  {profile?.clubName && (
+                    <span className="game-menu-summary-label">
+                      {profile.clubName}
+                    </span>
+                  )}
                 </div>
-                {profile?.level != null && (
-                  <p className="game-menu-summary-label">
-                    Level {profile.level} · {profile.xp ?? 0} XP
-                    {profile.clubName ? ` · ${profile.clubName}` : ''}
-                  </p>
-                )}
                 <p className="game-menu-section-title">My Territories</p>
                 {myParcels.length === 0 ? (
                   <p className="game-menu-empty">
@@ -1562,12 +1717,8 @@ export default function GamePage() {
 
             {menuTab === 'shop' && (
               <div className="game-menu-panel game-menu-shop">
-                <p className="game-menu-avatars-title">
-                  Choose your map avatar
-                </p>
-                <p className="game-menu-avatars-subtitle">
-                  Own a Sticker below? Equip it to use as your map avatar
-                  instead of these.
+                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
+                  Avatar
                 </p>
                 <div className="game-menu-avatar-grid">
                   {AVATARS.map((avatar) => {
@@ -1611,15 +1762,9 @@ export default function GamePage() {
                     </div>
                   ))}
                 </div>
-                {equippedHero && (
-                  <p className="game-menu-avatars-hint">
-                    Your equipped Hero ({equippedHero.storeItem.name}) is
-                    showing on the map instead — unequip it below to switch back
-                    to a free avatar.
-                  </p>
-                )}
-
-                <p className="game-menu-avatars-title">Map style</p>
+                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
+                  Map
+                </p>
                 <div className="game-menu-avatar-grid">
                   {MAP_STYLES.map((style) => {
                     const isSelected = style.id === mapStyleId
@@ -1648,7 +1793,9 @@ export default function GamePage() {
                   })}
                 </div>
 
-                <p className="game-menu-avatars-title">Area emoji</p>
+                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
+                  Emoji
+                </p>
                 <div className="game-menu-avatar-grid">
                   {AREA_EMOJIS.map((emoji) => {
                     const isSelected = emoji.id === areaEmojiId
@@ -1700,6 +1847,13 @@ export default function GamePage() {
                               <img
                                 src={resolveFileUrl(item.assetUrl)}
                                 alt={item.name}
+                                onError={(e) => {
+                                  // Same broken-asset-URL issue as the Hero
+                                  // avatar (see buildPlayerMarkerIcon) - hide
+                                  // the swatch image instead of leaving a
+                                  // broken-image glyph in the shop list.
+                                  e.currentTarget.style.display = 'none'
+                                }}
                               />
                             )}
                           </span>
@@ -1874,9 +2028,7 @@ export default function GamePage() {
                 <ul className="game-menu-list game-coin-bundle-list">
                   {coinBundles.map((bundle) => (
                     <li key={bundle.fahhcoinAmount} className="game-store-item">
-                      <span className="game-hud-icon game-hud-icon-coin">
-                        <FaCoins />
-                      </span>
+                      <span className="game-hud-icon game-hud-icon-coin" />
                       <span className="game-store-item-info">
                         <span className="game-menu-list-area">
                           {bundle.fahhcoinAmount} Fahhcoin

@@ -124,3 +124,25 @@ export function formatArea(sqMeters) {
   const decimals = km < 0.01 ? 4 : km < 1 ? 3 : 2
   return `${km.toFixed(decimals)} km²`
 }
+
+// Mirrors the backend's level curve (TerritoryXpServiceImpl.levelForXp /
+// territory.xp.level-curve-base, defaulting to 100): level(xp) = 1 +
+// floor(sqrt(xp / LEVEL_CURVE_BASE)), so cumulative XP to reach level L is
+// LEVEL_CURVE_BASE * (L - 1)^2. There's no API field for "XP to next level",
+// so this inverts that same formula client-side to drive the XP progress
+// bar. Keep in sync if the server-side base ever changes.
+const LEVEL_CURVE_BASE = 100
+
+export function xpFloorForLevel(level) {
+  return LEVEL_CURVE_BASE * (level - 1) ** 2
+}
+
+// How far into the current level a player's XP sits, as both raw numbers
+// (for a "1,234 / 2,000 XP" style label) and a 0-1 fill fraction for a bar.
+export function levelProgress(level, xp) {
+  const floor = xpFloorForLevel(level)
+  const ceiling = xpFloorForLevel(level + 1)
+  const span = Math.max(1, ceiling - floor)
+  const into = Math.max(0, (xp || 0) - floor)
+  return { into, span, pct: Math.min(1, into / span) }
+}

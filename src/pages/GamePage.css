@@ -1,25 +1,52 @@
+/* Custom in-game display font (Passion One, bold slab) - bundled locally
+   rather than loaded from Google Fonts so the game still reads right
+   offline/on a flaky connection. Scoped to .game-page (see the font-family
+   rule below) so the rest of the site keeps its own type. */
+@font-face {
+  font-family: 'Passion One';
+  src: url('../assets/fonts/PassionOne-Bold.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Passion One';
+  src: url('../assets/fonts/PassionOne-Black.ttf') format('truetype');
+  font-weight: 800 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Palette + cel-shading recipe documented in /style.md — CSS custom
    properties here so TerritoryMap's own stylesheet (a DOM descendant of
-   .game-page) can reuse the same tokens without duplicating hex values. */
+   .game-page) can reuse the same tokens without duplicating hex values.
+   Punched up brighter/more saturated than the original muted set (still
+   readable, just less "sun-faded board game" and more "premium mobile
+   game") - see the glossy gradient buttons below for the other half of
+   that same shift. */
 .game-page {
   --game-ink: #3d2b1a;
-  --game-wood: #c98f52;
-  --game-wood-dark: #9c6a34;
-  --game-wood-light: #e8c084;
-  --game-stone: #9a9d93;
-  --game-stone-dark: #6e7166;
-  --game-stone-light: #c4c7bc;
-  --game-gold: #f4c430;
-  --game-gold-dark: #c4900c;
-  --game-gold-light: #ffe08a;
-  --game-green: #6fa15e;
-  --game-green-dark: #46733a;
-  --game-green-light: #a4cf8e;
-  --game-red: #d9553f;
-  --game-red-dark: #a53a28;
-  --game-red-light: #ef8a76;
-  --game-cream: #f6ecd9;
-  --game-panel: rgba(44, 32, 20, 0.9);
+  --game-wood: #e0a355;
+  --game-wood-dark: #a8672c;
+  --game-wood-light: #ffd9a0;
+  --game-stone: #aeb3a6;
+  --game-stone-dark: #767a6d;
+  --game-stone-light: #dfe2d6;
+  /* Matches the site's own brand orange (index.css --brand/--brand-amber/
+     --brand-dark) instead of a separate in-game yellow/gold - one warm
+     orange identity across the whole product, not two competing ones. */
+  --game-gold: #ff7a29;
+  --game-gold-dark: #c94a08;
+  --game-gold-light: #ffb15c;
+  --game-green: #4fc85e;
+  --game-green-dark: #268a3a;
+  --game-green-light: #a8f0af;
+  --game-red: #ff5a4d;
+  --game-red-dark: #c72a20;
+  --game-red-light: #ffab9e;
+  --game-cream: #fff6e6;
+  --game-panel: rgba(44, 32, 20, 0.92);
 
   position: fixed;
   inset: 0;
@@ -27,6 +54,15 @@
   height: 100dvh;
   overflow: hidden;
   background: #0a0806;
+  font-family: 'Passion One', 'Trebuchet MS', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.game-page button,
+.game-page input,
+.game-page select,
+.game-page textarea {
+  font-family: inherit;
 }
 
 /* --- Loading screen: shown from page-open until the basemap has actually
@@ -87,9 +123,13 @@
    bar rather than boxed in a card below a header. Carved-stone slab: flat
    base color, one hard-edged shadow band for the shaded half, one chunky
    offset drop shadow beneath the whole shape. --- */
-.game-exit-btn {
+/* Round HUD badges (exit / mute / map theme) share one glossy recipe: a
+   gradient body plus a soft highlight arc up top, closer to Clash of Clans'
+   chunky enamel-button look than a flat cel-shaded circle. */
+.game-exit-btn,
+.game-mute-btn,
+.game-map-theme-btn {
   position: absolute;
-  top: 16px;
   left: 16px;
   z-index: 600;
   width: 44px;
@@ -98,47 +138,45 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--game-stone);
+  background: radial-gradient(
+    circle at 32% 28%,
+    var(--game-stone-light),
+    var(--game-stone) 55%,
+    var(--game-stone-dark) 100%
+  );
   color: var(--game-ink);
   border: 3px solid var(--game-ink);
   box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.55),
     inset 0 -6px 0 var(--game-stone-dark),
     0 3px 0 var(--game-ink);
   text-decoration: none;
   font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
 }
 
-.game-exit-btn:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 -6px 0 var(--game-stone-dark),
-    0 1px 0 var(--game-ink);
+.game-exit-btn {
+  top: 16px;
+  font-size: 22px;
 }
 
 .game-mute-btn {
-  position: absolute;
   top: 68px;
-  left: 16px;
-  z-index: 600;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--game-stone);
-  color: var(--game-ink);
-  border: 3px solid var(--game-ink);
-  box-shadow:
-    inset 0 -6px 0 var(--game-stone-dark),
-    0 3px 0 var(--game-ink);
-  font-size: 15px;
-  cursor: pointer;
+  font-size: 22px;
 }
 
-.game-mute-btn:active {
+.game-map-theme-btn {
+  top: 120px;
+  font-size: 15px;
+}
+
+.game-exit-btn:active,
+.game-mute-btn:active,
+.game-map-theme-btn:active {
   transform: translateY(2px);
   box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.4),
     inset 0 -6px 0 var(--game-stone-dark),
     0 1px 0 var(--game-ink);
 }
@@ -152,18 +190,29 @@
   gap: 8px;
 }
 
+/* Clash Royale-style resource pill: a dark rounded bar with the number, and
+   the resource's own glossy medallion overlapping its right edge, rather
+   than an icon-then-number row inside one flat capsule. */
 .game-hud-stat {
+  position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
-  background: var(--game-panel);
-  border: 3px solid var(--game-ink);
+  justify-content: flex-start;
+  gap: 0;
+  background: linear-gradient(
+    180deg,
+    var(--game-stone-light) 0%,
+    var(--game-stone) 55%,
+    var(--game-stone-dark) 100%
+  );
+  border: 2px solid rgba(0, 0, 0, 0.55);
   border-radius: 999px;
-  padding: 4px 16px 4px 4px;
+  padding: 6px 22px 6px 16px;
   box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.1),
-    0 3px 0 var(--game-ink);
+    inset 0 2px 3px rgba(255, 255, 255, 0.5),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 3px 0 rgba(0, 0, 0, 0.45);
 }
 
 .game-hud-stat-clickable {
@@ -181,44 +230,64 @@
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
-/* --- Resource medallion: a chunky, flat, cel-shaded coin/gem rather than a
-   glossy icon — one base color, one hard-edged shadow band, no gradient. --- */
+/* --- Resource medallion: glossy and overlapping the pill's right edge
+   (absolute-positioned, half in/half out) - the Clash Royale coin/gem
+   treatment, not an inline icon sitting flush inside the bar. --- */
 .game-hud-icon {
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 2.5px solid var(--game-ink);
-  font-size: 16px;
+  border: 2.5px solid rgba(0, 0, 0, 0.55);
+  font-size: 15px;
   flex-shrink: 0;
-  box-shadow: 0 2px 0 var(--game-ink);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
+/* Plain coin token (per reference) - flat yellow disc, not the site's
+   orange --game-gold or the stacked-coins FaCoins glyph. */
 .game-hud-icon-coin {
-  background: var(--game-gold);
+  background: radial-gradient(
+    circle at 32% 26%,
+    #fff3b0,
+    #ffd23f 55%,
+    #d19a00 100%
+  );
   color: var(--game-ink);
   box-shadow:
-    inset 0 -7px 0 var(--game-gold-dark),
-    0 2px 0 var(--game-ink);
+    inset 0 2px 2px rgba(255, 255, 255, 0.6),
+    inset 0 -7px 0 #b8850a,
+    0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
 .game-hud-icon-flag {
-  background: var(--game-green);
+  background: radial-gradient(
+    circle at 32% 26%,
+    var(--game-green-light),
+    var(--game-green) 55%,
+    var(--game-green-dark) 100%
+  );
   color: var(--game-ink);
   box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.6),
     inset 0 -7px 0 var(--game-green-dark),
-    0 2px 0 var(--game-ink);
+    0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
 .game-hud-value {
-  font-size: 19px;
+  padding-right: 20px;
+  font-size: 18px;
   font-weight: 800;
-  color: var(--game-cream);
-  -webkit-text-stroke: 2.5px var(--game-ink);
+  color: #fff;
+  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.5);
   paint-order: stroke fill;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .game-page-banner {
@@ -305,10 +374,16 @@
    default orange-gradient buttons — scoped to .game-page so the rest of
    the app is untouched. */
 .game-page .btn-primary {
-  background: var(--game-gold);
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light) 0%,
+    var(--game-gold) 45%,
+    var(--game-gold-dark) 100%
+  );
   color: var(--game-ink);
   border: 3px solid var(--game-ink);
   box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.6),
     inset 0 -6px 0 var(--game-gold-dark),
     0 3px 0 var(--game-ink);
   text-shadow: none;
@@ -326,15 +401,22 @@
 .game-page .btn-primary:active {
   transform: translateY(2px);
   box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.5),
     inset 0 -6px 0 var(--game-gold-dark),
     0 1px 0 var(--game-ink);
 }
 
 .game-page .btn-outline {
-  background: var(--game-wood);
+  background: linear-gradient(
+    180deg,
+    var(--game-wood-light) 0%,
+    var(--game-wood) 45%,
+    var(--game-wood-dark) 100%
+  );
   color: var(--game-ink);
   border: 3px solid var(--game-ink);
   box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.5),
     inset 0 -6px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
 }
@@ -347,6 +429,7 @@
 .game-page .btn-outline:active {
   transform: translateY(2px);
   box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.4),
     inset 0 -6px 0 var(--game-wood-dark),
     0 1px 0 var(--game-ink);
 }
@@ -530,6 +613,9 @@
   height: 60px;
 }
 
+/* "List" badge (per reference) with a bold near-black ring, but shaded
+   the same way as the other HUD/radial badges (radial-gradient body +
+   inset top sheen + inset bottom shade band) instead of a flat fill. */
 .game-menu-btn {
   position: relative;
   width: 60px;
@@ -538,13 +624,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--game-gold);
-  color: var(--game-ink);
-  border: 4px solid var(--game-ink);
+  background: radial-gradient(
+    circle at 32% 28%,
+    var(--game-gold-light),
+    var(--game-gold) 55%,
+    var(--game-gold-dark) 100%
+  );
+  color: #000;
+  border: 4px solid #000;
   box-shadow:
+    inset 0 3px 3px rgba(255, 255, 255, 0.6),
     inset 0 -9px 0 var(--game-gold-dark),
-    inset 0 3px 0 var(--game-gold-light),
-    0 5px 0 var(--game-ink);
+    0 5px 0 #000;
   font-size: 24px;
   cursor: pointer;
   transition:
@@ -556,9 +647,9 @@
 .game-menu-btn.is-open {
   transform: translateY(4px);
   box-shadow:
+    inset 0 3px 3px rgba(255, 255, 255, 0.6),
     inset 0 -9px 0 var(--game-gold-dark),
-    inset 0 3px 0 var(--game-gold-light),
-    0 1px 0 var(--game-ink);
+    0 1px 0 #000;
 }
 
 /* Dims the map while the radial menu is fanned out, and lets a tap
@@ -571,22 +662,71 @@
   background: rgba(10, 8, 6, 0.35);
 }
 
+/* Decorative wood-sign title card shown above the radial menu while it's
+   fanned out - the text sits in the plank's carved interior, inset from the
+   image's own vine/post border rather than centered on the whole graphic. */
+.game-menu-banner {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 680;
+  width: 240px;
+  pointer-events: none;
+}
+
+.game-menu-banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.game-menu-banner-text {
+  position: absolute;
+  top: 18%;
+  left: 24%;
+  right: 24%;
+  bottom: 16%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.game-menu-banner-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--game-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.game-menu-banner-subtitle {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--game-wood-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
 /* Each option is an icon "badge" — chunky cel-shaded circle, thick ink
-   outline, offset drop shadow — plus a wood nameplate pill below it, the
-   same carved-resource-icon language as the HUD coin/parcel badges (see
-   /style.md), not the plain dark hamburger-menu circles this replaced. */
+   outline, offset drop shadow — the same carved-resource-icon language as
+   the HUD coin/parcel badges (see /style.md), not the plain dark
+   hamburger-menu circles this replaced. Icon-only, no text label. */
 .game-radial-item {
   position: absolute;
   top: 0;
   /* Wrap is 60px wide (see .game-fab-wrap); this item is 100px, so -20px
      keeps its icon centered on the FAB's own center before the motion x/y
-     offset fans it out, regardless of how wide each item's label pill is. */
+     offset fans it out. */
   left: -20px;
   width: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
   pointer-events: none;
 }
 
@@ -670,19 +810,6 @@
     inset 0 -9px 0 var(--game-red-dark),
     inset 0 3px 0 var(--game-red-light),
     0 1px 0 var(--game-ink);
-}
-
-.game-radial-label {
-  pointer-events: none;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--game-panel);
-  border: 2px solid var(--game-ink);
-  box-shadow: 0 2px 0 var(--game-ink);
-  color: var(--game-cream);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 /* --- Menu sheet: Territory / Shop drawer - fullscreen, not a partial-height
@@ -800,6 +927,20 @@
   object-fit: contain;
 }
 
+/* The player's real account photo, shown as a small badge under the big
+   hero/avatar art rather than standing in for it - the hero graphic is the
+   in-game skin, this is "who's actually playing." */
+.game-menu-profile-pic {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 8px auto 0;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--game-gold);
+  box-shadow: 0 2px 0 var(--game-ink);
+}
+
 .game-menu-phrase {
   text-align: center;
   font-size: 13px;
@@ -815,6 +956,103 @@
   color: var(--game-gold);
   margin: 0;
   padding-top: 4px;
+}
+
+/* Level/XP badge + fill bar, sized up from Clash of Clans' own thin sliver
+   meter so it reads clearly at a glance rather than disappearing under the
+   shield icon. */
+.game-level-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 4px 0;
+}
+
+/* Shield outline (clip-path hexagon) instead of a plain circle - the
+   Clash-Royale trophy-road badge shape. */
+.game-level-badge {
+  flex-shrink: 0;
+  width: 46px;
+  height: 48px;
+  clip-path: polygon(50% 0%, 95% 18%, 95% 64%, 50% 100%, 5% 64%, 5% 18%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    circle at 32% 26%,
+    var(--game-gold-light),
+    var(--game-gold) 55%,
+    var(--game-gold-dark) 100%
+  );
+  color: #fff;
+  font-weight: 800;
+  font-size: 19px;
+  box-shadow: inset 0 0 0 2px var(--game-ink);
+}
+
+.game-xp-bar {
+  position: relative;
+  flex: 1;
+  height: 13px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1.5px solid var(--game-ink);
+  /* visible, not hidden - the progress marker below sits half outside the
+     fill bar's own rounded end and would get clipped otherwise. */
+  overflow: visible;
+}
+
+.game-xp-bar-fill {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 50%,
+    var(--game-green-dark) 100%
+  );
+  transition: width 0.4s ease;
+}
+
+/* A thin glossy sheen along the top edge of the fill - the small cartoonish
+   detail that reads as "game UI" rather than a plain browser progress bar. */
+.game-xp-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  right: 3px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* A small gold diamond riding the leading edge of the fill - Clash
+   Royale's progress-marker detail, not just a flat color bar. */
+.game-xp-bar-marker {
+  position: absolute;
+  top: 50%;
+  right: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, var(--game-gold-light), var(--game-gold));
+  border: 1.5px solid var(--game-ink);
+  transform: translateY(-50%) rotate(45deg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.game-xp-bar-text {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin: 5px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(246, 236, 217, 0.6);
 }
 
 .game-menu-summary {
@@ -837,6 +1075,25 @@
   font-size: 12px;
   color: rgba(246, 236, 217, 0.7);
   margin-top: 4px;
+}
+
+/* One flag glyph per held parcel instead of "held across N parcels" text -
+   capped at 8 before folding into a "+N" chip so a heavily-territoried
+   player doesn't flood the row. */
+.game-menu-parcel-flags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--game-green);
+  font-size: 13px;
+}
+
+.game-menu-parcel-flags-more {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(246, 236, 217, 0.7);
+  margin-left: 2px;
 }
 
 .game-menu-section-title {
@@ -1000,18 +1257,14 @@
   margin: 0;
 }
 
-.game-menu-avatars-subtitle,
-.game-menu-avatars-hint {
-  width: 100%;
-  text-align: left;
-  font-size: 11px;
-  color: rgba(246, 236, 217, 0.6);
-  margin: 2px 0 0;
-}
-
-.game-menu-avatars-hint {
-  margin: -8px 0 12px;
+/* Shop section headers are one word, dead center - "Avatar" / "Map" /
+   "Emoji" - rather than a descriptive left-aligned sentence. */
+.game-menu-avatars-title-centered {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--game-gold);
+  margin: 6px 0 10px;
 }
 
 .game-menu-avatar-grid {
@@ -1156,18 +1409,32 @@
 
 @media (max-width: 560px) {
   .game-hud-stat {
-    padding: 3px 12px 3px 3px;
-    gap: 6px;
+    padding: 5px 18px 5px 12px;
   }
 
   .game-hud-icon {
+    right: -6px;
     width: 28px;
     height: 28px;
     font-size: 13px;
   }
 
   .game-hud-value {
+    padding-right: 16px;
     font-size: 16px;
+  }
+
+  .game-menu-banner {
+    top: 12px;
+    width: 190px;
+  }
+
+  .game-menu-banner-title {
+    font-size: 12px;
+  }
+
+  .game-menu-banner-subtitle {
+    font-size: 7px;
   }
 
   .game-fab-wrap {
@@ -1184,18 +1451,12 @@
   .game-radial-item {
     left: -17px;
     width: 90px;
-    gap: 10px;
   }
 
   .game-radial-btn {
     width: 52px;
     height: 52px;
     font-size: 21px;
-  }
-
-  .game-radial-label {
-    font-size: 11px;
-    padding: 3px 10px;
   }
 
   .game-menu-tab {
