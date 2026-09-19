@@ -285,14 +285,26 @@ export default function RegisterPage() {
                       <label htmlFor="emergencyContactRelationship">
                         Relationship
                       </label>
-                      <input
+                      <select
                         id="emergencyContactRelationship"
                         name="emergencyContactRelationship"
-                        type="text"
                         value={form.emergencyContactRelationship}
                         onChange={handleChange}
                         required
-                      />
+                      >
+                        <option value="">Select relationship</option>
+                        <option value="Family">Family</option>
+                        <option value="Partner">Partner</option>
+                        <option value="Relative">Relative</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Colleague">Colleague</option>
+                        <option value="Classmate">Classmate</option>
+                        <option value="Neighbor">Neighbor</option>
+                        <option value="Guardian">Guardian</option>
+                        <option value="Caregiver">Caregiver</option>
+                        <option value="Professional">Professional</option>
+                        <option value="Other">Other</option>
+                      </select>
                     </div>
                     <div className="field full">
                       <label htmlFor="emergencyContactPhone">
