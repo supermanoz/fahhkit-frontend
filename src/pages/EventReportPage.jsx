@@ -207,9 +207,12 @@ export default function EventReportPage() {
               </div>
               {event.capacity != null && (
                 <div>
+                  {/* Capacity is only ever enforced against PAID registrations
+                      (see EventServiceImpl#validateCapacityAvailable) - PENDING
+                      rows don't hold a slot, so they're excluded here too. */}
                   <dt>Capacity Filled</dt>
                   <dd>
-                    {report.total} / {event.capacity}
+                    {report.paid} / {event.capacity}
                   </dd>
                 </div>
               )}

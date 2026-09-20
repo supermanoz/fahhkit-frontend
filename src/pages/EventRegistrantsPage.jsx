@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import { FaSearch } from 'react-icons/fa'
 import { ApiError, canManageEvents, getJson, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { formatName } from '../utils/format'
@@ -33,6 +34,26 @@ const ATHLETE_ONLY_FILTER = [
   { field: 'userType', value: 'ATHLETE', type: 'object', object: 'user' },
 ]
 
+// actionType FILTER ANDs every entry in `search` together (see the backend's
+// DynamicWhereClause) - a name match and a status filter just join the
+// athlete-only filter as more AND conditions, rather than needing their own
+// OR-grouped query.
+function buildRegistrantSearch(nameQuery, statusFilter) {
+  const search = [...ATHLETE_ONLY_FILTER]
+  if (nameQuery) {
+    search.push({
+      field: 'fullName',
+      value: nameQuery,
+      type: 'object',
+      object: 'user',
+    })
+  }
+  if (statusFilter && statusFilter !== 'ALL') {
+    search.push({ field: 'paymentStatus', value: statusFilter, type: 'exact' })
+  }
+  return search
+}
+
 export default function EventRegistrantsPage() {
   const { id } = useParams()
   const { user, loading: userLoading } = useCurrentUser()
@@ -40,6 +61,9 @@ export default function EventRegistrantsPage() {
   const [registrants, setRegistrants] = useState([])
   const [athleteById, setAthleteById] = useState(new Map())
   const [stats, setStats] = useState({ paid: 0, pending: 0 })
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -155,6 +179,17 @@ export default function EventRegistrantsPage() {
     setPage(1)
   }, [id])
 
+  // Debounce the search box so we're not firing a request on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  // A new search term or status filter invalidates whatever page we were on.
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedQuery, statusFilter])
+
   // Event details, the athlete roster (for mobile numbers), and the
   // paid/pending counts — loaded once per event, independent of which page
   // of the registrant table is showing.
@@ -195,7 +230,7 @@ export default function EventRegistrantsPage() {
       pageNumber: page,
       noOfRecords: PAGE_SIZE,
       actionType: 'FILTER',
-      search: ATHLETE_ONLY_FILTER,
+      search: buildRegistrantSearch(debouncedQuery, statusFilter),
     })
       .then((data) => {
         setRegistrants(data?.content || [])
@@ -209,7 +244,7 @@ export default function EventRegistrantsPage() {
         )
       )
       .finally(() => setTableLoading(false))
-  }, [id, page, userLoading, allowed])
+  }, [id, page, userLoading, allowed, debouncedQuery, statusFilter])
 
   if (userLoading) {
     return (
@@ -240,152 +275,206 @@ export default function EventRegistrantsPage() {
             <h1>Applicants{event ? ` — ${event.name}` : ''}</h1>
             <p>Everyone who&apos;s registered for this event.</p>
           </div>
+          <div className="registrant-search-box">
+            <FaSearch className="registrant-search-icon" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by athlete name"
+            />
+          </div>
         </header>
 
         {error && <div className="banner error">{error}</div>}
         {loading && <p className="event-registrants-muted">Loading...</p>}
-        {!loading && !error && !tableLoading && report.total === 0 && (
-          <p className="event-registrants-muted">
-            No one has registered for this event yet.
-          </p>
-        )}
+        {!loading &&
+          !error &&
+          !tableLoading &&
+          report.total === 0 &&
+          !debouncedQuery &&
+          statusFilter === 'ALL' && (
+            <p className="event-registrants-muted">
+              No one has registered for this event yet.
+            </p>
+          )}
 
-        {!loading && !error && (tableLoading || report.total > 0) && (
-          <div className="event-registrants-body">
-            <div className="registrant-table-wrap">
-              <table className="registrant-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Mobile Number</th>
-                    <th>Payment Status</th>
-                    <th>Remarks</th>
-                    <th>Registered</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableLoading && registrants.length === 0 && (
+        {!loading &&
+          !error &&
+          (tableLoading ||
+            report.total > 0 ||
+            debouncedQuery ||
+            statusFilter !== 'ALL') && (
+            <div className="event-registrants-body">
+              <div className="registrant-table-wrap">
+                <table className="registrant-table">
+                  <thead>
                     <tr>
-                      <td
-                        colSpan={6}
-                        className="event-registrants-muted registrant-table-loading-cell"
-                      >
-                        Loading...
-                      </td>
-                    </tr>
-                  )}
-                  {registrants.map((registrant) => (
-                    <tr key={registrant.registrationId}>
-                      <td className="registrant-name-cell">
-                        {formatName(registrant.fullName)}
-                      </td>
-                      <td>
-                        {athleteById.get(registrant.userId)?.mobileNumber ||
-                          '—'}
-                      </td>
-                      <td className="registrant-payment-cell">
-                        <span
-                          className={`registrant-status status-${(registrant.paymentStatus || '').toLowerCase()}`}
-                        >
-                          {STATUS_LABELS[registrant.paymentStatus] ||
-                            registrant.paymentStatus}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => openStatusModal(registrant)}
-                        >
-                          Update
-                        </button>
-                      </td>
-                      <td className="registrant-remarks-cell">
-                        {registrant.remarks || '—'}
-                      </td>
-                      <td className="registrant-meta-cell">
-                        {formatDate(registrant.registeredDate)}
-                      </td>
-                      <td>
-                        <div className="registrant-actions">
-                          <Link
-                            to={`/athletes/${registrant.userId}`}
-                            className="btn btn-outline"
+                      <th>Name</th>
+                      <th>Mobile Number</th>
+                      <th>
+                        <div className="registrant-status-th">
+                          <span>Payment Status</span>
+                          <select
+                            className="registrant-status-filter"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            aria-label="Filter by payment status"
                           >
-                            View Profile
-                          </Link>
+                            <option value="ALL">All</option>
+                            {Object.entries(STATUS_LABELS).map(
+                              ([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              )
+                            )}
+                          </select>
                         </div>
-                      </td>
+                      </th>
+                      <th>Remarks</th>
+                      <th>Registered</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {tableLoading && registrants.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="event-registrants-muted registrant-table-loading-cell"
+                        >
+                          Loading...
+                        </td>
+                      </tr>
+                    )}
+                    {!tableLoading && registrants.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="event-registrants-muted registrant-table-loading-cell"
+                        >
+                          {debouncedQuery
+                            ? `No applicants match "${debouncedQuery}".`
+                            : statusFilter !== 'ALL'
+                              ? `No applicants with ${STATUS_LABELS[statusFilter]} status.`
+                              : 'No one has registered for this event yet.'}
+                        </td>
+                      </tr>
+                    )}
+                    {registrants.map((registrant) => (
+                      <tr key={registrant.registrationId}>
+                        <td className="registrant-name-cell">
+                          {formatName(registrant.fullName)}
+                        </td>
+                        <td>
+                          {athleteById.get(registrant.userId)?.mobileNumber ||
+                            '—'}
+                        </td>
+                        <td className="registrant-payment-cell">
+                          <span
+                            className={`registrant-status status-${(registrant.paymentStatus || '').toLowerCase()}`}
+                          >
+                            {STATUS_LABELS[registrant.paymentStatus] ||
+                              registrant.paymentStatus}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => openStatusModal(registrant)}
+                          >
+                            Update
+                          </button>
+                        </td>
+                        <td className="registrant-remarks-cell">
+                          {registrant.remarks || '—'}
+                        </td>
+                        <td className="registrant-meta-cell">
+                          {formatDate(registrant.registeredDate)}
+                        </td>
+                        <td>
+                          <div className="registrant-actions">
+                            <Link
+                              to={`/athletes/${registrant.userId}`}
+                              className="btn btn-outline"
+                            >
+                              View Profile
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-              {totalPages > 1 && (
-                <div className="registrant-table-pagination">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1 || tableLoading}
-                  >
-                    Previous
-                  </button>
-                  <span className="registrant-table-pagination-info">
-                    {tableLoading
-                      ? 'Loading…'
-                      : `Page ${page} of ${totalPages}`}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages || tableLoading}
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <aside
-              className="registrant-report glass-card"
-              data-aos="fade-left"
-            >
-              <Link
-                to={`/events/${id}/report`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary btn-block"
-              >
-                View Detailed Report
-              </Link>
-              <dl className="registrant-report-list">
-                <div>
-                  <dt>Total Registrants</dt>
-                  <dd>{report.total}</dd>
-                </div>
-                <div>
-                  <dt>Paid</dt>
-                  <dd>{report.paid}</dd>
-                </div>
-                <div>
-                  <dt>Pending Payment</dt>
-                  <dd>{report.pending}</dd>
-                </div>
-                <div>
-                  <dt>Failed / Cancelled</dt>
-                  <dd>{report.failedOrCancelled}</dd>
-                </div>
-                {Number(event?.entryFee) > 0 && (
-                  <div>
-                    <dt>Revenue Collected</dt>
-                    <dd>{report.revenue}</dd>
+                {totalPages > 1 && (
+                  <div className="registrant-table-pagination">
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1 || tableLoading}
+                    >
+                      Previous
+                    </button>
+                    <span className="registrant-table-pagination-info">
+                      {tableLoading
+                        ? 'Loading…'
+                        : `Page ${page} of ${totalPages}`}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={page >= totalPages || tableLoading}
+                    >
+                      Next
+                    </button>
                   </div>
                 )}
-              </dl>
-            </aside>
-          </div>
-        )}
+              </div>
+
+              <aside
+                className="registrant-report glass-card"
+                data-aos="fade-left"
+              >
+                <Link
+                  to={`/events/${id}/report`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary btn-block"
+                >
+                  View Detailed Report
+                </Link>
+                <dl className="registrant-report-list">
+                  <div>
+                    <dt>Total Registrants</dt>
+                    <dd>{report.total}</dd>
+                  </div>
+                  <div>
+                    <dt>Paid</dt>
+                    <dd>{report.paid}</dd>
+                  </div>
+                  <div>
+                    <dt>Pending Payment</dt>
+                    <dd>{report.pending}</dd>
+                  </div>
+                  <div>
+                    <dt>Failed / Cancelled</dt>
+                    <dd>{report.failedOrCancelled}</dd>
+                  </div>
+                  {Number(event?.entryFee) > 0 && (
+                    <div>
+                      <dt>Revenue Collected</dt>
+                      <dd>{report.revenue}</dd>
+                    </div>
+                  )}
+                </dl>
+              </aside>
+            </div>
+          )}
       </div>
 
       {editingRegistrant && (
