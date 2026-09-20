@@ -139,7 +139,9 @@
   color: var(--success);
 }
 
-.history-item-status.status-cancelled {
+.history-item-status.status-cancelled,
+.history-item-payment.payment-failed,
+.history-item-payment.payment-cancelled {
   background: var(--error-bg);
   color: var(--error);
 }

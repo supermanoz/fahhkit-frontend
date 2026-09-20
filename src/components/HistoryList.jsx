@@ -15,31 +15,23 @@ const STATUS_LABELS = {
 const PAYMENT_STATUS_LABELS = {
   PAID: 'Payment Paid',
   PENDING: 'Payment Pending',
-}
-
-// Free/no-fee events never get a payment record, so a missing paymentStatus
-// is treated as visible too — only a failed/cancelled payment hides an entry.
-function isVisible(item) {
-  return (
-    !item.paymentStatus ||
-    item.paymentStatus === 'PAID' ||
-    item.paymentStatus === 'PENDING'
-  )
+  FAILED: 'Payment Failed',
+  CANCELLED: 'Payment Cancelled',
 }
 
 export default function HistoryList({
   history,
   emptyMessage = 'No run history yet.',
 }) {
-  const visibleHistory = (history || []).filter(isVisible)
+  const entries = history || []
 
-  if (visibleHistory.length === 0) {
+  if (entries.length === 0) {
     return <p className="history-empty">{emptyMessage}</p>
   }
 
   return (
     <div className="history-list">
-      {visibleHistory.map((item) => (
+      {entries.map((item) => (
         <div className="history-item" key={item.registrationId}>
           <div className="history-item-main">
             <span className="history-item-type">
