@@ -1,0 +1,114 @@
+# Territory Run — Session Notes
+
+Working log of feature work on the Territory Run game (`GamePage`, `TerritoryMap`), kept so a
+future session (Claude or otherwise) can get oriented quickly without re-reading the whole diff.
+Update this as work continues rather than starting a new file each time. Git history/commit
+messages have the precise diffs — this is the "why" and "what's still open" that doesn't show up
+in a `git log`.
+
+Last updated: 2026-09-21, branch `RUN_CONQUER`, latest commit `f69c7be`.
+
+## Club system
+
+- `src/api/club.js` + `src/components/ClubPanel.jsx`: create a club, browse/search clubs, request
+  to join, leave your own club. New "Club" tab in the fullscreen menu.
+- Wired to the real backend (`ClubController` in the sibling FahhKit repo, `~/Documents/FahhKit`) —
+  verified field-for-field against `ClubResponse`/`ClubCreateRequest`/`DataPagination`.
+- **Scope cut, not a bug**: leader/co-leader tooling (review join requests, roster, kick,
+  promote/demote, transfer leadership) exists server-side but has no frontend yet.
+
+## Territory merging
+
+- Problem: the backend stores one `TerritoryParcel` row per claimed GPS loop, so two adjacent runs
+  show up as two separate parcels with a visible seam between them on the map, and as two separate
+  rows in the Me tab's "My Territories" list (more/smaller entries than what reads as one connected
+  territory).
+- Fix: `mergeTouchingParcels` in `src/utils/territoryGame.js` — geometric union via the
+  `polygon-clipping` package (was an installed-but-unused dependency, apparently intended for
+  exactly this). Groups by owner, unions same-owner parcels; touching/overlapping ones fuse into
+  one shape, non-touching ones stay separate. Recomputes area geometrically rather than summing.
+- Used by both `TerritoryMap.jsx` (map rendering + badge markers, one badge per merged shape now)
+  and `GamePage.jsx`'s "My Territories" list and the main HUD's territory count — all three used to
+  disagree, now they don't.
+- `sourceIds` on each merged shape tracks which original parcel ids fed into it, so
+  highlight/focus-on-a-specific-parcel (from the Me tab) still resolves correctly.
+
+## Running View (Google Maps nav-mode)
+
+- While a run is being tracked, the map can auto-follow the player and rotate so the direction of
+  travel points up, like Google Maps' "start riding" view.
+- Toggle button ("Switch to Normal View" / "Switch to Running View") in the tracking controls
+  (`GamePage.jsx`'s `navViewOn` state) — defaults to Running View each time a run starts, freely
+  switchable back and forth during the same run.
+- Implementation: `TerritoryMap.jsx`'s `.territory-map-heading` wrapper CSS-rotates the whole map
+  (basemap + Leaflet overlay together, since they're both children of one element — necessary
+  because Leaflet has no native bearing/rotation support, so only rotating the MapLibre layer would
+  desync territory polygons from the roads under them). `scale(1.5)` on that wrapper keeps the
+  rotated rectangle covering the viewport at any angle (verified visually at 45°/135° — no gaps).
+  **Deliberately no 3D tilt during nav mode** — an earlier attempt stacked a `rotateX` tilt on top
+  of the rotation/scale and it broke into a flattened, sideways-looking "landscape" camera; nav
+  mode is 2D rotation + auto-follow only.
+- **The actual bug that took two rounds to find**: GPS/WiFi fixes jitter by meters even standing
+  still (`MAX_ACCEPTABLE_ACCURACY_METERS` in `utils/run.js` admits up to 20m-accuracy points), so
+  naively recomputing a heading from any small position delta spun the whole map on pure
+  positioning noise, not real movement. Fixed in `GamePage.jsx`'s heading effect: only trust a
+  heading change when the fix's own _reported speed_ (an independently measured quantity, not
+  inferred from position deltas) clears a walking-pace floor (0.5 m/s); prefer the device's own
+  `coords.heading` (added to `useRunTracker.js`'s point shape) over a derived bearing when speed
+  clears that floor; otherwise only derive a bearing once movement clearly exceeds both fixes'
+  combined GPS accuracy margin (was a flat 3m, now 8m+accuracy-aware); ease into any change via
+  `smoothAngle` (circular exponential smoothing, `utils/territoryGame.js`) instead of snapping.
+  Verified live in a real browser (see below) that a stationary tracked run now holds `rotate(0deg)`
+  instead of spinning.
+
+## HUD / UI
+
+- Persistent level/XP pill on the main HUD, top-left corner (was buried in the menu) — clickable,
+  jumps to the Me tab. Shows first name + level + XP bar.
+- `IconShineOrbit` component (`src/components/IconShineOrbit.jsx`): a small gold spark takes a
+  slow loop around the hamburger menu button and the level badges, via anime.js's
+  `createMotionPath` (same mechanic `TapEffect.jsx` already used for the one-off tap flourish).
+- Run Conquest logo (background removed with Pillow flood-fill, cropped to content) now shows
+  centered over the radial menu instead of the old wood-sign "Territory Run" banner.
+- Button sounds: synthesized crisp/dry noise-burst click (`playClickSound`) for most buttons, a
+  real sample (`public/audio/button-click.mp3`, `playMenuSound`) for the hamburger/radial menu
+  button specifically.
+- Dark mode is now the default (was: auto sunrise/sunset via `utils/sunTimes.js`, removed entirely
+  per explicit request — light is now purely a manual opt-in via the moon/sun toggle).
+- Live "Distance" stat during a run refreshes every 5s instead of every render tick (Pace/Time
+  unaffected, still real-time).
+- Removed: the admin-only "Tap to Draw Territory" testing tool (manual polygon entry), the top-left
+  exit/back button, the decorative map vignette was briefly removed then restored (it's the
+  intentional radial edge-darkening "fog outside your view radius" effect, not a bug).
+- Adjacent-territory-merge also fixed a related visual bug: the bottom control sheet
+  (`.game-controls`) used to render as a bare dark-wood bar with nothing in it during idle map
+  browsing (since "Start Conquering" lives in the radial menu, not this sheet) — now transparent
+  when empty, keeping height reserved so the FAB/mute/dark-mode buttons don't jump.
+
+## Testing note
+
+- The dev server (`npm run dev`) serves over **HTTPS with a self-signed cert** (`basicSsl()` plugin
+  in `vite.config.js`, needed for `navigator.geolocation` to work off `localhost`) — use
+  `https://localhost:5173`, not `http://`. Plain HTTP silently fails with an empty reply, which
+  cost real time to figure out mid-session.
+- Chrome DevTools Protocol geolocation override isn't exposed through the available browser
+  automation tools here, so simulating real GPS movement for testing isn't straightforward;
+  validated the nav-mode rotation/scale geometry instead by directly setting
+  `.territory-map-heading`'s transform via injected JS and screenshotting at several angles.
+
+## Where things live (quick map)
+
+| Area                      | File(s)                                                |
+| ------------------------- | ------------------------------------------------------ |
+| Club UI                   | `src/api/club.js`, `src/components/ClubPanel.jsx`      |
+| Territory merge logic     | `src/utils/territoryGame.js` (`mergeTouchingParcels`)  |
+| Map rendering, nav mode   | `src/components/TerritoryMap.jsx`, `TerritoryMap.css`  |
+| Run tracking, GPS heading | `src/hooks/useRunTracker.js`, `src/pages/GamePage.jsx` |
+| Sounds                    | `src/utils/gameSound.js`                               |
+| Shine-orbit effect        | `src/components/IconShineOrbit.jsx`                    |
+| Visual style reference    | `style.md` (repo root)                                 |
+
+## Backend
+
+- Sibling repo at `~/Documents/FahhKit` (Spring Boot). **Never edit it** — diagnose only, hand off
+  fixes as a spec even if asked directly.
