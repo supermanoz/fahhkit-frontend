@@ -3,6 +3,7 @@
 // display math (area/perimeter formatting, GeoJSON-to-Leaflet conversion,
 // owner colors) and the live in-progress-loop preview math shown while a
 // GPS run is still being tracked, before it's ever submitted.
+import polygonClipping from 'polygon-clipping'
 import { haversineDistance } from './run'
 
 // Naxal, Kathmandu — matches the address already shown on the Contact page,
@@ -65,22 +66,97 @@ export function colorForOwner(ownerId) {
   return OTHER_OWNER_COLORS[hashString(ownerId) % OTHER_OWNER_COLORS.length]
 }
 
+function findEquippedAsset(equippedItems, category, field) {
+  return (equippedItems || []).find(
+    (i) => i.equipped && i.storeItem?.category === category
+  )?.storeItem?.[field]
+}
+
 // Converts a backend TerritoryParcelResponse (GeoJSON-style rings of
 // [lng, lat] pairs — see TerritoryServiceImpl#toRingCoordinates) into the
 // {lat, lng} point-array shape TerritoryMap already renders. Interior rings
 // (holes) are dropped — this game's map view doesn't render donut parcels,
 // same simplification the old client-only model made.
+//
+// ownerEquippedItems carries the parcel owner's equipped cosmetics
+// (TERRITORY_SHADE/TERRITORY_EMOJI) straight from the API - using those
+// instead of always falling back to the generic per-owner hash color/badge
+// is what lets someone else's bought customization actually show up on the
+// map. Falls back to the existing hashed color/default badge emoji when the
+// owner has nothing equipped in that category.
 export function toDisplayParcel(parcel, currentUserId) {
   const exteriorRing = parcel.geometry?.[0] || []
   const isMine = Boolean(currentUserId) && parcel.ownerId === currentUserId
+  const equippedShade = findEquippedAsset(
+    parcel.ownerEquippedItems,
+    'TERRITORY_SHADE',
+    'colorValue'
+  )
+  const equippedEmojiUrl = findEquippedAsset(
+    parcel.ownerEquippedItems,
+    'TERRITORY_EMOJI',
+    'assetUrl'
+  )
   return {
     id: parcel.id,
     ownerId: parcel.ownerId,
     ownerName: parcel.ownerName,
-    color: isMine ? PLAYER_COLOR : colorForOwner(parcel.ownerId),
+    color: isMine
+      ? PLAYER_COLOR
+      : equippedShade || colorForOwner(parcel.ownerId),
+    emojiUrl: equippedEmojiUrl || null,
     points: exteriorRing.map(([lng, lat]) => ({ lat, lng })),
     area: parcel.areaSqMeters || 0,
   }
+}
+
+// Initial compass bearing (0-360, 0 = north, clockwise) from a to b - used
+// to point the player marker's heading cone in the direction of travel
+// (course over ground from consecutive GPS fixes), Google Maps
+// navigation-view style, rather than needing a device compass sensor.
+export function bearingBetween(a, b) {
+  const toRad = (d) => (d * Math.PI) / 180
+  const toDeg = (r) => (r * 180) / Math.PI
+  const dLng = toRad(b.lng - a.lng)
+  const lat1 = toRad(a.lat)
+  const lat2 = toRad(b.lat)
+  const y = Math.sin(dLng) * Math.cos(lat2)
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng)
+  return (toDeg(Math.atan2(y, x)) + 360) % 360
+}
+
+// Eases a heading toward a new reading by `factor` instead of snapping
+// straight to it, so one still-slightly-noisy GPS fix doesn't jerk the
+// player marker/map rotation - shortest-path across the 0/360 wraparound
+// (e.g. 350 -> 10 eases through 0, a 20deg turn, not the long way through
+// 180).
+export function smoothAngle(current, target, factor = 0.35) {
+  const diff = ((target - current + 540) % 360) - 180
+  return (current + diff * factor + 360) % 360
+}
+
+// Standard ray-casting point-in-polygon test on {lat,lng} points - used to
+// detect the player physically stepping into a claimed parcel while moving
+// around the map, not just tapping one.
+export function pointInPolygon(point, polygonPoints) {
+  let inside = false
+  for (
+    let i = 0, j = polygonPoints.length - 1;
+    i < polygonPoints.length;
+    j = i++
+  ) {
+    const xi = polygonPoints[i].lng
+    const yi = polygonPoints[i].lat
+    const xj = polygonPoints[j].lng
+    const yj = polygonPoints[j].lat
+    const intersects =
+      yi > point.lat !== yj > point.lat &&
+      point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi
+    if (intersects) inside = !inside
+  }
+  return inside
 }
 
 // Shoelace formula on a local equirectangular projection (meters, scaled by
@@ -103,6 +179,56 @@ export function polygonAreaSqMeters(points) {
     sum += x1 * y2 - x2 * y1
   }
   return Math.abs(sum / 2)
+}
+
+function centroidOf(points) {
+  const lat = points.reduce((sum, p) => sum + p.lat, 0) / points.length
+  const lng = points.reduce((sum, p) => sum + p.lng, 0) / points.length
+  return { lat, lng }
+}
+
+// The backend stores one TerritoryParcel row per claimed loop, so a player
+// who's run two adjacent loops holds two separate parcels that happen to
+// share an edge. Presented as-is (map polygons, the Me tab's "My
+// Territories" list) that seam/split reads as two territories where it's
+// really one connected patch of ground. This merges a same-owner parcel
+// list into its geometric union: parcels that actually touch/overlap fuse
+// into a single shape, while separate (non-touching) clusters the owner
+// holds elsewhere stay distinct - polygon-clipping's union does that
+// automatically, no adjacency check needed up front. Used by both
+// TerritoryMap.jsx's per-owner rendering and GamePage.jsx's "My
+// Territories" list so the two always agree on what counts as one
+// territory. sourceIds tracks which original parcel ids fed into each
+// merged shape, so a highlight/focus targeting one specific original
+// parcel still resolves to whichever merged shape now contains it.
+export function mergeTouchingParcels(parcels) {
+  if (parcels.length <= 1) {
+    return parcels.map((p) => ({ ...p, sourceIds: [p.id] }))
+  }
+  let unioned
+  try {
+    unioned = polygonClipping.union(
+      ...parcels.map((p) => [p.points.map((pt) => [pt.lat, pt.lng])])
+    )
+  } catch {
+    // Malformed/self-intersecting loop (bad GPS data) - fall back to
+    // treating these parcels as unmerged rather than losing them entirely.
+    unioned = parcels.map((p) => [p.points.map((pt) => [pt.lat, pt.lng])])
+  }
+  return unioned.map((polygon, i) => {
+    const points = polygon[0].map(([lat, lng]) => ({ lat, lng }))
+    // A parcel's own centroid always lands inside whichever output cluster
+    // it fed into, disjoint clusters for the same owner included.
+    const sourceIds = parcels
+      .filter((p) => pointInPolygon(centroidOf(p.points), points))
+      .map((p) => p.id)
+    return {
+      id: `merged-${i}`,
+      points,
+      area: polygonAreaSqMeters(points),
+      sourceIds,
+    }
+  })
 }
 
 export function loopPerimeterMeters(points) {

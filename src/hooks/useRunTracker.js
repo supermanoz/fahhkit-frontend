@@ -108,7 +108,7 @@ export function useRunTracker() {
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, altitude, accuracy, speed } =
+        const { latitude, longitude, altitude, accuracy, speed, heading } =
           position.coords
         fixCountRef.current += 1
         lastAccuracyRef.current = accuracy ?? null
@@ -122,6 +122,13 @@ export function useRunTracker() {
           timestamp: position.timestamp,
           speed: speed ?? null,
           elevation: altitude ?? null,
+          // The GPS chip's own course-over-ground, when the device/browser
+          // can determine one (null when stationary or on a non-GPS
+          // location provider, e.g. desktop WiFi positioning) - far more
+          // reliable than deriving a heading from two consecutive fixes,
+          // since it's computed from the raw sensor data itself rather
+          // than from positioning noise (see GamePage.jsx's playerHeading).
+          heading: heading ?? null,
         }
 
         const previous = pointsRef.current[pointsRef.current.length - 1]

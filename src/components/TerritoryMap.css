@@ -12,14 +12,27 @@
   perspective-origin: center center;
 }
 
+/* Google Maps "start riding" nav mode - rotates the whole map (tiles +
+   territory overlays together, since they're both children of this one
+   element) so the player's direction of travel always points up, instead
+   of a fixed north-up view. The scale(1.5) in the inline transform (see
+   TerritoryMap.jsx) is what keeps a rotated rectangle covering every
+   corner of the screen instead of showing empty edges as it spins. Plain
+   `none` (no rotation) outside of navigation. */
+.territory-map-heading {
+  position: absolute;
+  inset: 0;
+  transform-origin: center center;
+  transition: transform 0.4s ease;
+}
+
 /* Flat/top-down until the player is zoomed in close (.is-close-in, toggled
    by zoom level — see CLOSE_IN_TILT_ZOOM in TerritoryMap.jsx), at which
    point it settles into a standing tilt so building-3d extrusions in the
    basemap read as real buildings. Mid-zoom gestures at any other level stay
    flat — no tilt flourish while scrolling/pinching through the rest of the
-   range. Always forced off during manualMode (tap-to-draw), since this is a
-   CSS transform on the whole map rather than a real perspective camera —
-   Leaflet's click-to-latlng math only stays accurate while flat. */
+   range. Also forced on for the whole duration of a tracked run, Google
+   Maps nav-view style (see ZoomTiltEffect's isNavigating). */
 .territory-map-tilt {
   position: absolute;
   inset: 0;
@@ -123,6 +136,24 @@
   height: 40px;
 }
 
+/* Google Maps nav-view style heading cone - a soft beam from the dot's own
+   center pointing in the direction of travel (course-over-ground, see
+   bearingBetween/TerritoryMap.jsx), not the avatar photo itself rotating.
+   The polygon's tip sits at the icon's exact center (50% 50%) so rotating
+   it in place always sweeps from the dot, regardless of heading. */
+.territory-map-player-heading {
+  position: absolute;
+  inset: -30px;
+  clip-path: polygon(50% 50%, 38% 4%, 62% 4%);
+  background: linear-gradient(
+    to top,
+    rgba(224, 165, 55, 0.7),
+    rgba(224, 165, 55, 0)
+  );
+  transition: transform 0.3s ease;
+  pointer-events: none;
+}
+
 .territory-map-player-avatar {
   position: absolute;
   inset: 0;
@@ -187,6 +218,12 @@
   line-height: 1;
 }
 
+.territory-badge img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
 /* Player-held ground gets a soft glow so it stands out from rival parcels
    at a glance, without needing a legend. */
 .territory-poly-player {
@@ -233,6 +270,12 @@
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease;
+}
+
+.territory-map-locate svg {
+  color: #fff;
+  filter: drop-shadow(1px 0 0 #000) drop-shadow(-1px 0 0 #000)
+    drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000);
 }
 
 .territory-map-locate:active {

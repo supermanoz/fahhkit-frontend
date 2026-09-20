@@ -31,13 +31,21 @@ export const MAP_STYLES = [
 // (which uses a different layer-id schema that breaks the English-only
 // place-label logic, and whose own layers reference a sprite image missing
 // from its sprite sheet - severely degrading render performance).
+//
+// Nullable: null means "no manual choice yet" - GamePage defaults dark mode
+// to true in that case rather than always starting light. Tapping the
+// moon/sun button pins an explicit true/false here, which then wins from
+// then on.
 const MAP_DARK_MODE_KEY = 'fahhkit_territory_map_dark_mode'
 
 export function loadMapDarkMode() {
   try {
-    return localStorage.getItem(MAP_DARK_MODE_KEY) === 'true'
+    const raw = localStorage.getItem(MAP_DARK_MODE_KEY)
+    if (raw === 'true') return true
+    if (raw === 'false') return false
+    return null
   } catch {
-    return false
+    return null
   }
 }
 

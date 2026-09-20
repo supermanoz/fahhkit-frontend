@@ -1,6 +1,8 @@
-// Synthesized UI sound effects (Web Audio API oscillators) — no extra audio
-// files to ship for these, just short generated tones. Kept separate from
-// the background music in GamePage.jsx, which is a real <audio> loop.
+// UI sound effects - most buttons get a synthesized crisp/dry click (see
+// playClickSound), the hamburger/radial menu button gets a real bubbly
+// sample instead (see playMenuSound), and the milestone chime is its own
+// synthesized two-note tone. Kept separate from the background music in
+// GamePage.jsx, which is its own real <audio> loop.
 let ctx = null
 
 // Browsers refuse to start (or auto-resume) an AudioContext before a user
@@ -33,10 +35,72 @@ function tone({ freq, duration, startAt = 0, type = 'sine', peakGain = 0.1 }) {
   osc.stop(now + duration + 0.02)
 }
 
-// A short, dry tick for any button press — the game's whole HUD is chunky
-// carved-stone/wood buttons, so this stays percussive rather than musical.
+// A short burst of filtered white noise - the standard way to synthesize a
+// "crisp" click/tap texture (mechanical keyboard switch, pen click, that
+// ASMR tapping sound) without shipping an actual audio sample. High-passed
+// so it reads as a dry snap rather than a thump.
+function noiseBurst({
+  duration,
+  startAt = 0,
+  filterFreq = 4500,
+  peakGain = 0.2,
+}) {
+  const audioCtx = getContext()
+  if (!audioCtx) return
+  const now = audioCtx.currentTime + startAt
+  const frameCount = Math.max(1, Math.floor(audioCtx.sampleRate * duration))
+  const buffer = audioCtx.createBuffer(1, frameCount, audioCtx.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < frameCount; i++) {
+    data[i] = Math.random() * 2 - 1
+  }
+  const noise = audioCtx.createBufferSource()
+  noise.buffer = buffer
+
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'highpass'
+  filter.frequency.value = filterFreq
+
+  const gain = audioCtx.createGain()
+  gain.gain.setValueAtTime(0, now)
+  gain.gain.linearRampToValueAtTime(peakGain, now + 0.003)
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+
+  noise.connect(filter)
+  filter.connect(gain)
+  gain.connect(audioCtx.destination)
+  noise.start(now)
+  noise.stop(now + duration + 0.02)
+}
+
+// A crisp, textured tap for ordinary button presses - a high-passed noise
+// burst layered with a very brief high tone for a touch of pitched body,
+// rather than a flat synth-tone beep.
 export function playClickSound() {
-  tone({ freq: 660, duration: 0.06, type: 'square', peakGain: 0.06 })
+  noiseBurst({ duration: 0.035, filterFreq: 4500, peakGain: 0.22 })
+  tone({ freq: 1800, duration: 0.02, type: 'triangle', peakGain: 0.05 })
+}
+
+// A real sample (public/audio/button-click.mp3, a "bubble pop" SFX) used
+// only for the hamburger/radial menu button - resetting currentTime and
+// replaying the same element on each call rather than a fresh `new Audio()`
+// every tap, since menu open/close fires often.
+const MENU_SOUND_URL = `${import.meta.env.BASE_URL}audio/button-click.mp3`
+let menuAudio = null
+function getMenuAudio() {
+  if (typeof window === 'undefined') return null
+  if (!menuAudio) {
+    menuAudio = new Audio(MENU_SOUND_URL)
+    menuAudio.volume = 0.5
+  }
+  return menuAudio
+}
+
+export function playMenuSound() {
+  const audio = getMenuAudio()
+  if (!audio) return
+  audio.currentTime = 0
+  audio.play().catch(() => {})
 }
 
 // A brighter rising two-note chime for hitting a new km milestone mid-run.

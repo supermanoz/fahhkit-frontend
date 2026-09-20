@@ -25,7 +25,12 @@ import { FaCrosshairs } from 'react-icons/fa'
 // public/mlgl (so their relative import of each other still resolves) —
 // this just has to point maplibre-gl at the copy before it creates one.
 setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
-import { PLAYER_COLOR, formatArea } from '../utils/territoryGame'
+import {
+  PLAYER_COLOR,
+  formatArea,
+  mergeTouchingParcels,
+} from '../utils/territoryGame'
+import { resolveFileUrl } from '../api/client'
 // Same fallback image GamePage.jsx uses (its own defaultAvatarImage) - this
 // used to be a different local avatar (Wind), so a broken avatarSrc (e.g.
 // the account's equipped Hero's assetUrl 404ing) showed one character on
@@ -179,10 +184,16 @@ function PokemonStyleBaseLayer({ styleUrl, darkMode, onReady }) {
 // else on the marker, which is what made the avatar appear to "vanish" after
 // the game had been open a while. onerror falls back to a guaranteed-local
 // bundled image and clears itself so it can't loop.
-function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
+// heading is course-over-ground in degrees (0 = north, clockwise) - see
+// bearingBetween in utils/territoryGame.js. The cone element overflows well
+// past the marker's own 40x40 box (same trick the pulse rings already use -
+// Leaflet doesn't clip icon overflow), pointing away from the dot's exact
+// center so rotating it in place sweeps correctly regardless of heading.
+function buildPlayerMarkerIcon(avatarSrc, fallbackSrc, heading) {
   return L.divIcon({
     className: 'territory-map-player-icon',
     html:
+      `<span class="territory-map-player-heading" style="transform:rotate(${heading || 0}deg)"></span>` +
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
       `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />`,
@@ -195,12 +206,21 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
 // planted at the centroid — no name floating on the map. Tapping it still
 // reveals who holds it via a popup, so the information isn't lost, just not
 // cluttering the default view.
+//
+// t.emojiUrl is the owner's equipped TERRITORY_EMOJI Store item (see
+// toDisplayParcel) — an uploaded image, not a literal emoji glyph, despite
+// the category's name. Falls back to the default crown/flag glyph when the
+// owner has nothing equipped there.
 function territoryBadgeIcon(t, isMine, playerColor) {
-  const emoji = isMine ? '👑' : '🚩'
   const background = isMine ? playerColor || PLAYER_COLOR : t.color
+  const badgeContent = t.emojiUrl
+    ? `<img src="${resolveFileUrl(t.emojiUrl)}" alt="" onerror="this.replaceWith(document.createTextNode('${isMine ? '👑' : '🚩'}'))" />`
+    : isMine
+      ? '👑'
+      : '🚩'
   return L.divIcon({
     className: 'territory-badge-icon',
-    html: `<div class="territory-badge" style="background:${background}">${emoji}</div>`,
+    html: `<div class="territory-badge" style="background:${background}">${badgeContent}</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   })
@@ -210,6 +230,34 @@ function polygonCentroid(points) {
   const lat = points.reduce((sum, p) => sum + p.lat, 0) / points.length
   const lng = points.reduce((sum, p) => sum + p.lng, 0) / points.length
   return [lat, lng]
+}
+
+// Groups territories by owner before merging (see mergeTouchingParcels in
+// utils/territoryGame.js, shared with the Me tab's own "My Territories"
+// list) so the two touching/overlapping-parcel-fusing rules stay in exactly
+// one place instead of drifting apart.
+function mergeOwnerTerritories(territories) {
+  const byOwner = new Map()
+  for (const t of territories) {
+    if (!byOwner.has(t.ownerId)) byOwner.set(t.ownerId, [])
+    byOwner.get(t.ownerId).push(t)
+  }
+
+  const merged = []
+  for (const parcels of byOwner.values()) {
+    const { ownerId, ownerName, color, emojiUrl } = parcels[0]
+    for (const m of mergeTouchingParcels(parcels)) {
+      merged.push({
+        ...m,
+        id: `${ownerId}-${m.id}`,
+        ownerId,
+        ownerName,
+        color,
+        emojiUrl,
+      })
+    }
+  }
+  return merged
 }
 
 function toLatLngs(points) {
@@ -252,18 +300,6 @@ function FocusHighlight({ highlightOwnerId, highlightParcelId, territories }) {
   return null
 }
 
-// TEMP: admin-only tap-to-draw (see GamePage.jsx). Registers a plain
-// Leaflet click handler rather than anything territory-specific, so it can
-// go away with a one-line deletion once real device testing replaces it.
-function ClickCapture({ enabled, onMapClick }) {
-  useMapEvents({
-    click(e) {
-      if (enabled) onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng })
-    },
-  })
-  return null
-}
-
 // One claimed parcel's polygon. Needs useMap() (not just the lat/lng click
 // handler react-leaflet's Polygon already gets) to project the polygon's
 // own points into container-pixel space for the tap flourish (see
@@ -273,7 +309,6 @@ function TerritoryPolygon({
   isMine,
   isHighlighted,
   playerColor,
-  manualMode,
   onParcelClick,
   onTapEffect,
 }) {
@@ -298,10 +333,6 @@ function TerritoryPolygon({
       }}
       eventHandlers={{
         click: (e) => {
-          // Manual (admin tap-to-draw) taps need to reach ClickCapture at
-          // the map level instead - letting a parcel click here also add a
-          // draw point.
-          if (manualMode) return
           L.DomEvent.stopPropagation(e)
           onTapEffect(
             t.points.map((p) => {
@@ -327,11 +358,13 @@ const CLOSE_IN_TILT_ZOOM = 19
 // basemap actually read as buildings instead of flat footprints. Only that
 // close-in state tilts — mid-zoom gestures at any other level stay flat, so
 // scrolling/pinching through the rest of the range doesn't wobble the whole
-// map. Forced back flat whenever manualMode is on: this is a CSS transform
-// on the whole map, not a real perspective camera, so Leaflet's own
-// click-to-latlng math (used by ClickCapture for tap-to-draw) only stays
-// accurate while flat.
-function ZoomTiltEffect({ tiltRef, manualMode }) {
+// map. Deliberately NOT forced on just because a run is being tracked
+// (isNavigating, see NavigationCameraEffect below) - combined with that
+// mode's own heading-rotation scale, the two together over-tilted/over-
+// zoomed the view into a flattened, sideways-looking "landscape" camera
+// angle instead of a readable nav view. Nav mode stays flat/rotating; the
+// 3D tilt is purely a zoom-triggered thing.
+function ZoomTiltEffect({ tiltRef }) {
   const map = useMapEvents({
     zoom() {
       syncCloseInTilt()
@@ -339,15 +372,33 @@ function ZoomTiltEffect({ tiltRef, manualMode }) {
   })
 
   function syncCloseInTilt() {
-    const closeIn = map.getZoom() >= CLOSE_IN_TILT_ZOOM && !manualMode
+    const closeIn = map.getZoom() >= CLOSE_IN_TILT_ZOOM
     tiltRef.current?.classList.toggle('is-close-in', closeIn)
   }
 
   useEffect(() => {
     syncCloseInTilt()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualMode])
+  }, [])
 
+  return null
+}
+
+// Google Maps "start riding" nav mode - while actively tracking a run, the
+// camera keeps the player centered automatically instead of requiring a
+// manual pan/zoom, at a close enough zoom to actually read as navigation.
+// playerLocation gets a new object reference on every GPS fix (see
+// GamePage.jsx), so this re-centers on each real position update.
+function NavigationCameraEffect({ isNavigating, playerLocation }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!isNavigating || !playerLocation) return
+    map.setView(
+      [playerLocation.lat, playerLocation.lng],
+      Math.max(map.getZoom(), 18),
+      { animate: true, duration: 0.8 }
+    )
+  }, [map, isNavigating, playerLocation])
   return null
 }
 
@@ -462,25 +513,31 @@ export default function TerritoryMap({
   highlightOwnerId,
   highlightParcelId,
   avatarSrc,
+  playerHeading,
   playerColor,
   trailColor,
   mapStyleUrl,
   darkMode,
-  manualMode,
-  onMapClick,
+  isNavigating,
   onParcelClick,
   onMapReady,
 }) {
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
   const [mapInstance, setMapInstance] = useState(null)
+  // While navigating, the whole map rotates to point the travel direction
+  // up (see .territory-map-heading below) - the marker's own heading cone
+  // would otherwise double up on that rotation, so it just points straight
+  // up (0deg, already "forward" on a rotated map) instead of the real
+  // compass heading.
   const playerMarkerIcon = useMemo(
     () =>
       buildPlayerMarkerIcon(
         avatarSrc || defaultAvatarImage,
-        defaultAvatarImage
+        defaultAvatarImage,
+        isNavigating ? 0 : playerHeading
       ),
-    [avatarSrc]
+    [avatarSrc, playerHeading, isNavigating]
   )
 
   const [activeTapEffects, setActiveTapEffects] = useState([])
@@ -493,110 +550,128 @@ export default function TerritoryMap({
     setActiveTapEffects((effects) => effects.filter((e) => e.id !== id))
   }
 
+  const mergedTerritories = useMemo(
+    () => mergeOwnerTerritories(territories),
+    [territories]
+  )
+
   return (
     <div className="territory-map">
-      <div className="territory-map-tilt" ref={tiltRef}>
-        <MapContainer
-          center={[center.lat, center.lng]}
-          zoom={17}
-          scrollWheelZoom
-          zoomControl={false}
-          renderer={territoryRenderer}
-        >
-          <PokemonStyleBaseLayer
-            styleUrl={mapStyleUrl}
-            darkMode={darkMode}
-            onReady={onMapReady}
-          />
+      <div
+        className="territory-map-heading"
+        style={{
+          transform: isNavigating
+            ? `rotate(${-(playerHeading || 0)}deg) scale(1.5)`
+            : 'none',
+        }}
+      >
+        <div className="territory-map-tilt" ref={tiltRef}>
+          <MapContainer
+            center={[center.lat, center.lng]}
+            zoom={17}
+            scrollWheelZoom
+            zoomControl={false}
+            renderer={territoryRenderer}
+          >
+            <PokemonStyleBaseLayer
+              styleUrl={mapStyleUrl}
+              darkMode={darkMode}
+              onReady={onMapReady}
+            />
 
-          {territories.map((t) => {
-            const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
-            const isHighlighted = highlightParcelId
-              ? t.id === highlightParcelId
-              : highlightOwnerId === t.ownerId
-            return (
-              <TerritoryPolygon
-                key={t.id}
-                t={t}
-                isMine={isMine}
-                isHighlighted={isHighlighted}
-                playerColor={playerColor}
-                manualMode={manualMode}
-                onParcelClick={onParcelClick}
-                onTapEffect={handleTapEffect}
+            {mergedTerritories.map((t) => {
+              const isMine =
+                Boolean(currentUserId) && t.ownerId === currentUserId
+              const isHighlighted = highlightParcelId
+                ? t.sourceIds.includes(highlightParcelId)
+                : highlightOwnerId === t.ownerId
+              return (
+                <TerritoryPolygon
+                  key={t.id}
+                  t={t}
+                  isMine={isMine}
+                  isHighlighted={isHighlighted}
+                  playerColor={playerColor}
+                  onParcelClick={onParcelClick}
+                  onTapEffect={handleTapEffect}
+                />
+              )
+            })}
+
+            {mergedTerritories.map((t) => {
+              const isMine =
+                Boolean(currentUserId) && t.ownerId === currentUserId
+              return (
+                <Marker
+                  key={`${t.id}-badge`}
+                  position={polygonCentroid(t.points)}
+                  icon={territoryBadgeIcon(t, isMine, playerColor)}
+                >
+                  <Popup>
+                    <strong>{isMine ? 'You' : t.ownerName}</strong>
+                    <br />
+                    {formatArea(t.area)}
+                  </Popup>
+                </Marker>
+              )
+            })}
+
+            {livePath.length > 0 && (
+              <Polyline
+                positions={toLatLngs(livePath)}
+                pathOptions={{ color: trailColor || '#E63946', weight: 4 }}
               />
-            )
-          })}
+            )}
 
-          {territories.map((t) => {
-            const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
-            return (
+            {showPreview && (
+              <Polygon
+                positions={toLatLngs(livePath)}
+                pathOptions={{
+                  color: '#FFC94D',
+                  weight: 2,
+                  dashArray: '6 8',
+                  fillColor: '#FFC94D',
+                  fillOpacity: 0.15,
+                }}
+              />
+            )}
+
+            {playerLocation && (
               <Marker
-                key={`${t.id}-badge`}
-                position={polygonCentroid(t.points)}
-                icon={territoryBadgeIcon(t, isMine, playerColor)}
-              >
-                <Popup>
-                  <strong>{isMine ? 'You' : t.ownerName}</strong>
-                  <br />
-                  {formatArea(t.area)}
-                </Popup>
-              </Marker>
-            )
-          })}
+                position={[playerLocation.lat, playerLocation.lng]}
+                icon={playerMarkerIcon}
+                zIndexOffset={1000}
+                // Tapping your own avatar shows nothing - interactive so the
+                // tap doesn't fall through to a territory badge/polygon it
+                // happens to be sitting on and pop that up instead.
+                eventHandlers={{
+                  click: (e) => L.DomEvent.stopPropagation(e),
+                }}
+              />
+            )}
 
-          {livePath.length > 0 && (
-            <Polyline
-              positions={toLatLngs(livePath)}
-              pathOptions={{ color: trailColor || '#E63946', weight: 4 }}
+            <FocusHighlight
+              highlightOwnerId={highlightOwnerId}
+              highlightParcelId={highlightParcelId}
+              territories={territories}
             />
-          )}
-
-          {showPreview && (
-            <Polygon
-              positions={toLatLngs(livePath)}
-              pathOptions={{
-                color: '#FFC94D',
-                weight: 2,
-                dashArray: '6 8',
-                fillColor: '#FFC94D',
-                fillOpacity: 0.15,
-              }}
+            <InvalidateSizeOnMount />
+            <ZoomRangeLimiter />
+            <ZoomTiltEffect tiltRef={tiltRef} />
+            <NavigationCameraEffect
+              isNavigating={isNavigating}
+              playerLocation={playerLocation}
             />
-          )}
-
-          {playerLocation && (
-            <Marker
-              position={[playerLocation.lat, playerLocation.lng]}
-              icon={playerMarkerIcon}
-              zIndexOffset={1000}
-              // Tapping your own avatar shows nothing - interactive so the
-              // tap doesn't fall through to a territory badge/polygon it
-              // happens to be sitting on and pop that up instead.
-              eventHandlers={{
-                click: (e) => L.DomEvent.stopPropagation(e),
-              }}
+            <CaptureMapInstance onReady={setMapInstance} />
+          </MapContainer>
+          {activeTapEffects.map((effect) => (
+            <TapEffect
+              key={effect.id}
+              points={effect.points}
+              onDone={() => clearTapEffect(effect.id)}
             />
-          )}
-
-          <FocusHighlight
-            highlightOwnerId={highlightOwnerId}
-            highlightParcelId={highlightParcelId}
-            territories={territories}
-          />
-          <ClickCapture enabled={Boolean(manualMode)} onMapClick={onMapClick} />
-          <InvalidateSizeOnMount />
-          <ZoomRangeLimiter />
-          <ZoomTiltEffect tiltRef={tiltRef} manualMode={manualMode} />
-          <CaptureMapInstance onReady={setMapInstance} />
-        </MapContainer>
-        {activeTapEffects.map((effect) => (
-          <TapEffect
-            key={effect.id}
-            points={effect.points}
-            onDone={() => clearTapEffect(effect.id)}
-          />
-        ))}
+          ))}
+        </div>
       </div>
       <div className="territory-map-vignette" aria-hidden="true" />
       {mapInstance && <LocateButton map={mapInstance} />}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -14,6 +14,7 @@ import {
   FaTimes,
   FaTrophy,
   FaUser,
+  FaUsers,
 } from 'react-icons/fa'
 import { BsVolumeMuteFill, BsVolumeUpFill } from 'react-icons/bs'
 import TerritoryMap from '../components/TerritoryMap'
@@ -21,7 +22,7 @@ import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
-import { ApiError, isAdmin, resolveFileUrl } from '../api/client'
+import { ApiError, resolveFileUrl } from '../api/client'
 import { createRun, getRun, getRuns } from '../api/runs'
 import {
   findClubLeaderboard,
@@ -41,13 +42,18 @@ import {
 import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
 import {
   DEFAULT_CENTER,
+  LOOP_CLOSURE_THRESHOLD_METERS,
   LOOP_MIN_AREA_SQ_METERS,
   LOOP_MIN_POINTS,
   VIEW_RADIUS_METERS,
+  bearingBetween,
   formatArea,
   levelProgress,
   loopPerimeterMeters,
+  mergeTouchingParcels,
+  pointInPolygon,
   polygonAreaSqMeters,
+  smoothAngle,
   toDisplayParcel,
 } from '../utils/territoryGame'
 import {
@@ -58,6 +64,7 @@ import {
   formatDuration,
   formatPace,
   formatRunDate,
+  haversineDistance,
   toLocalDateTimeString,
 } from '../utils/run'
 import {
@@ -65,11 +72,17 @@ import {
   downloadBlob,
   exportShareCardBlob,
 } from '../utils/shareCanvas'
-import { playClickSound, playMilestoneChime } from '../utils/gameSound'
+import {
+  playClickSound,
+  playMenuSound,
+  playMilestoneChime,
+} from '../utils/gameSound'
 import { isBlazeHero } from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
+import ClubPanel from '../components/ClubPanel'
+import IconShineOrbit from '../components/IconShineOrbit'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
-import woodSignBanner from '../assets/images/wood-sign-banner.png'
+import runConquestLogo from '../assets/images/run-conquest-logo.png'
 import {
   AVATARS,
   COMING_SOON_AVATARS,
@@ -97,23 +110,6 @@ function formatMeters(meters) {
   if (!meters) return '0 m'
   if (meters < 1000) return `${Math.round(meters)} m`
   return `${(meters / 1000).toFixed(2)} km`
-}
-
-// Chunky fletched-dart back arrow (per reference art) instead of a thin
-// line-style chevron - a solid notched-tail shape rendered in currentColor
-// so it just inherits the exit button's existing ink color/sizing.
-function BackArrowIcon(props) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="1em"
-      height="1em"
-      fill="currentColor"
-      {...props}
-    >
-      <path d="M4 12 L18 3 L14.5 12 L18 21 Z" />
-    </svg>
-  )
 }
 
 // Pokémon GO-style fan-out: tapping the pokéball FAB pops these options up
@@ -163,6 +159,9 @@ const RESULT_POLL_DELAY_MS = 2500
 
 const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
+// Tally-style flags: one flag icon reads as 5 held territories instead of 1,
+// so a player with dozens of parcels doesn't need a wall of flag glyphs.
+const PARCELS_PER_FLAG = 5
 
 const EVENT_TYPE_TITLES = {
   CLAIMED: 'Territory claimed!',
@@ -194,6 +193,44 @@ function summarizeRunEvents(events) {
 export default function GamePage() {
   const { user, isAuthed, loading: userLoading } = useCurrentUser()
   const tracker = useRunTracker()
+  // The live "Distance" stat during a run - throttled to refresh once every
+  // 5s instead of on every render (tracker.elapsedSeconds ticks every
+  // second, which would otherwise redraw this on every tick even though
+  // the real distance only actually changes when a new GPS fix comes in).
+  // A ref (not the tracker value itself) inside the interval closure so it
+  // always reads the latest distance rather than the one captured when the
+  // interval was created. Pace/Time stay tied to tracker's real-time
+  // values - only this one display number is deliberately calmer.
+  const trackerDistanceRef = useRef(0)
+  trackerDistanceRef.current = tracker.distance
+  const [displayedDistance, setDisplayedDistance] = useState(0)
+  useEffect(() => {
+    if (tracker.status !== 'tracking') {
+      setDisplayedDistance(0)
+      return
+    }
+    setDisplayedDistance(trackerDistanceRef.current)
+    const interval = setInterval(() => {
+      setDisplayedDistance(trackerDistanceRef.current)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [tracker.status])
+  // "Running View" (Google Maps nav-mode - auto-follow, rotate to heading,
+  // see TerritoryMap's isNavigating) is the default the moment a run
+  // starts, but not everyone wants the map spinning under them - this lets
+  // the player flip back to the normal, manually-pannable north-up map
+  // and back again as often as they like during the same run (see the
+  // toggle button in the tracking controls below). Defaults back to
+  // Running View at the start of each new run rather than remembering the
+  // last run's choice.
+  const [navViewOn, setNavViewOn] = useState(true)
+  const wasTrackingRef = useRef(false)
+  useEffect(() => {
+    const isTracking = tracker.status === 'tracking'
+    if (isTracking && !wasTrackingRef.current) setNavViewOn(true)
+    wasTrackingRef.current = isTracking
+  }, [tracker.status])
+  const isNavigating = tracker.status === 'tracking' && navViewOn
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
@@ -206,6 +243,23 @@ export default function GamePage() {
 
   const [profile, setProfile] = useState(null)
   const [myParcels, setMyParcels] = useState([])
+  // The backend still lists one row per claimed loop, so two adjacent runs
+  // show up as two separate parcels there - merged the same way
+  // TerritoryMap.jsx merges them on the map itself, so the Me tab's "My
+  // Territories" list always matches what actually reads as one connected
+  // territory on screen instead of showing more, smaller entries than the
+  // map does.
+  const myTerritories = useMemo(() => {
+    const displayParcels = myParcels.map((p) => toDisplayParcel(p, user?.id))
+    return mergeTouchingParcels(displayParcels).map((m) => ({
+      ...m,
+      currentScore: m.sourceIds.reduce(
+        (sum, id) =>
+          sum + (myParcels.find((p) => p.id === id)?.currentScore || 0),
+        0
+      ),
+    }))
+  }, [myParcels, user?.id])
   const [myRuns, setMyRuns] = useState([])
   const [viewingRun, setViewingRun] = useState(null)
   const [loadingRunId, setLoadingRunId] = useState(null)
@@ -266,11 +320,16 @@ export default function GamePage() {
 
   // Map basemap dark mode - a quick top-level toggle independent of the
   // Shop's Map style picker (MAP_STYLES), which stays whatever light style
-  // the player picked there. Persisted the same way as the music mute.
-  const [mapDarkMode, setMapDarkMode] = useState(() => loadMapDarkMode())
+  // the player picked there. Defaults dark until the player explicitly
+  // taps the sun/moon button, which then pins their own true/false choice
+  // (persisted, like the music mute) from then on.
+  const [mapDarkModeOverride, setMapDarkModeOverride] = useState(() =>
+    loadMapDarkMode()
+  )
+  const mapDarkMode = mapDarkModeOverride ?? true
   function toggleMapDarkMode() {
-    setMapDarkMode((prev) => {
-      const next = !prev
+    setMapDarkModeOverride((prev) => {
+      const next = !(prev ?? true)
       saveMapDarkMode(next)
       return next
     })
@@ -279,18 +338,6 @@ export default function GamePage() {
   // run — a ref (not state) since it's read/written from inside an effect
   // and should never itself trigger a re-render.
   const lastMilestoneRef = useRef(0)
-
-  // TEMP: admin-only tap-to-draw, purely for testing without needing a real
-  // GPS trace. The backend has no "submit a shape directly" endpoint — this
-  // still goes through the same POST /v1/run path a real run does, just with
-  // synthetic points spaced far enough apart in time to clear the anti-cheat
-  // sustained-speed check rather than a real device's GPS timestamps. Revert
-  // by deleting this block and the isAdminUser-gated button below once real
-  // device testing covers this instead.
-  const [manualMode, setManualMode] = useState(false)
-  const [manualPoints, setManualPoints] = useState([])
-  const [manualDraft, setManualDraft] = useState(null)
-  const isAdminUser = isAdmin(user)
 
   // The bottom action sheet's height changes with its content (idle vs.
   // tracking vs. draft-run-with-stats) and with the device's own safe-area
@@ -362,6 +409,88 @@ export default function GamePage() {
     tracker.status === 'tracking' && tracker.path.length > 0
       ? tracker.path[tracker.path.length - 1]
       : liveLocation || center
+
+  // "Entering [rival]'s territory!" banner - fires the moment the player's
+  // dot physically crosses into a claimed parcel that isn't theirs, not just
+  // when they tap one on the map. insideParcelId tracks which parcel (if
+  // any) the player is currently standing in so this only fires on the
+  // transition into a new one, not every location update while still inside.
+  const [insideParcelId, setInsideParcelId] = useState(null)
+  const [territoryEntryBanner, setTerritoryEntryBanner] = useState(null)
+  useEffect(() => {
+    if (!playerLocation) return
+    const standingIn = nearbyParcels.find((t) =>
+      pointInPolygon(playerLocation, t.points)
+    )
+    const nextId = standingIn?.id ?? null
+    if (nextId === insideParcelId) return
+    setInsideParcelId(nextId)
+    if (standingIn && standingIn.ownerId !== user?.id) {
+      setTerritoryEntryBanner({
+        ownerName: standingIn.ownerName || 'a rival',
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerLocation, nearbyParcels])
+
+  useEffect(() => {
+    if (!territoryEntryBanner) return
+    const timeout = setTimeout(() => setTerritoryEntryBanner(null), 3200)
+    return () => clearTimeout(timeout)
+  }, [territoryEntryBanner])
+
+  // Player marker's heading cone (Google Maps nav-view style), and - while
+  // actively navigating a tracked run - the whole map's rotation (see
+  // TerritoryMap's isNavigating). Real GPS/WiFi fixes jitter by meters even
+  // standing still (MAX_ACCEPTABLE_ACCURACY_METERS admits up to 20m-
+  // accuracy points, and network/WiFi positioning can report a
+  // meaningfully different "best guess" position on consecutive polls with
+  // zero real movement), so naively recomputing a heading from any nearby
+  // fix's position DELTA alone - even a fairly large one - spun the whole
+  // map on pure positioning noise instead of real movement. The fix a real
+  // nav SDK uses: never re-orient the camera off position deltas alone,
+  // corroborate with the fix's own reported SPEED (an independently
+  // measured quantity, not inferred from consecutive positions) before
+  // trusting any heading change at all - preferring the GPS chip's own
+  // reported course (coords.heading, see useRunTracker.js) when speed
+  // clears the floor, else only a recomputed bearing once the movement
+  // also clearly exceeds both fixes' combined accuracy margin. Easing into
+  // any new heading (smoothAngle) instead of snapping straight to it.
+  const MIN_BEARING_MOVEMENT_METERS = 8
+  const MIN_TRUSTED_SPEED_MPS = 0.5
+  const lastBearingFixRef = useRef(null)
+  const [playerHeading, setPlayerHeading] = useState(0)
+  useEffect(() => {
+    if (!playerLocation) return
+    const isMoving =
+      (playerLocation.speed ?? 0) > MIN_TRUSTED_SPEED_MPS ||
+      (lastBearingFixRef.current?.speed ?? 0) > MIN_TRUSTED_SPEED_MPS
+    if (!isMoving) {
+      lastBearingFixRef.current = playerLocation
+      return
+    }
+    if (
+      playerLocation.heading != null &&
+      !Number.isNaN(playerLocation.heading)
+    ) {
+      setPlayerHeading((current) =>
+        smoothAngle(current, playerLocation.heading)
+      )
+      lastBearingFixRef.current = playerLocation
+      return
+    }
+    const prev = lastBearingFixRef.current
+    if (prev) {
+      const moved = haversineDistance(prev, playerLocation)
+      const noiseFloor = (prev.accuracy || 0) + (playerLocation.accuracy || 0)
+      if (moved >= Math.max(MIN_BEARING_MOVEMENT_METERS, noiseFloor)) {
+        setPlayerHeading((current) =>
+          smoothAngle(current, bearingBetween(prev, playerLocation))
+        )
+      }
+    }
+    lastBearingFixRef.current = playerLocation
+  }, [playerLocation])
 
   async function refreshProfile() {
     try {
@@ -475,7 +604,12 @@ export default function GamePage() {
   // wiring a sound effect into each individual onClick.
   function handleGameClick(e) {
     const btn = e.target.closest('button')
-    if (btn && !btn.disabled) playClickSound()
+    if (!btn || btn.disabled) return
+    if (btn.classList.contains('game-menu-btn')) {
+      playMenuSound()
+    } else {
+      playClickSound()
+    }
   }
 
   async function loadLeaderboard() {
@@ -619,17 +753,6 @@ export default function GamePage() {
     tracker.clearPendingRun()
   }
 
-  // TEMP: admin-only manual loop, see the state declaration above.
-  function handleStartManual() {
-    setManualPoints([])
-    setManualMode(true)
-  }
-
-  function handleMapTap(point) {
-    if (!manualMode) return
-    setManualPoints((prev) => [...prev, point])
-  }
-
   // Tapping a claimed parcel directly on the map is a stronger signal than
   // tapping a leaderboard row (the player already has it in view), so this
   // skips the "view on map?" confirm dialog and goes straight to the same
@@ -646,73 +769,23 @@ export default function GamePage() {
   // highlight/focus flow as handleParcelClick above (no confirm dialog,
   // since picking a specific row is already an explicit choice), just
   // sourced from the paginated my-parcels list instead of the map.
-  function handleViewMyParcel(parcel) {
+  function handleViewMyParcel(territory) {
     setHighlightedEntry({
       userId: user?.id,
       fullName: user?.fullName,
-      areaSqMeters: parcel.areaSqMeters,
-      parcelId: parcel.id,
+      areaSqMeters: territory.area,
+      // A merged territory's own id is synthetic (see mergeTouchingParcels)
+      // - sourceIds[0] is a real parcel id the map can actually fly to and
+      // match against, and since TerritoryMap highlights the whole merged
+      // shape that id's parcel now belongs to, the visual result still
+      // covers the entire merged territory, not just that one sub-parcel.
+      parcelId: territory.sourceIds[0],
     })
     setMenuOpen(false)
   }
 
-  function handleCancelManual() {
-    setManualMode(false)
-    setManualPoints([])
-  }
-
-  // A jogging pace, comfortably under the backend's 7 m/s sustained-speed
-  // anti-cheat ceiling — spacing points by a FIXED duration regardless of
-  // loop size (an earlier version of this) implied a sprint/vehicle pace on
-  // any loop bigger than a couple hundred meters and got silently rejected
-  // as implausible. Duration has to scale with distance instead.
-  const MANUAL_DRAFT_PACE_MPS = 3
-
-  function handleCloseManualLoop() {
-    if (manualPoints.length < 2) return
-    // A real run closes itself because the runner physically ends up back
-    // near where they started - tapped vertices have no such tendency (the
-    // last tap of a decagon is just as far from the first as any other
-    // vertex), so the server's 25m closure-gap check fails almost every
-    // time without this. Appending an explicit duplicate of the first point
-    // as the last point guarantees a 0m gap regardless of where the tapping
-    // actually stopped.
-    const closedPoints = [...manualPoints, manualPoints[0]]
-    const distance = loopPerimeterMeters(manualPoints)
-    const durationSeconds = Math.max(
-      MIN_VALID_RUN_DURATION_SECONDS + 5,
-      Math.ceil(distance / MANUAL_DRAFT_PACE_MPS)
-    )
-    const durationMs = durationSeconds * 1000
-    const now = Date.now()
-    const spacingMs = durationMs / Math.max(1, closedPoints.length - 1)
-    const startedAt = new Date(now - durationMs)
-    const endedAt = new Date(now)
-    const points = closedPoints.map((p, i) => ({
-      lat: p.lat,
-      lng: p.lng,
-      accuracy: 5,
-      speed: null,
-      elevation: null,
-      timestamp: startedAt.getTime() + i * spacingMs,
-    }))
-    setManualDraft({
-      points,
-      distance,
-      duration: durationSeconds,
-      startedAt,
-      endedAt,
-    })
-    setManualMode(false)
-    setManualPoints([])
-  }
-
   function discardDraft() {
-    if (manualDraft) {
-      setManualDraft(null)
-    } else {
-      tracker.clearPendingRun()
-    }
+    tracker.clearPendingRun()
   }
 
   // Exports and saves the map-snapshot share card straight to the device —
@@ -881,13 +954,26 @@ export default function GamePage() {
           : null
   const showGpsError = Boolean(gpsStatusMessage) && !gpsErrorDismissed
 
-  const pendingRun = tracker.pendingRun || manualDraft
+  const pendingRun = tracker.pendingRun
   const draftArea = pendingRun ? polygonAreaSqMeters(pendingRun.points) : 0
   const draftPerimeter = pendingRun ? loopPerimeterMeters(pendingRun.points) : 0
   const draftLooksThin =
     pendingRun &&
     (pendingRun.points.length < LOOP_MIN_POINTS ||
       draftArea < LOOP_MIN_AREA_SQ_METERS)
+  // Mirrors the backend's own closure-gap check (see
+  // LOOP_CLOSURE_THRESHOLD_METERS) - a real GPS run only closes itself if the
+  // runner physically ends up back near where they started. Flagging a wide
+  // gap here immediately, right when the loop is ended, is more actionable
+  // than only discovering it after the server silently doesn't count the run
+  // as territory.
+  const draftLoopOpen =
+    pendingRun &&
+    pendingRun.points.length >= 2 &&
+    haversineDistance(
+      pendingRun.points[0],
+      pendingRun.points[pendingRun.points.length - 1]
+    ) > LOOP_CLOSURE_THRESHOLD_METERS
 
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
@@ -1006,17 +1092,17 @@ export default function GamePage() {
           center={center}
           playerLocation={playerLocation}
           territories={nearbyParcels}
-          livePath={manualMode ? manualPoints : tracker.path}
+          livePath={tracker.path}
           currentUserId={user?.id}
           highlightOwnerId={highlightedOwnerId}
           highlightParcelId={highlightedEntry?.parcelId ?? null}
           avatarSrc={avatarSrc}
+          playerHeading={playerHeading}
           playerColor={equippedShade}
           trailColor={equippedTrailColor}
           mapStyleUrl={currentMapStyle?.styleUrl}
           darkMode={mapDarkMode}
-          manualMode={manualMode}
-          onMapClick={handleMapTap}
+          isNavigating={isNavigating}
           onParcelClick={handleParcelClick}
           onMapReady={handleMapReady}
         />
@@ -1033,9 +1119,37 @@ export default function GamePage() {
         </div>
       )}
 
-      <Link to="/" className="game-exit-btn" aria-label="Exit to home">
-        <BackArrowIcon />
-      </Link>
+      {profile?.level != null && (
+        <button
+          type="button"
+          className="game-hud-level"
+          aria-label={`Level ${profile.level} - view your territories`}
+          onClick={() => {
+            switchTab('me')
+            setMenuOpen(true)
+          }}
+        >
+          <span className="game-hud-level-badge">
+            {profile.level}
+            <IconShineOrbit shape="hex" width={34} height={36} />
+          </span>
+          <div className="game-hud-level-info">
+            {user?.fullName && (
+              <span className="game-hud-level-name">
+                {user.fullName.split(' ')[0]}
+              </span>
+            )}
+            <div className="game-hud-level-bar">
+              <div
+                className="game-hud-level-bar-fill"
+                style={{
+                  width: `${Math.round(levelProgress(profile.level, profile.xp ?? 0).pct * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        </button>
+      )}
 
       <button
         type="button"
@@ -1078,12 +1192,31 @@ export default function GamePage() {
             setMenuOpen(true)
           }}
         >
-          <span className="game-hud-value">{profile?.parcelCount ?? 0}</span>
+          <span className="game-hud-value">{myTerritories.length}</span>
           <span className="game-hud-icon game-hud-icon-flag">
             <FaFlag />
           </span>
         </button>
       </div>
+
+      <AnimatePresence>
+        {territoryEntryBanner && (
+          <motion.div
+            key={territoryEntryBanner.ownerName}
+            className="game-territory-entry-banner"
+            initial={{ opacity: 0, y: -40, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+          >
+            <span className="game-territory-entry-banner-flag">🚩</span>
+            <span className="game-territory-entry-banner-text">
+              Entering <strong>{territoryEntryBanner.ownerName}</strong>
+              &apos;s territory!
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {radialOpen && (
         <div
@@ -1094,21 +1227,30 @@ export default function GamePage() {
 
       <AnimatePresence>
         {radialOpen && (
-          <motion.div
+          <motion.img
+            src={runConquestLogo}
+            alt="Run Conquest"
             className="game-menu-banner"
-            initial={{ opacity: 0, y: -18, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -18, scale: 0.9 }}
+            initial={{
+              opacity: 0,
+              x: '-50%',
+              y: 'calc(-50% - 118px)',
+              scale: 0.9,
+            }}
+            animate={{
+              opacity: 1,
+              x: '-50%',
+              y: 'calc(-50% - 100px)',
+              scale: 1,
+            }}
+            exit={{
+              opacity: 0,
+              x: '-50%',
+              y: 'calc(-50% - 118px)',
+              scale: 0.9,
+            }}
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-          >
-            <img src={woodSignBanner} alt="" className="game-menu-banner-img" />
-            <div className="game-menu-banner-text">
-              <span className="game-menu-banner-title">Territory Run</span>
-              <span className="game-menu-banner-subtitle">
-                Claim it. Run it. Own it.
-              </span>
-            </div>
-          </motion.div>
+          />
         )}
       </AnimatePresence>
 
@@ -1156,57 +1298,24 @@ export default function GamePage() {
           aria-expanded={radialOpen}
         >
           <FaListUl />
+          <IconShineOrbit shape="circle" width={60} height={60} gap={6} />
         </button>
       </div>
 
-      <div className="game-controls" ref={controlsRef}>
-        {tracker.status === 'idle' &&
-          !pendingRun &&
-          !manualMode &&
-          isAdminUser && (
-            <div className="game-controls-actions">
-              <button
-                type="button"
-                className="btn btn-outline btn-lg"
-                onClick={handleStartManual}
-              >
-                Tap to Draw Territory
-              </button>
-            </div>
-          )}
-
-        {manualMode && (
-          <>
-            <div className="game-controls-stats">
-              <span>{manualPoints.length} points</span>
-              <span>Tap the map to add points</span>
-            </div>
-            <div className="game-controls-actions">
-              <button
-                type="button"
-                className="btn btn-primary btn-lg"
-                onClick={handleCloseManualLoop}
-                disabled={manualPoints.length < LOOP_MIN_POINTS}
-              >
-                Close Loop
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-lg"
-                onClick={handleCancelManual}
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
-
+      <div
+        className={`game-controls${
+          tracker.status === 'tracking' || pendingRun
+            ? ''
+            : ' game-controls-empty'
+        }`}
+        ref={controlsRef}
+      >
         {tracker.status === 'tracking' && (
           <>
             <div className="game-controls-stats">
               <span className="game-stat">
                 <span className="game-stat-value">
-                  {formatMeters(tracker.distance)}
+                  {formatMeters(displayedDistance)}
                 </span>
                 <span className="game-stat-label">Distance</span>
               </span>
@@ -1234,7 +1343,7 @@ export default function GamePage() {
                 className="btn btn-primary btn-lg"
                 onClick={() => tracker.stop()}
               >
-                Close Loop
+                End
               </button>
               <button
                 type="button"
@@ -1244,6 +1353,13 @@ export default function GamePage() {
                 Cancel
               </button>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline game-view-toggle"
+              onClick={() => setNavViewOn((on) => !on)}
+            >
+              {navViewOn ? 'Switch to Normal View' : 'Switch to Running View'}
+            </button>
           </>
         )}
 
@@ -1271,11 +1387,18 @@ export default function GamePage() {
                 Discard
               </button>
             </div>
-            {draftLooksThin && (
-              <p className="game-controls-hint">
-                This loop looks short or small — the server may not count it as
-                closed territory. Bigger, cleanly closed loops score best.
+            {draftLoopOpen ? (
+              <p className="game-controls-hint game-controls-hint-error">
+                This loop isn&apos;t closed — your capture might not be complete
+                since you didn&apos;t finish back where you started.
               </p>
+            ) : (
+              draftLooksThin && (
+                <p className="game-controls-hint">
+                  This loop looks short or small — the server may not count it
+                  as closed territory. Bigger, cleanly closed loops score best.
+                </p>
+              )
             )}
           </>
         )}
@@ -1409,17 +1532,6 @@ export default function GamePage() {
               <button
                 type="button"
                 className="btn btn-outline"
-                onClick={() => {
-                  setHighlightedEntry(null)
-                  setMenuTab('leaderboard')
-                  setMenuOpen(true)
-                }}
-              >
-                Back to Leaderboard
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline"
                 onClick={() => setHighlightedEntry(null)}
               >
                 Close
@@ -1455,6 +1567,14 @@ export default function GamePage() {
               >
                 <FaTrophy />
                 Leaderboard
+              </button>
+              <button
+                type="button"
+                className={`game-menu-tab ${menuTab === 'club' ? 'active' : ''}`}
+                onClick={() => switchTab('club')}
+              >
+                <FaUsers />
+                Club
               </button>
               <button
                 type="button"
@@ -1552,6 +1672,15 @@ export default function GamePage() {
               </div>
             )}
 
+            {menuTab === 'club' && (
+              <div className="game-menu-panel">
+                <ClubPanel
+                  hasClub={Boolean(profile?.clubName)}
+                  onClubChanged={refreshProfile}
+                />
+              </div>
+            )}
+
             {menuTab === 'me' && (
               <div
                 className="game-menu-panel"
@@ -1614,6 +1743,11 @@ export default function GamePage() {
                         <div className="game-level-track">
                           <span className="game-level-badge">
                             {profile.level}
+                            <IconShineOrbit
+                              shape="hex"
+                              width={46}
+                              height={48}
+                            />
                           </span>
                           <div className="game-xp-bar">
                             <div
@@ -1636,16 +1770,20 @@ export default function GamePage() {
                   </span>
                   <span
                     className="game-menu-parcel-flags"
-                    aria-label={`${profile?.parcelCount ?? 0} territor${profile?.parcelCount === 1 ? 'y' : 'ies'} held`}
+                    aria-label={`${myTerritories.length} territor${myTerritories.length === 1 ? 'y' : 'ies'} held (each flag = ${PARCELS_PER_FLAG})`}
+                    title={`Each flag = ${PARCELS_PER_FLAG} territories`}
                   >
                     {Array.from({
-                      length: Math.min(profile?.parcelCount ?? 0, 8),
+                      length: Math.min(
+                        Math.ceil(myTerritories.length / PARCELS_PER_FLAG),
+                        8
+                      ),
                     }).map((_, i) => (
                       <FaFlag key={i} />
                     ))}
-                    {(profile?.parcelCount ?? 0) > 8 && (
+                    {myTerritories.length > 8 * PARCELS_PER_FLAG && (
                       <span className="game-menu-parcel-flags-more">
-                        +{profile.parcelCount - 8}
+                        +{myTerritories.length - 8 * PARCELS_PER_FLAG}
                       </span>
                     )}
                   </span>
@@ -1656,27 +1794,26 @@ export default function GamePage() {
                   )}
                 </div>
                 <p className="game-menu-section-title">My Territories</p>
-                {myParcels.length === 0 ? (
+                {myTerritories.length === 0 ? (
                   <p className="game-menu-empty">
                     Finish a GPS run that closes a loop to see territory here.
                   </p>
                 ) : (
                   <ul className="game-menu-list">
-                    {[...myParcels]
-                      .sort((a, b) => b.areaSqMeters - a.areaSqMeters)
-                      .map((p) => (
-                        <li key={p.id}>
+                    {[...myTerritories]
+                      .sort((a, b) => b.area - a.area)
+                      .map((t) => (
+                        <li key={t.id}>
                           <button
                             type="button"
                             className="game-menu-list-row"
-                            onClick={() => handleViewMyParcel(p)}
+                            onClick={() => handleViewMyParcel(t)}
                           >
                             <span className="game-menu-list-area">
-                              {currentAreaEmoji?.emoji}{' '}
-                              {formatArea(p.areaSqMeters)}
+                              {currentAreaEmoji?.emoji} {formatArea(t.area)}
                             </span>
                             <span className="game-menu-list-meta">
-                              score {Math.round(p.currentScore || 0)}
+                              score {Math.round(t.currentScore || 0)}
                             </span>
                           </button>
                         </li>
@@ -1722,7 +1859,11 @@ export default function GamePage() {
                 </p>
                 <div className="game-menu-avatar-grid">
                   {AVATARS.map((avatar) => {
-                    const isSelected = avatar.id === avatarId
+                    // A purchased Store Hero always wins over a free local
+                    // avatar pick (see avatarSrc above) - showing this card
+                    // as "Equipped" while a real Hero is actually in effect
+                    // would disagree with what the map/Me tab actually show.
+                    const isSelected = avatar.id === avatarId && !equippedHero
                     return (
                       <button
                         key={avatar.id}
@@ -1868,7 +2009,9 @@ export default function GamePage() {
                                     ? 'Equipped · your map avatar'
                                     : 'Equipped'
                                   : 'Owned'
-                                : `${item.priceFahhcoin} Fahhcoin`}
+                                : item.priceFahhcoin > 0
+                                  ? `${item.priceFahhcoin} Fahhcoin`
+                                  : 'Free'}
                             </span>
                           </span>
                           {owned ? (
@@ -2078,7 +2221,9 @@ export default function GamePage() {
               onClick={(e) => e.stopPropagation()}
             >
               <p>
-                Buy {storeChoice.name} for {storeChoice.priceFahhcoin} Fahhcoin?
+                {storeChoice.priceFahhcoin > 0
+                  ? `Buy ${storeChoice.name} for ${storeChoice.priceFahhcoin} Fahhcoin?`
+                  : `Unlock ${storeChoice.name} for free?`}
               </p>
               <div className="game-confirm-actions">
                 <button
