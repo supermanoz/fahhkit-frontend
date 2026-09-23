@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
-import { FaSearch } from 'react-icons/fa'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
+import {
+  FaCalendarAlt,
+  FaEnvelope,
+  FaMoneyCheckAlt,
+  FaPhone,
+  FaUser,
+} from 'react-icons/fa'
 import { ApiError, canManageEvents, getJson, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatName } from '../utils/format'
 import { formatDate } from '../utils/events'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import SearchFilters from '../components/SearchFilters'
+import {
+  emptyFilterValues,
+  hasActiveFilters,
+  toBackendDate,
+} from '../utils/searchFilters'
 import './EventRegistrantsPage.css'
 
 const STATUS_LABELS = {
@@ -25,6 +38,14 @@ const UPDATABLE_STATUSES = [
 
 const PAGE_SIZE = 30
 
+// The backend stores the moderator-assigned bib number in the generic extra1
+// column and exposes it as `bibNumber` (older deploys still send `extra1`).
+// A bib number is only assigned when the athlete picks up their bib, so
+// having one is what "BIB collected" means.
+function bibNumberOf(registrant) {
+  return registrant?.bibNumber || registrant?.extra1 || ''
+}
+
 // Only athletes can be applicants for an event — admins/moderators are
 // excluded even if one of them happens to have a registration row. This
 // join-filter (rather than fetching every registrant and every athlete to
@@ -34,36 +55,102 @@ const ATHLETE_ONLY_FILTER = [
   { field: 'userType', value: 'ATHLETE', type: 'object', object: 'user' },
 ]
 
+const REGISTRANT_FILTER_FIELDS = [
+  {
+    key: 'name',
+    label: 'Athlete name',
+    placeholder: 'e.g. Sita Rai',
+    icon: FaUser,
+  },
+  {
+    key: 'phone',
+    label: 'Phone number',
+    type: 'tel',
+    placeholder: 'e.g. 98XXXXXXXX',
+    icon: FaPhone,
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    type: 'email',
+    placeholder: 'e.g. sita@mail.com',
+    icon: FaEnvelope,
+  },
+  {
+    key: 'paymentStatus',
+    label: 'Payment status',
+    type: 'select',
+    icon: FaMoneyCheckAlt,
+    options: [
+      { value: '', label: 'All statuses' },
+      ...Object.entries(STATUS_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+  },
+  {
+    key: 'registeredOn',
+    label: 'Registered on',
+    type: 'date',
+    icon: FaCalendarAlt,
+  },
+]
+
 // actionType FILTER ANDs every entry in `search` together (see the backend's
-// DynamicWhereClause) - a name match and a status filter just join the
-// athlete-only filter as more AND conditions, rather than needing their own
-// OR-grouped query.
-function buildRegistrantSearch(nameQuery, statusFilter) {
+// DynamicWhereClause) - each filled-in box just joins the athlete-only filter
+// as another AND condition, rather than needing its own OR-grouped query.
+// Text boxes are LIKE %value% matches; user fields go through a join on `user`.
+function buildRegistrantSearch(filters) {
   const search = [...ATHLETE_ONLY_FILTER]
-  if (nameQuery) {
+  const userLike = (field, value) => ({
+    field,
+    value,
+    type: 'object',
+    object: 'user',
+  })
+  const name = filters.name.trim()
+  const phone = filters.phone.trim()
+  const email = filters.email.trim()
+  if (name) search.push(userLike('fullName', name))
+  if (phone) search.push(userLike('mobileNumber', phone))
+  if (email) search.push(userLike('email', email))
+  if (filters.paymentStatus) {
     search.push({
-      field: 'fullName',
-      value: nameQuery,
-      type: 'object',
-      object: 'user',
+      field: 'paymentStatus',
+      value: filters.paymentStatus,
+      type: 'exact',
     })
   }
-  if (statusFilter && statusFilter !== 'ALL') {
-    search.push({ field: 'paymentStatus', value: statusFilter, type: 'exact' })
+  if (filters.registeredOn) {
+    search.push({
+      field: 'createdDate',
+      value: toBackendDate(filters.registeredOn),
+      type: 'date',
+    })
   }
   return search
 }
 
 export default function EventRegistrantsPage() {
   const { id } = useParams()
+  const location = useLocation()
   const { user, loading: userLoading } = useCurrentUser()
   const [event, setEvent] = useState(null)
   const [registrants, setRegistrants] = useState([])
   const [athleteById, setAthleteById] = useState(new Map())
-  const [stats, setStats] = useState({ paid: 0, pending: 0 })
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [stats, setStats] = useState({
+    paid: 0,
+    pending: 0,
+    failed: 0,
+    cancelled: 0,
+  })
+  const [filters, setFilters] = useState(() =>
+    emptyFilterValues(REGISTRANT_FILTER_FIELDS)
+  )
+  // Debounced so typing in a box doesn't fire a request per keystroke.
+  const debouncedFilters = useDebouncedValue(filters)
+  const filtering = hasActiveFilters(debouncedFilters)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -75,41 +162,38 @@ export default function EventRegistrantsPage() {
     remarks: '',
   })
   const [statusSaving, setStatusSaving] = useState(false)
+  // The details modal opens with the payment status form ('view'); the BIB
+  // collection form ('bib') swaps in only once its button is clicked.
+  const [modalMode, setModalMode] = useState('view')
+  const [bibInput, setBibInput] = useState('')
   const [statusError, setStatusError] = useState(null)
 
   const allowed = canManageEvents(user)
 
+  // One count-only query per status (noOfRecords: 1, read totalElements) so
+  // the summary panel never has to pull the whole roster.
   const fetchStats = useCallback(() => {
-    return Promise.all([
+    const countStatus = (status) =>
       postJson(`/v1/event/${id}/registrations`, {
         pageNumber: 1,
         noOfRecords: 1,
         actionType: 'FILTER',
         search: [
           ...ATHLETE_ONLY_FILTER,
-          { field: 'paymentStatus', value: 'PAID', type: 'exact' },
+          { field: 'paymentStatus', value: status, type: 'exact' },
         ],
-      }),
-      postJson(`/v1/event/${id}/registrations`, {
-        pageNumber: 1,
-        noOfRecords: 1,
-        actionType: 'FILTER',
-        search: [
-          ...ATHLETE_ONLY_FILTER,
-          { field: 'paymentStatus', value: 'PENDING', type: 'exact' },
-        ],
-      }),
-    ]).then(([paidPage, pendingPage]) => {
-      setStats({
-        paid: paidPage?.totalElements ?? 0,
-        pending: pendingPage?.totalElements ?? 0,
-      })
+      }).then((page) => page?.totalElements ?? 0)
+    return Promise.all(
+      ['PAID', 'PENDING', 'FAILED', 'CANCELLED'].map(countStatus)
+    ).then(([paid, pending, failed, cancelled]) => {
+      setStats({ paid, pending, failed, cancelled })
     })
   }, [id])
 
   function openStatusModal(registrant) {
     setStatusError(null)
     setStatusForm({ paymentStatus: '', remarks: '' })
+    setModalMode('view')
     setEditingRegistrant(registrant)
   }
 
@@ -118,9 +202,66 @@ export default function EventRegistrantsPage() {
     setEditingRegistrant(null)
   }
 
-  async function handleStatusSubmit(e) {
+  function backToDetails() {
+    setStatusError(null)
+    setModalMode('view')
+  }
+
+  function startBibEdit() {
+    setStatusError(null)
+    setBibInput(bibNumberOf(editingRegistrant))
+    setModalMode('bib')
+  }
+
+  async function handleBibSubmit() {
+    const bibNumber = bibInput.trim()
+    if (!bibNumber) {
+      setStatusError('Enter the BIB number handed to the athlete.')
+      return
+    }
+    setStatusError(null)
+    setStatusSaving(true)
+    try {
+      const updated = await postJson(
+        '/v1/event/registration/update-performance',
+        {
+          registrationId: editingRegistrant.registrationId,
+          bibNumber,
+        }
+      )
+      // Fall back to what we sent in case this deploy's response predates
+      // the bibNumber field.
+      const merged = {
+        ...editingRegistrant,
+        ...updated,
+        bibNumber: bibNumberOf(updated) || bibNumber,
+      }
+      setRegistrants((prev) =>
+        prev.map((r) =>
+          r.registrationId === merged.registrationId ? merged : r
+        )
+      )
+      // Stay open on the details view so the "Collected" badge confirms it.
+      setEditingRegistrant(merged)
+      setModalMode('view')
+    } catch (err) {
+      setStatusError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not save the BIB collection. Please try again.'
+      )
+    } finally {
+      setStatusSaving(false)
+    }
+  }
+
+  async function handleModalSubmit(e) {
     e.preventDefault()
     if (!editingRegistrant) return
+    if (modalMode === 'bib') {
+      await handleBibSubmit()
+      return
+    }
     if (!statusForm.paymentStatus) {
       setStatusError('Please select a status.')
       return
@@ -162,14 +303,14 @@ export default function EventRegistrantsPage() {
 
   const report = useMemo(() => {
     const entryFee = Number(event?.entryFee) || 0
+    const failedOrCancelled = stats.failed + stats.cancelled
     return {
-      total: stats.paid + stats.pending,
+      // Same definition as the detailed report: every registration row,
+      // whatever its payment status.
+      total: stats.paid + stats.pending + failedOrCancelled,
       paid: stats.paid,
       pending: stats.pending,
-      // /v1/event/{id}/registrations only ever returns PENDING/PAID rows —
-      // a FAILED/CANCELLED attempt never became a real registrant — so this
-      // bucket is always empty.
-      failedOrCancelled: 0,
+      failedOrCancelled,
       revenue: stats.paid * entryFee,
     }
   }, [stats, event])
@@ -179,16 +320,10 @@ export default function EventRegistrantsPage() {
     setPage(1)
   }, [id])
 
-  // Debounce the search box so we're not firing a request on every keystroke.
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350)
-    return () => clearTimeout(timer)
-  }, [query])
-
-  // A new search term or status filter invalidates whatever page we were on.
+  // A new set of filters invalidates whatever page we were on.
   useEffect(() => {
     setPage(1)
-  }, [debouncedQuery, statusFilter])
+  }, [debouncedFilters])
 
   // Event details, the athlete roster (for mobile numbers), and the
   // paid/pending counts — loaded once per event, independent of which page
@@ -230,7 +365,7 @@ export default function EventRegistrantsPage() {
       pageNumber: page,
       noOfRecords: PAGE_SIZE,
       actionType: 'FILTER',
-      search: buildRegistrantSearch(debouncedQuery, statusFilter),
+      search: buildRegistrantSearch(debouncedFilters),
     })
       .then((data) => {
         setRegistrants(data?.content || [])
@@ -244,7 +379,7 @@ export default function EventRegistrantsPage() {
         )
       )
       .finally(() => setTableLoading(false))
-  }, [id, page, userLoading, allowed, debouncedQuery, statusFilter])
+  }, [id, page, userLoading, allowed, debouncedFilters])
 
   if (userLoading) {
     return (
@@ -275,16 +410,16 @@ export default function EventRegistrantsPage() {
             <h1>Applicants{event ? ` — ${event.name}` : ''}</h1>
             <p>Everyone who&apos;s registered for this event.</p>
           </div>
-          <div className="registrant-search-box">
-            <FaSearch className="registrant-search-icon" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by athlete name"
-            />
-          </div>
         </header>
+
+        <SearchFilters
+          fields={REGISTRANT_FILTER_FIELDS}
+          values={filters}
+          onChange={setFilters}
+          title="Find an applicant"
+          idPrefix="registrant-filter"
+          quickField="name"
+        />
 
         {error && <div className="banner error">{error}</div>}
         {loading && <p className="event-registrants-muted">Loading...</p>}
@@ -292,8 +427,7 @@ export default function EventRegistrantsPage() {
           !error &&
           !tableLoading &&
           report.total === 0 &&
-          !debouncedQuery &&
-          statusFilter === 'ALL' && (
+          !filtering && (
             <p className="event-registrants-muted">
               No one has registered for this event yet.
             </p>
@@ -301,40 +435,18 @@ export default function EventRegistrantsPage() {
 
         {!loading &&
           !error &&
-          (tableLoading ||
-            report.total > 0 ||
-            debouncedQuery ||
-            statusFilter !== 'ALL') && (
+          (tableLoading || report.total > 0 || filtering) && (
             <div className="event-registrants-body">
               <div className="registrant-table-wrap">
                 <table className="registrant-table">
                   <thead>
                     <tr>
+                      <th aria-label="Actions"></th>
                       <th>Name</th>
                       <th>Mobile Number</th>
-                      <th>
-                        <div className="registrant-status-th">
-                          <span>Payment Status</span>
-                          <select
-                            className="registrant-status-filter"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            aria-label="Filter by payment status"
-                          >
-                            <option value="ALL">All</option>
-                            {Object.entries(STATUS_LABELS).map(
-                              ([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-                      </th>
+                      <th>Payment Status</th>
+                      <th>BIB</th>
                       <th>Remarks</th>
-                      <th>Registered</th>
-                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -354,53 +466,71 @@ export default function EventRegistrantsPage() {
                           colSpan={6}
                           className="event-registrants-muted registrant-table-loading-cell"
                         >
-                          {debouncedQuery
-                            ? `No applicants match "${debouncedQuery}".`
-                            : statusFilter !== 'ALL'
-                              ? `No applicants with ${STATUS_LABELS[statusFilter]} status.`
-                              : 'No one has registered for this event yet.'}
+                          {filtering
+                            ? 'No applicants match those filters. Try loosening one up.'
+                            : 'No one has registered for this event yet.'}
                         </td>
                       </tr>
                     )}
                     {registrants.map((registrant) => (
                       <tr key={registrant.registrationId}>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => openStatusModal(registrant)}
+                          >
+                            View / Update
+                          </button>
+                        </td>
                         <td className="registrant-name-cell">
-                          {formatName(registrant.fullName)}
+                          <Link
+                            to={`/athletes/${registrant.userId}`}
+                            // Lets the profile's back link return here
+                            // rather than to the athlete search page.
+                            state={{
+                              backTo: {
+                                path: location.pathname + location.search,
+                                label: 'Back to applicants',
+                              },
+                            }}
+                            className="registrant-name-link"
+                            title="View profile"
+                          >
+                            {formatName(registrant.fullName)}
+                          </Link>
                         </td>
                         <td>
                           {athleteById.get(registrant.userId)?.mobileNumber ||
                             '—'}
                         </td>
-                        <td className="registrant-payment-cell">
+                        <td>
                           <span
                             className={`registrant-status status-${(registrant.paymentStatus || '').toLowerCase()}`}
                           >
                             {STATUS_LABELS[registrant.paymentStatus] ||
                               registrant.paymentStatus}
                           </span>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => openStatusModal(registrant)}
-                          >
-                            Update
-                          </button>
+                        </td>
+                        <td>
+                          {bibNumberOf(registrant) ? (
+                            <span
+                              className="bib-badge bib-collected"
+                              title="BIB collected"
+                            >
+                              #{bibNumberOf(registrant)}
+                            </span>
+                          ) : registrant.paymentStatus === 'PAID' ? (
+                            <span className="bib-badge bib-pending">
+                              Not collected
+                            </span>
+                          ) : (
+                            // Unpaid registrants can't collect a BIB yet.
+                            '—'
+                          )}
                         </td>
                         <td className="registrant-remarks-cell">
                           {registrant.remarks || '—'}
-                        </td>
-                        <td className="registrant-meta-cell">
-                          {formatDate(registrant.registeredDate)}
-                        </td>
-                        <td>
-                          <div className="registrant-actions">
-                            <Link
-                              to={`/athletes/${registrant.userId}`}
-                              className="btn btn-outline"
-                            >
-                              View Profile
-                            </Link>
-                          </div>
                         </td>
                       </tr>
                     ))}
@@ -482,74 +612,186 @@ export default function EventRegistrantsPage() {
           <form
             className="status-update-modal glass-card"
             onClick={(e) => e.stopPropagation()}
-            onSubmit={handleStatusSubmit}
+            onSubmit={handleModalSubmit}
           >
-            <h2>Update Payment Status</h2>
+            <h2>Registration Details</h2>
             <p className="status-update-subject">
-              {formatName(editingRegistrant.fullName)} &middot; currently{' '}
-              <strong>
-                {STATUS_LABELS[editingRegistrant.paymentStatus] ||
-                  editingRegistrant.paymentStatus}
-              </strong>
+              {formatName(editingRegistrant.fullName)}
             </p>
 
-            {statusError && <div className="banner error">{statusError}</div>}
+            <dl className="status-update-summary">
+              <div>
+                <dt>Phone</dt>
+                <dd>
+                  {athleteById.get(editingRegistrant.userId)?.mobileNumber ||
+                    '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Registered</dt>
+                <dd>{formatDate(editingRegistrant.registeredDate)}</dd>
+              </div>
+              <div>
+                <dt>Current status</dt>
+                <dd>
+                  <span
+                    className={`registrant-status status-${(editingRegistrant.paymentStatus || '').toLowerCase()}`}
+                  >
+                    {STATUS_LABELS[editingRegistrant.paymentStatus] ||
+                      editingRegistrant.paymentStatus}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>BIB</dt>
+                <dd>
+                  {bibNumberOf(editingRegistrant) ? (
+                    <span className="bib-badge bib-collected">
+                      Collected &middot; #{bibNumberOf(editingRegistrant)}
+                    </span>
+                  ) : (
+                    <span className="bib-badge bib-pending">Not collected</span>
+                  )}
+                </dd>
+              </div>
+              {editingRegistrant.transactionId && (
+                <div>
+                  <dt>Transaction ID</dt>
+                  <dd className="status-update-mono">
+                    {editingRegistrant.transactionId}
+                  </dd>
+                </div>
+              )}
+              {editingRegistrant.remarks && (
+                <div>
+                  <dt>Last remark</dt>
+                  <dd>{editingRegistrant.remarks}</dd>
+                </div>
+              )}
+            </dl>
 
-            <div className="field">
-              <label htmlFor="status-update-status">New Status</label>
-              <select
-                id="status-update-status"
-                value={statusForm.paymentStatus}
-                onChange={(e) =>
-                  setStatusForm((f) => ({
-                    ...f,
-                    paymentStatus: e.target.value,
-                  }))
-                }
-                required
-              >
-                <option value="">Select status</option>
-                {UPDATABLE_STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {modalMode === 'view' && (
+              <>
+                {statusError && (
+                  <div className="banner error">{statusError}</div>
+                )}
 
-            <div className="field">
-              <label htmlFor="status-update-remarks">
-                Remarks <span className="opt">(required)</span>
-              </label>
-              <textarea
-                id="status-update-remarks"
-                rows={3}
-                value={statusForm.remarks}
-                onChange={(e) =>
-                  setStatusForm((f) => ({ ...f, remarks: e.target.value }))
-                }
-                placeholder="Why is this status being changed?"
-                required
-              />
-            </div>
+                <div className="field">
+                  <label htmlFor="status-update-status">Payment Status</label>
+                  <select
+                    id="status-update-status"
+                    value={statusForm.paymentStatus}
+                    onChange={(e) =>
+                      setStatusForm((f) => ({
+                        ...f,
+                        paymentStatus: e.target.value,
+                      }))
+                    }
+                    required
+                  >
+                    <option value="">Select status</option>
+                    {UPDATABLE_STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="status-update-actions">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={closeStatusModal}
-                disabled={statusSaving}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={statusSaving}
-              >
-                {statusSaving ? 'Saving...' : 'Save Status'}
-              </button>
-            </div>
+                <div className="field">
+                  <label htmlFor="status-update-remarks">
+                    Remarks <span className="opt">(required)</span>
+                  </label>
+                  <textarea
+                    id="status-update-remarks"
+                    rows={3}
+                    value={statusForm.remarks}
+                    onChange={(e) =>
+                      setStatusForm((f) => ({ ...f, remarks: e.target.value }))
+                    }
+                    placeholder="Why is this status being changed?"
+                    required
+                  />
+                </div>
+
+                <div className="status-update-actions status-update-actions-wrap">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={closeStatusModal}
+                    disabled={statusSaving}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={startBibEdit}
+                    disabled={
+                      statusSaving || editingRegistrant.paymentStatus !== 'PAID'
+                    }
+                    title={
+                      editingRegistrant.paymentStatus !== 'PAID'
+                        ? 'Only paid registrants can collect a BIB'
+                        : undefined
+                    }
+                  >
+                    {bibNumberOf(editingRegistrant)
+                      ? 'Edit BIB Number'
+                      : 'Mark BIB Collected'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={statusSaving}
+                  >
+                    {statusSaving ? 'Saving...' : 'Save Status'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {modalMode === 'bib' && (
+              <>
+                {statusError && (
+                  <div className="banner error">{statusError}</div>
+                )}
+
+                <div className="field">
+                  <label htmlFor="status-update-bib">BIB Number</label>
+                  <input
+                    id="status-update-bib"
+                    type="text"
+                    value={bibInput}
+                    onChange={(e) => setBibInput(e.target.value)}
+                    placeholder="Number on the bib handed over, e.g. 1042"
+                    autoFocus
+                    required
+                  />
+                  <p className="status-update-hint">
+                    Saving this marks the athlete&apos;s BIB as collected.
+                  </p>
+                </div>
+
+                <div className="status-update-actions">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={backToDetails}
+                    disabled={statusSaving}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={statusSaving}
+                  >
+                    {statusSaving ? 'Saving...' : 'Save BIB'}
+                  </button>
+                </div>
+              </>
+            )}
           </form>
         </div>
       )}

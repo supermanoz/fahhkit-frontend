@@ -1,21 +1,102 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { FaSearch } from 'react-icons/fa'
+import {
+  FaCalendarAlt,
+  FaCity,
+  FaEnvelope,
+  FaPhone,
+  FaUser,
+} from 'react-icons/fa'
 import { ApiError, canManageEvents, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatName } from '../utils/format'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import SearchFilters from '../components/SearchFilters'
+import {
+  emptyFilterValues,
+  hasActiveFilters,
+  toBackendDate,
+} from '../utils/searchFilters'
 import './AthleteSearchPage.css'
 
 const PAGE_SIZE = 30
-const SEARCH_FIELDS = ['fullName', 'email', 'mobileNumber']
+
+const ATHLETE_FILTER_FIELDS = [
+  {
+    key: 'name',
+    label: 'Athlete name',
+    placeholder: 'e.g. Sita Rai',
+    icon: FaUser,
+  },
+  {
+    key: 'phone',
+    label: 'Phone number',
+    type: 'tel',
+    placeholder: 'e.g. 98XXXXXXXX',
+    icon: FaPhone,
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    type: 'email',
+    placeholder: 'e.g. sita@mail.com',
+    icon: FaEnvelope,
+  },
+  {
+    key: 'city',
+    label: 'City',
+    placeholder: 'e.g. Kathmandu',
+    icon: FaCity,
+  },
+  {
+    key: 'joinedOn',
+    label: 'Joined on',
+    type: 'date',
+    icon: FaCalendarAlt,
+  },
+]
+
+// actionType FILTER ANDs every entry together (see the backend's
+// DynamicWhereClause), so each filled-in box narrows the list further. Name,
+// phone, email and joined date live on the joined User; city is on Athlete.
+// Gender/status aren't offered: the join filter is a LIKE, so "MALE" would
+// also match "FEMALE" and "ACTIVE" would match "INACTIVE".
+function buildAthleteSearch(filters) {
+  const search = []
+  const userLike = (field, value) => ({
+    field,
+    value,
+    type: 'object',
+    object: 'user',
+  })
+  const name = filters.name.trim()
+  const phone = filters.phone.trim()
+  const email = filters.email.trim()
+  const city = filters.city.trim()
+  if (name) search.push(userLike('fullName', name))
+  if (phone) search.push(userLike('mobileNumber', phone))
+  if (email) search.push(userLike('email', email))
+  if (city) search.push({ field: 'city', value: city })
+  if (filters.joinedOn) {
+    search.push({
+      ...userLike('joinedDate', toBackendDate(filters.joinedOn)),
+      subType: 'date',
+    })
+  }
+  return search
+}
 
 export default function AthleteSearchPage() {
   const { user, isAuthed, loading: userLoading } = useCurrentUser()
   const [athletes, setAthletes] = useState([])
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [filters, setFilters] = useState(() =>
+    emptyFilterValues(ATHLETE_FILTER_FIELDS)
+  )
+  // Debounced so typing in a box doesn't fire a request per keystroke.
+  const debouncedFilters = useDebouncedValue(filters)
+  const filtering = hasActiveFilters(debouncedFilters)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
@@ -44,16 +125,10 @@ export default function AthleteSearchPage() {
     return () => clearTimeout(timer)
   }, [banner])
 
-  // Debounce the search box so we're not firing a request on every keystroke.
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350)
-    return () => clearTimeout(timer)
-  }, [query])
-
-  // A new search term invalidates the current page.
+  // A new set of filters invalidates the current page.
   useEffect(() => {
     setPage(1)
-  }, [debouncedQuery])
+  }, [debouncedFilters])
 
   useEffect(() => {
     if (userLoading || !allowed) {
@@ -61,19 +136,11 @@ export default function AthleteSearchPage() {
       return
     }
     setLoading(true)
-    const search = debouncedQuery
-      ? SEARCH_FIELDS.map((field) => ({
-          field,
-          object: 'user',
-          type: 'object',
-          value: debouncedQuery,
-        }))
-      : []
     postJson('/v1/athlete/find', {
       pageNumber: page,
       noOfRecords: PAGE_SIZE,
-      actionType: debouncedQuery ? 'SEARCH' : 'FILTER',
-      search,
+      actionType: 'FILTER',
+      search: buildAthleteSearch(debouncedFilters),
       sort: [{ field: 'user.fullName', direction: 'asc' }],
     })
       .then((data) => {
@@ -89,7 +156,7 @@ export default function AthleteSearchPage() {
         )
       )
       .finally(() => setLoading(false))
-  }, [userLoading, allowed, page, debouncedQuery])
+  }, [userLoading, allowed, page, debouncedFilters])
 
   if (!userLoading && !allowed) {
     return (
@@ -127,20 +194,23 @@ export default function AthleteSearchPage() {
           <div className={`banner ${banner.kind}`}>{banner.message}</div>
         )}
 
-        <div className="athlete-search-box">
-          <FaSearch className="athlete-search-icon" />
-          <input
-            type="text"
-            placeholder="Search by name, email, or mobile number"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <SearchFilters
+          fields={ATHLETE_FILTER_FIELDS}
+          values={filters}
+          onChange={setFilters}
+          title="Find an athlete"
+          idPrefix="athlete-filter"
+          quickField="name"
+        />
 
         {error && <div className="banner error">{error}</div>}
         {loading && <p className="athlete-search-muted">Loading athletes...</p>}
         {!loading && !error && athletes.length === 0 && (
-          <p className="athlete-search-muted">No athletes found.</p>
+          <p className="athlete-search-muted">
+            {filtering
+              ? 'No athletes match those filters. Try loosening one up.'
+              : 'No athletes found.'}
+          </p>
         )}
 
         <div className="athlete-search-list">

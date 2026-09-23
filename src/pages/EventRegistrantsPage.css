@@ -49,37 +49,6 @@
   font-size: 14px;
 }
 
-.registrant-search-box {
-  position: relative;
-  width: 100%;
-  max-width: 320px;
-}
-
-.registrant-search-icon {
-  position: absolute;
-  top: 50%;
-  left: 14px;
-  transform: translateY(-50%);
-  color: var(--muted);
-}
-
-.registrant-search-box input {
-  width: 100%;
-  padding: 12px 14px 12px 40px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-family: inherit;
-  background: var(--card);
-  color: var(--text);
-}
-
-.registrant-search-box input:focus {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
 .event-registrants-muted {
   color: var(--muted);
   font-size: 14px;
@@ -165,11 +134,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.registrant-table th:last-child,
-.registrant-table td:last-child {
-  white-space: normal;
-}
-
 .registrant-table-loading-cell {
   text-align: center !important;
   white-space: normal !important;
@@ -184,31 +148,6 @@
   background: var(--bg);
 }
 
-.registrant-status-th {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.registrant-status-filter {
-  text-transform: none;
-  letter-spacing: normal;
-  font-weight: 500;
-  font-size: 11px;
-  font-family: inherit;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--card);
-  color: var(--text);
-}
-
-.registrant-status-filter:focus {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
 .registrant-table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -217,8 +156,20 @@
   font-weight: 600;
 }
 
-.registrant-meta-cell {
-  color: var(--muted);
+.registrant-name-link {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.registrant-name-link:hover,
+.registrant-name-link:focus-visible {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  outline: none;
 }
 
 .registrant-status {
@@ -244,26 +195,15 @@
   color: var(--error);
 }
 
-.registrant-payment-cell {
-  padding-top: 8px;
-  padding-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .registrant-remarks-cell {
   color: var(--muted);
-  max-width: 160px;
+  min-width: 140px;
+  max-width: 200px;
   white-space: normal;
-}
-
-.registrant-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  width: 90px;
+  /* Remarks often carry long unbroken tokens (transaction IDs) that would
+     otherwise spill across into the next column. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .registrant-table .btn {
@@ -312,6 +252,77 @@
   color: var(--text);
 }
 
+.status-update-summary {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.status-update-summary div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.status-update-summary div:last-child {
+  border-bottom: none;
+}
+
+.status-update-summary dt {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-update-summary dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.status-update-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500 !important;
+}
+
+.bib-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.bib-badge.bib-collected {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.bib-badge.bib-pending {
+  background: var(--brand-light);
+  color: var(--brand-dark);
+}
+
+.status-update-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-update-actions-wrap {
+  flex-wrap: wrap;
+}
+
 .status-update-actions {
   display: flex;
   justify-content: flex-end;
@@ -335,6 +346,7 @@
   color: var(--muted);
 }
 
+.status-update-modal input,
 .status-update-modal select,
 .status-update-modal textarea {
   width: 100%;

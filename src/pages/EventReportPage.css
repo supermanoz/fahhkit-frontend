@@ -278,3 +278,9 @@
     gap: 14px 20px;
   }
 }
+
+.event-report-filter-count {
+  color: var(--muted);
+  font-size: 0.7em;
+  font-weight: 500;
+}

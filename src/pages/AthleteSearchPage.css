@@ -30,36 +30,6 @@
   font-size: 14px;
 }
 
-.athlete-search-box {
-  position: relative;
-  margin-bottom: 24px;
-}
-
-.athlete-search-icon {
-  position: absolute;
-  top: 50%;
-  left: 14px;
-  transform: translateY(-50%);
-  color: var(--muted);
-}
-
-.athlete-search-box input {
-  width: 100%;
-  padding: 12px 14px 12px 40px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-family: inherit;
-  background: var(--card);
-  color: var(--text);
-}
-
-.athlete-search-box input:focus {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
 .athlete-search-muted {
   color: var(--muted);
   font-size: 14px;
@@ -132,10 +102,6 @@
 @media (min-width: 900px) {
   .athlete-search-header h1 {
     font-size: 30px;
-  }
-
-  .athlete-search-box {
-    max-width: 440px;
   }
 
   .athlete-search-list {

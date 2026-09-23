@@ -1,12 +1,27 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ApiError, canManageEvents, getJson, postJson } from '../api/client'
+import {
+  FaCalendarAlt,
+  FaEnvelope,
+  FaMoneyCheckAlt,
+  FaPhone,
+  FaUser,
+  FaVenusMars,
+} from 'react-icons/fa'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatName } from '../utils/format'
 import { EVENT_TYPE_LABELS, formatDate } from '../utils/events'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import DonutChart from '../components/DonutChart'
+import SearchFilters from '../components/SearchFilters'
+import {
+  emptyFilterValues,
+  hasActiveFilters,
+  toInputDate,
+} from '../utils/searchFilters'
 import './EventReportPage.css'
 
 const STATUS_LABELS = {
@@ -31,6 +46,82 @@ const GENDER_LABELS = {
 
 const PAGE_SIZE = 20
 
+const REPORT_FILTER_FIELDS = [
+  {
+    key: 'name',
+    label: 'Athlete name',
+    placeholder: 'e.g. Sita Rai',
+    icon: FaUser,
+  },
+  {
+    key: 'phone',
+    label: 'Phone number',
+    type: 'tel',
+    placeholder: 'e.g. 98XXXXXXXX',
+    icon: FaPhone,
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    type: 'email',
+    placeholder: 'e.g. sita@mail.com',
+    icon: FaEnvelope,
+  },
+  {
+    key: 'gender',
+    label: 'Gender',
+    type: 'select',
+    icon: FaVenusMars,
+    options: [
+      { value: '', label: 'All genders' },
+      ...Object.entries(GENDER_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+  },
+  {
+    key: 'paymentStatus',
+    label: 'Payment status',
+    type: 'select',
+    icon: FaMoneyCheckAlt,
+    options: [
+      { value: '', label: 'All statuses' },
+      ...Object.entries(STATUS_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+  },
+  {
+    key: 'registeredOn',
+    label: 'Registered on',
+    type: 'date',
+    icon: FaCalendarAlt,
+  },
+]
+
+// The report already holds every registrant in memory (the stats and charts
+// need the full roster), so the table's filters run client-side rather than
+// re-querying the backend.
+function matchesFilters(registrant, filters) {
+  const includes = (haystack, needle) =>
+    !needle ||
+    String(haystack || '')
+      .toLowerCase()
+      .includes(needle.trim().toLowerCase())
+  return (
+    includes(registrant.fullName, filters.name) &&
+    includes(registrant.mobileNumber, filters.phone) &&
+    includes(registrant.email, filters.email) &&
+    (!filters.gender || registrant.gender === filters.gender) &&
+    (!filters.paymentStatus ||
+      registrant.paymentStatus === filters.paymentStatus) &&
+    (!filters.registeredOn ||
+      toInputDate(registrant.registeredDate) === filters.registeredOn)
+  )
+}
+
 function calculateAge(birthDate) {
   if (!birthDate) return null
   const dob = new Date(birthDate)
@@ -50,16 +141,33 @@ export default function EventReportPage() {
   const [event, setEvent] = useState(null)
   const [registrants, setRegistrants] = useState([])
   const [page, setPage] = useState(1)
+  const [filters, setFilters] = useState(() =>
+    emptyFilterValues(REPORT_FILTER_FIELDS)
+  )
+  const debouncedFilters = useDebouncedValue(filters, 200)
+  const filtering = hasActiveFilters(debouncedFilters)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const allowed = canManageEvents(user)
 
-  const totalPages = Math.max(1, Math.ceil(registrants.length / PAGE_SIZE))
-  const pagedRegistrants = registrants.slice(
+  const filteredRegistrants = useMemo(
+    () => registrants.filter((r) => matchesFilters(r, debouncedFilters)),
+    [registrants, debouncedFilters]
+  )
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredRegistrants.length / PAGE_SIZE)
+  )
+  const pagedRegistrants = filteredRegistrants.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE
   )
+
+  // A new set of filters invalidates whatever page of the table we were on.
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedFilters])
 
   useEffect(() => {
     if (userLoading || !allowed) {
@@ -96,6 +204,7 @@ export default function EventReportPage() {
           .map((r) => ({
             ...r,
             mobileNumber: athleteById.get(r.userId).mobileNumber,
+            email: athleteById.get(r.userId).email,
             gender: userById.get(r.userId)?.gender || null,
             birthDate: userById.get(r.userId)?.birthDate || null,
           }))
@@ -366,10 +475,33 @@ export default function EventReportPage() {
             )}
 
             <section className="event-report-table-section" data-aos="fade-up">
-              <h2>All Registrants</h2>
+              <h2>
+                All Registrants
+                {filtering && (
+                  <span className="event-report-filter-count">
+                    {' '}
+                    &middot; {filteredRegistrants.length} of{' '}
+                    {registrants.length}
+                  </span>
+                )}
+              </h2>
+              {registrants.length > 0 && (
+                <SearchFilters
+                  fields={REPORT_FILTER_FIELDS}
+                  values={filters}
+                  onChange={setFilters}
+                  title="Find a registrant"
+                  idPrefix="report-filter"
+                  quickField="name"
+                />
+              )}
               {registrants.length === 0 ? (
                 <p className="event-report-muted">
                   No one has registered for this event yet.
+                </p>
+              ) : filteredRegistrants.length === 0 ? (
+                <p className="event-report-muted">
+                  No registrants match those filters. Try loosening one up.
                 </p>
               ) : (
                 <div className="event-report-table-wrap">
