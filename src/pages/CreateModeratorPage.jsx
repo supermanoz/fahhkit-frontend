@@ -3,6 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { ApiError, isAdmin, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
   NAME_PATTERN,
   NAME_TITLE,
   PHONE_PATTERN,
@@ -123,6 +125,8 @@ export default function CreateModeratorPage() {
                     id="email"
                     name="email"
                     type="email"
+                    pattern={EMAIL_PATTERN}
+                    title={EMAIL_TITLE}
                     value={form.email}
                     onChange={handleChange}
                     required

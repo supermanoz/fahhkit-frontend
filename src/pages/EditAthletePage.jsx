@@ -10,6 +10,8 @@ import {
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { COUNTRIES_SORTED } from '../constants/countries'
 import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
   NAME_PATTERN,
   NAME_TITLE,
   PHONE_PATTERN,
@@ -182,6 +184,8 @@ export default function EditAthletePage() {
                       id="email"
                       name="email"
                       type="email"
+                      pattern={EMAIL_PATTERN}
+                      title={EMAIL_TITLE}
                       value={form.email}
                       onChange={handleChange}
                       required

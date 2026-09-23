@@ -8,6 +8,8 @@ import {
 } from 'react-icons/fa'
 import { postJson, ApiError } from '../api/client'
 import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
   NAME_PATTERN,
   NAME_TITLE,
   PHONE_PATTERN,
@@ -131,6 +133,8 @@ export default function ContactPage() {
                       id="email"
                       name="email"
                       type="email"
+                      pattern={EMAIL_PATTERN}
+                      title={EMAIL_TITLE}
                       autoComplete="email"
                       value={form.email}
                       onChange={handleChange}

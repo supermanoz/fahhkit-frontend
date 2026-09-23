@@ -204,3 +204,11 @@
 .register-success .btn {
   min-width: 180px;
 }
+
+.register-wrap .hint-error {
+  color: var(--error);
+}
+
+.register-wrap .field input[aria-invalid='true'] {
+  border-color: var(--error);
+}
