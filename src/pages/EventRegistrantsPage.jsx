@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import {
@@ -38,12 +39,30 @@ const UPDATABLE_STATUSES = [
 
 const PAGE_SIZE = 30
 
-// The backend stores the moderator-assigned bib number in the generic extra1
-// column and exposes it as `bibNumber` (older deploys still send `extra1`).
-// A bib number is only assigned when the athlete picks up their bib, so
-// having one is what "BIB collected" means.
+// The backend auto-assigns the next sequential bib number the moment a
+// registration is PAID (moderators can still override it) and exposes it as
+// `bibNumber` (older deploys still send `extra1`). Whether the athlete has
+// physically picked the bib up is tracked separately as `bibCollected`.
 function bibNumberOf(registrant) {
   return registrant?.bibNumber || registrant?.extra1 || ''
+}
+
+function isBibCollected(registrant) {
+  return registrant?.bibCollected === true
+}
+
+function BibBadge({ registrant, showNumber = true }) {
+  const number = bibNumberOf(registrant)
+  const collected = isBibCollected(registrant)
+  return (
+    <span
+      className={`bib-badge ${collected ? 'bib-collected' : 'bib-pending'}`}
+      title={collected ? 'BIB collected' : 'BIB not collected yet'}
+    >
+      {showNumber && number && <>#{number} &middot; </>}
+      {collected ? 'Collected' : 'Not collected'}
+    </span>
+  )
 }
 
 // Only athletes can be applicants for an event — admins/moderators are
@@ -162,11 +181,13 @@ export default function EventRegistrantsPage() {
     remarks: '',
   })
   const [statusSaving, setStatusSaving] = useState(false)
-  // The details modal opens with the payment status form ('view'); the BIB
-  // collection form ('bib') swaps in only once its button is clicked.
-  const [modalMode, setModalMode] = useState('view')
-  const [bibInput, setBibInput] = useState('')
   const [statusError, setStatusError] = useState(null)
+  // The BIB card in the details modal saves on its own, separately from the
+  // payment status form, so it keeps its own saving/error state.
+  const [bibEditing, setBibEditing] = useState(false)
+  const [bibInput, setBibInput] = useState('')
+  const [bibSaving, setBibSaving] = useState(false)
+  const [bibError, setBibError] = useState(null)
 
   const allowed = canManageEvents(user)
 
@@ -193,75 +214,75 @@ export default function EventRegistrantsPage() {
   function openStatusModal(registrant) {
     setStatusError(null)
     setStatusForm({ paymentStatus: '', remarks: '' })
-    setModalMode('view')
+    setBibEditing(false)
+    setBibError(null)
     setEditingRegistrant(registrant)
   }
 
   function closeStatusModal() {
-    if (statusSaving) return
+    if (statusSaving || bibSaving) return
     setEditingRegistrant(null)
   }
 
-  function backToDetails() {
-    setStatusError(null)
-    setModalMode('view')
-  }
-
   function startBibEdit() {
-    setStatusError(null)
+    setBibError(null)
     setBibInput(bibNumberOf(editingRegistrant))
-    setModalMode('bib')
+    setBibEditing(true)
   }
 
-  async function handleBibSubmit() {
-    const bibNumber = bibInput.trim()
-    if (!bibNumber) {
-      setStatusError('Enter the BIB number handed to the athlete.')
-      return
-    }
-    setStatusError(null)
-    setStatusSaving(true)
+  function cancelBibEdit() {
+    setBibError(null)
+    setBibEditing(false)
+  }
+
+  // Both the number override and the collected toggle go through
+  // update-performance; the backend ignores whichever field is left out.
+  async function saveBib(changes, errorMessage) {
+    setBibError(null)
+    setBibSaving(true)
     try {
       const updated = await postJson(
         '/v1/event/registration/update-performance',
-        {
-          registrationId: editingRegistrant.registrationId,
-          bibNumber,
-        }
+        { registrationId: editingRegistrant.registrationId, ...changes }
       )
-      // Fall back to what we sent in case this deploy's response predates
-      // the bibNumber field.
-      const merged = {
-        ...editingRegistrant,
-        ...updated,
-        bibNumber: bibNumberOf(updated) || bibNumber,
-      }
+      const merged = { ...editingRegistrant, ...updated }
       setRegistrants((prev) =>
         prev.map((r) =>
           r.registrationId === merged.registrationId ? merged : r
         )
       )
-      // Stay open on the details view so the "Collected" badge confirms it.
+      // Stay open so the BIB card confirms the change.
       setEditingRegistrant(merged)
-      setModalMode('view')
+      setBibEditing(false)
     } catch (err) {
-      setStatusError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not save the BIB collection. Please try again.'
-      )
+      setBibError(err instanceof ApiError ? err.message : errorMessage)
     } finally {
-      setStatusSaving(false)
+      setBibSaving(false)
     }
+  }
+
+  async function handleBibSubmit() {
+    const bibNumber = bibInput.trim()
+    if (!bibNumber) {
+      setBibError('Enter a BIB number.')
+      return
+    }
+    await saveBib(
+      { bibNumber },
+      'Could not save the BIB number. Please try again.'
+    )
+  }
+
+  async function toggleBibCollected() {
+    await saveBib(
+      { bibCollected: !isBibCollected(editingRegistrant) },
+      'Could not update BIB collection. Please try again.'
+    )
   }
 
   async function handleModalSubmit(e) {
     e.preventDefault()
     if (!editingRegistrant) return
-    if (modalMode === 'bib') {
-      await handleBibSubmit()
-      return
-    }
     if (!statusForm.paymentStatus) {
       setStatusError('Please select a status.')
       return
@@ -513,19 +534,11 @@ export default function EventRegistrantsPage() {
                           </span>
                         </td>
                         <td>
-                          {bibNumberOf(registrant) ? (
-                            <span
-                              className="bib-badge bib-collected"
-                              title="BIB collected"
-                            >
-                              #{bibNumberOf(registrant)}
-                            </span>
-                          ) : registrant.paymentStatus === 'PAID' ? (
-                            <span className="bib-badge bib-pending">
-                              Not collected
-                            </span>
+                          {registrant.paymentStatus === 'PAID' ||
+                          bibNumberOf(registrant) ? (
+                            <BibBadge registrant={registrant} />
                           ) : (
-                            // Unpaid registrants can't collect a BIB yet.
+                            // Unpaid registrants don't have a BIB yet.
                             '—'
                           )}
                         </td>
@@ -642,18 +655,6 @@ export default function EventRegistrantsPage() {
                   </span>
                 </dd>
               </div>
-              <div>
-                <dt>BIB</dt>
-                <dd>
-                  {bibNumberOf(editingRegistrant) ? (
-                    <span className="bib-badge bib-collected">
-                      Collected &middot; #{bibNumberOf(editingRegistrant)}
-                    </span>
-                  ) : (
-                    <span className="bib-badge bib-pending">Not collected</span>
-                  )}
-                </dd>
-              </div>
               {editingRegistrant.transactionId && (
                 <div>
                   <dt>Transaction ID</dt>
@@ -670,128 +671,144 @@ export default function EventRegistrantsPage() {
               )}
             </dl>
 
-            {modalMode === 'view' && (
-              <>
-                {statusError && (
-                  <div className="banner error">{statusError}</div>
+            <section className="bib-card">
+              <div className="bib-card-head">
+                <span className="bib-card-label">BIB</span>
+                {editingRegistrant.paymentStatus === 'PAID' && (
+                  <BibBadge registrant={editingRegistrant} showNumber={false} />
                 )}
+              </div>
 
-                <div className="field">
-                  <label htmlFor="status-update-status">Payment Status</label>
-                  <select
-                    id="status-update-status"
-                    value={statusForm.paymentStatus}
-                    onChange={(e) =>
-                      setStatusForm((f) => ({
-                        ...f,
-                        paymentStatus: e.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    <option value="">Select status</option>
-                    {UPDATABLE_STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="field">
-                  <label htmlFor="status-update-remarks">
-                    Remarks <span className="opt">(required)</span>
-                  </label>
-                  <textarea
-                    id="status-update-remarks"
-                    rows={3}
-                    value={statusForm.remarks}
-                    onChange={(e) =>
-                      setStatusForm((f) => ({ ...f, remarks: e.target.value }))
-                    }
-                    placeholder="Why is this status being changed?"
-                    required
-                  />
-                </div>
-
-                <div className="status-update-actions status-update-actions-wrap">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={closeStatusModal}
-                    disabled={statusSaving}
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={startBibEdit}
-                    disabled={
-                      statusSaving || editingRegistrant.paymentStatus !== 'PAID'
-                    }
-                    title={
-                      editingRegistrant.paymentStatus !== 'PAID'
-                        ? 'Only paid registrants can collect a BIB'
-                        : undefined
-                    }
-                  >
-                    {bibNumberOf(editingRegistrant)
-                      ? 'Edit BIB Number'
-                      : 'Mark BIB Collected'}
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={statusSaving}
-                  >
-                    {statusSaving ? 'Saving...' : 'Save Status'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {modalMode === 'bib' && (
-              <>
-                {statusError && (
-                  <div className="banner error">{statusError}</div>
-                )}
-
-                <div className="field">
-                  <label htmlFor="status-update-bib">BIB Number</label>
+              {editingRegistrant.paymentStatus !== 'PAID' ? (
+                <p className="bib-card-note">
+                  A BIB number is assigned once payment is confirmed.
+                </p>
+              ) : bibEditing ? (
+                <div className="bib-card-edit">
                   <input
-                    id="status-update-bib"
+                    aria-label="BIB number"
                     type="text"
                     value={bibInput}
                     onChange={(e) => setBibInput(e.target.value)}
-                    placeholder="Number on the bib handed over, e.g. 1042"
+                    onKeyDown={(e) => {
+                      // Enter would otherwise submit the payment status form.
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleBibSubmit()
+                      }
+                    }}
+                    placeholder="e.g. 1042"
                     autoFocus
-                    required
                   />
-                  <p className="status-update-hint">
-                    Saving this marks the athlete&apos;s BIB as collected.
-                  </p>
-                </div>
-
-                <div className="status-update-actions">
                   <button
                     type="button"
-                    className="btn btn-outline"
-                    onClick={backToDetails}
-                    disabled={statusSaving}
+                    className="btn btn-outline btn-sm"
+                    onClick={cancelBibEdit}
+                    disabled={bibSaving}
                   >
-                    Back
+                    Cancel
                   </button>
                   <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={statusSaving}
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleBibSubmit}
+                    disabled={bibSaving}
                   >
-                    {statusSaving ? 'Saving...' : 'Save BIB'}
+                    {bibSaving ? 'Saving...' : 'Save'}
                   </button>
                 </div>
-              </>
-            )}
+              ) : (
+                <div className="bib-card-row">
+                  <span className="bib-card-number">
+                    {bibNumberOf(editingRegistrant)
+                      ? `#${bibNumberOf(editingRegistrant)}`
+                      : 'No number yet'}
+                    <button
+                      type="button"
+                      className="bib-card-link"
+                      onClick={startBibEdit}
+                      disabled={bibSaving}
+                    >
+                      {bibNumberOf(editingRegistrant) ? 'Edit' : 'Assign'}
+                    </button>
+                  </span>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${isBibCollected(editingRegistrant) ? 'btn-outline' : 'btn-primary'}`}
+                    onClick={toggleBibCollected}
+                    disabled={bibSaving}
+                  >
+                    {bibSaving
+                      ? 'Saving...'
+                      : isBibCollected(editingRegistrant)
+                        ? 'Undo collected'
+                        : 'Mark collected'}
+                  </button>
+                </div>
+              )}
+
+              {bibError && <div className="banner error">{bibError}</div>}
+            </section>
+
+            <h3 className="status-update-section-title">Update payment</h3>
+
+            {statusError && <div className="banner error">{statusError}</div>}
+
+            <div className="field">
+              <label htmlFor="status-update-status">Payment Status</label>
+              <select
+                id="status-update-status"
+                value={statusForm.paymentStatus}
+                onChange={(e) =>
+                  setStatusForm((f) => ({
+                    ...f,
+                    paymentStatus: e.target.value,
+                  }))
+                }
+                required
+              >
+                <option value="">Select status</option>
+                {UPDATABLE_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="status-update-remarks">
+                Remarks <span className="opt">(required)</span>
+              </label>
+              <textarea
+                id="status-update-remarks"
+                rows={3}
+                value={statusForm.remarks}
+                onChange={(e) =>
+                  setStatusForm((f) => ({ ...f, remarks: e.target.value }))
+                }
+                placeholder="Why is this status being changed?"
+                required
+              />
+            </div>
+
+            <div className="status-update-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={closeStatusModal}
+                disabled={statusSaving || bibSaving}
+              >
+                Close
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={statusSaving}
+              >
+                {statusSaving ? 'Saving...' : 'Save Status'}
+              </button>
+            </div>
           </form>
         </div>
       )}

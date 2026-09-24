@@ -301,6 +301,7 @@
   letter-spacing: 0.04em;
   padding: 4px 10px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .bib-badge.bib-collected {
@@ -319,8 +320,80 @@
   font-size: 12px;
 }
 
-.status-update-actions-wrap {
-  flex-wrap: wrap;
+.bib-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.bib-card-head,
+.bib-card-row,
+.bib-card-edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bib-card-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bib-card-number {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.bib-card-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand-dark);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bib-card-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bib-card-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bib-card-edit input {
+  flex: 1;
+  min-width: 0;
+}
+
+.bib-card .banner {
+  margin: 0;
+}
+
+.status-update-modal .btn-sm {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+.status-update-section-title {
+  margin: 4px 0 0;
+  font-size: 14px;
 }
 
 .status-update-actions {
