@@ -1,0 +1,274 @@
+.search-filters {
+  padding: 18px 20px 20px;
+  margin-bottom: 24px;
+}
+
+.search-filters-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.search-filters-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.search-filters-head h2 svg {
+  color: var(--brand);
+}
+
+.search-filters-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 999px;
+  background: var(--brand-light);
+  color: var(--brand-dark);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-filters-clear:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
+.search-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.search-filter-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.search-filter-box label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.search-filter-box.is-filled label {
+  color: var(--brand);
+}
+
+.search-filter-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-filter-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.search-filter-control input,
+.search-filter-control select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 32px 10px 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--text);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.search-filter-control select {
+  padding-right: 12px;
+  cursor: pointer;
+}
+
+.search-filter-box.is-filled input,
+.search-filter-box.is-filled select {
+  border-color: var(--brand);
+}
+
+.search-filter-control input:focus,
+.search-filter-control select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.search-filter-reset {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.search-filter-reset:hover {
+  background: var(--brand-light);
+  color: var(--brand-dark);
+}
+
+/* Date inputs draw their own picker icon on the right — keep clear of it. */
+.search-filter-control input[type='date'] {
+  padding-right: 12px;
+}
+
+.search-filter-control input[type='date'] ~ .search-filter-reset {
+  right: 36px;
+}
+
+/* Mobile toggle — hidden on desktop, where the boxes are always shown. */
+.search-filters-toggle {
+  display: none;
+}
+
+/* Mobile quick search bar — desktop already shows the full grid. */
+.search-filters-quick {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .search-filters {
+    padding: 10px 12px;
+  }
+
+  .search-filters.is-open {
+    padding-bottom: 16px;
+  }
+
+  .search-filters-head {
+    margin-bottom: 0;
+  }
+
+  .search-filters.is-open .search-filters-head {
+    margin-bottom: 14px;
+  }
+
+  .search-filters-head h2 {
+    display: none;
+  }
+
+  .search-filters-toggle {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .search-filters-toggle-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--gradient-brand);
+    color: #fff;
+    box-shadow: var(--shadow-glow);
+  }
+
+  .search-filters-toggle-label {
+    flex: 1;
+  }
+
+  .search-filters-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+  }
+
+  .search-filters-chevron {
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+
+  .search-filters.is-open .search-filters-chevron {
+    transform: rotate(180deg);
+  }
+
+  .search-filters-grid {
+    display: none;
+    grid-template-columns: 1fr;
+  }
+
+  .search-filters.is-open .search-filters-grid {
+    display: grid;
+  }
+
+  .search-filters-quick {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin: 8px 0 4px;
+  }
+
+  .search-filters-quick input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 32px 10px 34px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 16px; /* 16px stops iOS zooming in on focus */
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
+  }
+
+  .search-filters-quick input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .search-filters-quick input:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+}

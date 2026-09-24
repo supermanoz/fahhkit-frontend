@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './ForgotPasswordPage.css'
 
-const INITIAL_FORM = { mobileNumber: '', birthDate: '' }
+const INITIAL_FORM = { mobileNumber: '' }
 
 export default function ForgotPasswordPage() {
   const [form, setForm] = useState(INITIAL_FORM)
@@ -68,8 +68,7 @@ export default function ForgotPasswordPage() {
                 <div className="forgot-logo">🔑</div>
                 <h1>Forgot Password</h1>
                 <p>
-                  Verify your identity with your mobile number or email to
-                  receive a new password
+                  Enter your mobile number or email to receive a new password
                 </p>
               </header>
 
@@ -87,17 +86,6 @@ export default function ForgotPasswordPage() {
                     autoComplete="username"
                     placeholder="98XXXXXXXX or you@example.com"
                     value={form.mobileNumber}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="birthDate">Date of Birth</label>
-                  <input
-                    id="birthDate"
-                    name="birthDate"
-                    type="date"
-                    value={form.birthDate}
                     onChange={handleChange}
                     required
                   />

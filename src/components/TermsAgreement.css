@@ -1,0 +1,32 @@
+.terms-agreement {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  margin: 4px 0 16px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.terms-agreement input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.terms-agreement-link {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.terms-agreement-link:hover {
+  text-decoration: underline;
+}

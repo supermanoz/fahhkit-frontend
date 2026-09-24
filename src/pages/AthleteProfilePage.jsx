@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   ApiError,
   canManageEvents,
@@ -17,8 +17,15 @@ import './AthleteProfilePage.css'
 
 const GENDER_LABELS = { MALE: 'Male', FEMALE: 'Female', OTHERS: 'Others' }
 
+// Where the back link goes when the page linking here didn't say.
+const DEFAULT_BACK = { path: '/athletes', label: 'Back to search' }
+
 export default function AthleteProfilePage() {
   const { userId } = useParams()
+  // Pages that link here (e.g. an event's applicants table) pass
+  // state.backTo so the back link returns to them instead of search.
+  const location = useLocation()
+  const backTo = location.state?.backTo || DEFAULT_BACK
   const { user, isAuthed, loading: userLoading } = useCurrentUser()
   const [profile, setProfile] = useState(null)
   const [history, setHistory] = useState([])
@@ -80,10 +87,14 @@ export default function AthleteProfilePage() {
       <div className="athlete-profile-wrap">
         <div className="athlete-profile-top">
           <p className="athlete-profile-back">
-            <Link to="/athletes">&larr; Back to search</Link>
+            <Link to={backTo.path}>&larr; {backTo.label}</Link>
           </p>
           {profile && (
-            <Link to={`/athletes/${userId}/edit`} className="btn btn-outline">
+            <Link
+              to={`/athletes/${userId}/edit`}
+              state={location.state}
+              className="btn btn-outline"
+            >
               Edit Athlete
             </Link>
           )}

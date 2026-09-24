@@ -128,7 +128,7 @@
 
 .registrant-table th,
 .registrant-table td {
-  padding: 12px 14px;
+  padding: 8px 12px;
   text-align: left;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
@@ -156,8 +156,20 @@
   font-weight: 600;
 }
 
-.registrant-meta-cell {
-  color: var(--muted);
+.registrant-name-link {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.registrant-name-link:hover,
+.registrant-name-link:focus-visible {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  outline: none;
 }
 
 .registrant-status {
@@ -183,9 +195,169 @@
   color: var(--error);
 }
 
+.registrant-remarks-cell {
+  color: var(--muted);
+  min-width: 140px;
+  max-width: 200px;
+  white-space: normal;
+  /* Remarks often carry long unbroken tokens (transaction IDs) that would
+     otherwise spill across into the next column. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .registrant-table .btn {
-  padding: 6px 14px;
+  padding: 4px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.status-update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  background: rgba(20, 17, 15, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.status-update-modal {
+  width: 100%;
+  max-width: 420px;
+  margin: auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.status-update-modal h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.status-update-subject {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.status-update-subject strong {
+  color: var(--text);
+}
+
+.status-update-summary {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.status-update-summary div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.status-update-summary div:last-child {
+  border-bottom: none;
+}
+
+.status-update-summary dt {
+  flex-shrink: 0;
+  color: var(--muted);
   font-size: 12px;
+}
+
+.status-update-summary dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.status-update-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500 !important;
+}
+
+.bib-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.bib-badge.bib-collected {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.bib-badge.bib-pending {
+  background: var(--brand-light);
+  color: var(--brand-dark);
+}
+
+.status-update-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-update-actions-wrap {
+  flex-wrap: wrap;
+}
+
+.status-update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.status-update-modal .field {
+  margin: 0;
+}
+
+.status-update-modal label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.status-update-modal label .opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.status-update-modal input,
+.status-update-modal select,
+.status-update-modal textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
 }
 
 .registrant-table-pagination {

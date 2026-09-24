@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { postForm, ApiError } from '../api/client'
 import { COUNTRIES_SORTED } from '../constants/countries'
 import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
   NAME_PATTERN,
   NAME_TITLE,
   PHONE_PATTERN,
@@ -10,6 +12,7 @@ import {
 } from '../constants/validation'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import TermsAgreement from '../components/TermsAgreement'
 import './RegisterPage.css'
 
 const INITIAL_FORM = {
@@ -37,6 +40,14 @@ export default function RegisterPage() {
   // a link straight into UpdatePasswordPage), never shown here, so this page
   // just confirms the email was sent instead of routing to that form itself.
   const [registeredEmail, setRegisteredEmail] = useState(null)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  // Typed twice to catch typos — the login details are emailed, so a wrong
+  // address means the athlete never gets in. Kept out of `form` so it isn't
+  // sent to the backend.
+  const [confirmEmail, setConfirmEmail] = useState('')
+  const emailsMismatch =
+    confirmEmail.trim() !== '' &&
+    confirmEmail.trim().toLowerCase() !== form.email.trim().toLowerCase()
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -47,6 +58,10 @@ export default function RegisterPage() {
     e.preventDefault()
     setBanner(null)
 
+    const confirmInput = e.target.elements.confirmEmail
+    confirmInput.setCustomValidity(
+      emailsMismatch ? "Emails don't match — check for typos." : ''
+    )
     if (!e.target.reportValidity()) return
 
     const formData = new FormData()
@@ -59,6 +74,8 @@ export default function RegisterPage() {
       const data = await postForm('/v1/athlete/signup', formData)
       setRegisteredEmail(data?.email || form.email)
       setForm(INITIAL_FORM)
+      setConfirmEmail('')
+      setAgreedToTerms(false)
       e.target.reset()
     } catch (err) {
       const message =
@@ -132,10 +149,40 @@ export default function RegisterPage() {
                         id="email"
                         name="email"
                         type="email"
+                        placeholder="e.g. sita@gmail.com"
+                        pattern={EMAIL_PATTERN}
+                        title={EMAIL_TITLE}
+                        autoComplete="email"
                         value={form.email}
                         onChange={handleChange}
                         required
                       />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="confirmEmail">Confirm Email</label>
+                      <input
+                        id="confirmEmail"
+                        name="confirmEmail"
+                        type="email"
+                        placeholder="Type your email again"
+                        autoComplete="off"
+                        value={confirmEmail}
+                        onChange={(e) => {
+                          e.target.setCustomValidity('')
+                          setConfirmEmail(e.target.value)
+                        }}
+                        aria-invalid={emailsMismatch || undefined}
+                        aria-describedby="confirmEmail-hint"
+                        required
+                      />
+                      <p
+                        id="confirmEmail-hint"
+                        className={`hint${emailsMismatch ? ' hint-error' : ''}`}
+                      >
+                        {emailsMismatch
+                          ? "Emails don't match yet."
+                          : 'Your login details are sent here, so double-check it.'}
+                      </p>
                     </div>
                     <div className="field">
                       <label htmlFor="mobileNumber">Mobile Number</label>
@@ -282,14 +329,26 @@ export default function RegisterPage() {
                       <label htmlFor="emergencyContactRelationship">
                         Relationship
                       </label>
-                      <input
+                      <select
                         id="emergencyContactRelationship"
                         name="emergencyContactRelationship"
-                        type="text"
                         value={form.emergencyContactRelationship}
                         onChange={handleChange}
                         required
-                      />
+                      >
+                        <option value="">Select relationship</option>
+                        <option value="Family">Family</option>
+                        <option value="Partner">Partner</option>
+                        <option value="Relative">Relative</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Colleague">Colleague</option>
+                        <option value="Classmate">Classmate</option>
+                        <option value="Neighbor">Neighbor</option>
+                        <option value="Guardian">Guardian</option>
+                        <option value="Caregiver">Caregiver</option>
+                        <option value="Professional">Professional</option>
+                        <option value="Other">Other</option>
+                      </select>
                     </div>
                     <div className="field full">
                       <label htmlFor="emergencyContactPhone">
@@ -311,10 +370,17 @@ export default function RegisterPage() {
                   </div>
                 </fieldset>
 
+                <TermsAgreement
+                  id="signup-terms-agreement"
+                  to="/terms/signup"
+                  checked={agreedToTerms}
+                  onChange={setAgreedToTerms}
+                />
+
                 <button
                   type="submit"
                   className="btn btn-primary btn-block"
-                  disabled={submitting}
+                  disabled={submitting || !agreedToTerms}
                 >
                   {submitting ? 'Registering...' : 'Register'}
                 </button>

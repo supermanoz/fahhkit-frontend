@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ApiError,
   canManageEvents,
@@ -10,6 +10,8 @@ import {
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { COUNTRIES_SORTED } from '../constants/countries'
 import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
   NAME_PATTERN,
   NAME_TITLE,
   PHONE_PATTERN,
@@ -23,6 +25,7 @@ export default function EditAthletePage() {
   const { userId } = useParams()
   const { user, loading: userLoading } = useCurrentUser()
   const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState(null)
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -98,7 +101,8 @@ export default function EditAthletePage() {
     setSubmitting(true)
     try {
       await postJson('/v1/athlete/update', { userId, ...form })
-      navigate(`/athletes/${userId}`)
+      // Carry the profile's backTo along so its back link still works.
+      navigate(`/athletes/${userId}`, { state: location.state })
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -182,6 +186,8 @@ export default function EditAthletePage() {
                       id="email"
                       name="email"
                       type="email"
+                      pattern={EMAIL_PATTERN}
+                      title={EMAIL_TITLE}
                       value={form.email}
                       onChange={handleChange}
                       required

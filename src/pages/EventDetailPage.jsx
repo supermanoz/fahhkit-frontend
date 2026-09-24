@@ -12,6 +12,7 @@ import { useEventRegistrationStatuses } from '../hooks/useRegisteredEvents'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Carousel from '../components/Carousel'
+import TermsAgreement from '../components/TermsAgreement'
 import {
   EVENT_TYPE_LABELS,
   formatDate,
@@ -32,6 +33,7 @@ export default function EventDetailPage() {
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState(null)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   useEffect(() => {
     getJson(`/v1/event/${id}`)
@@ -256,11 +258,21 @@ export default function EventDetailPage() {
                     {registerError && (
                       <div className="banner error">{registerError}</div>
                     )}
+                    {!currentStatus && (
+                      <TermsAgreement
+                        id="event-terms-agreement"
+                        to="/terms/event-registration"
+                        checked={agreedToTerms}
+                        onChange={setAgreedToTerms}
+                      />
+                    )}
                     <button
                       type="button"
                       className="btn btn-primary btn-block"
                       onClick={handleRegister}
-                      disabled={registering}
+                      disabled={
+                        registering || (!currentStatus && !agreedToTerms)
+                      }
                     >
                       {registering
                         ? 'Redirecting...'

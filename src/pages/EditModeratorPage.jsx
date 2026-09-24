@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, getJson, isAdmin, postJson } from '../api/client'
 import { useCurrentUser } from '../hooks/useCurrentUser'
-import { NAME_PATTERN, NAME_TITLE } from '../constants/validation'
+import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
+  NAME_PATTERN,
+  NAME_TITLE,
+} from '../constants/validation'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './CreateModeratorPage.css'
@@ -159,6 +164,8 @@ export default function EditModeratorPage() {
                       id="email"
                       name="email"
                       type="email"
+                      pattern={EMAIL_PATTERN}
+                      title={EMAIL_TITLE}
                       value={form.email}
                       onChange={handleChange}
                       required
