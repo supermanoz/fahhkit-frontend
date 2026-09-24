@@ -1,0 +1,304 @@
+/* Lives inside .game-page, so it reuses the --game-* palette tokens. */
+.lb {
+  --lb-gold: var(--game-gold, #ff7a29);
+  --lb-gold-light: var(--game-gold-light, #ffb15c);
+  --lb-silver: #c9ced6;
+  --lb-silver-dark: #8a929e;
+  --lb-bronze: #d98b4a;
+  --lb-bronze-dark: #9a5a27;
+  --lb-cream: var(--game-cream, #fff6e6);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- Podium: 2 · 1 · 3, winner raised --- */
+.lb-podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: start;
+  column-gap: 6px;
+  padding: 34px 0 8px;
+}
+
+.lb-podium-spot {
+  all: unset;
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.lb-podium-spot:disabled {
+  cursor: default;
+}
+
+.lb-podium-spot.place-2,
+.lb-podium-spot.place-3 {
+  padding-top: 48px;
+}
+
+.lb-podium-frame {
+  position: relative;
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* The coloured border is a slightly larger copy of the avatar's shape
+   behind it - clip-path eats real borders. */
+.lb-podium-border {
+  display: block;
+  padding: 4px;
+}
+
+.lb-podium-border,
+.lb-podium-avatar {
+  clip-path: polygon(
+    10% 0%,
+    90% 0%,
+    100% 9%,
+    100% 68%,
+    50% 100%,
+    0% 68%,
+    0% 9%
+  );
+}
+
+.place-1 .lb-podium-border {
+  width: 92px;
+  height: 104px;
+  background: linear-gradient(180deg, var(--lb-gold-light), var(--lb-gold));
+}
+
+.place-2 .lb-podium-border {
+  width: 70px;
+  height: 80px;
+  background: linear-gradient(180deg, var(--lb-silver), var(--lb-silver-dark));
+}
+
+/* #3 is a circle, like the reference podium. */
+.place-3 .lb-podium-border,
+.place-3 .lb-podium-avatar {
+  clip-path: none;
+  border-radius: 50%;
+}
+
+.place-3 .lb-podium-border {
+  width: 74px;
+  height: 74px;
+  background: linear-gradient(180deg, var(--lb-bronze), var(--lb-bronze-dark));
+}
+
+.lb-podium-avatar {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lb-podium-avatar.lb-avatar-initials {
+  font-size: 22px;
+}
+
+.place-1 .lb-podium-avatar.lb-avatar-initials {
+  font-size: 30px;
+}
+
+.lb-podium-medal {
+  position: absolute;
+  right: -8px;
+  bottom: 2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.place-1 .lb-podium-medal {
+  width: 36px;
+  height: 36px;
+  right: -12px;
+  bottom: 8px;
+  font-size: 17px;
+  background: radial-gradient(circle at 35% 30%, #ffe3a3, var(--lb-gold) 70%);
+}
+
+.place-2 .lb-podium-medal {
+  background: radial-gradient(
+    circle at 35% 30%,
+    #f4f6f9,
+    var(--lb-silver-dark) 75%
+  );
+}
+
+.place-3 .lb-podium-medal {
+  background: radial-gradient(
+    circle at 35% 30%,
+    #f2c08f,
+    var(--lb-bronze-dark) 75%
+  );
+}
+
+/* Light rays fanned out either side of #1. */
+.lb-podium-ray {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--ray-len);
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 2px;
+  background: var(--lb-gold-light);
+  transform-origin: 0 50%;
+  transform: rotate(var(--ray-angle)) translateX(60px);
+  animation: lb-ray-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes lb-ray-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-podium-ray {
+    animation: none;
+  }
+}
+
+.lb-podium-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lb-cream);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.place-1 .lb-podium-name {
+  font-size: 18px;
+}
+
+.lb-podium-area {
+  color: var(--lb-gold-light);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.lb-podium-spot.is-player .lb-podium-name {
+  color: var(--lb-gold-light);
+}
+
+/* --- Rank 4+ list --- */
+.lb-list-head,
+.lb-row {
+  display: grid;
+  grid-template-columns: 34px 40px 1fr auto;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.lb-list-head {
+  padding: 0 14px;
+  color: rgba(246, 236, 217, 0.5);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lb-list-head .lb-col-name {
+  grid-column: 2 / 4;
+}
+
+.lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lb-row {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 34px 40px 1fr auto;
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(246, 236, 217, 0.06);
+  border: 1px solid rgba(246, 236, 217, 0.12);
+  cursor: pointer;
+}
+
+.lb-row:disabled {
+  cursor: default;
+}
+
+.lb-row:hover:not(:disabled) {
+  background: rgba(246, 236, 217, 0.1);
+}
+
+.lb-row.is-player {
+  background: rgba(255, 122, 41, 0.14);
+  border-color: var(--lb-gold);
+}
+
+.lb-row .lb-col-rank {
+  color: var(--lb-cream);
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.lb-row .lb-col-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lb-cream);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.lb-row .lb-col-area {
+  color: rgba(246, 236, 217, 0.65);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.lb-row-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px rgba(246, 236, 217, 0.35);
+}
+
+.lb-avatar-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}

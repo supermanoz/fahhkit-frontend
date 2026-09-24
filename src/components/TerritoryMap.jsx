@@ -36,6 +36,11 @@ import { resolveFileUrl } from '../api/client'
 // the account's equipped Hero's assetUrl 404ing) showed one character on
 // the map and a different one in the Me panel instead of matching.
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
+import blazeIdleSheet from '../assets/images/blaze-map-idle.png'
+import blazeRunUpSheet from '../assets/images/blaze-map-run-up.png'
+import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
+import blazeRunLeftSheet from '../assets/images/blaze-map-run-left.png'
+import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
 import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
 import './TerritoryMap.css'
@@ -67,7 +72,7 @@ const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
 // quarter/borough tags some cities double up with neighbourhood).
 //
 // This is specific to positron/liberty/bright (the only MAP_STYLES options
-// - see constants/mapStyles.js). Dark mode is a CSS filter over one of
+// - see constants/mapStyles.js). The night look is a CSS filter over one of
 // those same three, not OpenFreeMap's own separate "dark" style, which
 // uses a completely different layer-id/field schema and whose own layers
 // reference a sprite image missing from its sprite sheet badly enough to
@@ -131,13 +136,13 @@ function hideSymbolLayers(glMap) {
 // Renders the vector basemap via MapLibre GL (through the maplibre-gl-leaflet
 // bridge) so it lives in the same tile pane a raster TileLayer would have
 // used, underneath all the Polygon/Marker overlays below.
-function PokemonStyleBaseLayer({ styleUrl, darkMode, onReady }) {
+function PokemonStyleBaseLayer({ styleUrl, onReady }) {
   const map = useMap()
 
   useEffect(() => {
     const glLayer = L.maplibreGL({
       style: styleUrl || BASEMAP_STYLE_URL,
-      className: `territory-map-tiles${darkMode ? ' is-dark-mode' : ''}`,
+      className: 'territory-map-tiles',
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
@@ -153,18 +158,12 @@ function PokemonStyleBaseLayer({ styleUrl, darkMode, onReady }) {
     return () => {
       map.removeLayer(glLayer)
     }
-    // Re-created (not just re-styled) on a style OR dark-mode change -
-    // simplest way to fully swap a maplibre-gl-leaflet layer's className
-    // without fighting its own internal style-diffing. Dark mode is a CSS
-    // filter on this same className (see TerritoryMap.css .is-dark-mode),
-    // not a separate vector style - OpenFreeMap's own "dark" style shares
-    // the underlying tiles but uses a different layer-id/field schema than
-    // positron/liberty/bright (breaking the English-label logic above) and
-    // its own layers reference a "wood-pattern" sprite image that doesn't
-    // exist in that style's sprite sheet, which pinned the render thread
-    // hard enough to make the page unresponsive. Filtering a known-good
-    // light style avoids both problems entirely.
-  }, [map, styleUrl, darkMode, onReady])
+    // Re-created (not just re-styled) on a style change - simplest way to
+    // fully swap a maplibre-gl-leaflet layer without fighting its own
+    // internal style-diffing. The real-world weather/time look is a CSS
+    // filter driven from .territory-map (see --ambience-filter), so it
+    // never forces a re-create.
+  }, [map, styleUrl, onReady])
 
   return null
 }
@@ -199,6 +198,46 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc, heading) {
       `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
+  })
+}
+
+// Blaze gets a full-body animated sprite on the map instead of the round
+// avatar photo: idle when standing still, and a run cycle facing the
+// on-screen direction of travel while moving. Each sheet is a 4-frame
+// horizontal strip stepped through by CSS (see .territory-map-blaze).
+const BLAZE_SHEETS = {
+  idle: blazeIdleSheet,
+  up: blazeRunUpSheet,
+  down: blazeRunDownSheet,
+  left: blazeRunLeftSheet,
+  right: blazeRunRightSheet,
+}
+
+// Compass heading -> which way he runs on screen (north is up on the
+// non-rotated map).
+function blazePoseForHeading(heading) {
+  const h = (((heading || 0) % 360) + 360) % 360
+  if (h >= 315 || h < 45) return 'up'
+  if (h < 135) return 'right'
+  if (h < 225) return 'down'
+  return 'left'
+}
+
+// Anchored at his feet (not the icon's center) so he stands on the GPS
+// point; the sonar pulse sits flattened on the ground underneath him.
+function buildBlazeMarkerIcon(pose) {
+  return L.divIcon({
+    className: 'territory-map-player-icon territory-map-blaze-icon',
+    html:
+      '<span class="territory-map-blaze-body">' +
+      '<span class="territory-map-blaze-ground">' +
+      '<span class="territory-map-player-pulse"></span>' +
+      '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
+      '</span>' +
+      `<span class="territory-map-blaze is-${pose === 'idle' ? 'idle' : 'running'}" style="background-image:url('${BLAZE_SHEETS[pose]}')"></span>` +
+      '</span>',
+    iconSize: [48, 64],
+    iconAnchor: [24, 58],
   })
 }
 
@@ -300,10 +339,8 @@ function FocusHighlight({ highlightOwnerId, highlightParcelId, territories }) {
   return null
 }
 
-// One claimed parcel's polygon. Needs useMap() (not just the lat/lng click
-// handler react-leaflet's Polygon already gets) to project the polygon's
-// own points into container-pixel space for the tap flourish (see
-// TapEffect.jsx) — that's the one thing plain eventHandlers can't give us.
+// One claimed parcel's polygon. A tap also kicks off the gold lap flourish
+// around it (see TapEffect.jsx).
 function TerritoryPolygon({
   t,
   isMine,
@@ -312,7 +349,6 @@ function TerritoryPolygon({
   onParcelClick,
   onTapEffect,
 }) {
-  const map = useMap()
   return (
     <Polygon
       positions={toLatLngs(t.points)}
@@ -334,12 +370,7 @@ function TerritoryPolygon({
       eventHandlers={{
         click: (e) => {
           L.DomEvent.stopPropagation(e)
-          onTapEffect(
-            t.points.map((p) => {
-              const point = map.latLngToContainerPoint([p.lat, p.lng])
-              return { x: point.x, y: point.y }
-            })
-          )
+          onTapEffect(t.points)
           onParcelClick?.(t)
         },
       }}
@@ -517,7 +548,9 @@ export default function TerritoryMap({
   playerColor,
   trailColor,
   mapStyleUrl,
-  darkMode,
+  ambience,
+  blazeSprite,
+  playerMoving,
   isNavigating,
   onParcelClick,
   onMapReady,
@@ -530,15 +563,35 @@ export default function TerritoryMap({
   // would otherwise double up on that rotation, so it just points straight
   // up (0deg, already "forward" on a rotated map) instead of the real
   // compass heading.
+  // Blaze's pose only changes on idle/running or a new quadrant, so the icon
+  // (and its CSS animation) isn't rebuilt on every small heading update.
+  const blazePose = blazeSprite
+    ? !playerMoving
+      ? 'idle'
+      : isNavigating
+        ? 'up'
+        : blazePoseForHeading(playerHeading)
+    : null
+  const markerHeading = blazePose ? null : isNavigating ? 0 : playerHeading
   const playerMarkerIcon = useMemo(
     () =>
-      buildPlayerMarkerIcon(
-        avatarSrc || defaultAvatarImage,
-        defaultAvatarImage,
-        isNavigating ? 0 : playerHeading
-      ),
-    [avatarSrc, playerHeading, isNavigating]
+      blazePose
+        ? buildBlazeMarkerIcon(blazePose)
+        : buildPlayerMarkerIcon(
+            avatarSrc || defaultAvatarImage,
+            defaultAvatarImage,
+            markerHeading
+          ),
+    [blazePose, avatarSrc, markerHeading]
   )
+
+  // Warm the cache so switching idle -> running never shows a blank frame.
+  useEffect(() => {
+    if (!blazeSprite) return
+    Object.values(BLAZE_SHEETS).forEach((src) => {
+      new Image().src = src
+    })
+  }, [blazeSprite])
 
   const [activeTapEffects, setActiveTapEffects] = useState([])
   const nextTapEffectIdRef = useRef(0)
@@ -556,13 +609,23 @@ export default function TerritoryMap({
   )
 
   return (
-    <div className="territory-map">
+    <div
+      className="territory-map"
+      style={
+        ambience?.filter ? { '--ambience-filter': ambience.filter } : undefined
+      }
+    >
       <div
         className="territory-map-heading"
         style={{
           transform: isNavigating
             ? `rotate(${-(playerHeading || 0)}deg) scale(1.5)`
             : 'none',
+          // Blaze counter-rotates by this so he stays upright on screen
+          // while the whole map is rotated in nav view.
+          '--map-counter-rotation': isNavigating
+            ? `${playerHeading || 0}deg`
+            : '0deg',
         }}
       >
         <div className="territory-map-tilt" ref={tiltRef}>
@@ -575,7 +638,6 @@ export default function TerritoryMap({
           >
             <PokemonStyleBaseLayer
               styleUrl={mapStyleUrl}
-              darkMode={darkMode}
               onReady={onMapReady}
             />
 
@@ -663,16 +725,24 @@ export default function TerritoryMap({
               playerLocation={playerLocation}
             />
             <CaptureMapInstance onReady={setMapInstance} />
+            {activeTapEffects.map((effect) => (
+              <TapEffect
+                key={effect.id}
+                points={effect.points}
+                onDone={() => clearTapEffect(effect.id)}
+              />
+            ))}
           </MapContainer>
-          {activeTapEffects.map((effect) => (
-            <TapEffect
-              key={effect.id}
-              points={effect.points}
-              onDone={() => clearTapEffect(effect.id)}
-            />
-          ))}
         </div>
       </div>
+      {ambience && (
+        <div
+          className={`territory-map-sky sky-phase-${ambience.phase} sky-${ambience.sky}`}
+          aria-hidden="true"
+        >
+          <div className="territory-map-sky-weather" />
+        </div>
+      )}
       <div className="territory-map-vignette" aria-hidden="true" />
       {mapInstance && <LocateButton map={mapInstance} />}
     </div>

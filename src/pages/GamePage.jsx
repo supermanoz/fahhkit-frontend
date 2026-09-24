@@ -7,10 +7,8 @@ import {
   FaFlag,
   FaListUl,
   FaLock,
-  FaMoon,
   FaPlay,
   FaStore,
-  FaSun,
   FaTimes,
   FaTrophy,
   FaUser,
@@ -80,7 +78,7 @@ import {
 import { isBlazeHero } from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
 import ClubPanel from '../components/ClubPanel'
-import IconShineOrbit from '../components/IconShineOrbit'
+import LeaderboardPodium from '../components/LeaderboardPodium'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import runConquestLogo from '../assets/images/run-conquest-logo.png'
 import {
@@ -93,11 +91,14 @@ import {
 import {
   MAP_STYLES,
   getMapStyleById,
-  loadMapDarkMode,
   loadMapStyleId,
-  saveMapDarkMode,
   saveMapStyleId,
 } from '../constants/mapStyles'
+import {
+  describeAmbience,
+  fetchSkyConditions,
+  pickWeatherHype,
+} from '../utils/mapAmbience'
 import {
   AREA_EMOJIS,
   getAreaEmojiById,
@@ -159,6 +160,10 @@ const RESULT_POLL_DELAY_MS = 2500
 
 const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
+// Clash-style digit grouping with spaces ("4 138 274") for the HUD counters.
+const formatCoins = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+// Minimum time the loading screen stays up, even on a fast load.
+const LOADING_MIN_MS = 4500
 // Tally-style flags: one flag icon reads as 5 held territories instead of 1,
 // so a player with dozens of parcels doesn't need a wall of flag glyphs.
 const PARCELS_PER_FLAG = 5
@@ -318,22 +323,14 @@ export default function GamePage() {
   })
   const musicRef = useRef(null)
 
-  // Map basemap dark mode - a quick top-level toggle independent of the
-  // Shop's Map style picker (MAP_STYLES), which stays whatever light style
-  // the player picked there. Defaults dark until the player explicitly
-  // taps the sun/moon button, which then pins their own true/false choice
-  // (persisted, like the music mute) from then on.
-  const [mapDarkModeOverride, setMapDarkModeOverride] = useState(() =>
-    loadMapDarkMode()
-  )
-  const mapDarkMode = mapDarkModeOverride ?? true
-  function toggleMapDarkMode() {
-    setMapDarkModeOverride((prev) => {
-      const next = !(prev ?? true)
-      saveMapDarkMode(next)
-      return next
-    })
-  }
+  // Real-world sky for the map (replaces the old manual dark/light
+  // toggle) - weather + sunrise/sunset for the player's actual location,
+  // loaded before the game is shown so the map never flashes the wrong
+  // look. skyLoaded flips true even if the lookup fails; the map then just
+  // falls back to a device-clock day/night guess (see mapAmbience.js).
+  const [skyConditions, setSkyConditions] = useState(null)
+  const [skyLoaded, setSkyLoaded] = useState(false)
+  const [skyClock, setSkyClock] = useState(() => Date.now())
   // Last 1km-multiple the player was alerted for during the current tracked
   // run — a ref (not state) since it's read/written from inside an effect
   // and should never itself trigger a re-render.
@@ -397,6 +394,11 @@ export default function GamePage() {
         setLiveLocation({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          // Kept (like useRunTracker's points) so the heading cone and
+          // Blaze's run animation also work outside a tracked run.
+          accuracy: position.coords.accuracy,
+          speed: position.coords.speed ?? null,
+          heading: position.coords.heading ?? null,
         })
       },
       () => {},
@@ -409,6 +411,102 @@ export default function GamePage() {
     tracker.status === 'tracking' && tracker.path.length > 0
       ? tracker.path[tracker.path.length - 1]
       : liveLocation || center
+
+  // Read through a ref so the refresh interval below doesn't restart on
+  // every GPS update.
+  const skyLocationRef = useRef(playerLocation)
+  skyLocationRef.current = playerLocation
+
+  useEffect(() => {
+    if (locating) return
+    let cancelled = false
+    let controller = null
+    async function loadSky() {
+      controller?.abort()
+      controller = new AbortController()
+      const { lat, lng } = skyLocationRef.current
+      try {
+        const conditions = await fetchSkyConditions(lat, lng, {
+          signal: controller.signal,
+        })
+        if (!cancelled) setSkyConditions(conditions)
+      } catch {
+        // Keep whatever sky we already had (or the clock-based fallback).
+      } finally {
+        if (!cancelled) setSkyLoaded(true)
+      }
+    }
+    loadSky()
+    // Don't hold the game hostage to a slow weather API.
+    const giveUp = setTimeout(() => setSkyLoaded(true), 5000)
+    const refresh = setInterval(loadSky, 15 * 60 * 1000)
+    // Re-evaluates dawn/day/dusk/night between fetches.
+    const tick = setInterval(() => setSkyClock(Date.now()), 60 * 1000)
+    return () => {
+      cancelled = true
+      controller?.abort()
+      clearTimeout(giveUp)
+      clearInterval(refresh)
+      clearInterval(tick)
+    }
+  }, [locating])
+
+  const mapAmbience = useMemo(
+    () => describeAmbience(skyConditions, skyClock),
+    [skyConditions, skyClock]
+  )
+
+  // Weather hype pop-up - once per visit, a beat after the loading screen
+  // clears so it lands on the actual map rather than being hidden behind
+  // the overlay's fade-out.
+  const [weatherHype, setWeatherHype] = useState(null)
+  const weatherHypeShownRef = useRef(false)
+  const introReady = !locating && mapReady && skyLoaded
+
+  // Loading screen runs for at least LOADING_MIN_MS so the logo + bar get
+  // their moment, but the bar can't pass the real load steps (location,
+  // sky, map) - a slow load just holds it there until they land.
+  const [loadStart] = useState(() => Date.now())
+  const [loadNow, setLoadNow] = useState(loadStart)
+  const [loadingDone, setLoadingDone] = useState(false)
+  const loadStepCap = introReady
+    ? 100
+    : 12 + 29 * [!locating, skyLoaded, mapReady].filter(Boolean).length
+  const loadPct = Math.min(
+    (100 * (loadNow - loadStart)) / LOADING_MIN_MS,
+    loadStepCap
+  )
+  useEffect(() => {
+    if (loadingDone) return
+    const tick = setInterval(() => setLoadNow(Date.now()), 100)
+    return () => clearInterval(tick)
+  }, [loadingDone])
+  useEffect(() => {
+    if (loadPct < 100 || loadingDone) return
+    // Brief beat on a full bar before the overlay lifts.
+    const done = setTimeout(() => setLoadingDone(true), 350)
+    return () => clearTimeout(done)
+  }, [loadPct, loadingDone])
+  const gameReady = introReady && loadingDone
+
+  useEffect(() => {
+    if (!gameReady || weatherHypeShownRef.current) return
+    // Marked shown inside the timeout, not before it - StrictMode's dev-only
+    // effect double-run would otherwise clear the timer and never show it.
+    const show = setTimeout(() => {
+      weatherHypeShownRef.current = true
+      setWeatherHype(pickWeatherHype(mapAmbience))
+    }, 600)
+    return () => clearTimeout(show)
+    // Only the moment the game first becomes ready matters, not later sky
+    // refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameReady])
+  useEffect(() => {
+    if (!weatherHype) return
+    const hide = setTimeout(() => setWeatherHype(null), 6000)
+    return () => clearTimeout(hide)
+  }, [weatherHype])
 
   // "Entering [rival]'s territory!" banner - fires the moment the player's
   // dot physically crosses into a claimed parcel that isn't theirs, not just
@@ -490,6 +588,19 @@ export default function GamePage() {
       }
     }
     lastBearingFixRef.current = playerLocation
+  }, [playerLocation])
+
+  // Drives Blaze's idle vs. running sprite on the map. Uses the fix's own
+  // reported speed (same noise reasoning as the heading above) and holds
+  // "moving" for a few seconds after the last fast fix, so a single slow
+  // or missed GPS reading doesn't flicker him back to idle mid-run.
+  const [playerMoving, setPlayerMoving] = useState(false)
+  useEffect(() => {
+    if ((playerLocation?.speed ?? 0) > MIN_TRUSTED_SPEED_MPS) {
+      setPlayerMoving(true)
+    }
+    const settle = setTimeout(() => setPlayerMoving(false), 4000)
+    return () => clearTimeout(settle)
   }, [playerLocation])
 
   async function refreshProfile() {
@@ -752,6 +863,15 @@ export default function GamePage() {
     tracker.stop()
     tracker.clearPendingRun()
   }
+
+  // The territory info box closes itself after a few seconds (the Close
+  // button still works). Each new tap sets a fresh object, restarting the
+  // timer, and closing it also clears the map highlight, same as Close.
+  useEffect(() => {
+    if (!highlightedEntry) return
+    const autoClose = setTimeout(() => setHighlightedEntry(null), 4000)
+    return () => clearTimeout(autoClose)
+  }, [highlightedEntry])
 
   // Tapping a claimed parcel directly on the map is a stronger signal than
   // tapping a leaderboard row (the player already has it in view), so this
@@ -1074,8 +1194,6 @@ export default function GamePage() {
     )
   }
 
-  const gameReady = !locating && mapReady
-
   return (
     <div
       className="game-page"
@@ -1101,7 +1219,9 @@ export default function GamePage() {
           playerColor={equippedShade}
           trailColor={equippedTrailColor}
           mapStyleUrl={currentMapStyle?.styleUrl}
-          darkMode={mapDarkMode}
+          ambience={skyLoaded ? mapAmbience : null}
+          blazeSprite={showBlazeHeroSprite}
+          playerMoving={playerMoving}
           isNavigating={isNavigating}
           onParcelClick={handleParcelClick}
           onMapReady={handleMapReady}
@@ -1110,12 +1230,26 @@ export default function GamePage() {
 
       {!gameReady && (
         <div className="game-loading-overlay">
-          <div className="game-loading-badge">
-            <div className="game-loading-spinner" />
+          <img
+            src={runConquestLogo}
+            alt="Run Conquest"
+            className="game-loading-logo"
+          />
+          <div className="game-loading-footer">
+            <p className="game-loading-text">
+              {locating
+                ? 'Finding your location…'
+                : !skyLoaded
+                  ? 'Checking the sky…'
+                  : 'Preparing your run…'}
+            </p>
+            <div className="game-loading-bar">
+              <div
+                className="game-loading-bar-fill"
+                style={{ width: `${loadPct}%` }}
+              />
+            </div>
           </div>
-          <p className="game-loading-text">
-            {locating ? 'Finding your location…' : 'Preparing your run…'}
-          </p>
         </div>
       )}
 
@@ -1130,10 +1264,9 @@ export default function GamePage() {
           }}
         >
           <span className="game-hud-level-badge">
-            {profile.level}
-            <IconShineOrbit shape="hex" width={34} height={36} />
+            <span className="game-hud-level-num">{profile.level}</span>
           </span>
-          <div className="game-hud-level-info">
+          <div className="game-hud-level-track">
             {user?.fullName && (
               <span className="game-hud-level-name">
                 {user.fullName.split(' ')[0]}
@@ -1160,44 +1293,63 @@ export default function GamePage() {
         {musicMuted ? <BsVolumeMuteFill /> : <BsVolumeUpFill />}
       </button>
 
-      <button
-        type="button"
-        className="game-map-theme-btn"
-        onClick={toggleMapDarkMode}
-        aria-label={
-          mapDarkMode ? 'Switch map to light mode' : 'Switch map to dark mode'
-        }
-      >
-        {mapDarkMode ? <FaSun /> : <FaMoon />}
-      </button>
-
       <div className="game-hud">
         <button
           type="button"
-          className="game-hud-stat game-hud-stat-clickable"
+          className="game-hud-stat game-hud-stat-bar game-hud-stat-coin game-hud-stat-clickable"
           aria-label="Fahhcoin balance - buy more Fahhcoin"
           onClick={openCoinShop}
         >
           <span className="game-hud-value">
-            {profile?.fahhcoinBalance ?? 0}
+            {formatCoins(profile?.fahhcoinBalance ?? 0)}
           </span>
           <span className="game-hud-icon game-hud-icon-coin" />
         </button>
         <button
           type="button"
-          className="game-hud-stat game-hud-stat-clickable"
+          className="game-hud-stat game-hud-stat-bar game-hud-stat-clickable"
           aria-label="Territories held - view your territories"
           onClick={() => {
             switchTab('me')
             setMenuOpen(true)
           }}
         >
-          <span className="game-hud-value">{myTerritories.length}</span>
+          <span className="game-hud-value">
+            {formatCoins(myTerritories.length)}
+          </span>
           <span className="game-hud-icon game-hud-icon-flag">
             <FaFlag />
           </span>
         </button>
       </div>
+
+      <AnimatePresence>
+        {weatherHype && (
+          <motion.button
+            type="button"
+            key="weather-hype"
+            className={`game-weather-hype sky-${mapAmbience.sky}`}
+            onClick={() => setWeatherHype(null)}
+            aria-label={`${weatherHype.title}. ${weatherHype.line} Tap to dismiss.`}
+            initial={{ opacity: 0, y: -40, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+          >
+            <span className="game-weather-hype-emoji" aria-hidden="true">
+              {weatherHype.emoji}
+            </span>
+            <span className="game-weather-hype-body">
+              <strong className="game-weather-hype-title">
+                {weatherHype.title}
+                {mapAmbience.temperature != null &&
+                  ` · ${mapAmbience.temperature}°`}
+              </strong>
+              <span className="game-weather-hype-line">{weatherHype.line}</span>
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {territoryEntryBanner && (
@@ -1224,35 +1376,6 @@ export default function GamePage() {
           onClick={() => setRadialOpen(false)}
         />
       )}
-
-      <AnimatePresence>
-        {radialOpen && (
-          <motion.img
-            src={runConquestLogo}
-            alt="Run Conquest"
-            className="game-menu-banner"
-            initial={{
-              opacity: 0,
-              x: '-50%',
-              y: 'calc(-50% - 118px)',
-              scale: 0.9,
-            }}
-            animate={{
-              opacity: 1,
-              x: '-50%',
-              y: 'calc(-50% - 100px)',
-              scale: 1,
-            }}
-            exit={{
-              opacity: 0,
-              x: '-50%',
-              y: 'calc(-50% - 118px)',
-              scale: 0.9,
-            }}
-            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-          />
-        )}
-      </AnimatePresence>
 
       <div className="game-fab-wrap">
         <AnimatePresence>
@@ -1298,7 +1421,6 @@ export default function GamePage() {
           aria-expanded={radialOpen}
         >
           <FaListUl />
-          <IconShineOrbit shape="circle" width={60} height={60} gap={6} />
         </button>
       </div>
 
@@ -1513,9 +1635,9 @@ export default function GamePage() {
         {highlightedEntry && (
           <motion.div
             className="game-highlight-toast glass-card"
-            initial={{ opacity: 0, x: '-50%', y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: -20, scale: 0.9 }}
+            initial={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
           >
             <h3>
               {isMyEntry(highlightedEntry)
@@ -1621,30 +1743,20 @@ export default function GamePage() {
                       No territory claimed yet — be the first.
                     </p>
                   ) : (
-                    <ul className="game-menu-leaderboard">
-                      {leaderboard.map((entry) => (
-                        <li
-                          key={entry.userId}
-                          className={isMyEntry(entry) ? 'is-player' : ''}
-                        >
-                          <button
-                            type="button"
-                            className="game-menu-leaderboard-row"
-                            onClick={() => setViewingProfile(entry)}
-                          >
-                            <span className="game-menu-leaderboard-rank">
-                              #{entry.rank}
-                            </span>
-                            <span className="game-menu-leaderboard-name">
-                              {isMyEntry(entry) ? 'You' : entry.fullName}
-                            </span>
-                            <span className="game-menu-leaderboard-area">
-                              {formatArea(entry.areaSqMeters)}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <LeaderboardPodium
+                      nameLabel="Runner"
+                      entries={leaderboard.map((entry) => ({
+                        key: entry.userId,
+                        rank: entry.rank,
+                        name: isMyEntry(entry) ? 'You' : entry.fullName,
+                        area: formatArea(entry.areaSqMeters),
+                        avatarSrc: isMyEntry(entry)
+                          ? resolveFileUrl(user?.profilePictureUrl)
+                          : null,
+                        isPlayer: isMyEntry(entry),
+                        onClick: () => setViewingProfile(entry),
+                      }))}
+                    />
                   )
                 ) : leaderboardError ? (
                   <p className="game-menu-empty">{leaderboardError}</p>
@@ -1653,21 +1765,16 @@ export default function GamePage() {
                     No club has claimed territory yet.
                   </p>
                 ) : (
-                  <ul className="game-menu-leaderboard">
-                    {clubLeaderboard.map((entry) => (
-                      <li key={entry.clubId}>
-                        <span className="game-menu-leaderboard-rank">
-                          #{entry.rank}
-                        </span>
-                        <span className="game-menu-leaderboard-name">
-                          {entry.clubName}
-                        </span>
-                        <span className="game-menu-leaderboard-area">
-                          {formatArea(entry.totalAreaSqMeters)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <LeaderboardPodium
+                    nameLabel="Club"
+                    entries={clubLeaderboard.map((entry) => ({
+                      key: entry.clubId,
+                      rank: entry.rank,
+                      name: entry.clubName,
+                      area: formatArea(entry.totalAreaSqMeters),
+                      isPlayer: entry.clubName === profile?.clubName,
+                    }))}
+                  />
                 )}
               </div>
             )}
@@ -1743,11 +1850,6 @@ export default function GamePage() {
                         <div className="game-level-track">
                           <span className="game-level-badge">
                             {profile.level}
-                            <IconShineOrbit
-                              shape="hex"
-                              width={46}
-                              height={48}
-                            />
                           </span>
                           <div className="game-xp-bar">
                             <div

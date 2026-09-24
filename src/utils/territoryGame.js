@@ -23,7 +23,7 @@ export const LOOP_CLOSURE_THRESHOLD_METERS = 25
 // show on the map. The view itself isn't fenced to this (see
 // ZoomRangeLimiter in TerritoryMap.jsx) — panning further out just shows an
 // empty map past this radius until the player moves and it re-queries.
-export const VIEW_RADIUS_METERS = 2000
+export const VIEW_RADIUS_METERS = 15000
 
 export function boundsForRadius(center, radiusMeters) {
   const dLat = radiusMeters / 111320

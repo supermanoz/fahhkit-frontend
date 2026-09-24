@@ -1,3 +1,9 @@
+import {
+  MAX_UPLOAD_BYTES,
+  compressFormDataImages,
+  formDataFileBytes,
+} from '../utils/imageCompress'
+
 const PRIMARY_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const FALLBACK_API_BASE_URL = import.meta.env.VITE_API_FALLBACK_URL || ''
@@ -130,8 +136,16 @@ async function parseResponse(response, hadToken) {
   return body?.data
 }
 
-export async function postForm(path, formData) {
+export async function postForm(path, rawFormData) {
   const hadToken = Boolean(getToken())
+  const formData = await compressFormDataImages(rawFormData)
+  const fileBytes = formDataFileBytes(formData)
+  if (fileBytes > MAX_UPLOAD_BYTES) {
+    throw new ApiError(
+      'Those images are too chunky for the server — try smaller photos (under ~1 MB total).',
+      413
+    )
+  }
   let response
   try {
     response = await fetchWithFallback(path, {
@@ -140,8 +154,12 @@ export async function postForm(path, formData) {
       body: formData,
     })
   } catch {
+    // An over-size body gets a CORS-less 413 from nginx, which the browser
+    // reports as a network failure — so hint at size when files were sent.
     throw new ApiError(
-      'Could not reach the server. Please try again in a moment.',
+      fileBytes > 0
+        ? 'Could not upload — the server may have rejected the image size. Try a smaller photo.'
+        : 'Could not reach the server. Please try again in a moment.',
       0
     )
   }

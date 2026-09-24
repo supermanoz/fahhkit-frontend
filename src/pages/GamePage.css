@@ -78,36 +78,92 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  background: #0a0806;
+  background:
+    radial-gradient(
+      ellipse at 50% 42%,
+      rgba(201, 74, 8, 0.35) 0%,
+      rgba(10, 8, 6, 0) 60%
+    ),
+    #0a0806;
 }
 
-.game-loading-badge {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+/* Run Conquest logo front and centre while the map loads - moved here
+   from the radial menu so it's the first thing players see. */
+.game-loading-logo {
+  width: min(320px, 78vw);
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.7));
+  animation: game-loading-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes game-loading-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Pokémon GO-style status line + thin progress bar pinned to the bottom. */
+.game-loading-footer {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 36px);
+  transform: translateX(-50%);
+  width: min(300px, 76vw);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: var(--game-panel);
-  border: 3px solid var(--game-ink);
-  box-shadow:
-    inset 0 -6px 0 rgba(0, 0, 0, 0.3),
-    0 3px 0 var(--game-ink);
+  gap: 12px;
 }
 
-.game-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 4px solid rgba(246, 236, 217, 0.15);
-  border-top-color: var(--game-gold);
-  animation: game-loading-spin 0.9s linear infinite;
+.game-loading-bar {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(246, 236, 217, 0.18);
+  overflow: hidden;
 }
 
-@keyframes game-loading-spin {
+.game-loading-bar-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--game-gold-light),
+    var(--game-gold) 70%,
+    var(--game-gold-dark)
+  );
+  box-shadow: 0 0 8px rgba(255, 122, 41, 0.6);
+  transition: width 0.15s linear;
+  overflow: hidden;
+}
+
+/* Sheen sweeping across the fill so the bar reads as alive while a step
+   is still in flight. */
+.game-loading-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  animation: game-loading-sheen 1.4s linear infinite;
+}
+
+@keyframes game-loading-sheen {
+  from {
+    transform: translateX(-100%);
+  }
   to {
-    transform: rotate(360deg);
+    transform: translateX(260%);
   }
 }
 
@@ -115,8 +171,9 @@
   margin: 0;
   color: var(--game-cream);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 0.02em;
+  text-align: center;
 }
 
 /* --- Top bar: level HUD, bled to the screen edge like Pokémon GO's status
@@ -127,8 +184,7 @@
    corner (floating above the dynamic-height bottom sheet, same trick
    .game-fab-wrap uses) rather than the top, now that the exit button that
    used to live above them here is gone. */
-.game-mute-btn,
-.game-map-theme-btn {
+.game-mute-btn {
   position: absolute;
   left: 16px;
   z-index: 600;
@@ -161,11 +217,6 @@
   font-size: 22px;
 }
 
-.game-map-theme-btn {
-  bottom: calc(var(--sheet-h, 90px) + 72px);
-  font-size: 15px;
-}
-
 /* Persistent level/XP pill on the main game screen, top-left corner - Clash
    of Clans keeps this visible at all times rather than burying it in a
    menu, unlike the full-size version in the Me tab (.game-level-track)
@@ -177,7 +228,6 @@
   z-index: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
   background: none;
   border: none;
   padding: 0;
@@ -193,73 +243,150 @@
   transform: translateY(2px);
 }
 
+/* Clash Royale layout: a rounded-square badge with a burst behind the
+   number, a bar flush against it, and the name riding the bar's top edge.
+   Colours stay ours (orange badge, green fill). */
 .game-hud-level-badge {
   position: relative;
+  z-index: 2;
   flex-shrink: 0;
-  width: 34px;
-  height: 36px;
-  clip-path: polygon(50% 0%, 95% 18%, 95% 64%, 50% 100%, 5% 64%, 5% 18%);
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    circle at 32% 26%,
-    var(--game-gold-light),
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light) 0%,
     var(--game-gold) 55%,
     var(--game-gold-dark) 100%
   );
+  border: 2.5px solid var(--game-ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.2),
+    0 2px 0 var(--game-ink);
+}
+
+/* 12-point burst behind the level number. */
+.game-hud-level-badge::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  clip-path: polygon(
+    50% 0%,
+    59% 17%,
+    75% 7%,
+    76% 25%,
+    93% 25%,
+    83% 41%,
+    100% 50%,
+    83% 59%,
+    93% 75%,
+    76% 75%,
+    75% 93%,
+    59% 83%,
+    50% 100%,
+    41% 83%,
+    25% 93%,
+    24% 75%,
+    7% 75%,
+    17% 59%,
+    0% 50%,
+    17% 41%,
+    7% 25%,
+    24% 25%,
+    25% 7%,
+    41% 17%
+  );
+  background: linear-gradient(180deg, #ffc98a 0%, var(--game-gold-light) 100%);
+}
+
+.game-hud-level-num {
+  position: relative;
   color: #fff;
-  font-weight: 800;
-  font-size: 13px;
-  border: 2px solid var(--game-ink);
-  box-shadow: 0 2px 0 var(--game-ink);
+  font-weight: 900;
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    1px 1px 0 var(--game-ink),
+    -1px -1px 0 var(--game-ink),
+    1px -1px 0 var(--game-ink),
+    -1px 1px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
 }
 
-.game-hud-level-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-/* Name tag riding above the XP bar - Clash Royale's top-left HUD shows the
-   player's name here so the corner reads as "this is you," not just a
-   number. First name only (see GamePage.jsx) to keep the pill compact. */
-.game-hud-level-name {
-  align-self: flex-start;
-  max-width: 125px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1.5px solid var(--game-ink);
-  color: var(--game-cream);
-  font-size: 11px;
-  font-weight: 700;
+.game-hud-level-track {
+  position: relative;
+  margin-left: -3px;
 }
 
 .game-hud-level-bar {
   position: relative;
-  width: 95px;
-  height: 13px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1.5px solid var(--game-ink);
+  width: 150px;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(225, 228, 218, 0.55);
+  border: 2.5px solid var(--game-ink);
   overflow: hidden;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
 }
 
+/* Whitish sheen along the top of the whole track. */
+.game-hud-level-bar::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  right: 4px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+/* Two-tone fill - light top half, saturated bottom half. */
 .game-hud-level-bar-fill {
   height: 100%;
-  border-radius: 999px;
+  max-width: 100%;
   background: linear-gradient(
     180deg,
     var(--game-green-light) 0%,
-    var(--game-green) 50%,
+    var(--game-green-light) 48%,
+    var(--game-green) 52%,
     var(--game-green-dark) 100%
   );
+  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.25);
   transition: width 0.4s ease;
+}
+
+/* First name (see GamePage.jsx) riding the bar's top-left edge. */
+.game-hud-level-name {
+  position: absolute;
+  z-index: 1;
+  left: 8px;
+  bottom: calc(100% - 9px);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 8px 2px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
 }
 
 /* White glyph + black outline (via layered drop-shadows, since these are
@@ -269,7 +396,6 @@
    language. Targets the icon itself, not the button, so the outline traces
    the glyph rather than smearing around the whole circular badge. */
 .game-mute-btn svg,
-.game-map-theme-btn svg,
 .game-menu-btn svg,
 .game-radial-btn svg {
   color: #fff;
@@ -277,30 +403,7 @@
     drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000);
 }
 
-/* IconShineOrbit - a small gold spark taking a slow, looping lap around the
-   hamburger menu button/level badges' own outline (see
-   components/IconShineOrbit.jsx). The guide shape it laps is invisible;
-   only the spark itself renders. */
-.icon-shine-orbit {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.icon-shine-orbit-guide {
-  fill: none;
-  stroke: none;
-}
-
-.icon-shine-orbit-spark {
-  fill: var(--game-gold, #f4c430);
-  filter: drop-shadow(0 0 3px rgba(244, 196, 48, 0.95))
-    drop-shadow(0 0 6px rgba(244, 196, 48, 0.6));
-}
-
-.game-mute-btn:active,
-.game-map-theme-btn:active {
+.game-mute-btn:active {
   transform: translateY(2px);
   box-shadow:
     inset 0 2px 3px rgba(255, 255, 255, 0.4),
@@ -313,6 +416,82 @@
    effect in GamePage.jsx), not from tapping a parcel. Functional MVP
    animation (framer-motion spring in/out + a looping glow) - see the
    backlog note that a real designer pass on this is still wanted. */
+/* Weather hype pop-up shown once after the game loads (see
+   pickWeatherHype in utils/mapAmbience.js). Same chunky game-badge look as
+   the territory entry banner, tinted to the current sky. Tap dismisses. */
+.game-weather-hype {
+  --hype-a: #ffb347;
+  --hype-b: #ff7a29;
+  --hype-glow: rgba(255, 150, 60, 0.55);
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  z-index: 700;
+  translate: -50% 0;
+  width: min(360px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--hype-a), var(--hype-b));
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.4),
+    0 4px 0 var(--game-ink),
+    0 0 22px var(--hype-glow);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.game-weather-hype.sky-rain,
+.game-weather-hype.sky-storm {
+  --hype-a: #4a7fd4;
+  --hype-b: #274b8f;
+  --hype-glow: rgba(74, 127, 212, 0.55);
+}
+
+.game-weather-hype.sky-overcast,
+.game-weather-hype.sky-fog {
+  --hype-a: #8a93a3;
+  --hype-b: #5a6273;
+  --hype-glow: rgba(120, 130, 150, 0.5);
+}
+
+.game-weather-hype.sky-snow {
+  --hype-a: #7cc4e8;
+  --hype-b: #3f8fc0;
+  --hype-glow: rgba(124, 196, 232, 0.6);
+}
+
+.game-weather-hype-emoji {
+  font-size: 30px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+.game-weather-hype-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.game-weather-hype-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.game-weather-hype-line {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
 .game-territory-entry-banner {
   position: absolute;
   top: 76px;
@@ -371,6 +550,10 @@
   z-index: 600;
   display: flex;
   gap: 8px;
+  /* Same height as the level badge (.game-hud-level-badge) so the
+     counters centre on the XP bar's line rather than riding higher. */
+  height: 50px;
+  align-items: center;
 }
 
 /* Clash Royale-style resource pill: a dark rounded bar with the number, and
@@ -433,30 +616,84 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
-/* Plain coin token (per reference) - flat yellow disc, not the site's
-   orange --game-gold or the stacked-coins FaCoins glyph. */
+/* Clash-style gold coin: a bright face inside a deeper gold rim, with a
+   gloss arc up top. Plain face - no letter - per the reference. */
 .game-hud-icon-coin {
   background: radial-gradient(
-    circle at 32% 26%,
-    #fff3b0,
-    #ffd23f 55%,
-    #d19a00 100%
+    circle at 50% 50%,
+    #ffe95e 0%,
+    #ffd21f 52%,
+    #d99200 58%,
+    #ffcf2a 70%,
+    #ffb800 86%,
+    #c98600 100%
   );
-  color: var(--game-ink);
   box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.6),
-    inset 0 -7px 0 #b8850a,
+    inset 0 -3px 0 rgba(150, 90, 0, 0.55),
     0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
-/* "F" for Fahhcoin, embossed into the coin face like a real minted coin
-   rather than a flat glyph sitting on top of it. */
-.game-hud-icon-coin::after {
-  content: 'F';
-  font-weight: 800;
-  font-size: 16px;
-  color: #b8850a;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+.game-hud-icon-coin::before,
+.game-hud-stat-bar .game-hud-icon-flag::before {
+  content: '';
+  position: absolute;
+  top: 12%;
+  left: 22%;
+  width: 40%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  transform: rotate(-20deg);
+}
+
+/* Clash-style resource bar (coins + parcels): translucent bar matching the
+   XP bar's track, number right-aligned, and a bigger medallion overhanging
+   the right end. */
+.game-hud-stat-bar {
+  justify-content: flex-end;
+  min-width: 64px;
+  margin-right: 14px;
+  border-radius: 6px;
+  padding: 3px 34px 3px 14px;
+  /* Same light translucent track as the XP bar, no dark lower half. */
+  background: rgba(225, 228, 218, 0.55);
+  border: 2.5px solid var(--game-ink);
+  box-shadow: none;
+}
+
+/* Whitish sheen along the top, same as the XP bar. */
+.game-hud-stat-bar::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  right: 22px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.game-hud-stat-coin {
+  min-width: 112px;
+}
+
+.game-hud-stat-bar .game-hud-icon {
+  right: -16px;
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(0, 0, 0, 0.6);
+}
+
+.game-hud-stat-bar .game-hud-value {
+  padding-right: 0;
+  -webkit-text-stroke: 2px var(--game-ink);
+  text-shadow: 0 2px 0 var(--game-ink);
+  letter-spacing: 0.02em;
+}
+
+.game-hud-stat-bar .game-hud-icon-flag {
+  font-size: 18px;
 }
 
 .game-hud-icon-flag {
@@ -699,7 +936,7 @@
 .game-highlight-toast {
   position: fixed;
   left: 50%;
-  top: 20px;
+  top: 50%;
   z-index: 1200;
   padding: 16px 22px;
   text-align: center;
@@ -881,16 +1118,6 @@
    the artwork already has its own title lettering/flags baked in, so this
    is just the image itself, no separate text overlay like the old wood-sign
    banner needed. */
-.game-menu-banner {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  z-index: 680;
-  width: 300px;
-  pointer-events: none;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6));
-}
-
 /* Each option is an icon "badge" — chunky cel-shaded circle, thick ink
    outline, offset drop shadow — the same carved-resource-icon language as
    the HUD coin/parcel badges (see /style.md), not the plain dark
@@ -1336,69 +1563,6 @@
   color: rgba(246, 236, 217, 0.6);
 }
 
-.game-menu-leaderboard {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.game-menu-leaderboard li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: rgba(246, 236, 217, 0.06);
-  border-radius: 12px;
-  border: 1px solid rgba(246, 236, 217, 0.12);
-}
-
-.game-menu-leaderboard li.is-player {
-  background: rgba(224, 165, 55, 0.16);
-  border-color: var(--game-gold);
-}
-
-.game-menu-leaderboard li:hover {
-  background: rgba(246, 236, 217, 0.1);
-}
-
-.game-menu-leaderboard-row {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.game-menu-leaderboard-rank {
-  font-weight: 800;
-  color: rgba(246, 236, 217, 0.6);
-  font-size: 13px;
-  width: 26px;
-  flex-shrink: 0;
-}
-
-.game-menu-leaderboard-name {
-  flex: 1;
-  font-weight: 700;
-  color: var(--game-cream);
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.game-menu-leaderboard-area {
-  font-weight: 700;
-  color: var(--game-gold);
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
 .game-menu-shop {
   display: flex;
   flex-direction: column;
@@ -1678,8 +1842,20 @@
     font-size: 16px;
   }
 
-  .game-menu-banner {
-    width: 230px;
+  .game-hud-stat-bar {
+    min-width: 56px;
+    margin-right: 11px;
+    padding: 3px 26px 3px 12px;
+  }
+
+  .game-hud-stat-coin {
+    min-width: 96px;
+  }
+
+  .game-hud-stat-bar .game-hud-icon {
+    right: -13px;
+    width: 36px;
+    height: 36px;
   }
 
   .game-fab-wrap {

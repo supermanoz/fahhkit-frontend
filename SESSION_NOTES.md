@@ -112,3 +112,30 @@ Last updated: 2026-09-21, branch `RUN_CONQUER`, latest commit `f69c7be`.
 
 - Sibling repo at `~/Documents/FahhKit` (Spring Boot). **Never edit it** — diagnose only, hand off
   fixes as a spec even if asked directly.
+
+## Real-world map sky (replaces dark/light toggle)
+
+- `src/utils/mapAmbience.js`: fetches current weather + sunrise/sunset from Open-Meteo (free,
+  keyless, browser-callable) for the player's location and maps it to a phase
+  (dawn/day/dusk/night) × sky (clear/partly/overcast/fog/rain/snow/storm).
+- Look = stacked CSS filter on the basemap (`--ambience-filter` on `.territory-map`) plus a
+  `.territory-map-sky` overlay (sun glare, twilight tint, rain/snow/fog/lightning). Night reuses
+  the old dark-mode inversion. Animations are off under `prefers-reduced-motion`.
+- GamePage holds the loading screen ("Checking the sky…") until the weather lookup finishes or a
+  5s timeout passes. If the lookup fails, it falls back to a device-clock day/night guess.
+  Refetches every 15 min and re-checks the phase every minute.
+- The sun/moon button is removed; weather is shown via a one-off hype pop-up after load instead.
+- Open-Meteo's free tier is non-commercial only. A paid plan (or proxying through the backend) is
+  needed before a commercial launch.
+
+## Blaze animated map sprite
+
+- When Blaze is the active avatar (free pick or equipped Store Hero, same `showBlazeHeroSprite`
+  check as the Me tab), the map marker is a full-body sprite instead of the round photo:
+  `blaze-map-idle.png` when still, and `blaze-map-run-{up,down,left,right}.png` while moving.
+  Each is a 4-frame, 48×64 horizontal strip stepped by CSS (`.territory-map-blaze`).
+- The strips were cut from the artist's white-background sheets (edge flood-fill to transparent,
+  frames bottom-aligned into uniform cells, 2× resolution). The originals are not in the repo.
+- Moving = the GPS fix's reported speed > 0.5 m/s, held for 4s. `liveLocation` now keeps
+  speed/heading/accuracy, so the heading cone also works outside a tracked run. Direction = heading
+  quadrant (north = up). Nav view always uses "up" and counter-rotates him to stay upright.
