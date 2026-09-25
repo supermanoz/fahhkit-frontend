@@ -117,14 +117,15 @@ const REGISTRANT_FILTER_FIELDS = [
     label: 'BIB collection',
     type: 'select',
     icon: FaTag,
-    // No "Not collected" option yet: bibCollected lives in the backend's
-    // extra2 column, which stays NULL until a moderator first toggles it, and
-    // the search API has no not-equal/is-null match — an exact "false" would
-    // silently skip everyone who was never touched. Sort the BIB column
-    // (not-collected first) with Payment status = Paid for the call list.
+    // "Not collected" only matches registrants explicitly marked extra2 =
+    // "false" — it won't catch rows where extra2 is still NULL (a moderator
+    // never touched the toggle), since the search API has no not-equal/
+    // is-null match. Sort the BIB column (not-collected first) with Payment
+    // status = Paid to also catch the untouched/NULL rows for a call list.
     options: [
       { value: '', label: 'Any' },
       { value: 'true', label: 'Collected' },
+      { value: 'false', label: 'Not Collected' },
     ],
   },
   {
