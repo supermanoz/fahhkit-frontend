@@ -10,6 +10,7 @@ export const EVENT_TYPE_LABELS = {
   FLEXIBILITY: 'Flexibility',
   PHYSIQUE: 'Physique',
   RECREATIONAL: 'Recreational',
+  RAID: 'Raid',
 }
 
 export function formatDate(value) {

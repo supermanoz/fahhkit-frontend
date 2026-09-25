@@ -16,7 +16,7 @@ export const DEFAULT_CENTER = { lat: 27.7166, lng: 85.3247 }
 // surprise the runner later. The server's own values are the ones that actually
 // decide whether a run turns into territory.
 export const LOOP_MIN_POINTS = 10
-export const LOOP_MIN_AREA_SQ_METERS = 100
+export const LOOP_MIN_AREA_SQ_METERS = 2000
 export const LOOP_CLOSURE_THRESHOLD_METERS = 25
 
 // Radius around the player that findParcelsNear queries for territory to
@@ -242,7 +242,7 @@ export function loopPerimeterMeters(points) {
 }
 
 // Always km² (never raw m²) so area reads consistently everywhere it's shown. Precision scales
-// with magnitude so a just-claimed small parcel (LOOP_MIN_AREA_SQ_METERS = 100 m² = 0.0001 km²)
+// with magnitude so a just-claimed small parcel (LOOP_MIN_AREA_SQ_METERS = 2000 m² = 0.002 km²)
 // still shows a nonzero number instead of rounding away to "0.00 km²".
 export function formatArea(sqMeters) {
   if (!sqMeters) return '0 km²'

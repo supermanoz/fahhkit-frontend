@@ -211,3 +211,48 @@
     height: 220px;
   }
 }
+
+/* RAID events - shared boss health/damage bar. */
+.event-raid {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 90, 77, 0.14),
+    rgba(255, 122, 41, 0.08)
+  );
+  border: 1px solid rgba(255, 90, 77, 0.35);
+}
+
+.event-raid-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.event-raid-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.2);
+  overflow: hidden;
+}
+
+.event-raid-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffb15c, #ff5a4d);
+  transition: width 0.4s ease;
+}
+
+.event-raid-fill.is-defeated {
+  background: linear-gradient(90deg, #a8f0af, #4fc85e);
+}
+
+.event-raid-note {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

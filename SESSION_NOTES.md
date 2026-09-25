@@ -136,6 +136,41 @@ Last updated: 2026-09-21, branch `RUN_CONQUER`, latest commit `f69c7be`.
   Each is a 4-frame, 48×64 horizontal strip stepped by CSS (`.territory-map-blaze`).
 - The strips were cut from the artist's white-background sheets (edge flood-fill to transparent,
   frames bottom-aligned into uniform cells, 2× resolution). The originals are not in the repo.
-- Moving = the GPS fix's reported speed > 0.5 m/s, held for 4s. `liveLocation` now keeps
+- Moving (run animation) = a real jog, not phone wobble: fixes with accuracy ≤ 25m only; ≥ 2 fixes in
+  the last 12s reporting speed ≥ 1.8 m/s (skipped if the browser never reports speed) AND straight-line
+  ground covered in that window ≥ max(8m, worse fix's accuracy) at ≥ ~1.26 m/s average. Held 3s after
+  the last qualifying fix so it doesn't flicker. Heading cone still uses the looser 0.5 m/s rule. `liveLocation` now keeps
   speed/heading/accuracy, so the heading cone also works outside a tracked run. Direction = heading
   quadrant (north = up). Nav view always uses "up" and counter-rotates him to stay upright.
+
+## Backend catch-up (2026-09-25) — mail, PvP races, heroes, raid, Google sign-in
+
+Frontend for backend commits `ea0f213`…`d528e87` on `feature/territory-game`:
+
+- **Live pushes**: `src/hooks/useGameSocket.js` (`@stomp/stompjs`, raw WS at `{api}/ws`). `/specific/{userId}`
+  carries run outcome (`outcome`), mail (`recipientId`+`type`) and territory events (`eventType`) — sniffed
+  by shape. PvP has its own `/specific/{userId}/pvp-*` sub-destinations. Everything degrades to REST
+  polling if the socket never connects.
+- **Run outcome**: rejected runs (cheat / loop not closed / area too small / crossed itself) now show a
+  reason toast instead of the generic timeout. `LOOP_MIN_AREA_SQ_METERS` is 2000 to match the server.
+- **Mail tab**: `useMailbox` + `MailPanel` (inbox + News/broadcasts, claim gift, join/decline club invite).
+- **Race tab**: `usePvp` + `PvpPanel` — quick match queue, nearby discovery (opt-in, location pinged every
+  2 min), direct challenge with custom stake, accept/decline/cancel, results. "Start Race Run" starts the
+  tracker with `challengeId` (persisted in the tracker's saved run) and `createRun` sends it.
+- **Heroes**: own **Heroes** menu tab (`HeroGallery`, Dota-style tall cards). Heroes with sprite strips
+  (`src/utils/heroSprites.js`, keyed by lowercased name - only Blaze today) stand animated in their card
+  and break into a run on hover; others show their portrait. Tapping opens `HeroDetailModal` (pose
+  toggle, ability stat bars, backstory lore, skins with Equip / Buy → the normal purchase confirm).
+  Shop keeps a "Meet the Heroes" link; HERO items still show their perk.
+- **TEMP: Blaze is everyone's default hero.** The backend's seeded "Default Hero" item (owned+equipped by
+  every account) is ignored by the frontend (`isPlaceholderHero` in `utils/hero.js`) and hidden from the
+  Heroes tab, so anyone without a real Store Hero equipped plays as Blaze. The Shop's free Avatar picker is
+  hidden (it duplicated Heroes) and `avatarId` is pinned to Blaze. Avatar art in `constants/avatars.js`
+  now doubles as hero portraits by name (`getAvatarByName`). Search `TEMP` to revert.
+  Caveat: server-side the player still has "Default Hero" equipped, so Blaze's +5% PACE perk is **not**
+  applied to scoring until the backend grants/equips a Blaze skin by default.
+- **Clubs**: partial-name search via `/v1/club/search`; leaders/co-leaders get "Invite to my club" on a
+  player's profile (sends a CLUB_INVITE mail).
+- **Raid events**: RAID type + target score on create/edit, boss-HP bar on event detail, raid events
+  allowed on Track a Run.
+- **Google sign-in**: `GoogleSignInButton` on Login (hidden unless `VITE_GOOGLE_CLIENT_ID` is set).

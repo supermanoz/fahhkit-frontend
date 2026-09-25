@@ -30,3 +30,15 @@ export function requestToJoinClub(clubId) {
 export function leaveClub(clubId) {
   return postJson(`/v1/club/${clubId}/leave`, {})
 }
+
+// Case-insensitive "name contains" lookup, unlike findClubs' exact-field
+// search - what a type-ahead actually wants.
+export function searchClubsByName(name) {
+  return getJson(`/v1/club/search?name=${encodeURIComponent(name)}`)
+}
+
+// Sends the target player a CLUB_INVITE mail - they accept or decline it
+// from their inbox.
+export function inviteToClub(clubId, targetUserId, message) {
+  return postJson(`/v1/club/${clubId}/invite`, { targetUserId, message })
+}

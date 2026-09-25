@@ -15,9 +15,25 @@ export default function AthleteTerritoryProfilePanel({
   fullName,
   areaEmoji,
   onClose,
+  canInvite = false,
+  onInvite,
 }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState(null)
+  const [inviteState, setInviteState] = useState(null)
+
+  async function handleInvite() {
+    setInviteState({ phase: 'sending' })
+    try {
+      await onInvite(userId)
+      setInviteState({ phase: 'sent' })
+    } catch (err) {
+      setInviteState({
+        phase: 'error',
+        message: err?.message || 'Could not send that invite.',
+      })
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -75,6 +91,34 @@ export default function AthleteTerritoryProfilePanel({
                 Level {profile.level} · {profile.xp ?? 0} XP
                 {profile.clubName ? ` · ${profile.clubName}` : ''}
               </p>
+            )}
+
+            {/* Leaders/co-leaders only, and only for players not already in
+                a club - the backend enforces both, this just hides a button
+                that could never work. */}
+            {canInvite && onInvite && !profile.clubName && (
+              <div className="athlete-profile-invite">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleInvite}
+                  disabled={
+                    inviteState?.phase === 'sending' ||
+                    inviteState?.phase === 'sent'
+                  }
+                >
+                  {inviteState?.phase === 'sent'
+                    ? 'Invite sent 📬'
+                    : inviteState?.phase === 'sending'
+                      ? 'Sending…'
+                      : 'Invite to my club'}
+                </button>
+                {inviteState?.phase === 'error' && (
+                  <p className="game-controls-hint game-controls-hint-error">
+                    {inviteState.message}
+                  </p>
+                )}
+              </div>
             )}
 
             <p className="game-menu-section-title">

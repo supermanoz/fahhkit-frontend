@@ -1,0 +1,156 @@
+/* Idle "go run" pop-up: character bursting in from the left with a comic
+   speech bubble. Uses the game palette tokens from .game-page. */
+.idle-nudge {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--sheet-h, 90px) + 96px);
+  translate: -50% 0;
+  z-index: 1250;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.idle-nudge-character {
+  flex-shrink: 0;
+  width: 128px;
+  height: 128px;
+  margin-right: -14px;
+  filter: drop-shadow(0 6px 0 rgba(61, 43, 26, 0.5))
+    drop-shadow(0 0 16px rgba(255, 122, 41, 0.45));
+  animation: idle-nudge-bounce 1.2s ease-in-out infinite;
+}
+
+.idle-nudge-character img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+@keyframes idle-nudge-bounce {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.idle-nudge-bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 28px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, #fffaf0, var(--game-cream));
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -4px 0 rgba(224, 163, 85, 0.35),
+    0 5px 0 var(--game-ink),
+    0 10px 22px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+/* Bubble tail pointing at the character. */
+.idle-nudge-bubble::before,
+.idle-nudge-bubble::after {
+  content: '';
+  position: absolute;
+  left: -16px;
+  bottom: 18px;
+  border: 10px solid transparent;
+  border-right: 16px solid var(--game-ink);
+  border-left: 0;
+}
+
+.idle-nudge-bubble::after {
+  left: -10px;
+  bottom: 21px;
+  border-width: 7px 12px 7px 0;
+  border-right-color: #fffaf0;
+}
+
+.idle-nudge-shout {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--game-gold);
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
+}
+
+.idle-nudge-line {
+  margin: 6px 0 10px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.idle-nudge-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.idle-nudge-go,
+.idle-nudge-later {
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.idle-nudge-go {
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 3px solid var(--game-ink);
+  background: var(--game-red);
+  color: var(--game-cream);
+  font-size: 15px;
+  box-shadow:
+    inset 0 -5px 0 var(--game-red-dark),
+    inset 0 2px 0 var(--game-red-light),
+    0 4px 0 var(--game-ink);
+}
+
+.idle-nudge-go.is-battle {
+  background: var(--game-gold);
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -5px 0 var(--game-gold-dark),
+    inset 0 2px 0 var(--game-gold-light),
+    0 4px 0 var(--game-ink);
+}
+
+.idle-nudge-go:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 -5px 0 var(--game-red-dark),
+    inset 0 2px 0 var(--game-red-light),
+    0 1px 0 var(--game-ink);
+}
+
+.idle-nudge-later {
+  padding: 4px;
+  border: none;
+  background: none;
+  color: rgba(61, 43, 26, 0.7);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+@media (max-width: 400px) {
+  .idle-nudge-line {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-nudge-character {
+    animation: none;
+  }
+}

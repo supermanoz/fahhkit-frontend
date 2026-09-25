@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   FaCheck,
+  FaChevronDown,
   FaCoins,
+  FaEnvelope,
   FaFlag,
   FaListUl,
-  FaLock,
   FaPlay,
   FaStore,
   FaTimes,
@@ -20,6 +21,9 @@ import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
+import { useGameSocket } from '../hooks/useGameSocket'
+import { useMailbox } from '../hooks/useMailbox'
+import { usePvp } from '../hooks/usePvp'
 import { ApiError, resolveFileUrl } from '../api/client'
 import { createRun, getRun, getRuns } from '../api/runs'
 import {
@@ -30,8 +34,12 @@ import {
   findParcelsNear,
   getTerritoryProfile,
 } from '../api/territory'
+import { getMyClub, inviteToClub } from '../api/club'
+import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
+  findHeroes,
+  getHero,
   getOwnedStoreItems,
   getStoreCatalog,
   purchaseStoreItem,
@@ -75,19 +83,26 @@ import {
   playMenuSound,
   playMilestoneChime,
 } from '../utils/gameSound'
-import { isBlazeHero } from '../utils/hero'
+import {
+  describeHeroAbility,
+  isBlazeHero,
+  isPlaceholderHero,
+} from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
 import ClubPanel from '../components/ClubPanel'
+import MailPanel from '../components/MailPanel'
+import PvpPanel from '../components/PvpPanel'
+import HeroGallery from '../components/HeroGallery'
+import HeroDetailModal from '../components/HeroDetailModal'
+import { GiSpartanHelmet } from 'react-icons/gi'
+import { RaceTabIcon } from '../components/CrossedSwordsIcon'
+import IdleNudge from '../components/IdleNudge'
 import LeaderboardPodium from '../components/LeaderboardPodium'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import runConquestLogo from '../assets/images/run-conquest-logo.png'
-import {
-  AVATARS,
-  COMING_SOON_AVATARS,
-  getAvatarById,
-  loadAvatarId,
-  saveAvatarId,
-} from '../constants/avatars'
+// TEMP: AVATARS / COMING_SOON_AVATARS / loadAvatarId return with the
+// Shop's Avatar picker (see avatarId below).
+import { getAvatarById, saveAvatarId } from '../constants/avatars'
 import {
   MAP_STYLES,
   getMapStyleById,
@@ -157,6 +172,77 @@ const RADIAL_ITEMS = [
 // not an error), so a timeout here isn't necessarily bad news.
 const RESULT_POLL_ATTEMPTS = 6
 const RESULT_POLL_DELAY_MS = 2500
+
+// How the server processed a run (RunScoreBreakdownResponse, pushed over the
+// socket - see useGameSocket). SUCCESS still goes through the territory-event
+// summary below; these are the "no territory, here's why" cases, which used
+// to just look like a silent timeout.
+const RUN_REJECTION_COPY = {
+  CHEAT_DETECTED: {
+    title: 'Whoa there, speedster 🛵',
+    message:
+      "That pace looked more scooter than sneakers, so this one didn't count for territory.",
+  },
+  NOT_ENOUGH_POINTS: {
+    title: 'GPS lost the plot 📡',
+    message:
+      'Not enough location fixes came through to draw your loop. Keep the game open while you run and try again.',
+  },
+  LOOP_NOT_CLOSED: {
+    title: 'So close, loop-wise 🔁',
+    message:
+      'Your route never made it back near the start. Finish where you began to seal the territory.',
+  },
+  AREA_TOO_SMALL: {
+    title: 'Cozy, but tiny 🏠',
+    message: `That loop didn't enclose enough ground. Territory needs at least ${LOOP_MIN_AREA_SQ_METERS.toLocaleString()} m² inside it, so go bigger.`,
+  },
+  INVALID_GEOMETRY_AFTER_REPAIR: {
+    title: 'That shape broke geometry 🥨',
+    message:
+      'Your route crossed itself too many times to make a valid territory. A cleaner loop will do it.',
+  },
+}
+
+function describeRunRejection(outcome) {
+  if (!outcome || outcome.outcome === 'SUCCESS') return null
+  const key =
+    outcome.outcome === 'CHEAT_DETECTED'
+      ? 'CHEAT_DETECTED'
+      : outcome.rejectionReason || 'LOOP_NOT_CLOSED'
+  return (
+    RUN_REJECTION_COPY[key] || {
+      title: 'No territory this time',
+      message: outcome.message || 'This run did not count as territory.',
+    }
+  )
+}
+
+const PVP_ALERT_COPY = {
+  matched: {
+    title: 'Rival found! ⚔️',
+    line: 'Confirm the race to lock in stakes.',
+  },
+  received: {
+    title: 'You got called out 🫵',
+    line: 'Someone nearby wants to race you.',
+  },
+  started: { title: 'Race is ON 🏁', line: 'Stakes locked. Go run it.' },
+  resolved: {
+    title: 'Race results are in 🏆',
+    line: 'Tap to see who took the pot.',
+  },
+  expired: {
+    title: 'Queue timed out ⌛',
+    line: 'Nobody bit this time. Try again?',
+  },
+}
+
+// Idle nudge: pops Blaze up to egg the player on after this long with no
+// taps/keys and no movement on the map; after "Not now" it waits longer
+// before trying again so it doesn't nag.
+const IDLE_NUDGE_MS = 7 * 1000
+const IDLE_NUDGE_SNOOZE_MS = 3 * 60 * 1000
 
 const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
@@ -282,17 +368,25 @@ export default function GamePage() {
   const [coinBundlesError, setCoinBundlesError] = useState(null)
   const [buyingBundleAmount, setBuyingBundleAmount] = useState(null)
   const [coinBuyError, setCoinBuyError] = useState(null)
+  const [heroes, setHeroes] = useState([])
+  const [heroesLoading, setHeroesLoading] = useState(false)
+  // Id, not the object, so the modal picks up the refreshed hero after an
+  // equip reloads the roster.
+  const [selectedHeroId, setSelectedHeroId] = useState(null)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTab, setMenuTab] = useState('me')
   const [radialOpen, setRadialOpen] = useState(false)
+  const [tabPickerOpen, setTabPickerOpen] = useState(false)
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   const [viewingProfile, setViewingProfile] = useState(null)
   const [storeChoice, setStoreChoice] = useState(null)
-  const [avatarId, setAvatarId] = useState(
-    () => loadAvatarId() || AVATARS[0].id
-  )
+  // TEMP: Blaze for everyone for now - the Avatar picker is hidden from the
+  // Shop (Heroes tab replaces it), so an old saved pick would be stuck with
+  // no way to change it. Restore `loadAvatarId() || AVATARS[0].id` when
+  // the picker comes back.
+  const [avatarId, setAvatarId] = useState(() => getAvatarById('blaze').id)
   const [avatarChoice, setAvatarChoice] = useState(null)
   const [mapStyleId, setMapStyleId] = useState(
     () => loadMapStyleId() || MAP_STYLES[0].id
@@ -411,6 +505,53 @@ export default function GamePage() {
     tracker.status === 'tracking' && tracker.path.length > 0
       ? tracker.path[tracker.path.length - 1]
       : liveLocation || center
+
+  const mailbox = useMailbox()
+  const pvp = usePvp({ userId: isAuthed ? user?.id : null, playerLocation })
+
+  // Run-processing outcomes pushed over the socket, keyed by run id - the
+  // push can land before OR after createRun() resolves, so it's parked here
+  // and checked from both sides (onRunProcessed and attemptSubmit).
+  const runOutcomesRef = useRef({})
+  // The run whose result toast is currently showing; once its outcome is
+  // known, the territory-event poll for it stops early.
+  const watchedRunIdRef = useRef(null)
+  const settledRunIdRef = useRef(null)
+
+  function showRunOutcome(outcome) {
+    const rejection = describeRunRejection(outcome)
+    if (!rejection) return false
+    settledRunIdRef.current = outcome.runId
+    setRunResult({ phase: 'rejected', ...rejection })
+    refreshProfile()
+    return true
+  }
+
+  useGameSocket(isAuthed ? user?.id : null, {
+    onRunProcessed: (outcome) => {
+      runOutcomesRef.current[outcome.runId] = outcome
+      if (outcome.runId === watchedRunIdRef.current) showRunOutcome(outcome)
+    },
+    onMail: mailbox.receiveMail,
+    onBroadcastMail: mailbox.receiveBroadcast,
+    onPvp: (eventName, payload) => {
+      pvp.handlePush(eventName, payload)
+      // Stakes move on accept, payouts on resolve.
+      if (
+        eventName === 'pvp-challenge-resolved' ||
+        eventName === 'pvp-challenge-reviewed'
+      ) {
+        refreshProfile()
+      }
+    },
+  })
+
+  useEffect(() => {
+    if (!pvp.alert) return
+    const hide = setTimeout(pvp.clearAlert, 7000)
+    return () => clearTimeout(hide)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvp.alert])
 
   // Read through a ref so the refresh interval below doesn't restart on
   // every GPS update.
@@ -590,18 +731,128 @@ export default function GamePage() {
     lastBearingFixRef.current = playerLocation
   }, [playerLocation])
 
-  // Drives Blaze's idle vs. running sprite on the map. Uses the fix's own
-  // reported speed (same noise reasoning as the heading above) and holds
-  // "moving" for a few seconds after the last fast fix, so a single slow
-  // or missed GPS reading doesn't flicker him back to idle mid-run.
+  // Drives Blaze's idle vs. running sprite on the map. A phone sitting on a
+  // table (or being waved around in a hand) still produces GPS fixes that
+  // drift a few metres and can report small speeds, so a single fast-ish
+  // reading is NOT enough. Blaze only runs when the movement looks like a
+  // real run/jog, confirmed two ways at once:
+  //   1. the device's own reported speed is at jogging pace on at least two
+  //      of the recent fixes (not a one-off spike), and
+  //   2. the player has actually covered ground: straight-line distance
+  //      over the recent window beats both a minimum AND the fixes' own
+  //      accuracy margin, so drift inside the GPS error circle never counts.
+  // Fixes with poor accuracy are ignored entirely. Once running, it holds
+  // for a few seconds so a missed/slow fix mid-run doesn't flicker him
+  // back to idle.
+  const RUN_ANIM_MIN_SPEED_MPS = 1.8 // ~9:15 min/km - a slow jog
+  const RUN_ANIM_MAX_ACCURACY_M = 25
+  const RUN_ANIM_WINDOW_MS = 12000
+  const RUN_ANIM_MIN_DISPLACEMENT_M = 8
+  const RUN_ANIM_HOLD_MS = 3000
+  const recentFixesRef = useRef([])
+  const lastRunningAtRef = useRef(0)
   const [playerMoving, setPlayerMoving] = useState(false)
   useEffect(() => {
-    if ((playerLocation?.speed ?? 0) > MIN_TRUSTED_SPEED_MPS) {
-      setPlayerMoving(true)
+    const fix = playerLocation
+    if (
+      !fix ||
+      fix.accuracy == null ||
+      fix.accuracy > RUN_ANIM_MAX_ACCURACY_M
+    ) {
+      return
     }
-    const settle = setTimeout(() => setPlayerMoving(false), 4000)
-    return () => clearTimeout(settle)
+    const now = Date.now()
+    const recent = [
+      ...recentFixesRef.current.filter((f) => now - f.at <= RUN_ANIM_WINDOW_MS),
+      { ...fix, at: now },
+    ]
+    recentFixesRef.current = recent
+
+    const fastFixes = recent.filter(
+      (f) => (f.speed ?? 0) >= RUN_ANIM_MIN_SPEED_MPS
+    ).length
+    const first = recent[0]
+    const covered = recent.length > 1 ? haversineDistance(first, fix) : 0
+    const elapsedS = (now - first.at) / 1000
+    // The larger of the two error circles, not their sum - summing made a
+    // real slow jog on average GPS (±15m) need 30m in one window.
+    const noiseFloor = Math.max(first.accuracy || 0, fix.accuracy || 0)
+    const coveredRealGround =
+      covered >= Math.max(RUN_ANIM_MIN_DISPLACEMENT_M, noiseFloor) &&
+      elapsedS > 0 &&
+      covered / elapsedS >= RUN_ANIM_MIN_SPEED_MPS * 0.7
+    // Some browsers never report speed - then ground covered alone decides.
+    const speedReported = recent.some((f) => f.speed != null)
+    const running = coveredRealGround && (!speedReported || fastFixes >= 2)
+
+    if (!running) return
+    lastRunningAtRef.current = now
+    setPlayerMoving(true)
   }, [playerLocation])
+
+  // Drops back to idle once nothing has qualified as running for
+  // RUN_ANIM_HOLD_MS - whether fixes stopped arriving or keep arriving slow.
+  useEffect(() => {
+    if (!playerMoving) return
+    const check = setInterval(() => {
+      if (Date.now() - lastRunningAtRef.current > RUN_ANIM_HOLD_MS) {
+        setPlayerMoving(false)
+      }
+    }, 500)
+    return () => clearInterval(check)
+  }, [playerMoving])
+
+  const [idleNudgeOpen, setIdleNudgeOpen] = useState(false)
+  const idleDelayRef = useRef(IDLE_NUDGE_MS)
+  // Only nag when it makes sense: game on screen, nothing running or
+  // waiting to submit, no menu/sheet/toast in the way.
+  const canNudge =
+    gameReady &&
+    tracker.status !== 'tracking' &&
+    !tracker.pendingRun &&
+    !menuOpen &&
+    !radialOpen &&
+    !coinShopOpen &&
+    !viewingProfile &&
+    !runResult &&
+    !saveError &&
+    !playerMoving
+  useEffect(() => {
+    if (!canNudge) {
+      setIdleNudgeOpen(false)
+      return
+    }
+    if (idleNudgeOpen) return
+    let timer
+    const arm = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => setIdleNudgeOpen(true), idleDelayRef.current)
+    }
+    arm()
+    const events = ['pointerdown', 'keydown', 'wheel', 'touchmove']
+    events.forEach((e) => window.addEventListener(e, arm, { passive: true }))
+    return () => {
+      clearTimeout(timer)
+      events.forEach((e) => window.removeEventListener(e, arm))
+    }
+  }, [canNudge, idleNudgeOpen])
+
+  function dismissIdleNudge() {
+    idleDelayRef.current = IDLE_NUDGE_SNOOZE_MS
+    setIdleNudgeOpen(false)
+  }
+
+  function runFromIdleNudge() {
+    idleDelayRef.current = IDLE_NUDGE_MS
+    setIdleNudgeOpen(false)
+    handleStartRun()
+  }
+
+  function battleFromIdleNudge() {
+    idleDelayRef.current = IDLE_NUDGE_MS
+    setIdleNudgeOpen(false)
+    openMenu('race')
+  }
 
   async function refreshProfile() {
     try {
@@ -657,6 +908,7 @@ export default function GamePage() {
     refreshProfile()
     refreshNearbyParcels()
     refreshOwnedItems()
+    mailbox.refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locating, isAuthed])
 
@@ -771,6 +1023,50 @@ export default function GamePage() {
         err instanceof ApiError ? err.message : 'Could not load the shop.'
       )
     }
+    loadHeroes()
+  }
+
+  // The roster list has no abilities on it, only the per-hero detail does -
+  // fine to fan out since it's a handful of heroes, and a failure just
+  // leaves the Heroes tab empty.
+  async function loadHeroes() {
+    setHeroesLoading(true)
+    try {
+      const page = await findHeroes(1, 20)
+      const roster = (page?.content || []).filter((h) => h.active !== false)
+      const details = await Promise.all(
+        roster.map((h) => getHero(h.id).catch(() => h))
+      )
+      setHeroes(details)
+    } catch {
+      setHeroes([])
+    } finally {
+      setHeroesLoading(false)
+    }
+  }
+
+  // Leaders/co-leaders can invite players they find on the leaderboard.
+  const canInviteToClub =
+    profile?.clubRole === 'LEADER' || profile?.clubRole === 'CO_LEADER'
+
+  async function handleInviteToClub(targetUserId) {
+    const club = await getMyClub()
+    if (!club) throw new Error("You're not in a club anymore.")
+    await inviteToClub(club.id, targetUserId)
+  }
+
+  function handleMailClaimed(item) {
+    if (item.type === 'STORE_ITEM_GRANT') {
+      refreshOwnedItems()
+      if (storeCatalog.length > 0) loadStore()
+    }
+    if (item.type === 'CLUB_INVITE') refreshProfile()
+  }
+
+  function handleStartRace(challenge) {
+    setMenuOpen(false)
+    setGpsErrorDismissed(false)
+    tracker.start(null, { challengeId: challenge.id })
   }
 
   function openMenu(tab) {
@@ -851,7 +1147,11 @@ export default function GamePage() {
     setMenuTab(tab)
     if (tab === 'leaderboard' && leaderboard.length === 0) loadLeaderboard()
     if (tab === 'shop' && storeCatalog.length === 0) loadStore()
+    // loadStore also loads the heroes, plus owned items for their badges.
+    if (tab === 'heroes' && heroes.length === 0) loadStore()
     if (tab === 'me' && myRuns.length === 0) loadMyRuns()
+    if (tab === 'mail') mailbox.refresh()
+    if (tab === 'race') pvp.refreshChallenges()
   }
 
   function handleStartRun() {
@@ -972,9 +1272,12 @@ export default function GamePage() {
         duration: pendingRun.duration,
         startedAt: toLocalDateTimeString(pendingRun.startedAt),
         endedAt: toLocalDateTimeString(pendingRun.endedAt),
+        challengeId: pendingRun.challengeId || undefined,
       })
+      if (pendingRun.challengeId) pvp.refreshChallenges()
       setCompletedRun({
         id: created.id,
+        isRace: Boolean(pendingRun.challengeId),
         points: pendingRun.points,
         distance: pendingRun.distance,
         duration: pendingRun.duration,
@@ -982,7 +1285,7 @@ export default function GamePage() {
       })
       discardDraft()
       setSaving(false)
-      pollForTerritoryResult(submittedAt)
+      pollForTerritoryResult(submittedAt, created.id)
     } catch (err) {
       // Deliberately not clearing the pending run - it stays saved (see
       // useRunTracker) so "Retry Save" works even after closing the app.
@@ -997,10 +1300,16 @@ export default function GamePage() {
     }
   }
 
-  async function pollForTerritoryResult(submittedAt) {
+  async function pollForTerritoryResult(submittedAt, runId) {
+    watchedRunIdRef.current = runId
+    settledRunIdRef.current = null
     setRunResult({ phase: 'processing' })
+    const early = runOutcomesRef.current[runId]
+    if (early && showRunOutcome(early)) return
     for (let attempt = 0; attempt < RESULT_POLL_ATTEMPTS; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, RESULT_POLL_DELAY_MS))
+      // The socket already told us it's a no-territory run - stop polling.
+      if (settledRunIdRef.current === runId) return
       try {
         const page = await findMyTerritoryEvents(1, 5)
         // A single run can produce more than one event in the same pass —
@@ -1021,6 +1330,7 @@ export default function GamePage() {
         // A transient failure here shouldn't cut the wait short - just try again.
       }
     }
+    if (settledRunIdRef.current === runId) return
     setRunResult({ phase: 'timeout' })
     refreshProfile()
     refreshNearbyParcels()
@@ -1055,6 +1365,17 @@ export default function GamePage() {
       )
     }
   }
+
+  const galleryHeroes = heroes.filter((h) => !isPlaceholderHero(h.name))
+  // The hero the player is actually playing as: an equipped Store Hero,
+  // else Blaze (the default).
+  const activeHeroId = equippedHero
+    ? equippedHero.storeItem.heroId
+    : heroes.find((h) => isBlazeHero(h.name))?.id
+  const selectedHero = selectedHeroId
+    ? heroes.find((h) => h.id === selectedHeroId) || null
+    : null
+  const closeHeroModal = useCallback(() => setSelectedHeroId(null), [])
 
   const isMyEntry = (entry) => entry.userId === user?.id
   const highlightedOwnerId = highlightedEntry?.userId ?? null
@@ -1095,6 +1416,55 @@ export default function GamePage() {
       pendingRun.points[pendingRun.points.length - 1]
     ) > LOOP_CLOSURE_THRESHOLD_METERS
 
+  const menuTabs = [
+    { id: 'leaderboard', label: 'Leaderboard', Icon: FaTrophy, tone: 'gold' },
+    { id: 'club', label: 'Club', Icon: FaUsers, tone: 'green' },
+    {
+      id: 'race',
+      label: 'Race',
+      Icon: RaceTabIcon,
+      tone: 'battle',
+      badge: pvp.actionCount > 0 ? String(pvp.actionCount) : null,
+    },
+    {
+      id: 'mail',
+      label: 'Mail',
+      Icon: FaEnvelope,
+      tone: 'stone',
+      badge:
+        mailbox.unreadCount > 0
+          ? mailbox.unreadCount > 9
+            ? '9+'
+            : String(mailbox.unreadCount)
+          : null,
+    },
+    { id: 'me', label: 'Me', Icon: FaUser, tone: 'green' },
+    { id: 'heroes', label: 'Heroes', Icon: GiSpartanHelmet, tone: 'red' },
+    { id: 'shop', label: 'Shop', Icon: FaStore, tone: 'wood' },
+  ]
+  const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
+  // Collapsed picker shows one dot summing what's waiting on other tabs.
+  const otherTabsBadgeCount =
+    (menuTab === 'race' ? 0 : pvp.actionCount) +
+    (menuTab === 'mail' ? 0 : mailbox.unreadCount)
+
+  // Live PvP race this tracked run counts for, if any.
+  const raceChallenge = tracker.challengeId
+    ? pvp.challenges.find((c) => c.id === tracker.challengeId) || null
+    : null
+  const raceProgress = raceChallenge?.distanceMeters
+    ? tracker.distance / raceChallenge.distanceMeters
+    : 0
+  const raceModeLabel = raceChallenge
+    ? getPvpModeByMeters(raceChallenge.distanceMeters)?.label ||
+      formatMeters(raceChallenge.distanceMeters)
+    : ''
+  const raceOpponentName = raceChallenge
+    ? raceChallenge.challengerId === user?.id
+      ? raceChallenge.opponentName
+      : raceChallenge.challengerName
+    : ''
+
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
   const currentAreaEmoji = getAreaEmojiById(areaEmojiId)
@@ -1102,8 +1472,13 @@ export default function GamePage() {
   // image (the others are borders/colors/backgrounds meant to layer onto a
   // profile picture, not stand in for one) — equipping one takes priority
   // over the local placeholder picker below since it's a real, owned item.
+  // TEMP: the backend's placeholder "Default Hero" doesn't count - see
+  // isPlaceholderHero - so new players land on Blaze.
   const equippedHero = ownedItems.find(
-    (o) => o.equipped && o.storeItem.category === 'HERO'
+    (o) =>
+      o.equipped &&
+      o.storeItem.category === 'HERO' &&
+      !isPlaceholderHero(o.storeItem.name)
   )
   const avatarSrc =
     (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
@@ -1174,9 +1549,14 @@ export default function GamePage() {
   if (!userLoading && !isAuthed) {
     return (
       <div className="game-page">
-        <div className="game-confirm-overlay" style={{ position: 'fixed' }}>
-          <div className="game-confirm-card">
-            <p>
+        <div className="game-loading-overlay">
+          <img
+            src={runConquestLogo}
+            alt="Run Conquest"
+            className="game-loading-logo"
+          />
+          <div className="game-loading-footer game-loading-footer--gate">
+            <p className="game-loading-text">
               Sign in to play Territory Run — claiming ground, GPS runs, and
               Fahhcoin are for logged-in athletes only.
             </p>
@@ -1184,7 +1564,11 @@ export default function GamePage() {
               <Link to="/" className="btn btn-outline">
                 Back to Home
               </Link>
-              <Link to="/login" className="btn btn-primary">
+              <Link
+                to="/login"
+                state={{ from: '/game' }}
+                className="btn btn-primary"
+              >
                 Sign In
               </Link>
             </div>
@@ -1348,6 +1732,66 @@ export default function GamePage() {
               <span className="game-weather-hype-line">{weatherHype.line}</span>
             </span>
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      {raceChallenge && tracker.status === 'tracking' && (
+        <div
+          className={`pvp-race-hud ${raceProgress >= 1 ? 'is-done' : ''}`}
+          role="status"
+        >
+          {raceProgress >= 1
+            ? `🏁 ${raceModeLabel} done! Hit End and submit your race.`
+            : `⚡ Race vs ${raceOpponentName} · ${formatMeters(
+                Math.max(0, raceChallenge.distanceMeters - tracker.distance)
+              )} to go`}
+          <div className="pvp-race-hud-bar">
+            <div
+              className="pvp-race-hud-fill"
+              style={{ width: `${Math.min(100, raceProgress * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {pvp.alert && PVP_ALERT_COPY[pvp.alert.kind] && (
+          <motion.button
+            type="button"
+            key={`pvp-${pvp.alert.kind}-${pvp.alert.challenge?.id || ''}`}
+            className="game-weather-hype game-pvp-alert"
+            onClick={() => {
+              pvp.clearAlert()
+              openMenu('race')
+            }}
+            initial={{ opacity: 0, y: -40, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+          >
+            <span className="game-weather-hype-emoji" aria-hidden="true">
+              ⚔️
+            </span>
+            <span className="game-weather-hype-body">
+              <strong className="game-weather-hype-title">
+                {PVP_ALERT_COPY[pvp.alert.kind].title}
+              </strong>
+              <span className="game-weather-hype-line">
+                {PVP_ALERT_COPY[pvp.alert.kind].line}
+              </span>
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {idleNudgeOpen && (
+          <IdleNudge
+            key="idle-nudge"
+            onRun={runFromIdleNudge}
+            onBattle={battleFromIdleNudge}
+            onDismiss={dismissIdleNudge}
+          />
         )}
       </AnimatePresence>
 
@@ -1572,6 +2016,31 @@ export default function GamePage() {
                 <h3>Run submitted!</h3>
                 {renderCompletedRunStats()}
                 <p>Checking your territory…</p>
+                {completedRun?.isRace && (
+                  <p className="game-controls-hint">
+                    🏁 Race time logged. Results land once your rival runs too.
+                    Check the Race tab.
+                  </p>
+                )}
+              </>
+            )}
+            {runResult.phase === 'rejected' && (
+              <>
+                <h3>{runResult.title}</h3>
+                {renderCompletedRunStats()}
+                <p>{runResult.message}</p>
+                {completedRun?.isRace && (
+                  <p className="game-controls-hint">
+                    🏁 Your race time still counts. Check the Race tab.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setRunResult(null)}
+                >
+                  Got it
+                </button>
               </>
             )}
             {runResult.phase === 'done' &&
@@ -1675,45 +2144,128 @@ export default function GamePage() {
             <button
               type="button"
               className="game-menu-close"
-              onClick={() => setMenuOpen(false)}
+              onClick={() => {
+                setMenuOpen(false)
+                setTabPickerOpen(false)
+              }}
               aria-label="Close menu"
             >
               <FaTimes />
             </button>
 
+            {/* Desktop: one row of tabs. Phones: a single game-style
+                picker showing the current tab, which drops down the rest -
+                six tabs in a row/grid was too cramped on a narrow screen. */}
             <div className="game-menu-tabs">
+              {menuTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}`}
+                  onClick={() => switchTab(tab.id)}
+                >
+                  <span
+                    className={`game-menu-picker-medal game-menu-tab-medal tone-${tab.tone}`}
+                  >
+                    <tab.Icon />
+                  </span>
+                  {tab.label}
+                  {tab.badge && (
+                    <span className="game-menu-tab-badge">{tab.badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="game-menu-picker">
+              {tabPickerOpen && (
+                <div
+                  className="game-menu-picker-scrim"
+                  onClick={() => setTabPickerOpen(false)}
+                />
+              )}
               <button
                 type="button"
-                className={`game-menu-tab ${menuTab === 'leaderboard' ? 'active' : ''}`}
-                onClick={() => switchTab('leaderboard')}
+                className="game-menu-picker-current"
+                onClick={() => setTabPickerOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={tabPickerOpen}
               >
-                <FaTrophy />
-                Leaderboard
+                <span
+                  className={`game-menu-picker-medal tone-${activeMenuTab.tone}`}
+                >
+                  <activeMenuTab.Icon />
+                </span>
+                <span className="game-menu-picker-label">
+                  {activeMenuTab.label}
+                </span>
+                {!tabPickerOpen && otherTabsBadgeCount > 0 && (
+                  <span className="game-menu-tab-badge game-menu-picker-badge">
+                    {otherTabsBadgeCount > 9 ? '9+' : otherTabsBadgeCount}
+                  </span>
+                )}
+                <span
+                  className={`game-menu-picker-knob ${tabPickerOpen ? 'is-open' : ''}`}
+                >
+                  <FaChevronDown />
+                </span>
               </button>
-              <button
-                type="button"
-                className={`game-menu-tab ${menuTab === 'club' ? 'active' : ''}`}
-                onClick={() => switchTab('club')}
-              >
-                <FaUsers />
-                Club
-              </button>
-              <button
-                type="button"
-                className={`game-menu-tab ${menuTab === 'me' ? 'active' : ''}`}
-                onClick={() => switchTab('me')}
-              >
-                <FaUser />
-                Me
-              </button>
-              <button
-                type="button"
-                className={`game-menu-tab ${menuTab === 'shop' ? 'active' : ''}`}
-                onClick={() => switchTab('shop')}
-              >
-                <FaStore />
-                Shop
-              </button>
+              <AnimatePresence>
+                {tabPickerOpen && (
+                  <motion.ul
+                    className="game-menu-picker-list"
+                    role="listbox"
+                    initial={{ opacity: 0, y: -14, scale: 0.92 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 460, damping: 26 }}
+                  >
+                    {menuTabs.map((tab, i) => (
+                      <motion.li
+                        key={tab.id}
+                        initial={{ opacity: 0, x: -18 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 520,
+                          damping: 24,
+                          delay: 0.03 + i * 0.035,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={menuTab === tab.id}
+                          className={`game-menu-picker-option ${menuTab === tab.id ? 'active' : ''}`}
+                          onClick={() => {
+                            switchTab(tab.id)
+                            setTabPickerOpen(false)
+                          }}
+                        >
+                          <span
+                            className={`game-menu-picker-medal tone-${tab.tone}`}
+                          >
+                            <tab.Icon />
+                          </span>
+                          <span className="game-menu-picker-label">
+                            {tab.label}
+                          </span>
+                          {tab.badge && (
+                            <span className="game-menu-tab-badge game-menu-picker-badge">
+                              {tab.badge}
+                            </span>
+                          )}
+                          {menuTab === tab.id && (
+                            <span className="game-menu-picker-here">
+                              <FaCheck />
+                            </span>
+                          )}
+                        </button>
+                      </motion.li>
+                    ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
             </div>
 
             {menuTab === 'leaderboard' && (
@@ -1785,6 +2337,24 @@ export default function GamePage() {
                   hasClub={Boolean(profile?.clubName)}
                   onClubChanged={refreshProfile}
                 />
+              </div>
+            )}
+
+            {menuTab === 'race' && (
+              <div className="game-menu-panel">
+                <PvpPanel
+                  pvp={pvp}
+                  userId={user?.id}
+                  balance={profile?.fahhcoinBalance ?? 0}
+                  onStartRace={handleStartRace}
+                  racing={tracker.status === 'tracking' || Boolean(pendingRun)}
+                />
+              </div>
+            )}
+
+            {menuTab === 'mail' && (
+              <div className="game-menu-panel">
+                <MailPanel mailbox={mailbox} onClaimed={handleMailClaimed} />
               </div>
             )}
 
@@ -1954,57 +2524,29 @@ export default function GamePage() {
               </div>
             )}
 
+            {menuTab === 'heroes' && (
+              <div className="game-menu-panel game-menu-heroes">
+                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
+                  Choose your hero
+                </p>
+                <HeroGallery
+                  heroes={galleryHeroes}
+                  ownedItems={ownedItems}
+                  activeHeroId={activeHeroId}
+                  loading={heroesLoading}
+                  onSelect={(hero) => {
+                    setStoreActionError(null)
+                    setSelectedHeroId(hero.id)
+                  }}
+                />
+              </div>
+            )}
+
             {menuTab === 'shop' && (
               <div className="game-menu-panel game-menu-shop">
-                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
-                  Avatar
-                </p>
-                <div className="game-menu-avatar-grid">
-                  {AVATARS.map((avatar) => {
-                    // A purchased Store Hero always wins over a free local
-                    // avatar pick (see avatarSrc above) - showing this card
-                    // as "Equipped" while a real Hero is actually in effect
-                    // would disagree with what the map/Me tab actually show.
-                    const isSelected = avatar.id === avatarId && !equippedHero
-                    return (
-                      <button
-                        key={avatar.id}
-                        type="button"
-                        className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
-                        onClick={() => setAvatarChoice(avatar)}
-                        disabled={isSelected}
-                      >
-                        <img src={avatar.src} alt={avatar.name} />
-                        <span className="game-menu-avatar-name">
-                          {avatar.name}
-                        </span>
-                        <span className="game-menu-avatar-tag">
-                          {isSelected ? (
-                            <>
-                              <FaCheck /> Equipped
-                            </>
-                          ) : (
-                            'Free'
-                          )}
-                        </span>
-                      </button>
-                    )
-                  })}
-                  {COMING_SOON_AVATARS.map((avatar) => (
-                    <div
-                      key={avatar.id}
-                      className="game-menu-avatar-card is-locked"
-                    >
-                      <img src={avatar.src} alt={avatar.name} />
-                      <span className="game-menu-avatar-name">
-                        {avatar.name}
-                      </span>
-                      <span className="game-menu-avatar-tag">
-                        <FaLock /> Coming Soon
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {/* TEMP: free Avatar picker hidden - it duplicated the Heroes
+                    tab. Its images now back the matching heroes instead
+                    (see HeroFigure). Restore from git to bring it back. */}
                 <p className="game-menu-avatars-title game-menu-avatars-title-centered">
                   Map
                 </p>
@@ -2061,6 +2603,16 @@ export default function GamePage() {
                   })}
                 </div>
 
+                {galleryHeroes.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline game-menu-heroes-link"
+                    onClick={() => switchTab('heroes')}
+                  >
+                    <GiSpartanHelmet /> Meet the Heroes - stats &amp; lore
+                  </button>
+                )}
+
                 {storeError ? (
                   <p className="game-menu-empty">{storeError}</p>
                 ) : storeCatalog.length === 0 ? (
@@ -2104,6 +2656,17 @@ export default function GamePage() {
                             <span className="game-menu-list-area">
                               {item.name}
                             </span>
+                            {item.heroId &&
+                              heroes.find((h) => h.id === item.heroId)
+                                ?.abilities?.length > 0 && (
+                                <span className="game-store-item-perk">
+                                  ⚡{' '}
+                                  {heroes
+                                    .find((h) => h.id === item.heroId)
+                                    .abilities.map(describeHeroAbility)
+                                    .join(' · ')}
+                                </span>
+                              )}
                             <span className="game-menu-list-meta">
                               {owned
                                 ? owned.equipped
@@ -2168,6 +2731,8 @@ export default function GamePage() {
             }
             areaEmoji={currentAreaEmoji?.emoji}
             onClose={() => setViewingProfile(null)}
+            canInvite={canInviteToClub && !isMyEntry(viewingProfile)}
+            onInvite={handleInviteToClub}
           />
         )}
       </AnimatePresence>
@@ -2303,6 +2868,24 @@ export default function GamePage() {
               )}
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedHero && (
+          <HeroDetailModal
+            key={selectedHero.id}
+            hero={selectedHero}
+            ownedItems={ownedItems}
+            isActive={selectedHero.id === activeHeroId}
+            error={storeActionError}
+            onClose={closeHeroModal}
+            onEquip={handleEquip}
+            onBuy={(skin) => {
+              setSelectedHeroId(null)
+              setStoreChoice(skin)
+            }}
+          />
         )}
       </AnimatePresence>
 

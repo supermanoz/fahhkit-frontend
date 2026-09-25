@@ -42,6 +42,14 @@ async function fetchWithFallback(path, options) {
   throw lastError
 }
 
+// Whichever API server last answered (see fetchWithFallback) - the STOMP
+// socket (useGameSocket) has to connect to that same host, not blindly to
+// the primary one, or a dev session on the fallback API would never hear
+// anything.
+export function getActiveApiBaseUrl() {
+  return getCandidateBaseUrls()[0] || PRIMARY_API_BASE_URL
+}
+
 export function resolveFileUrl(path) {
   if (!path) return null
   if (/^https?:\/\//i.test(path)) return path

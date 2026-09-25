@@ -47,3 +47,8 @@ export function findClubLeaderboard(pageNumber = 1, noOfRecords = 20) {
     noOfRecords,
   })
 }
+
+// Current season's top clubs as a plain list (no paging).
+export function getTopClubs(limit = 10) {
+  return getJson(`/v1/leaderboard/club/top?limit=${limit}`)
+}

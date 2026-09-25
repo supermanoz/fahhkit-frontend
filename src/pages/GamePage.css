@@ -176,6 +176,18 @@
   text-align: center;
 }
 
+/* Signed-out gate reuses the loading poster - the sign-in copy + buttons sit
+   where the status line and progress bar normally go. */
+.game-loading-footer--gate {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+  width: min(360px, 88vw);
+  gap: 18px;
+}
+
+.game-loading-footer--gate .game-loading-text {
+  line-height: 1.4;
+}
+
 /* --- Top bar: level HUD, bled to the screen edge like Pokémon GO's status
    bar rather than boxed in a card below a header. --- */
 /* Round HUD badges (mute / map theme) share one glossy recipe: a gradient
@@ -1238,6 +1250,9 @@
 
 .game-menu-close {
   position: absolute;
+  /* Tabs are position:relative (for their badges), so without this they
+     paint over the X. */
+  z-index: 2;
   top: 14px;
   right: 16px;
   width: 32px;
@@ -1256,6 +1271,313 @@
   display: flex;
   gap: 8px;
   margin-bottom: 18px;
+  /* Keeps the tab row clear of the absolute close (X) button. */
+  margin-right: 40px;
+}
+
+/* Phone-only tab picker, Clash-style: a chunky wooden plank showing the
+   current tab (colour-coded icon medallion + outlined label + round orange
+   knob) that springs open a framed board of raised, pressable plank rows.
+   Same enamel-button recipe as the radial menu (.game-radial-btn). */
+.game-menu-picker {
+  display: none;
+  position: relative;
+  z-index: 5;
+  margin: 0 46px 18px 0;
+}
+
+.game-menu-picker-current,
+.game-menu-picker-option {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 3px solid var(--game-ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game-menu-picker-current {
+  padding: 7px 8px 7px 7px;
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    var(--game-wood-light) 0%,
+    var(--game-wood) 45%,
+    var(--game-wood-dark) 100%
+  );
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -6px 0 rgba(120, 70, 25, 0.55),
+    0 5px 0 var(--game-ink),
+    0 8px 14px rgba(0, 0, 0, 0.35);
+}
+
+.game-menu-picker-current:active {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -6px 0 rgba(120, 70, 25, 0.55),
+    0 1px 0 var(--game-ink);
+}
+
+/* Outlined chunky label - same stroke trick as the HUD counters. */
+.game-menu-picker-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 19px;
+  letter-spacing: 0.02em;
+  color: var(--game-cream);
+  text-shadow:
+    2px 0 0 var(--game-ink),
+    -2px 0 0 var(--game-ink),
+    0 2px 0 var(--game-ink),
+    0 -2px 0 var(--game-ink),
+    1.5px 1.5px 0 var(--game-ink),
+    -1.5px 1.5px 0 var(--game-ink),
+    1.5px -1.5px 0 var(--game-ink),
+    -1.5px -1.5px 0 var(--game-ink),
+    0 4px 0 var(--game-ink);
+}
+
+/* Round enamel coin behind each tab icon. */
+.game-menu-picker-medal {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--game-ink);
+  font-size: 17px;
+  color: var(--game-ink);
+  --medal: var(--game-gold);
+  --medal-dark: var(--game-gold-dark);
+  --medal-light: var(--game-gold-light);
+  background: var(--medal);
+  box-shadow:
+    inset 0 -5px 0 var(--medal-dark),
+    inset 0 2px 0 var(--medal-light),
+    0 2px 0 var(--game-ink);
+}
+
+.game-menu-picker-medal.tone-green {
+  --medal: var(--game-green);
+  --medal-dark: var(--game-green-dark);
+  --medal-light: var(--game-green-light);
+}
+
+.game-menu-picker-medal.tone-red {
+  --medal: var(--game-red);
+  --medal-dark: var(--game-red-dark);
+  --medal-light: var(--game-red-light);
+  color: var(--game-cream);
+}
+
+.game-menu-picker-medal.tone-wood {
+  --medal: var(--game-wood);
+  --medal-dark: var(--game-wood-dark);
+  --medal-light: var(--game-wood-light);
+}
+
+.game-menu-picker-medal.tone-battle {
+  /* Red coin with a gold ring, crossed swords filling it. */
+  --medal: var(--game-red);
+  --medal-dark: var(--game-red-dark);
+  --medal-light: var(--game-red-light);
+  box-shadow:
+    inset 0 0 0 2.5px var(--game-gold-light),
+    inset 0 -5px 0 var(--medal-dark),
+    0 2px 0 var(--game-ink);
+}
+
+/* Swords slightly overflow the coin, like the reference badge. */
+.game-menu-picker-medal .race-tab-icon {
+  flex-shrink: 0;
+  width: 125%;
+  height: 125%;
+  overflow: visible;
+}
+
+.game-menu-picker-medal.tone-stone {
+  --medal: var(--game-stone);
+  --medal-dark: var(--game-stone-dark);
+  --medal-light: var(--game-stone-light);
+}
+
+/* Big round orange "open" knob on the plank's right end. */
+.game-menu-picker-knob {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--game-ink);
+  background: var(--game-gold);
+  color: var(--game-ink);
+  font-size: 14px;
+  box-shadow:
+    inset 0 -5px 0 var(--game-gold-dark),
+    inset 0 2px 0 var(--game-gold-light);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.game-menu-picker-knob.is-open {
+  transform: rotate(180deg);
+}
+
+/* The dropped-down board: dark wood frame with a lighter inner border. */
+.game-menu-picker-list {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: -46px;
+  margin: 0;
+  padding: 10px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 18px;
+  border: 3px solid var(--game-ink);
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.025) 0 6px,
+      transparent 6px 12px
+    ),
+    linear-gradient(180deg, #5a3e24, #3a2816);
+  box-shadow:
+    inset 0 0 0 3px rgba(224, 163, 85, 0.35),
+    inset 0 3px 0 rgba(255, 255, 255, 0.12),
+    0 6px 0 var(--game-ink),
+    0 14px 28px rgba(0, 0, 0, 0.55);
+  transform-origin: top center;
+}
+
+.game-menu-picker-option {
+  padding: 6px 12px 6px 6px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #7a5634, #5e4027);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.25),
+    0 4px 0 var(--game-ink);
+}
+
+.game-menu-picker-option .game-menu-picker-label {
+  font-size: 17px;
+}
+
+.game-menu-picker-option:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.25),
+    0 1px 0 var(--game-ink);
+}
+
+/* Current tab: lit-up gold plank. */
+.game-menu-picker-option.active {
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light),
+    var(--game-gold) 55%,
+    var(--game-gold-dark)
+  );
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.2),
+    0 4px 0 var(--game-ink),
+    0 0 14px rgba(255, 122, 41, 0.55);
+}
+
+.game-menu-picker-here {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid var(--game-ink);
+  background: var(--game-green);
+  color: var(--game-ink);
+  font-size: 11px;
+  box-shadow: inset 0 -3px 0 var(--game-green-dark);
+}
+
+/* Desktop tab row borrows the picker's coloured icon coins, just smaller. */
+.game-menu-tab-medal {
+  width: 28px;
+  height: 28px;
+  border-width: 2.5px;
+  font-size: 13px;
+}
+
+/* Tap-outside-to-close layer, under the button and list. */
+.game-menu-picker-scrim {
+  position: fixed;
+  inset: 0;
+}
+
+.game-menu-picker-current,
+.game-menu-picker-list {
+  z-index: 1;
+}
+
+/* Inline (not corner-pinned) inside the picker rows. */
+.game-menu-tab-badge.game-menu-picker-badge {
+  position: static;
+  min-width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+/* Unread mail / races-needing-you count on a tab. */
+.game-menu-tab {
+  position: relative;
+}
+
+.game-menu-tab-badge {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-red);
+  border: 2px solid var(--game-ink);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Hero perk line under a HERO item in the shop list. */
+.game-store-item-perk {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--game-green-light);
+}
+
+/* PvP callouts reuse the weather-hype pill, in fight colours. */
+.game-weather-hype.game-pvp-alert {
+  --hype-a: #ff8a7a;
+  --hype-b: #c72a20;
+  --hype-glow: rgba(255, 90, 77, 0.55);
+  z-index: 710;
 }
 
 .game-menu-tab {
@@ -1885,4 +2207,22 @@
     padding: 8px 4px;
     gap: 4px;
   }
+
+  /* Six tabs don't fit a phone - swap the row for the dropdown picker. */
+  .game-menu-tabs {
+    display: none;
+  }
+
+  .game-menu-picker {
+    display: block;
+  }
+}
+
+.game-menu-heroes-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 12px;
 }

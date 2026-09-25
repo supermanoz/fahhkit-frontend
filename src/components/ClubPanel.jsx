@@ -8,6 +8,7 @@ import {
   getMyClub,
   leaveClub,
   requestToJoinClub,
+  searchClubsByName,
 } from '../api/club'
 
 // Club tab, MVP scope: create a club (if you're not in one), browse/search
@@ -54,8 +55,14 @@ export default function ClubPanel({ hasClub, onClubChanged }) {
     setLoadingClubs(true)
     setBrowseError(null)
     try {
-      const page = await findClubs(1, 20, text)
-      setClubs(page?.content || [])
+      // Typed text goes through the partial-match search ("run" finds
+      // "Night Runners"); the plain list is only for the empty-box browse.
+      if (text) {
+        setClubs((await searchClubsByName(text)) || [])
+      } else {
+        const page = await findClubs(1, 20)
+        setClubs(page?.content || [])
+      }
     } catch (err) {
       setBrowseError(
         err instanceof ApiError ? err.message : 'Could not load clubs.'

@@ -168,6 +168,50 @@ export default function EventDetailPage() {
                   </p>
                 )}
 
+                {/* Co-op raid: every registrant's run score is damage on
+                    the boss (currentScore) until it hits targetScore. The
+                    backend tallies it on a schedule, so this is as of the
+                    last page load. */}
+                {event.type === 'RAID' && event.targetScore > 0 && (
+                  <div className="event-raid">
+                    <div className="event-raid-head">
+                      <span>
+                        {event.raidDefeatedAt
+                          ? '🏆 Boss defeated!'
+                          : '🐉 Raid boss'}
+                      </span>
+                      <span>
+                        {Math.round(event.currentScore || 0).toLocaleString()} /{' '}
+                        {Math.round(event.targetScore).toLocaleString()} dmg
+                      </span>
+                    </div>
+                    <div
+                      className="event-raid-bar"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={event.targetScore}
+                      aria-valuenow={event.currentScore || 0}
+                    >
+                      <div
+                        className={`event-raid-fill ${event.raidDefeatedAt ? 'is-defeated' : ''}`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            ((event.currentScore || 0) / event.targetScore) *
+                              100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    {!event.raidDefeatedAt && (
+                      <p className="event-raid-note">
+                        Every registered runner&apos;s run chips away at it.
+                        Bring friends.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <dl className="event-detail-meta">
                   <div>
                     <dt>Date</dt>

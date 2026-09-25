@@ -6,5 +6,5 @@ export default function SectionTitle({ eyebrow, title, subtitle }) {
       <h2 className="section-heading">{title}</h2>
       {subtitle && <p className="section-sub">{subtitle}</p>}
     </div>
-  );
+  )
 }

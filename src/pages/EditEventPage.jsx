@@ -25,6 +25,7 @@ const EVENT_TYPES = [
   'FLEXIBILITY',
   'PHYSIQUE',
   'RECREATIONAL',
+  'RAID',
 ]
 
 const EVENT_STATUSES = ['DRAFT', 'PUBLISHED', 'CANCELLED', 'COMPLETED']
@@ -64,6 +65,7 @@ export default function EditEventPage() {
           capacity: event.capacity ?? '',
           registrationDeadline: toDatetimeLocal(event.registrationDeadline),
           type: event.type || '',
+          targetScore: event.targetScore ?? '',
         })
         setStatus(event.status || '')
         setInitialStatus(event.status || '')
@@ -123,6 +125,10 @@ export default function EditEventPage() {
         ...form,
         entryFee: form.entryFee === '' ? null : Number(form.entryFee),
         capacity: form.capacity === '' ? null : Number(form.capacity),
+        targetScore:
+          form.type === 'RAID' && form.targetScore !== ''
+            ? Number(form.targetScore)
+            : null,
       })
       if (status && status !== initialStatus) {
         await postJson('/v1/event/update-status', { eventId: id, status })
@@ -275,6 +281,23 @@ export default function EditEventPage() {
                     onChange={handleChange}
                   />
                 </div>
+                {form.type === 'RAID' && (
+                  <div className="field">
+                    <label htmlFor="targetScore">
+                      Raid Boss HP (target score)
+                    </label>
+                    <input
+                      id="targetScore"
+                      name="targetScore"
+                      type="number"
+                      min="1"
+                      step="any"
+                      value={form.targetScore}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+                )}
                 <div className="field">
                   <label htmlFor="status">Status</label>
                   <select

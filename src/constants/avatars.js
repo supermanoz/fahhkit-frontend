@@ -44,6 +44,14 @@ export function getAvatarById(id) {
   return AVATARS.find((a) => a.id === id) || null
 }
 
+// Backend heroes share names with these characters (Blaze, Bolt, Cyclone,
+// Pulse...), so the art doubles as their portrait on the Heroes tab.
+export function getAvatarByName(name) {
+  if (typeof name !== 'string') return null
+  const key = name.trim().toLowerCase()
+  return AVATARS.find((a) => a.id === key) || null
+}
+
 export function loadAvatarId() {
   try {
     return localStorage.getItem(STORAGE_KEY)

@@ -4,6 +4,7 @@ import { postJson, getJson, setToken, setUser, ApiError } from '../api/client'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PasswordField from '../components/PasswordField'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import './LoginPage.css'
 
 const INITIAL_FORM = { mobileNumber: '', password: '' }
@@ -41,20 +42,52 @@ export default function LoginPage() {
         })
         return
       }
-      setToken(data.tokenId)
-      const user = await getJson('/v1/user/find/logged-in')
-      setUser(user)
-      navigate('/', {
-        state: {
-          message: `Welcome back, ${user?.fullName || 'athlete'}! You're signed in.`,
-        },
-      })
+      await finishSignIn(data)
     } catch (err) {
       const message =
         err instanceof ApiError
           ? err.message
           : 'Sign in failed. Please try again.'
       setBanner({ kind: 'error', message })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Shared tail of password and Google sign-in: store the token, load the
+  // user, and head back to wherever sent them here.
+  async function finishSignIn(data) {
+    setToken(data.tokenId)
+    const user = await getJson('/v1/user/find/logged-in')
+    setUser(user)
+    // Pages that gate on sign-in pass `state.from` so the user lands back
+    // where they were. Only same-origin paths - never a `//host` redirect.
+    const from = location.state?.from
+    const redirectTo =
+      typeof from === 'string' && from.startsWith('/') && !from.startsWith('//')
+        ? from
+        : '/'
+    navigate(redirectTo, {
+      state: {
+        message: `Welcome back, ${user?.fullName || 'athlete'}! You're signed in.`,
+      },
+    })
+  }
+
+  async function handleGoogleCredential(idToken) {
+    setBanner(null)
+    setSubmitting(true)
+    try {
+      const data = await postJson('/v1/auth/google', { idToken })
+      await finishSignIn(data)
+    } catch (err) {
+      setBanner({
+        kind: 'error',
+        message:
+          err instanceof ApiError
+            ? err.message
+            : 'Google sign-in failed. Please try again.',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -120,12 +153,35 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <GoogleSignInButtonBlock
+            onCredential={handleGoogleCredential}
+            onError={() =>
+              setBanner({
+                kind: 'error',
+                message: 'Google sign-in was cancelled or failed.',
+              })
+            }
+          />
+
           <p className="login-footer">
             New to FahhKit? <Link to="/register">Create an account</Link>
           </p>
         </div>
       </div>
       <Footer />
+    </div>
+  )
+}
+
+// "or" divider + button, only when Google sign-in is configured.
+function GoogleSignInButtonBlock(props) {
+  if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) return null
+  return (
+    <div className="login-oauth">
+      <div className="login-divider">
+        <span>or</span>
+      </div>
+      <GoogleSignInButton {...props} />
     </div>
   )
 }

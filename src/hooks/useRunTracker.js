@@ -41,6 +41,9 @@ export function useRunTracker() {
   const timerRef = useRef(null)
   const startedAtRef = useRef(null)
   const eventIdRef = useRef(null)
+  // PvP race this run counts for (see api/pvp.js) - persisted with the run
+  // like eventId so a reload mid-race still submits it against the race.
+  const challengeIdRef = useRef(null)
   const fixCountRef = useRef(0)
   const lastAccuracyRef = useRef(null)
   const hiddenAtRef = useRef(null)
@@ -149,6 +152,7 @@ export function useRunTracker() {
         saveActiveRun({
           startedAt: startedAtRef.current.toISOString(),
           eventId: eventIdRef.current,
+          challengeId: challengeIdRef.current,
           points: pointsRef.current,
           distance: distanceRef.current,
         })
@@ -181,6 +185,7 @@ export function useRunTracker() {
       setElapsedSeconds(saved.duration ?? 0)
       setPendingRun({
         eventId: saved.eventId ?? null,
+        challengeId: saved.challengeId ?? null,
         points: saved.points,
         distance: saved.distance || 0,
         duration: saved.duration ?? 0,
@@ -196,6 +201,7 @@ export function useRunTracker() {
     distanceRef.current = saved.distance || 0
     startedAtRef.current = new Date(saved.startedAt)
     eventIdRef.current = saved.eventId ?? null
+    challengeIdRef.current = saved.challengeId ?? null
     setPath(pointsRef.current)
     setDistance(distanceRef.current)
     setElapsedSeconds(
@@ -217,7 +223,7 @@ export function useRunTracker() {
   }, [])
 
   const start = useCallback(
-    (eventId) => {
+    (eventId, { challengeId = null } = {}) => {
       if (!('geolocation' in navigator)) {
         setStatus('unsupported')
         return
@@ -234,10 +240,12 @@ export function useRunTracker() {
       setPendingRun(null)
       startedAtRef.current = new Date()
       eventIdRef.current = eventId ?? null
+      challengeIdRef.current = challengeId
 
       saveActiveRun({
         startedAt: startedAtRef.current.toISOString(),
         eventId: eventIdRef.current,
+        challengeId: challengeIdRef.current,
         points: [],
         distance: 0,
       })
@@ -256,6 +264,7 @@ export function useRunTracker() {
     const startedAt = startedAtRef.current ?? endedAt
     const result = {
       eventId: eventIdRef.current,
+      challengeId: challengeIdRef.current,
       points: pointsRef.current,
       distance,
       duration: Math.round((endedAt - startedAt) / 1000),
@@ -273,6 +282,7 @@ export function useRunTracker() {
       saveActiveRun({
         startedAt: startedAt.toISOString(),
         eventId: result.eventId,
+        challengeId: result.challengeId,
         points: result.points,
         distance: result.distance,
         stopped: true,
@@ -296,6 +306,8 @@ export function useRunTracker() {
   }, [])
 
   return {
+    // Read on render (status/distance changes re-render often enough).
+    challengeId: challengeIdRef.current,
     status,
     elapsedSeconds,
     distance,

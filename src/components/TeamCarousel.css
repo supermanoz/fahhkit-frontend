@@ -36,7 +36,10 @@
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .team-carousel-arrow:hover {
@@ -67,7 +70,9 @@
   background: var(--border);
   cursor: pointer;
   padding: 0;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
 }
 
 .team-carousel-dot.active {

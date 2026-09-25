@@ -1,0 +1,74 @@
+/* In-game inbox - rows reuse .game-menu-list styling; these just add the
+   expandable body, type icon and unread dot. */
+.mail-list li.mail-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mail-item.is-unread {
+  border-color: rgba(255, 177, 92, 0.55);
+  background: rgba(255, 122, 41, 0.1);
+}
+
+.mail-item-row {
+  gap: 12px;
+}
+
+.mail-item-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--game-ink);
+  background: var(--game-stone);
+  color: var(--game-ink);
+  font-size: 15px;
+}
+
+.mail-item-icon.type-CLUB_INVITE {
+  background: var(--game-green);
+}
+
+.mail-item-icon.type-STORE_ITEM_GRANT {
+  background: var(--game-gold);
+}
+
+.mail-item-icon.type-BROADCAST {
+  background: var(--game-wood);
+}
+
+.mail-item-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--game-red);
+  box-shadow: 0 0 6px rgba(255, 90, 77, 0.8);
+}
+
+.mail-item-body {
+  padding-left: 46px;
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.85);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.mail-item-body p {
+  margin: 0 0 8px;
+}
+
+.mail-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mail-item-actions .btn {
+  padding: 7px 14px;
+  font-size: 12px;
+}

@@ -1,0 +1,204 @@
+/* Race (PvP) tab - list rows reuse .game-menu-list; these cover the race
+   cards, quick-match/nearby boxes and the inline stake form. */
+.pvp-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.pvp-panel .game-menu-section-title svg,
+.pvp-card-title svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.game-menu-list li.pvp-race,
+.game-menu-list li.pvp-nearby {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pvp-race-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pvp-race-head .btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+.pvp-race-status {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--game-ink);
+  background: var(--game-stone);
+}
+
+.pvp-race-status.status-IN_PROGRESS {
+  background: var(--game-red);
+  color: var(--game-cream);
+  animation: pvp-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pvp-live-pulse {
+  50% {
+    box-shadow: 0 0 10px rgba(255, 90, 77, 0.8);
+  }
+}
+
+.pvp-race-note {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.8);
+}
+
+.pvp-race-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pvp-race-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+.pvp-race-actions:empty {
+  display: none;
+}
+
+.pvp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 2px solid rgba(246, 236, 217, 0.14);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 122, 41, 0.12),
+    rgba(246, 236, 217, 0.04)
+  );
+}
+
+.pvp-card .game-menu-list {
+  width: 100%;
+}
+
+.pvp-card-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--game-cream);
+}
+
+.pvp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pvp-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--game-gold);
+}
+
+.pvp-searching {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--game-gold-light);
+}
+
+.pvp-searching-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--game-gold);
+  animation: pvp-live-pulse 1s ease-in-out infinite;
+}
+
+.pvp-challenge-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pvp-challenge-form .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.pvp-stake-input {
+  width: 80px;
+}
+
+.pvp-won {
+  color: var(--game-green-light);
+  font-weight: 700;
+}
+
+.pvp-lost {
+  color: var(--game-red-light);
+}
+
+/* Live race strip over the map while a race run is being tracked. */
+.pvp-race-hud {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  transform: translateX(-50%);
+  z-index: 1100;
+  width: min(340px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border-radius: 14px;
+  border: 2.5px solid var(--game-ink);
+  background: var(--game-panel);
+  color: var(--game-cream);
+  box-shadow: 0 4px 0 var(--game-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pvp-race-hud-bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(246, 236, 217, 0.18);
+  overflow: hidden;
+}
+
+.pvp-race-hud-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--game-red-light), var(--game-red));
+  transition: width 0.3s ease;
+}
+
+.pvp-race-hud.is-done .pvp-race-hud-fill {
+  background: linear-gradient(
+    90deg,
+    var(--game-green-light),
+    var(--game-green)
+  );
+}

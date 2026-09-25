@@ -29,3 +29,14 @@ export function getOwnedStoreItems() {
 export function getEquippedStoreItems() {
   return getJson('/v1/store/equipped')
 }
+
+// Hero roster (see HeroController in the FahhKit backend) - each hero has
+// up to two small score abilities, and HERO-category store items point back
+// at their hero through heroId.
+export function findHeroes(pageNumber = 1, noOfRecords = 50) {
+  return postJson('/v1/store/heroes/find', { pageNumber, noOfRecords })
+}
+
+export function getHero(id) {
+  return getJson(`/v1/store/heroes/${id}`)
+}

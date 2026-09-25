@@ -31,8 +31,10 @@ export default function TrackRunPage() {
     })
       .then((data) => {
         const eligible = (data?.content || []).filter(
+          // RAID events take runs too - each one is damage on the boss.
           (entry) =>
-            entry.eventType === 'ENDURANCE' && entry.paymentStatus === 'PAID'
+            (entry.eventType === 'ENDURANCE' || entry.eventType === 'RAID') &&
+            entry.paymentStatus === 'PAID'
         )
         setEligibleEvents(eligible)
         if (eligible.length === 1) setSelectedEventId(eligible[0].eventId)

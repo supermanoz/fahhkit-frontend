@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@maplibre/maplibre-gl-leaflet": "^0.1.4",
+    "@stomp/stompjs": "^7.3.0",
     "animejs": "^4.5.0",
     "aos": "^2.3.4",
     "framer-motion": "^13.1.1",
