@@ -1367,6 +1367,20 @@ export default function GamePage() {
   }
 
   const galleryHeroes = heroes.filter((h) => !isPlaceholderHero(h.name))
+  // HERO is the one real Store category that's actually an avatar-shaped
+  // image (the others are borders/colors/backgrounds meant to layer onto a
+  // profile picture, not stand in for one) — equipping one takes priority
+  // over the local placeholder picker below since it's a real, owned item.
+  // TEMP: the backend's placeholder "Default Hero" doesn't count - see
+  // isPlaceholderHero - so new players land on Blaze.
+  // Declared up here (not next to currentAvatar) because activeHeroId reads
+  // it — using it any earlier is a TDZ crash that blanks the whole page.
+  const equippedHero = ownedItems.find(
+    (o) =>
+      o.equipped &&
+      o.storeItem.category === 'HERO' &&
+      !isPlaceholderHero(o.storeItem.name)
+  )
   // The hero the player is actually playing as: an equipped Store Hero,
   // else Blaze (the default).
   const activeHeroId = equippedHero
@@ -1468,18 +1482,6 @@ export default function GamePage() {
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
   const currentAreaEmoji = getAreaEmojiById(areaEmojiId)
-  // HERO is the one real Store category that's actually an avatar-shaped
-  // image (the others are borders/colors/backgrounds meant to layer onto a
-  // profile picture, not stand in for one) — equipping one takes priority
-  // over the local placeholder picker below since it's a real, owned item.
-  // TEMP: the backend's placeholder "Default Hero" doesn't count - see
-  // isPlaceholderHero - so new players land on Blaze.
-  const equippedHero = ownedItems.find(
-    (o) =>
-      o.equipped &&
-      o.storeItem.category === 'HERO' &&
-      !isPlaceholderHero(o.storeItem.name)
-  )
   const avatarSrc =
     (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
     currentAvatar?.src ||
