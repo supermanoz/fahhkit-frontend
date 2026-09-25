@@ -6,6 +6,10 @@ import {
   FaEnvelope,
   FaMoneyCheckAlt,
   FaPhone,
+  FaSort,
+  FaSortDown,
+  FaSortUp,
+  FaTag,
   FaUser,
 } from 'react-icons/fa'
 import { ApiError, canManageEvents, getJson, postJson } from '../api/client'
@@ -109,6 +113,21 @@ const REGISTRANT_FILTER_FIELDS = [
     ],
   },
   {
+    key: 'bibCollected',
+    label: 'BIB collection',
+    type: 'select',
+    icon: FaTag,
+    // No "Not collected" option yet: bibCollected lives in the backend's
+    // extra2 column, which stays NULL until a moderator first toggles it, and
+    // the search API has no not-equal/is-null match — an exact "false" would
+    // silently skip everyone who was never touched. Sort the BIB column
+    // (not-collected first) with Payment status = Paid for the call list.
+    options: [
+      { value: '', label: 'Any' },
+      { value: 'true', label: 'Collected' },
+    ],
+  },
+  {
     key: 'registeredOn',
     label: 'Registered on',
     type: 'date',
@@ -141,6 +160,14 @@ function buildRegistrantSearch(filters) {
       type: 'exact',
     })
   }
+  if (filters.bibCollected) {
+    // bibCollected is stored as the string "true"/"false" in extra2.
+    search.push({
+      field: 'extra2',
+      value: filters.bibCollected,
+      type: 'exact',
+    })
+  }
   if (filters.registeredOn) {
     search.push({
       field: 'createdDate',
@@ -149,6 +176,58 @@ function buildRegistrantSearch(filters) {
     })
   }
   return search
+}
+
+// Sortable table columns → the entity path the backend sorts on. Sorting is
+// done server-side (DataPagination.sort) so it spans every page, not just
+// the 30 rows currently loaded.
+const SORT_FIELDS = {
+  name: 'user.fullName',
+  mobile: 'user.mobileNumber',
+  paymentStatus: 'paymentStatus',
+  // extra2 = bibCollected ("true"/"false"/NULL). Ascending puts NULL and
+  // "false" first, i.e. not-collected athletes at the top.
+  bib: 'extra2',
+}
+
+// Registration order as a tie-breaker keeps paging stable when many rows
+// share the sorted value (e.g. every "Paid").
+function buildRegistrantSort(sort) {
+  if (!sort) return undefined
+  return [
+    { field: SORT_FIELDS[sort.key], direction: sort.direction },
+    { field: 'createdDate', direction: 'asc' },
+  ]
+}
+
+function SortableTh({ label, sortKey, sort, onSort, title }) {
+  const active = sort?.key === sortKey
+  const Icon = !active
+    ? FaSort
+    : sort.direction === 'asc'
+      ? FaSortUp
+      : FaSortDown
+  return (
+    <th
+      aria-sort={
+        active
+          ? sort.direction === 'asc'
+            ? 'ascending'
+            : 'descending'
+          : 'none'
+      }
+    >
+      <button
+        type="button"
+        className={`registrant-sort-btn${active ? ' active' : ''}`}
+        onClick={() => onSort(sortKey)}
+        title={title}
+      >
+        {label}
+        <Icon aria-hidden="true" className="registrant-sort-icon" />
+      </button>
+    </th>
+  )
 }
 
 export default function EventRegistrantsPage() {
@@ -170,6 +249,8 @@ export default function EventRegistrantsPage() {
   // Debounced so typing in a box doesn't fire a request per keystroke.
   const debouncedFilters = useDebouncedValue(filters)
   const filtering = hasActiveFilters(debouncedFilters)
+  // { key, direction } or null for the backend default (registration order).
+  const [sort, setSort] = useState(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -341,10 +422,19 @@ export default function EventRegistrantsPage() {
     setPage(1)
   }, [id])
 
-  // A new set of filters invalidates whatever page we were on.
+  // A new set of filters or sort order invalidates whatever page we were on.
   useEffect(() => {
     setPage(1)
-  }, [debouncedFilters])
+  }, [debouncedFilters, sort])
+
+  // Header click cycles ascending → descending → back to registration order.
+  function handleSort(key) {
+    setSort((prev) => {
+      if (prev?.key !== key) return { key, direction: 'asc' }
+      if (prev.direction === 'asc') return { key, direction: 'desc' }
+      return null
+    })
+  }
 
   // Event details, the athlete roster (for mobile numbers), and the
   // paid/pending counts — loaded once per event, independent of which page
@@ -387,6 +477,7 @@ export default function EventRegistrantsPage() {
       noOfRecords: PAGE_SIZE,
       actionType: 'FILTER',
       search: buildRegistrantSearch(debouncedFilters),
+      sort: buildRegistrantSort(sort),
     })
       .then((data) => {
         setRegistrants(data?.content || [])
@@ -400,7 +491,7 @@ export default function EventRegistrantsPage() {
         )
       )
       .finally(() => setTableLoading(false))
-  }, [id, page, userLoading, allowed, debouncedFilters])
+  }, [id, page, userLoading, allowed, debouncedFilters, sort])
 
   if (userLoading) {
     return (
@@ -463,10 +554,31 @@ export default function EventRegistrantsPage() {
                   <thead>
                     <tr>
                       <th aria-label="Actions"></th>
-                      <th>Name</th>
-                      <th>Mobile Number</th>
-                      <th>Payment Status</th>
-                      <th>BIB</th>
+                      <SortableTh
+                        label="Name"
+                        sortKey="name"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
+                      <SortableTh
+                        label="Mobile Number"
+                        sortKey="mobile"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
+                      <SortableTh
+                        label="Payment Status"
+                        sortKey="paymentStatus"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
+                      <SortableTh
+                        label="BIB"
+                        sortKey="bib"
+                        sort={sort}
+                        onSort={handleSort}
+                        title="Sort by BIB collection — not collected first"
+                      />
                       <th>Remarks</th>
                     </tr>
                   </thead>

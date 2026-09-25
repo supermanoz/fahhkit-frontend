@@ -447,3 +447,32 @@
   color: var(--muted);
   font-size: 13px;
 }
+
+.registrant-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.registrant-sort-btn:hover,
+.registrant-sort-btn.active {
+  color: var(--text);
+}
+
+.registrant-sort-icon {
+  font-size: 10px;
+  opacity: 0.45;
+}
+
+.registrant-sort-btn.active .registrant-sort-icon {
+  opacity: 1;
+  color: var(--brand);
+}
