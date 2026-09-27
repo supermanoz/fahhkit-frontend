@@ -1,0 +1,517 @@
+/* Club-tab-only pieces (emblem, perks, treasury, roles...). The cards,
+   rows, titles and buttons it's built from are shared - see GameCards.css. */
+/* Side by side when the panel is wide enough, stacked otherwise - sized
+   off the panel's own width rather than the viewport's. */
+.club-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+/* Shield-shaped emblem standing in for a clan badge. */
+.club-emblem {
+  flex-shrink: 0;
+  align-self: center;
+  width: 56px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: polygon(50% 0%, 96% 14%, 96% 58%, 50% 100%, 4% 58%, 4% 14%);
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light) 0%,
+    var(--game-gold) 50%,
+    var(--game-gold-dark) 100%
+  );
+  color: #fff;
+  font-size: 28px;
+}
+
+.club-emblem-lg {
+  width: 84px;
+  height: 94px;
+  font-size: 42px;
+}
+
+.club-emblem-sm {
+  width: 34px;
+  height: 38px;
+  font-size: 18px;
+}
+
+.club-perks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.club-perks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.club-perk-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 2px solid var(--game-ink);
+  color: #fff;
+  font-size: 17px;
+}
+
+.club-perk-icon.tone-gold {
+  background: var(--game-gold);
+}
+
+.club-perk-icon.tone-green {
+  background: var(--game-green);
+}
+
+.club-perk-icon.tone-red {
+  background: var(--game-red);
+}
+
+.club-perk-icon.tone-stone {
+  background: var(--game-stone-dark);
+}
+
+.club-blurb {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.club-create {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.game-club-input.club-input-light {
+  background: #fff;
+  border-color: rgba(61, 43, 26, 0.35);
+  color: var(--game-ink);
+}
+
+.game-club-input.club-input-light::placeholder {
+  color: rgba(61, 43, 26, 0.45);
+}
+
+/* --- My club --- */
+.club-banner-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.club-banner-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.club-banner-info .game-card-title {
+  text-align: left;
+}
+
+.club-description {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.85);
+}
+
+.club-desc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.club-desc-row .club-description {
+  flex: 1;
+  min-width: 0;
+}
+
+.club-description-empty {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.club-desc-edit-btn {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f7d77a, #d9a531);
+  color: #3b2505;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.club-desc-edit-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.club-desc-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.club-desc-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+}
+
+.club-desc-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.club-desc-actions .game-row-meta {
+  margin-right: auto;
+}
+
+.club-treasury {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.club-treasury-balance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.club-treasury-balance > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.club-coin {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: var(--game-gold);
+  color: #fff;
+  font-size: 20px;
+}
+
+.club-treasury-value {
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.club-donate {
+  display: flex;
+  gap: 8px;
+}
+
+.club-donate .game-club-input,
+.club-search .game-club-input {
+  margin-bottom: 0;
+}
+
+/* Role pill - on the banner ("You: Leader") and on every roster row. */
+.club-role {
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(246, 236, 217, 0.18);
+  color: var(--game-cream);
+}
+
+.club-role.role-leader {
+  background: var(--game-gold);
+  color: var(--game-ink);
+}
+
+.club-role.role-co_leader {
+  background: var(--game-green);
+  color: var(--game-ink);
+}
+
+.club-rank {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--game-ink);
+  color: var(--game-cream);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.club-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.club-search-icon {
+  flex-shrink: 0;
+  color: rgba(246, 236, 217, 0.6);
+}
+
+.club-leave {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.club-leave-prompt {
+  margin: 0;
+  font-weight: 800;
+  color: var(--game-cream);
+}
+
+/* "‹ All Clubs" - back from a club's info page to the browse list. */
+.club-back {
+  align-self: flex-start;
+}
+
+/* "Find runners near me" - secondary action under the invite search. */
+.club-nearby-btn {
+  align-self: flex-start;
+}
+
+/* --- Club Wars (ClubWarPanel.jsx) --- */
+.club-war-banner {
+  align-items: center;
+  text-align: center;
+}
+
+/* Phase ribbon across the top of the war banner. */
+.club-war-phase {
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--game-stone-dark);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink);
+}
+
+.club-war-phase.phase-preparing {
+  background: var(--game-wood-dark);
+}
+
+.club-war-phase.phase-battle {
+  background: var(--game-red);
+}
+
+.club-war-phase.phase-completed {
+  background: var(--game-gold);
+}
+
+.club-war-phase.phase-searching {
+  background: var(--game-green-dark);
+}
+
+.club-war-vs {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.club-war-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.club-war-side .game-row-name {
+  max-width: 100%;
+  text-align: center;
+}
+
+/* The rival's shield is red - ours stays gold. */
+.club-emblem-enemy {
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light) 0%,
+    var(--game-red) 50%,
+    var(--game-red-dark) 100%
+  );
+}
+
+.club-war-vs-label {
+  font-size: 28px;
+}
+
+.club-war-score {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.club-war-sub {
+  margin: 0;
+}
+
+/* Gentle pulse on the shield while matchmaking. */
+.club-war-searching {
+  animation: club-war-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes club-war-pulse {
+  50% {
+    transform: scale(1.08);
+    filter: brightness(1.15);
+  }
+}
+
+/* The player's own to-do card (lock hero / run) - cream call to action. */
+.club-war-mine .club-war-mine-title {
+  text-align: center;
+}
+
+.club-war-heroes {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.club-war-points {
+  flex-shrink: 0;
+  font-weight: 900;
+  color: var(--game-gold-light);
+}
+
+.club-war-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.club-war-picker-head .game-menu-section-title {
+  margin: 0;
+}
+
+/* Squad-picker checkbox. */
+.club-war-check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 2px solid var(--game-ink);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 14px;
+}
+
+.club-war-check.is-on {
+  background: var(--game-green);
+}
+
+/* My Club / Club Wars switch at the top of the Club tab. */
+.club-section-tabs {
+  margin-bottom: 0;
+}
+
+/* Hint that tapping a member row opens their profile with club actions. */
+.club-row-more {
+  flex-shrink: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(246, 236, 217, 0.6);
+  padding: 0 4px;
+}
+
+/* Generated club badge (TEMP, see ClubBadge) sitting where the emblem was. */
+.club-badge {
+  flex-shrink: 0;
+  align-self: center;
+  filter: drop-shadow(0 3px 0 rgba(61, 43, 26, 0.6));
+}
+
+.club-create-title {
+  text-align: center;
+}
+
+/* Member lists: names sit straight on the card (no box per row) with a
+   hairline between them; "you" is picked out in gold text instead. */
+.club-member-rows {
+  gap: 0;
+}
+
+.club-member-rows .game-row {
+  padding: 10px 4px;
+  border: none;
+  border-bottom: 1px solid rgba(246, 236, 217, 0.12);
+  border-radius: 0;
+  background: none;
+}
+
+.club-member-rows li:last-child .game-row {
+  border-bottom: none;
+}
+
+.club-member-rows .game-row.is-me {
+  background: none;
+}
+
+.club-member-rows .game-row.is-me .game-row-name {
+  color: var(--game-gold-light);
+}
+
+.club-member-rows .game-row-clickable:hover,
+.club-member-rows .game-row-clickable:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}

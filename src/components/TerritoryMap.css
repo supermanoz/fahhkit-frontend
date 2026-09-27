@@ -481,25 +481,6 @@
   border: none;
 }
 
-.territory-badge {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink, #3d2b1a);
-  box-shadow: 0 3px 0 var(--game-ink, #3d2b1a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.territory-badge img {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-
 /* Player-held ground gets a soft glow so it stands out from rival parcels
    at a glance, without needing a legend. */
 .territory-poly-player {
@@ -550,8 +531,6 @@
 
 .territory-map-locate svg {
   color: #fff;
-  filter: drop-shadow(1px 0 0 #000) drop-shadow(-1px 0 0 #000)
-    drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000);
 }
 
 .territory-map-locate:active {
@@ -603,4 +582,54 @@
     height: 42px;
     font-size: 16px;
   }
+}
+
+/* Zoomed-out "whole earth" view (see TerritoryGlobe in TerritoryMap.jsx).
+   Sits above Leaflet's panes (up to 700) so no markers poke through. It's
+   mounted invisible a few zoom levels early so its tiles are ready, then
+   cross-fades over the flat map. The deep-space backdrop shows around the
+   globe's edge. */
+.territory-globe {
+  position: absolute;
+  inset: 0;
+  z-index: 800;
+  background: radial-gradient(
+    circle at center,
+    #1b2a55 0%,
+    #0b1330 45%,
+    #03050d 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.territory-globe.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.territory-globe .maplibregl-canvas {
+  filter: var(
+    --ambience-filter,
+    saturate(1.45) contrast(1.08) brightness(1.03)
+  );
+}
+
+/* The globe carries its own attribution - Leaflet's would sit on top of it. */
+.territory-map.is-globe .leaflet-control-container {
+  display: none;
+}
+
+/* Keep "locate me" reachable over the globe - it dives back to street level. */
+.territory-map.is-globe .territory-map-locate,
+.territory-map.is-globe .territory-map-locate-error {
+  z-index: 900;
+}
+
+/* maplibre-gl.css (needed by the globe) gives every .maplibregl-map
+   position:relative - pin the Leaflet-bridged basemap's container back to
+   absolute so it stays exactly where Leaflet translates it. */
+.territory-map .leaflet-gl-layer {
+  position: absolute;
 }

@@ -56,9 +56,34 @@ export function resolveFileUrl(path) {
   return `${FILE_BASE_URL.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 }
 
+// The app calls club roles Captain / Vice-Captain; the backend's messages
+// still say leader / co-leader (and "leadership"). Reword them on the way in
+// so every error the player sees uses the game's names. "leaderboard" is
+// left alone.
+const CLUB_ROLE_WORDS = [
+  [/\bco[- ]?leaders\b/gi, 'vice-captains'],
+  [/\bco[- ]?leader\b/gi, 'vice-captain'],
+  [/\bleadership\b/gi, 'captaincy'],
+  [/\bleaders\b/gi, 'captains'],
+  [/\bleader\b/gi, 'captain'],
+]
+
+export function toClubRoleWords(text) {
+  if (typeof text !== 'string') return text
+  return CLUB_ROLE_WORDS.reduce(
+    (out, [pattern, word]) =>
+      out.replace(pattern, (match) =>
+        match[0] === match[0].toUpperCase()
+          ? word.replace(/(^|-)(\w)/g, (_, sep, c) => sep + c.toUpperCase())
+          : word
+      ),
+    text
+  )
+}
+
 export class ApiError extends Error {
   constructor(message, status) {
-    super(message)
+    super(toClubRoleWords(message))
     this.status = status
   }
 }

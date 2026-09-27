@@ -1,130 +1,279 @@
-.hero-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
+/* Hero roster in the Shop: a sideways-scrolling strip (swipe, or the round
+   arrow buttons on wider screens) of heroes standing free - no card frame.
+   Tier colour drives the floor glow: gold = in play, green = owned,
+   purple = buyable, grey = coming soon. Lives inside .game-page, so it
+   reuses the --game-* palette tokens. */
+
+.hero-roster {
+  position: relative;
   width: 100%;
 }
 
-.hero-tile {
+.hero-roster-track {
+  display: flex;
+  gap: 72px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 14px;
+  padding: 12px 14px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.hero-roster-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* Round wooden arrow buttons over the strip's edges. */
+.hero-roster-arrow {
   all: unset;
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  margin-top: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, var(--game-wood-light), var(--game-wood));
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -4px 0 var(--game-wood-dark),
+    0 3px 0 var(--game-ink);
+  cursor: pointer;
+}
+
+.hero-roster-arrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hero-roster-arrow.is-prev {
+  left: -10px;
+}
+
+.hero-roster-arrow.is-next {
+  right: -10px;
+}
+
+.hero-roster-arrow:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -4px 0 var(--game-wood-dark),
+    0 1px 0 var(--game-ink);
+}
+
+/* --- Hero (no card frame): stands on a glow in its tier colour. --- */
+.hero-card {
+  all: unset;
+  --tier: #8e44d6;
+  --tier-light: #c48bff;
   box-sizing: border-box;
   position: relative;
+  flex: 0 0 150px;
   display: flex;
   flex-direction: column;
-  aspect-ratio: 3 / 4.4;
-  border-radius: 12px;
-  border: 3px solid var(--game-ink);
-  overflow: hidden;
+  align-items: stretch;
+  gap: 4px;
+  padding: 10px 6px 4px;
+  scroll-snap-align: start;
+  border-radius: 14px;
   cursor: pointer;
-  background:
-    radial-gradient(
-      ellipse 80% 55% at 50% 78%,
-      rgba(255, 122, 41, 0.45),
-      transparent 70%
-    ),
-    linear-gradient(180deg, #2a1c12 0%, #120c07 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 177, 92, 0.25),
-    0 3px 0 var(--game-ink);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: transform 0.15s ease;
 }
 
-.hero-tile:hover,
-.hero-tile:focus-visible {
-  transform: translateY(-3px);
-  box-shadow:
-    inset 0 0 0 2px var(--game-gold-light),
-    0 0 16px rgba(255, 122, 41, 0.55),
-    0 5px 0 var(--game-ink);
+.hero-card:hover,
+.hero-card:focus-visible {
+  transform: translateY(-4px);
 }
 
-.hero-tile:focus-visible {
-  outline: 2px solid var(--game-gold-light);
+.hero-card:focus-visible {
+  outline: 3px solid var(--tier-light);
   outline-offset: 2px;
 }
 
-.hero-tile.is-equipped {
-  border-color: var(--game-gold);
-  box-shadow:
-    inset 0 0 0 2px var(--game-gold-light),
-    0 0 14px rgba(255, 122, 41, 0.5),
-    0 3px 0 var(--game-ink);
+.hero-card:active {
+  transform: translateY(1px);
 }
 
-.hero-tile.is-soon .hero-tile-stage {
-  filter: grayscale(0.85) brightness(0.7);
+.hero-card.tier-equipped {
+  --tier: #ffb400;
+  --tier-light: #ffe07a;
 }
 
-.hero-tile-stage {
-  flex: 1;
-  min-height: 0;
+.hero-card.tier-owned {
+  --tier: #3cb54a;
+  --tier-light: #9ef0a4;
+}
+
+.hero-card.tier-soon {
+  --tier: #6d6f72;
+  --tier-light: #b8babd;
+}
+
+.hero-card-stage {
+  position: relative;
+  height: 170px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-bottom: 26px;
 }
 
-/* Flat portraits fill the card like a Dota hero pick instead of floating. */
-.hero-tile:not(.is-animated) .hero-tile-stage {
+/* Glowing floor the hero stands on. */
+.hero-card-stage::before {
+  content: '';
   position: absolute;
-  inset: 0;
-  padding: 0;
-  align-items: stretch;
+  left: 8%;
+  right: 8%;
+  bottom: -4px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    var(--tier-light) 0%,
+    var(--tier) 40%,
+    transparent 72%
+  );
+  opacity: 0.55;
 }
 
-.hero-tile:not(.is-animated) .hero-tile-stage .hero-figure-initial {
+.hero-card-stage > * {
+  position: relative;
+}
+
+.hero-card:not(.is-animated) .hero-card-stage .hero-figure-portrait {
+  width: 120px;
+  height: 160px;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.hero-card:not(.is-animated) .hero-card-stage .hero-figure-initial {
   margin: auto;
 }
 
-.hero-tile-name {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 16px 6px 6px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--game-cream);
-  text-shadow: 0 2px 0 var(--game-ink);
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85) 55%);
+.hero-card.tier-soon .hero-card-stage {
+  filter: grayscale(1) brightness(0.7);
 }
 
-.hero-tile-badge {
-  position: absolute;
-  top: 6px;
-  left: 6px;
+.hero-card-name {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 18px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-text-stroke: 1.2px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.hero-card.tier-equipped .hero-card-name {
+  color: var(--tier-light);
+}
+
+.hero-card-level {
+  text-align: center;
+  font-size: 12px;
+  color: var(--game-green-light);
+}
+
+/* Fat action bar at the foot. */
+.hero-card-foot {
+  margin: 4px 0 0;
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 3px solid var(--game-ink);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.1;
+  text-shadow: 0 1px 0 var(--game-ink);
+  -webkit-text-stroke: 0.6px var(--game-ink);
+  paint-order: stroke fill;
+  background: linear-gradient(180deg, #a8f07a 0%, #5cc23a 45%, #3a9a22 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.hero-card-foot svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hero-card-foot.is-equipped {
+  flex-direction: row;
+  gap: 4px;
+  background: linear-gradient(180deg, #ffe58a 0%, #ffb400 50%, #d98a00 100%);
+}
+
+.hero-card-foot.is-owned {
+  flex-direction: row;
+}
+
+.hero-card-foot-label {
+  font-size: 12px;
+}
+
+.hero-card-foot-price {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  border: 1.5px solid var(--game-ink);
-  font-size: 9px;
-  font-weight: 900;
-  text-transform: uppercase;
-  background: var(--game-gold);
-  color: var(--game-ink);
+  gap: 4px;
+  font-size: 16px;
 }
 
-.hero-tile-badge.is-owned {
-  background: var(--game-green);
+.hero-card-foot.is-locked {
+  flex-direction: row;
+  gap: 6px;
+  background: linear-gradient(180deg, #8a8c90, #5d5f62);
+  font-size: 12px;
+  -webkit-text-stroke: 0;
 }
 
-.hero-tile-badge.is-soon {
-  background: var(--game-stone);
+@media (max-width: 520px) {
+  .hero-roster-track {
+    gap: 56px;
+  }
+
+  .hero-card {
+    flex-basis: 128px;
+  }
+
+  .hero-card-stage {
+    height: 140px;
+  }
+
+  .hero-card-name {
+    font-size: 16px;
+  }
+
+  .hero-card .hero-figure-sprite {
+    scale: 0.82;
+    transform-origin: bottom center;
+  }
+
+  /* Swipe does the job on phones. */
+  .hero-roster-arrow {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-tile {
+  .hero-card {
     transition: none;
   }
-  .hero-tile:hover,
-  .hero-tile:focus-visible {
+  .hero-card:hover,
+  .hero-card:focus-visible,
+  .hero-card:active {
     transform: none;
   }
 }

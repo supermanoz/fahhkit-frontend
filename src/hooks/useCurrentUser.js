@@ -49,5 +49,13 @@ export function useCurrentUser() {
     }
   }, [isAuthed])
 
-  return { user, isAuthed, loading }
+  // After an edit (e.g. setting a nickname): swap in the server's updated
+  // user here and in the localStorage cache other pages read from.
+  function replaceUser(updated) {
+    if (!updated) return
+    setUser(updated)
+    setLocalUser(updated)
+  }
+
+  return { user, isAuthed, loading, replaceUser }
 }

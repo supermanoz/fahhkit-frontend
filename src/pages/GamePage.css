@@ -190,49 +190,10 @@
 
 /* --- Top bar: level HUD, bled to the screen edge like Pokémon GO's status
    bar rather than boxed in a card below a header. --- */
-/* Round HUD badges (mute / map theme) share one glossy recipe: a gradient
-   body plus a soft highlight arc up top, closer to Clash of Clans' chunky
-   enamel-button look than a flat cel-shaded circle. Anchored to the bottom
-   corner (floating above the dynamic-height bottom sheet, same trick
-   .game-fab-wrap uses) rather than the top, now that the exit button that
-   used to live above them here is gone. */
-.game-mute-btn {
-  position: absolute;
-  left: 16px;
-  z-index: 600;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(
-    circle at 32% 28%,
-    var(--game-stone-light),
-    var(--game-stone) 55%,
-    var(--game-stone-dark) 100%
-  );
-  color: var(--game-ink);
-  border: 3px solid var(--game-ink);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.55),
-    inset 0 -6px 0 var(--game-stone-dark),
-    0 3px 0 var(--game-ink);
-  text-decoration: none;
-  font-size: 16px;
-  cursor: pointer;
-  transition: transform 0.1s ease;
-}
-
-.game-mute-btn {
-  bottom: calc(var(--sheet-h, 90px) + 20px);
-  font-size: 22px;
-}
-
 /* Persistent level/XP pill on the main game screen, top-left corner - Clash
    of Clans keeps this visible at all times rather than burying it in a
-   menu, unlike the full-size version in the Me tab (.game-level-track)
-   which stays put. */
+   menu. The same LevelBar (components/LevelBar.jsx) renders a bigger copy
+   in the Me tab and player profiles (.game-level-hud). */
 .game-hud-level {
   position: absolute;
   top: 16px;
@@ -257,7 +218,7 @@
 
 /* Clash Royale layout: a rounded-square badge with a burst behind the
    number, a bar flush against it, and the name riding the bar's top edge.
-   Colours stay ours (orange badge, green fill). */
+   Blue badge and blue fill (Clash-style level colour). */
 .game-hud-level-badge {
   position: relative;
   z-index: 2;
@@ -268,12 +229,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: linear-gradient(
-    180deg,
-    var(--game-gold-light) 0%,
-    var(--game-gold) 55%,
-    var(--game-gold-dark) 100%
-  );
+  background: linear-gradient(180deg, #7cc6ff 0%, #2f8ee8 55%, #1a5fb4 100%);
   border: 2.5px solid var(--game-ink);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.45),
@@ -312,7 +268,7 @@
     25% 7%,
     41% 17%
   );
-  background: linear-gradient(180deg, #ffc98a 0%, var(--game-gold-light) 100%);
+  background: linear-gradient(180deg, #b8e2ff 0%, #6bb8f5 100%);
 }
 
 .game-hud-level-num {
@@ -367,12 +323,13 @@
 .game-hud-level-bar-fill {
   height: 100%;
   max-width: 100%;
+  /* Blue to match the level badge - light top half, deeper bottom half. */
   background: linear-gradient(
     180deg,
-    var(--game-green-light) 0%,
-    var(--game-green-light) 48%,
-    var(--game-green) 52%,
-    var(--game-green-dark) 100%
+    #9ad4ff 0%,
+    #9ad4ff 48%,
+    #2f8ee8 52%,
+    #1a5fb4 100%
   );
   box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.25);
   transition: width 0.4s ease;
@@ -384,9 +341,9 @@
   z-index: 1;
   left: 8px;
   bottom: calc(100% - 9px);
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Full nickname (max 20 chars server-side) - never truncated. */
+  max-width: none;
+  overflow: visible;
   white-space: nowrap;
   padding: 1px 8px 2px;
   color: #fff;
@@ -401,26 +358,17 @@
     0 2px 0 var(--game-ink);
 }
 
-/* White glyph + black outline (via layered drop-shadows, since these are
-   single-path currentColor icons, not stroke-able shapes) instead of the
-   dark-ink fill blending into the badge behind it - a more premium
-   cartoonish icon look, matching the game's Clash-style chunky-button
-   language. Targets the icon itself, not the button, so the outline traces
-   the glyph rather than smearing around the whole circular badge. */
-.game-mute-btn svg,
+/* Every icon inside a game button is white, whatever the badge color -
+   one consistent tint across the HUD (see GameIcons.jsx). Only the svg is
+   recolored, so any text label beside it keeps its own color. */
 .game-menu-btn svg,
-.game-radial-btn svg {
+.game-radial-btn svg,
+.game-menu-picker-medal svg,
+.game-menu-picker-knob svg,
+.game-menu-close svg,
+.game-run-viewer-close svg,
+.game-hud-icon-flag svg {
   color: #fff;
-  filter: drop-shadow(1px 0 0 #000) drop-shadow(-1px 0 0 #000)
-    drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000);
-}
-
-.game-mute-btn:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.4),
-    inset 0 -6px 0 var(--game-stone-dark),
-    0 1px 0 var(--game-ink);
 }
 
 /* Fortnite/Clash-style "zone" banner - fires the instant the player's dot
@@ -536,8 +484,6 @@
 
 .game-territory-entry-banner-flag {
   font-size: 18px;
-  filter: drop-shadow(1px 0 0 #000) drop-shadow(-1px 0 0 #000)
-    drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000);
 }
 
 @keyframes territory-entry-glow {
@@ -834,26 +780,40 @@
   font-weight: 600;
 }
 
-/* Buttons inside the game are carved wood/gold slabs, not the site's
-   default orange-gradient buttons — scoped to .game-page so the rest of
+/* Buttons inside the game match the shared .game-btn look (see
+   GameCards.css) - fat cel-shaded slabs with outlined white text: green for
+   the main action (.btn-primary), wood for secondary (.btn-outline) - not
+   the site's default gradient pills. Scoped to .game-page so the rest of
    the app is untouched. */
+.game-page .btn {
+  border-radius: 10px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
+}
+
 .game-page .btn-primary {
   background: linear-gradient(
     180deg,
-    var(--game-gold-light) 0%,
-    var(--game-gold) 45%,
-    var(--game-gold-dark) 100%
+    var(--game-green-light) 0%,
+    var(--game-green) 45%,
+    var(--game-green-dark) 100%
   );
-  color: var(--game-ink);
+  color: #fff;
   border: 3px solid var(--game-ink);
   box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.6),
-    inset 0 -6px 0 var(--game-gold-dark),
+    inset 0 -4px 0 var(--game-green-dark),
     0 3px 0 var(--game-ink);
-  text-shadow: none;
 }
 
-.game-page .btn-primary::after {
+.game-page .btn-primary::before,
+.game-page .btn-primary::after,
+.game-page .btn-outline::before {
   display: none;
 }
 
@@ -865,8 +825,7 @@
 .game-page .btn-primary:active {
   transform: translateY(2px);
   box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.5),
-    inset 0 -6px 0 var(--game-gold-dark),
+    inset 0 -4px 0 var(--game-green-dark),
     0 1px 0 var(--game-ink);
 }
 
@@ -877,30 +836,50 @@
     var(--game-wood) 45%,
     var(--game-wood-dark) 100%
   );
-  color: var(--game-ink);
+  color: #fff;
   border: 3px solid var(--game-ink);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.5),
-    inset 0 -6px 0 var(--game-wood-dark),
+    inset 0 -4px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
 }
 
 .game-page .btn-outline:hover {
   border-color: var(--game-ink);
-  color: var(--game-ink);
+  color: #fff;
 }
 
 .game-page .btn-outline:active {
   transform: translateY(2px);
   box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.4),
-    inset 0 -6px 0 var(--game-wood-dark),
+    inset 0 -4px 0 var(--game-wood-dark),
     0 1px 0 var(--game-ink);
 }
 
 .game-page .btn:disabled {
   opacity: 0.55;
   box-shadow: 0 3px 0 var(--game-ink);
+}
+
+/* Everything in the game is Passion One - headings (the site sets its own
+   heading font on h1-h4) and Leaflet's map popups included. */
+.game-page h1,
+.game-page h2,
+.game-page h3,
+.game-page h4,
+.game-page h5,
+.game-page h6,
+.game-page .leaflet-container {
+  font-family: inherit;
+}
+
+/* Belt and braces: force Passion One on every element in the game - the
+   top HUD (level, coins, flags), the menu's tab strip, leaderboard/podium,
+   and anything a library styles on its own (Leaflet/MapLibre controls,
+   popups) - so nothing falls back to the site's system font. */
+.game-page *:not(code):not(pre) {
+  font-family: 'Passion One', 'Trebuchet MS', sans-serif;
 }
 
 .game-claim-toast {
@@ -1107,6 +1086,11 @@
     box-shadow 0.1s ease;
 }
 
+/* Wraps the list/close glyph so the swap between them can spin in place. */
+.game-menu-btn-icon {
+  display: flex;
+}
+
 .game-menu-btn:active,
 .game-menu-btn.is-open {
   transform: translateY(4px);
@@ -1123,7 +1107,7 @@
   position: fixed;
   inset: 0;
   z-index: 650;
-  background: rgba(10, 8, 6, 0.35);
+  background: rgba(10, 8, 6, 0.55);
 }
 
 /* Run Conquest logo shown dead-center while the radial menu is fanned out -
@@ -1196,6 +1180,58 @@
     inset 0 -9px 0 var(--game-red-dark),
     inset 0 3px 0 var(--game-red-light),
     0 5px 0 var(--game-ink);
+}
+
+.game-radial-btn.radial-stone {
+  background: var(--game-stone);
+  box-shadow:
+    inset 0 -9px 0 var(--game-stone-dark),
+    inset 0 3px 0 var(--game-stone-light),
+    0 5px 0 var(--game-ink);
+}
+
+/* Unread mail / pending races, pinned to the badge's top-right like the
+   menu tabs' own count badges. */
+.game-radial-btn {
+  position: relative;
+}
+
+.game-radial-badge {
+  top: -6px;
+  right: -6px;
+}
+
+/* Every big menu button is labelled above it, Pokémon GO style. Absolutely
+   positioned so the label doesn't shift the button off its x/y slot. */
+.game-radial-label {
+  color: var(--game-cream);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Mail and Settings - small bare icons either side of the FAB (like the
+   reference's camera/news), not full badges; Mail keeps its unread count. */
+.game-radial-btn.radial-mini {
+  width: 44px;
+  height: 44px;
+  margin-top: 7px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 26px;
 }
 
 .game-radial-btn:active {
@@ -1329,19 +1365,15 @@
 .game-menu-picker-label {
   flex: 1;
   min-width: 0;
-  font-size: 19px;
-  letter-spacing: 0.02em;
-  color: var(--game-cream);
-  text-shadow:
-    2px 0 0 var(--game-ink),
-    -2px 0 0 var(--game-ink),
-    0 2px 0 var(--game-ink),
-    0 -2px 0 var(--game-ink),
-    1.5px 1.5px 0 var(--game-ink),
-    -1.5px 1.5px 0 var(--game-ink),
-    1.5px -1.5px 0 var(--game-ink),
-    -1.5px -1.5px 0 var(--game-ink),
-    0 4px 0 var(--game-ink);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: #fff;
+  /* Same outlined lettering as the HUD / hero names: black stroke painted
+     under a white fill, plus a drop edge. */
+  -webkit-text-stroke: 2.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 var(--game-ink);
 }
 
 /* Round enamel coin behind each tab icon. */
@@ -1386,22 +1418,15 @@
 }
 
 .game-menu-picker-medal.tone-battle {
-  /* Red coin with a gold ring, crossed swords filling it. */
+  /* Red coin with a gold ring around the crossed swords. */
   --medal: var(--game-red);
+  color: var(--game-cream);
   --medal-dark: var(--game-red-dark);
   --medal-light: var(--game-red-light);
   box-shadow:
     inset 0 0 0 2.5px var(--game-gold-light),
     inset 0 -5px 0 var(--medal-dark),
     0 2px 0 var(--game-ink);
-}
-
-/* Swords slightly overflow the coin, like the reference badge. */
-.game-menu-picker-medal .race-tab-icon {
-  flex-shrink: 0;
-  width: 125%;
-  height: 125%;
-  overflow: visible;
 }
 
 .game-menu-picker-medal.tone-stone {
@@ -1438,7 +1463,7 @@
   position: absolute;
   top: calc(100% + 10px);
   left: 0;
-  right: -46px;
+  right: 0;
   margin: 0;
   padding: 10px;
   list-style: none;
@@ -1473,7 +1498,8 @@
 }
 
 .game-menu-picker-option .game-menu-picker-label {
-  font-size: 17px;
+  font-size: 18px;
+  -webkit-text-stroke-width: 2px;
 }
 
 .game-menu-picker-option:active {
@@ -1590,9 +1616,13 @@
   border-radius: 14px;
   border: 2px solid var(--game-ink);
   background: rgba(246, 236, 217, 0.06);
-  color: rgba(246, 236, 217, 0.75);
-  font-weight: 700;
-  font-size: 13px;
+  color: #fff;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  -webkit-text-stroke: 1.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -1601,7 +1631,7 @@
 
 .game-menu-tab.active {
   background: var(--game-gold);
-  color: var(--game-ink);
+  color: #fff;
 }
 
 /* Solo/Club toggle inside the Leaderboard tab - same recipe as
@@ -1612,24 +1642,43 @@
   margin-bottom: 14px;
 }
 
+/* Chunky wood toggle, green when picked - the .game-btn look. */
 .game-menu-subtab {
   flex: 1;
   padding: 7px;
   border-radius: 10px;
   border: 2px solid var(--game-ink);
-  background: rgba(246, 236, 217, 0.06);
-  color: rgba(246, 236, 217, 0.75);
-  font-weight: 700;
-  font-size: 12px;
+  background: linear-gradient(
+    180deg,
+    var(--game-wood-light) 0%,
+    var(--game-wood) 45%,
+    var(--game-wood-dark) 100%
+  );
+  box-shadow:
+    inset 0 -3px 0 var(--game-wood-dark),
+    0 2px 0 var(--game-ink);
+  color: #fff;
+  font-weight: 900;
+  font-size: 13px;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
 }
 
 .game-menu-subtab.active {
-  background: var(--game-gold);
-  color: var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 45%,
+    var(--game-green-dark) 100%
+  );
+  box-shadow:
+    inset 0 -3px 0 var(--game-green-dark),
+    0 2px 0 var(--game-ink);
 }
 
 .game-menu-panel {
@@ -1686,102 +1735,42 @@
   padding-top: 4px;
 }
 
-/* Level/XP badge + fill bar, sized up from Clash of Clans' own thin sliver
-   meter so it reads clearly at a glance rather than disappearing under the
-   shield icon. */
-.game-level-track {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 4px 0;
-}
-
-/* Shield outline (clip-path hexagon) instead of a plain circle - the
-   Clash-Royale trophy-road badge shape. */
-.game-level-badge {
-  position: relative;
-  flex-shrink: 0;
-  width: 46px;
-  height: 48px;
-  clip-path: polygon(50% 0%, 95% 18%, 95% 64%, 50% 100%, 5% 64%, 5% 18%);
+/* Me tab / player profile level meter - the same LevelBar as the main HUD
+   (.game-hud-level-*), centered and stretched, with the XP count printed
+   inside the bar. */
+.game-level-hud {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    circle at 32% 26%,
-    var(--game-gold-light),
-    var(--game-gold) 55%,
-    var(--game-gold-dark) 100%
-  );
-  color: #fff;
-  font-weight: 800;
-  font-size: 19px;
-  box-shadow: inset 0 0 0 2px var(--game-ink);
-}
-
-.game-xp-bar {
-  position: relative;
-  flex: 1;
-  height: 13px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1.5px solid var(--game-ink);
-  /* visible, not hidden - the progress marker below sits half outside the
-     fill bar's own rounded end and would get clipped otherwise. */
-  overflow: visible;
-}
-
-.game-xp-bar-fill {
-  position: relative;
-  height: 100%;
-  max-width: 100%;
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    var(--game-green-light) 0%,
-    var(--game-green) 50%,
-    var(--game-green-dark) 100%
-  );
-  transition: width 0.4s ease;
-}
-
-/* A thin glossy sheen along the top edge of the fill - the small cartoonish
-   detail that reads as "game UI" rather than a plain browser progress bar. */
-.game-xp-bar-fill::after {
-  content: '';
-  position: absolute;
-  top: 1px;
-  left: 3px;
-  right: 3px;
-  height: 2px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-/* A small gold diamond riding the leading edge of the fill - Clash
-   Royale's progress-marker detail, not just a flat color bar. */
-.game-xp-bar-marker {
-  position: absolute;
-  top: 50%;
-  right: -7px;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, var(--game-gold-light), var(--game-gold));
-  border: 1.5px solid var(--game-ink);
-  transform: translateY(-50%) rotate(45deg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-.game-xp-bar-text {
-  display: block;
   width: 100%;
-  text-align: center;
-  margin: 5px 0 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(246, 236, 217, 0.6);
+  padding: 12px 4px 0;
+}
+
+.game-level-hud .game-hud-level-track {
+  flex: 1;
+  max-width: 260px;
+}
+
+.game-level-hud .game-hud-level-bar {
+  width: 100%;
+  height: 28px;
+}
+
+.game-hud-level-xp {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
 }
 
 .game-menu-summary {
@@ -1825,18 +1814,37 @@
   margin-left: 2px;
 }
 
+/* Same outlined white lettering as .game-card-title-sm. */
 .game-menu-section-title {
   width: 100%;
   text-align: left;
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--game-cream);
+  font-weight: 900;
+  font-size: 17px;
+  color: #fff;
   margin: 18px 0 8px;
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
+}
+
+/* Inside a card the card's own padding and gap do the spacing. */
+.game-card > .game-menu-section-title:first-child,
+.game-card > .game-menu-avatars-title {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.game-card .game-menu-avatar-grid,
+.game-card .game-menu-subtabs {
+  margin-bottom: 0;
 }
 
 .game-menu-empty {
   text-align: center;
-  color: rgba(246, 236, 217, 0.65);
+  color: rgba(246, 236, 217, 0.7);
   font-size: 13px;
   padding: 12px 0 4px;
 }
@@ -1850,18 +1858,19 @@
   gap: 8px;
 }
 
+/* Same row look as .game-row (GameCards.css). */
 .game-menu-list li {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: rgba(246, 236, 217, 0.06);
-  border-radius: 12px;
-  border: 1px solid rgba(246, 236, 217, 0.12);
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
 }
 
 .game-menu-list li:hover {
-  background: rgba(246, 236, 217, 0.1);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .game-menu-list-row {
@@ -1875,14 +1884,15 @@
 }
 
 .game-menu-list-area {
-  font-weight: 700;
-  color: var(--game-cream);
+  font-weight: 800;
+  color: #fff;
   font-size: 14px;
 }
 
 .game-menu-list-meta {
-  font-size: 11px;
-  color: rgba(246, 236, 217, 0.6);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(246, 236, 217, 0.75);
 }
 
 .game-menu-shop {
@@ -1892,6 +1902,15 @@
   text-align: center;
   padding: 20px 10px 6px;
   gap: 8px;
+}
+
+/* The shop centres its contents, which would shrink each card to its
+   content width and collapse the hero/shade grids to one column - stretch
+   the cards to the full panel width instead. */
+.game-menu-shop > .game-card {
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .game-menu-shop-icon {
@@ -1914,7 +1933,8 @@
   margin: 0;
 }
 
-/* --- Club tab (MVP: create/browse/join/leave - see ClubPanel.jsx). --- */
+/* Text input shared by the Club tab (ClubPanel.css styles the rest) and the
+   PvP stake field. */
 .game-club-input {
   width: 100%;
   padding: 10px 12px;
@@ -1930,87 +1950,38 @@
   color: rgba(246, 236, 217, 0.45);
 }
 
-.game-club-create {
-  display: flex;
-  flex-direction: column;
-}
-
-.game-club-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.game-club-search .game-club-input {
-  margin-bottom: 0;
-}
-
-.game-club-search-icon {
-  flex-shrink: 0;
-  color: rgba(246, 236, 217, 0.55);
-}
-
-.game-club-mine {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 0;
-}
-
-.game-club-mine-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.game-club-mine-icon {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  padding: 10px;
-  border-radius: 50%;
-  background: var(--game-gold);
-  color: var(--game-ink);
-  box-sizing: content-box;
-}
-
-.game-club-mine-name {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--game-gold);
-  margin: 0;
-}
-
-.game-club-mine-description {
-  color: rgba(246, 236, 217, 0.8);
-  font-size: 13px;
-  margin: 0;
-}
-
+/* Shop/Settings group headings - outlined lettering like
+   .game-card-title. */
 .game-menu-avatars-title {
   width: 100%;
   text-align: left;
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--game-cream);
+  font-weight: 900;
+  font-size: 18px;
+  color: #fff;
   margin: 0;
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
 }
 
 /* Shop section headers are one word, dead center - "Avatar" / "Map" /
    "Emoji" - rather than a descriptive left-aligned sentence. */
 .game-menu-avatars-title-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   text-align: center;
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--game-gold);
   margin: 6px 0 10px;
 }
 
 .game-menu-avatar-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -2023,20 +1994,24 @@
   align-items: center;
   gap: 4px;
   padding: 10px 6px;
-  background: rgba(246, 236, 217, 0.06);
-  border: 2px solid rgba(246, 236, 217, 0.16);
-  border-radius: 14px;
+  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
+  border: 3px solid var(--game-ink);
+  border-radius: 12px;
+  box-shadow: 0 3px 0 var(--game-ink);
   cursor: pointer;
   text-align: center;
 }
 
 .game-menu-avatar-card:hover {
-  background: rgba(246, 236, 217, 0.1);
+  filter: brightness(1.04);
 }
 
+/* Picked tile - gold ring, like a selected Clash card. */
 .game-menu-avatar-card.is-selected {
-  background: rgba(224, 165, 55, 0.16);
-  border-color: var(--game-gold);
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd98a 100%);
+  box-shadow:
+    0 0 0 3px var(--game-gold),
+    0 3px 0 var(--game-ink);
   cursor: default;
 }
 
@@ -2056,15 +2031,12 @@
   object-fit: cover;
 }
 
-.game-menu-emoji-glyph {
-  font-size: 28px;
-  line-height: 1;
-}
-
 .game-menu-avatar-name {
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--game-cream);
+  max-width: 100%;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--game-ink);
+  overflow-wrap: anywhere;
 }
 
 .game-menu-avatar-tag {
@@ -2072,7 +2044,8 @@
   align-items: center;
   gap: 3px;
   font-size: 11px;
-  color: var(--game-gold);
+  font-weight: 800;
+  color: var(--game-green-dark);
 }
 
 .game-avatar-confirm-compare {
@@ -2215,14 +2188,748 @@
 
   .game-menu-picker {
     display: block;
+    margin-right: 0;
+  }
+
+  .game-menu-picker-current {
+    padding-right: 18px;
+  }
+
+  /* Close (X) perches on the picker bar's top-right corner, Clash-popup
+     style, above the bar (z-index over the picker's 5). */
+  .game-menu-close {
+    z-index: 6;
+    top: 2px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--game-ink);
+    background: var(--game-red);
+    color: #fff;
+    font-size: 12px;
+    box-shadow:
+      inset 0 -4px 0 var(--game-red-dark),
+      inset 0 2px 0 var(--game-red-light),
+      0 3px 0 var(--game-ink);
+    transition: transform 0.08s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .game-menu-close:active {
+    transform: translateY(2px);
+    box-shadow:
+      inset 0 -4px 0 var(--game-red-dark),
+      inset 0 2px 0 var(--game-red-light),
+      0 1px 0 var(--game-ink);
   }
 }
 
-.game-menu-heroes-link {
+/* Settings tab - a tappable on/off row per preference, then the same
+   Map/Emoji pickers the Shop used to hold. */
+.game-settings-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 4px;
+  border: none;
+  border-bottom: 1px solid rgba(246, 236, 217, 0.12);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+/* Rows sit straight on the panel - a hairline between them, none after
+   the last one. */
+.game-settings-row:last-of-type {
+  border-bottom: none;
+}
+
+.game-settings-row-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.game-settings-row:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.game-settings-row-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  line-height: 1.1;
+}
+
+.game-settings-row-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(246, 236, 217, 0.7);
+}
+
+/* Chunky on/off switch - stone track that turns green, cream knob with an
+   ink outline that slides across. */
+.game-switch {
+  flex-shrink: 0;
+  position: relative;
+  width: 56px;
+  height: 30px;
+  border-radius: 999px;
+  border: 3px solid var(--game-ink);
+  background: var(--game-stone-dark);
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.3);
+  transition: background 0.2s ease;
+}
+
+.game-switch.is-on {
+  background: var(--game-green);
+  box-shadow:
+    inset 0 3px 0 var(--game-green-dark),
+    0 0 10px rgba(79, 200, 94, 0.45);
+}
+
+.game-switch-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: var(--game-cream);
+  box-shadow: inset 0 -3px 0 #d9c7a4;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.game-switch.is-on .game-switch-knob {
+  transform: translateX(26px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-switch,
+  .game-switch-knob {
+    transition: none;
+  }
+}
+
+.game-settings-toggle {
+  min-width: 52px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--game-stone);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+}
+
+.game-settings-toggle.is-on {
+  background: var(--game-green);
+}
+
+/* --- Shop: Territory Colors - same Dota-style packed grid as the heroes,
+   each tile a cartoon flag in that shade (ShadeFlag).
+   Tap: buy if not owned, else equip/unequip. --- */
+.shade-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.shade-tile {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.6);
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    filter 0.14s ease;
+}
+
+.shade-tile .shade-flag,
+.shade-tile .trail-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Flag flutters on hover. */
+.shade-flag-cloth {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+
+.shade-tile:hover .shade-flag-cloth,
+.shade-tile:focus-visible .shade-flag-cloth {
+  animation: shade-flag-wave 0.9s ease-in-out infinite;
+}
+
+@keyframes shade-flag-wave {
+  0%,
+  100% {
+    transform: skewY(0deg) scaleX(1);
+  }
+  50% {
+    transform: skewY(-5deg) scaleX(0.93);
+  }
+}
+
+.shade-shop-grid:hover .shade-tile:not(:hover) {
+  filter: brightness(0.6);
+}
+
+.shade-tile:hover,
+.shade-tile:focus-visible {
+  z-index: 2;
+  transform: scale(1.1);
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--shade),
+    0 0 18px var(--shade),
+    0 8px 16px rgba(0, 0, 0, 0.7);
+}
+
+.shade-tile:active {
+  transform: scale(1.05);
+}
+
+.shade-tile.is-equipped {
+  box-shadow:
+    inset 0 0 0 2px var(--game-gold),
+    0 0 10px rgba(255, 122, 41, 0.6);
+}
+
+.shade-tile-chip {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 3px;
+  border-radius: 999px;
+  border: 2px solid rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+  line-height: 1.3;
+  color: #fff;
+  -webkit-text-stroke: 0.8px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    rgba(40, 28, 18, 0.92),
+    rgba(20, 13, 7, 0.92)
+  );
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.shade-tile.is-owned .shade-tile-chip,
+.shade-tile.is-equipped .shade-tile-chip {
+  padding-left: 8px;
+  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
+}
+
+.shade-tile-chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* "Buy / Equip" call-out that fades in on hover. */
+.shade-tile-hint {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--game-ink);
+  font-size: 12px;
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: #fff;
+  background: linear-gradient(180deg, #7be07f, var(--game-green-dark));
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.shade-tile:hover .shade-tile-hint,
+.shade-tile:focus-visible .shade-tile-hint {
+  opacity: 1;
+}
+
+.shade-tile-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 48%,
+    transparent 60%
+  );
+  translate: -120% 0;
+}
+
+.shade-tile:hover .shade-tile-shine {
+  animation: hero-shine 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shade-tile {
+    transition: none;
+  }
+  .shade-tile:hover,
+  .shade-tile:focus-visible,
+  .shade-tile:active {
+    transform: none;
+  }
+  .shade-tile:hover .shade-tile-shine,
+  .shade-tile:hover .shade-flag-cloth {
+    animation: none;
+  }
+}
+
+/* Phones: 3 tiles a row (4 on wider phones), near-square, small type. */
+@media (max-width: 520px) {
+  .shade-shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding: 14px;
+  }
+
+  .shade-tile {
+    aspect-ratio: 1 / 1;
+  }
+
+  .shade-tile-chip {
+    font-size: 11px;
+    bottom: 4px;
+    right: 4px;
+  }
+
+  .shade-tile-hint {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+
+  .shade-tile-chip svg {
+    width: 9px;
+    height: 9px;
+  }
+
+  .shade-tile:hover,
+  .shade-tile:focus-visible {
+    transform: scale(1.04);
+  }
+}
+
+.game-confirm-shade-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 3px solid var(--game-ink);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+/* Trail drawing in on hover (TrailPreview). */
+.shade-tile:hover .trail-preview-line,
+.shade-tile:focus-visible .trail-preview-line {
+  stroke-dasharray: 260;
+  animation: trail-draw 0.9s ease-out;
+}
+
+@keyframes trail-draw {
+  from {
+    stroke-dashoffset: 260;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shade-tile:hover .trail-preview-line {
+    animation: none;
+  }
+}
+
+/* Shop wallet: Fahhcoin balance at the top of the Shop - just the coin,
+   the number and "+ Get more", no box. */
+.game-shop-wallet {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px;
+}
+
+.game-shop-wallet .game-hud-icon {
+  position: relative;
+  right: auto;
+  top: auto;
+  transform: none;
+  flex-shrink: 0;
+}
+
+.game-shop-wallet-value {
+  font-size: 24px;
+  color: #fff;
+  -webkit-text-stroke: 1px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+/* Small HUD coin (same face as .game-hud-icon-coin) for inline prices. */
+.game-coin {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.55);
+  vertical-align: middle;
+  background: radial-gradient(
+    circle at 50% 50%,
+    #ffe95e 0%,
+    #ffd21f 52%,
+    #d99200 58%,
+    #ffcf2a 70%,
+    #ffb800 86%,
+    #c98600 100%
+  );
+  box-shadow:
+    inset 0 -2px 0 rgba(150, 90, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.game-coin::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 6px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+/* --- Incoming PvP challenge prompt (ChallengePrompt). --- */
+.challenge-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(70px + env(safe-area-inset-top)) 16px 16px;
+  background: rgba(10, 6, 3, 0.55);
+}
+
+.challenge-prompt {
+  position: relative;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 34px 18px 14px;
+  text-align: center;
+  border-radius: 20px;
+  border: 3px solid var(--game-ink);
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      rgba(255, 90, 77, 0.35),
+      transparent 70%
+    ),
+    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
+  color: var(--game-cream);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 5px 0 var(--game-ink),
+    0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.challenge-prompt-emblem {
+  position: absolute;
+  top: -28px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light),
+    var(--game-red) 50%,
+    var(--game-red-dark)
+  );
+  color: #fff;
+  font-size: 26px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 3px 0 var(--game-ink),
+    0 0 18px rgba(255, 90, 77, 0.6);
+  animation: challenge-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes challenge-pulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.challenge-prompt-kicker {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--game-red-light);
+}
+
+.challenge-prompt-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  color: #fff;
+  -webkit-text-stroke: 1px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.challenge-prompt-terms {
+  display: flex;
+  gap: 10px;
   width: 100%;
-  margin: 4px 0 12px;
+  margin-top: 4px;
+}
+
+.challenge-prompt-term {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.challenge-prompt-term-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(246, 236, 217, 0.65);
+}
+
+.challenge-prompt-term-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 20px;
+  color: #fff;
+}
+
+.challenge-prompt-term-value .game-coin {
+  width: 18px;
+  height: 18px;
+}
+
+.challenge-prompt-note {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.7);
+}
+
+.challenge-prompt-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.challenge-prompt-actions .game-btn {
+  flex: 1;
+}
+
+.challenge-prompt-later {
+  all: unset;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.65);
+  text-decoration: underline;
+  padding: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .challenge-prompt-emblem {
+    animation: none;
+  }
+}
+
+/* Shop section tabs (Heroes / Territory / Trail / Map). */
+.game-shop-tabs {
+  align-self: stretch;
+}
+
+.game-shop-tabs .game-menu-subtab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* The hero roster sits straight on the panel (no card box). */
+.game-menu-shop > .hero-roster {
+  align-self: stretch;
+}
+
+/* Me tab: My Territories / History sit straight on the panel (no box). */
+.game-me-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--game-cream);
+}
+
+/* Me tab: club name with its (TEMP, generated) badge in front. */
+.game-menu-summary-club {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--game-cream);
+}
+
+.game-menu-summary-club .club-badge {
+  flex-shrink: 0;
+}
+
+/* Me tab: "Pick your runner tag" prompt, shown until a nickname is set. */
+.nickname-card {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 2px dashed rgba(255, 177, 92, 0.6);
+  background: rgba(255, 122, 41, 0.1);
+  text-align: left;
+}
+
+.nickname-card-title {
+  margin: 0;
+  font-size: 17px;
+  color: #fff;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.nickname-card-sub,
+.nickname-card-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.7);
+}
+
+.nickname-card-hint.is-error {
+  color: var(--game-red-light);
+}
+
+.nickname-card-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nickname-card-at {
+  font-size: 20px;
+  color: var(--game-gold-light);
+}
+
+.nickname-card-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* HUD coin counter: no bar behind it any more - just the number beside the
+   coin, with an ink outline (no shadow). */
+.game-hud .game-hud-stat-coin {
+  min-width: 0;
+  margin-right: 0;
+  padding: 0 44px 0 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.game-hud .game-hud-stat-coin::after {
+  display: none;
+}
+
+.game-hud .game-hud-stat-coin .game-hud-icon {
+  right: 0;
+}
+
+.game-hud .game-hud-stat-coin .game-hud-value {
+  font-size: 22px;
+  color: #fff;
+  -webkit-text-stroke: 2.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: none;
+}
+
+.game-hud .game-hud-stat-coin:active {
+  box-shadow: none;
+}
+
+@media (max-width: 560px) {
+  .game-hud .game-hud-stat-coin {
+    padding-right: 40px;
+  }
+
+  .game-hud .game-hud-stat-coin .game-hud-value {
+    font-size: 19px;
+  }
+}
+
+/* Menu tab icons (Leaderboard, Club, Race, Mail, Me, Shop, Settings) on
+   their medallions - picker bar, dropdown, desktop tabs and the radial
+   menu: heavier strokes plus a black outline (four 1px ink drop-shadows),
+   matching the outlined lettering beside them. */
+.game-menu-picker-medal svg,
+.game-radial-btn svg {
+  stroke-width: 3px;
+  overflow: visible;
+  filter: drop-shadow(1px 0 0 var(--game-ink))
+    drop-shadow(-1px 0 0 var(--game-ink)) drop-shadow(0 1px 0 var(--game-ink))
+    drop-shadow(0 -1px 0 var(--game-ink));
 }

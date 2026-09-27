@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useState } from 'react'
+import { IconBolt, IconCheck, IconClose } from './GameIcons'
 import { motion } from 'framer-motion'
-import { FaBolt, FaCheck, FaTimes } from 'react-icons/fa'
 import HeroFigure from './HeroFigure'
 import { resolveFileUrl } from '../api/client'
 import { getHeroSprite } from '../utils/heroSprites'
@@ -67,7 +67,7 @@ export default function HeroDetailModal({
           aria-label="Close"
           onClick={onClose}
         >
-          <FaTimes />
+          <IconClose />
         </button>
 
         <div className={`hero-modal-stage ${sprite ? '' : 'is-flat'}`}>
@@ -104,7 +104,7 @@ export default function HeroDetailModal({
               {abilities.map((a) => (
                 <li key={a.id}>
                   <span className="hero-modal-stat-label">
-                    <FaBolt aria-hidden="true" /> {a.label}
+                    <IconBolt aria-hidden="true" /> {a.label}
                   </span>
                   <span className="hero-modal-stat-value">
                     {a.sign}
@@ -166,7 +166,7 @@ export default function HeroDetailModal({
                           'Unequip'
                         ) : (
                           <>
-                            <FaCheck /> Equip
+                            <IconCheck /> Equip
                           </>
                         )}
                       </button>

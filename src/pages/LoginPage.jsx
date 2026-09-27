@@ -6,6 +6,7 @@ import Footer from '../components/Footer'
 import PasswordField from '../components/PasswordField'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import './LoginPage.css'
+import { playerNameOf } from '../utils/playerName'
 
 const INITIAL_FORM = { mobileNumber: '', password: '' }
 
@@ -69,7 +70,7 @@ export default function LoginPage() {
         : '/'
     navigate(redirectTo, {
       state: {
-        message: `Welcome back, ${user?.fullName || 'athlete'}! You're signed in.`,
+        message: `Welcome back, ${playerNameOf(user) || 'athlete'}! You're signed in.`,
       },
     })
   }

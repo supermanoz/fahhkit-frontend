@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
+import { IconChevronLeft, IconChevronRight, IconDownload } from './GameIcons'
 import { motion } from 'framer-motion'
-import { FaChevronLeft, FaChevronRight, FaDownload } from 'react-icons/fa'
 import {
   CARD_H,
   CARD_W,
@@ -127,7 +127,7 @@ export default function ShareRunCarousel({ run }) {
                   onClick={() => handleDownload(slide)}
                   disabled={downloadingVariant === slide.variant}
                 >
-                  <FaDownload />{' '}
+                  <IconDownload />{' '}
                   {downloadingVariant === slide.variant
                     ? 'Preparing...'
                     : `Download ${slide.ext.toUpperCase()}`}
@@ -145,7 +145,7 @@ export default function ShareRunCarousel({ run }) {
         onClick={() => goTo(index - 1)}
         disabled={index === 0}
       >
-        <FaChevronLeft />
+        <IconChevronLeft />
       </button>
       <button
         type="button"
@@ -154,7 +154,7 @@ export default function ShareRunCarousel({ run }) {
         onClick={() => goTo(index + 1)}
         disabled={index === SLIDES.length - 1}
       >
-        <FaChevronRight />
+        <IconChevronRight />
       </button>
 
       <div className="share-carousel-dots">

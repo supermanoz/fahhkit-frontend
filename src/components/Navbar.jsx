@@ -11,6 +11,7 @@ import {
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import ThemeToggle from './ThemeToggle'
 import './Navbar.css'
+import { playerNameOf } from '../utils/playerName'
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
@@ -117,7 +118,7 @@ export default function Navbar() {
                 ) : (
                   <FaUserCircle className="navbar-user-icon" />
                 )}
-                {user?.fullName}
+                {playerNameOf(user)}
                 <FaChevronDown className="navbar-user-caret" />
               </button>
               {userMenuOpen && (

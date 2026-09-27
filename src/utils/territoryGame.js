@@ -263,6 +263,11 @@ export function xpFloorForLevel(level) {
   return LEVEL_CURVE_BASE * (level - 1) ** 2
 }
 
+// Tally-style flags: one flag icon reads as 5 held territories instead of 1,
+// so a player with dozens of parcels doesn't need a wall of flag glyphs.
+// Shared by the Me tab and other players' profiles.
+export const PARCELS_PER_FLAG = 5
+
 // How far into the current level a player's XP sits, as both raw numbers
 // (for a "1,234 / 2,000 XP" style label) and a 0-1 fill fraction for a bar.
 export function levelProgress(level, xp) {

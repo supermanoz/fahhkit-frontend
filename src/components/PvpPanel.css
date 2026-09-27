@@ -77,20 +77,29 @@
   display: none;
 }
 
+/* Quick Match / Nearby Runners - same dark card as .game-card-dark
+   (GameCards.css). */
 .pvp-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  margin-top: 12px;
   padding: 14px;
   border-radius: 14px;
-  border: 2px solid rgba(246, 236, 217, 0.14);
-  background: linear-gradient(
-    160deg,
-    rgba(255, 122, 41, 0.12),
-    rgba(246, 236, 217, 0.04)
-  );
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, #5a4633 0%, #46362a 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 var(--game-ink);
+  color: var(--game-cream);
+}
+
+.pvp-card > .game-menu-section-title:first-child {
+  margin-top: 0;
+}
+
+.pvp-card .game-menu-subtabs {
+  width: 100%;
 }
 
 .pvp-card .game-menu-list {
@@ -99,9 +108,15 @@
 
 .pvp-card-title {
   margin: 0;
-  font-weight: 800;
-  font-size: 15px;
-  color: var(--game-cream);
+  font-weight: 900;
+  font-size: 17px;
+  color: #fff;
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
 }
 
 .pvp-toggle {

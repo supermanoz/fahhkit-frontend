@@ -12,6 +12,7 @@ import {
   sendDirectChallenge,
   setPvpDiscoverable,
 } from '../api/pvp'
+import { playerName } from '../utils/playerName'
 
 const DISCOVERABLE_KEY = 'fahhkit_pvp_discoverable'
 // Backend treats a location older than 15 min as stale (pvp.discovery.
@@ -19,6 +20,7 @@ const DISCOVERABLE_KEY = 'fahhkit_pvp_discoverable'
 const LOCATION_PING_MS = 2 * 60 * 1000
 // Queue matching sweeps every 5s server-side; the socket normally tells us
 // first, this is the fallback if it's not connected.
+const CHALLENGE_POLL_MS = 20000
 const QUEUE_POLL_MS = 5000
 
 function loadDiscoverable() {
@@ -38,9 +40,11 @@ export function mySide(challenge, userId) {
   const isChallenger = challenge.challengerId === userId
   return {
     isChallenger,
-    opponentName: isChallenger
-      ? challenge.opponentName
-      : challenge.challengerName,
+    // First name only - PvP responses carry full names, no nicknames.
+    opponentName: playerName(
+      null,
+      isChallenger ? challenge.opponentName : challenge.challengerName
+    ),
     confirmed: isChallenger
       ? challenge.challengerConfirmed
       : challenge.opponentConfirmed,
@@ -104,6 +108,22 @@ export function usePvp({ userId, playerLocation }) {
     refreshChallenges()
     refreshQueue()
   }, [userId, refreshChallenges, refreshQueue])
+
+  // Backstop for the socket push: re-check challenges every so often (and
+  // when the tab comes back) so an incoming challenge still pops up if the
+  // live connection dropped.
+  useEffect(() => {
+    if (!userId) return
+    const interval = setInterval(refreshChallenges, CHALLENGE_POLL_MS)
+    const onVisible = () => {
+      if (!document.hidden) refreshChallenges()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [userId, refreshChallenges])
 
   // While discoverable, keep our last-known location fresh so we show up in
   // other players' nearby lists.

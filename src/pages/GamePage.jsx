@@ -1,21 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  IconCheck,
+  IconChevronDown,
+  IconClose,
+  IconCrosshairs,
+  IconEnvelope,
+  IconFlag,
+  IconHelmet,
+  IconList,
+  IconMap,
+  IconPlay,
+  IconRunning,
+  IconSettings,
+  IconStore,
+  IconSwords,
+  IconTrophy,
+  IconUser,
+  IconUsers,
+  IconVolumeMute,
+  IconVolumeUp,
+} from '../components/GameIcons'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  FaCheck,
-  FaChevronDown,
-  FaCoins,
-  FaEnvelope,
-  FaFlag,
-  FaListUl,
-  FaPlay,
-  FaStore,
-  FaTimes,
-  FaTrophy,
-  FaUser,
-  FaUsers,
-} from 'react-icons/fa'
-import { BsVolumeMuteFill, BsVolumeUpFill } from 'react-icons/bs'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
@@ -23,7 +29,7 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
-import { usePvp } from '../hooks/usePvp'
+import { mySide, usePvp } from '../hooks/usePvp'
 import { ApiError, resolveFileUrl } from '../api/client'
 import { createRun, getRun, getRuns } from '../api/runs'
 import {
@@ -54,7 +60,6 @@ import {
   VIEW_RADIUS_METERS,
   bearingBetween,
   formatArea,
-  levelProgress,
   loopPerimeterMeters,
   mergeTouchingParcels,
   pointInPolygon,
@@ -83,19 +88,22 @@ import {
   playMenuSound,
   playMilestoneChime,
 } from '../utils/gameSound'
-import {
-  describeHeroAbility,
-  isBlazeHero,
-  isPlaceholderHero,
-} from '../utils/hero'
+import { isBlazeHero, isPlaceholderHero } from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
+import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
 import MailPanel from '../components/MailPanel'
 import PvpPanel from '../components/PvpPanel'
+import NearbyRunners from '../components/NearbyRunners'
 import HeroGallery from '../components/HeroGallery'
+import ShadeFlag from '../components/ShadeFlag'
+import TrailPreview from '../components/TrailPreview'
+import ColorShelf from '../components/ColorShelf'
+import ChallengePrompt from '../components/ChallengePrompt'
+import ClubBadge from '../components/ClubBadge'
+import NicknameCard from '../components/NicknameCard'
+import { playerName, playerNameOf } from '../utils/playerName'
 import HeroDetailModal from '../components/HeroDetailModal'
-import { GiSpartanHelmet } from 'react-icons/gi'
-import { RaceTabIcon } from '../components/CrossedSwordsIcon'
 import IdleNudge from '../components/IdleNudge'
 import LeaderboardPodium from '../components/LeaderboardPodium'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
@@ -114,13 +122,8 @@ import {
   fetchSkyConditions,
   pickWeatherHype,
 } from '../utils/mapAmbience'
-import {
-  AREA_EMOJIS,
-  getAreaEmojiById,
-  loadAreaEmojiId,
-  saveAreaEmojiId,
-} from '../constants/areaEmojis'
 import './GamePage.css'
+import '../components/GameCards.css'
 
 function formatMeters(meters) {
   if (!meters) return '0 m'
@@ -128,39 +131,77 @@ function formatMeters(meters) {
   return `${(meters / 1000).toFixed(2)} km`
 }
 
-// Pokémon GO-style fan-out: tapping the pokéball FAB pops these options up
-// in an arc instead of jumping straight to a menu, so the x/y offsets below
-// are the whole point, not incidental styling. Leaderboard/Me/Shop form the
-// top arc; "Start Conquering" sits centered below them, closer to the FAB,
-// as the primary action. It isn't a menu tab like the other three (see its
-// onClick special-case below) - it starts a run directly, moved in here off
-// the map's persistent bottom bar so the idle map reads clean with just the
-// FAB showing.
+// Pokémon GO-style menu: tapping the FAB (which turns into a close X) lays
+// these out above it, each labelled - five big buttons in an X (two up top,
+// the red Play button dead center, two below), with Mail and Settings as
+// small icons on either side of the FAB. x/y are each button's center offset
+// from the FAB's, so the layout itself is the point here, not incidental
+// styling.
+// The red Play button opens PLAY_OPTIONS instead of a menu tab.
 const RADIAL_ITEMS = [
-  {
-    tab: 'leaderboard',
-    label: 'Leaderboard',
-    Icon: FaTrophy,
-    tone: 'gold',
-    x: -119,
-    y: -107,
-  },
-  { tab: 'me', label: 'Me', Icon: FaUser, tone: 'green', x: 0, y: -198 },
+  { tab: 'me', label: 'Me', Icon: IconUser, tone: 'green', x: -112, y: -300 },
   {
     tab: 'shop',
     label: 'Shop',
-    Icon: FaStore,
+    Icon: IconStore,
     tone: 'wood',
-    x: 119,
-    y: -107,
+    x: 112,
+    y: -300,
+  },
+  { tab: 'play', label: 'Play', Icon: IconPlay, tone: 'red', x: 0, y: -200 },
+  {
+    tab: 'leaderboard',
+    label: 'Leaderboard',
+    Icon: IconTrophy,
+    tone: 'gold',
+    x: -112,
+    y: -100,
   },
   {
+    tab: 'club',
+    label: 'Club',
+    Icon: IconUsers,
+    tone: 'green',
+    x: 112,
+    y: -100,
+  },
+  {
+    tab: 'mail',
+    label: 'Mail',
+    Icon: IconEnvelope,
+    tone: 'mini',
+    x: -100,
+    y: 0,
+  },
+  {
+    tab: 'settings',
+    label: 'Settings',
+    Icon: IconSettings,
+    tone: 'mini',
+    x: 100,
+    y: 0,
+  },
+]
+
+// What the red Play button opens into: the original start-a-run ("Conquer"
+// territory) or a PvP race - a choice between modes, shown in place of the
+// main layout.
+const PLAY_OPTIONS = [
+  {
     tab: 'conquer',
-    label: 'Start Conquering',
-    Icon: FaPlay,
+    label: 'Conquer',
+    Icon: IconFlag,
+    tone: 'green',
+    x: -80,
+    y: -170,
+  },
+  {
+    tab: 'race',
+    label: 'PvP Race',
+    Icon: IconSwords,
     tone: 'red',
-    x: 0,
-    y: -95,
+    x: 80,
+    y: -170,
   },
 ]
 
@@ -218,14 +259,18 @@ function describeRunRejection(outcome) {
   )
 }
 
+// Shop sub-sections (tab row under the wallet).
+const SHOP_SECTIONS = [
+  { id: 'heroes', label: 'Heroes', Icon: IconHelmet },
+  { id: 'territory', label: 'Territory', Icon: IconFlag },
+  { id: 'trail', label: 'Trail', Icon: IconRunning },
+  { id: 'map', label: 'Map', Icon: IconMap },
+]
+
 const PVP_ALERT_COPY = {
   matched: {
     title: 'Rival found! ⚔️',
     line: 'Confirm the race to lock in stakes.',
-  },
-  received: {
-    title: 'You got called out 🫵',
-    line: 'Someone nearby wants to race you.',
   },
   started: { title: 'Race is ON 🏁', line: 'Stakes locked. Go run it.' },
   resolved: {
@@ -250,9 +295,6 @@ const MILESTONE_METERS = 1000
 const formatCoins = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 // Minimum time the loading screen stays up, even on a fast load.
 const LOADING_MIN_MS = 4500
-// Tally-style flags: one flag icon reads as 5 held territories instead of 1,
-// so a player with dozens of parcels doesn't need a wall of flag glyphs.
-const PARCELS_PER_FLAG = 5
 
 const EVENT_TYPE_TITLES = {
   CLAIMED: 'Territory claimed!',
@@ -282,7 +324,7 @@ function summarizeRunEvents(events) {
 }
 
 export default function GamePage() {
-  const { user, isAuthed, loading: userLoading } = useCurrentUser()
+  const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const tracker = useRunTracker()
   // The live "Distance" stat during a run - throttled to refresh once every
   // 5s instead of on every render (tracker.elapsedSeconds ticks every
@@ -360,6 +402,7 @@ export default function GamePage() {
   const [clubLeaderboard, setClubLeaderboard] = useState([])
   const [leaderboardError, setLeaderboardError] = useState(null)
   const [storeCatalog, setStoreCatalog] = useState([])
+  const [shopSection, setShopSection] = useState('heroes')
   const [ownedItems, setOwnedItems] = useState([])
   const [storeError, setStoreError] = useState(null)
   const [storeActionError, setStoreActionError] = useState(null)
@@ -376,7 +419,16 @@ export default function GamePage() {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTab, setMenuTab] = useState('me')
+  // 'main' shows RADIAL_ITEMS; 'play' swaps them for PLAY_OPTIONS.
+  const [radialMode, setRadialMode] = useState('main')
+  // The club war the current tracked run is for (HUD label only - the id
+  // itself travels with the run in useRunTracker).
+  const [activeWarRun, setActiveWarRun] = useState(null)
   const [radialOpen, setRadialOpen] = useState(false)
+  // Closing the fan always resets it to the main arc for next time.
+  useEffect(() => {
+    if (!radialOpen) setRadialMode('main')
+  }, [radialOpen])
   const [tabPickerOpen, setTabPickerOpen] = useState(false)
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
@@ -390,9 +442,6 @@ export default function GamePage() {
   const [avatarChoice, setAvatarChoice] = useState(null)
   const [mapStyleId, setMapStyleId] = useState(
     () => loadMapStyleId() || MAP_STYLES[0].id
-  )
-  const [areaEmojiId, setAreaEmojiId] = useState(
-    () => loadAreaEmojiId() || AREA_EMOJIS[0].id
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -553,6 +602,68 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pvp.alert])
 
+  // Incoming race challenge prompt: the newest PENDING challenge someone
+  // else sent me that I haven't answered. "Decide later" hides that one for
+  // this session (it's still in the Race tab).
+  const [laterChallengeIds, setLaterChallengeIds] = useState(() => new Set())
+  const [challengeBusy, setChallengeBusy] = useState(null)
+  const incomingChallenge = user?.id
+    ? pvp.challenges.find(
+        (c) =>
+          c.status === 'PENDING' &&
+          c.challengerId !== user.id &&
+          !mySide(c, user.id).confirmed &&
+          !laterChallengeIds.has(c.id)
+      )
+    : null
+
+  // Ping the player the first time each challenge shows up: a buzz + chime,
+  // and a system notification when the app is in the background (if they
+  // allowed notifications - asked when they turn on Visibility).
+  const notifiedChallengeIdsRef = useRef(new Set())
+  useEffect(() => {
+    const c = incomingChallenge
+    if (!c || notifiedChallengeIdsRef.current.has(c.id)) return
+    notifiedChallengeIdsRef.current.add(c.id)
+    navigator.vibrate?.([120, 60, 120])
+    playMilestoneChime()
+    if (
+      document.hidden &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    ) {
+      try {
+        const n = new Notification('Race challenge! ⚔️', {
+          body: `${playerName(null, c.challengerName) || 'A runner'} wants to race you for ${c.stakeAmount} Fahhcoin.`,
+          tag: `pvp-challenge-${c.id}`,
+        })
+        n.onclick = () => {
+          window.focus()
+          n.close()
+        }
+      } catch {
+        // Some mobile browsers only allow notifications from a service
+        // worker - the in-app prompt still shows when they come back.
+      }
+    }
+  }, [incomingChallenge])
+
+  async function answerChallenge(accept) {
+    if (!incomingChallenge) return
+    setChallengeBusy(accept ? 'accept' : 'decline')
+    const updated = await pvp.review(incomingChallenge, accept)
+    setChallengeBusy(null)
+    if (updated) {
+      refreshProfile()
+      if (accept) openMenu('race')
+    }
+  }
+
+  function putOffChallenge() {
+    if (!incomingChallenge) return
+    setLaterChallengeIds((prev) => new Set(prev).add(incomingChallenge.id))
+  }
+
   // Read through a ref so the refresh interval below doesn't restart on
   // every GPS update.
   const skyLocationRef = useRef(playerLocation)
@@ -666,7 +777,7 @@ export default function GamePage() {
     setInsideParcelId(nextId)
     if (standingIn && standingIn.ownerId !== user?.id) {
       setTerritoryEntryBanner({
-        ownerName: standingIn.ownerName || 'a rival',
+        ownerName: playerName(null, standingIn.ownerName) || 'a rival',
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1063,6 +1174,22 @@ export default function GamePage() {
     if (item.type === 'CLUB_INVITE') refreshProfile()
   }
 
+  // Club war entry run - createRun sends clubWarId, and the server checks
+  // the war is in BATTLE and the locked-in hero is equipped.
+  function handleStartWarRun(war, { ourName, theirName } = {}) {
+    setMenuOpen(false)
+    setGpsErrorDismissed(false)
+    setActiveWarRun({ id: war.id, ourName, theirName })
+    tracker.start(null, { clubWarId: war.id })
+  }
+
+  // Equips the hero a player locked in for a club war (their war run is
+  // rejected otherwise). Throws so ClubWarPanel can show the error.
+  async function handleEquipWarHero(storeItem) {
+    await equipStoreItem(storeItem.id)
+    await loadStore()
+  }
+
   function handleStartRace(challenge) {
     setMenuOpen(false)
     setGpsErrorDismissed(false)
@@ -1143,12 +1270,15 @@ export default function GamePage() {
     }
   }
 
-  function switchTab(tab) {
+  function switchTab(nextTab) {
+    // Heroes now live inside the Shop tab.
+    const tab = nextTab === 'heroes' ? 'shop' : nextTab
     setMenuTab(tab)
     if (tab === 'leaderboard' && leaderboard.length === 0) loadLeaderboard()
-    if (tab === 'shop' && storeCatalog.length === 0) loadStore()
     // loadStore also loads the heroes, plus owned items for their badges.
-    if (tab === 'heroes' && heroes.length === 0) loadStore()
+    if (tab === 'shop' && storeCatalog.length === 0) loadStore()
+    // Club Wars' hero lock-in needs owned heroes + the catalog for names.
+    if (tab === 'club' && storeCatalog.length === 0) loadStore()
     if (tab === 'me' && myRuns.length === 0) loadMyRuns()
     if (tab === 'mail') mailbox.refresh()
     if (tab === 'race') pvp.refreshChallenges()
@@ -1273,11 +1403,13 @@ export default function GamePage() {
         startedAt: toLocalDateTimeString(pendingRun.startedAt),
         endedAt: toLocalDateTimeString(pendingRun.endedAt),
         challengeId: pendingRun.challengeId || undefined,
+        clubWarId: pendingRun.clubWarId || undefined,
       })
       if (pendingRun.challengeId) pvp.refreshChallenges()
       setCompletedRun({
         id: created.id,
         isRace: Boolean(pendingRun.challengeId),
+        isWar: Boolean(pendingRun.clubWarId),
         points: pendingRun.points,
         distance: pendingRun.distance,
         duration: pendingRun.duration,
@@ -1367,6 +1499,15 @@ export default function GamePage() {
   }
 
   const galleryHeroes = heroes.filter((h) => !isPlaceholderHero(h.name))
+  // Shop shelves: heroes (and their skins) live in the hero gallery; the
+  // two colour categories get their own preview shelves (ColorShelf). The
+  // old catch-all Items list is gone - other categories (borders, profile
+  // backgrounds, phrases…) aren't sold in the Shop for now. Seeded default
+  // colours stay: they're real colours the player owns and can switch back to.
+  const shadeItems = storeCatalog.filter(
+    (i) => i.category === 'TERRITORY_SHADE'
+  )
+  const trailItems = storeCatalog.filter((i) => i.category === 'TRAIL_COLOR')
   // HERO is the one real Store category that's actually an avatar-shaped
   // image (the others are borders/colors/backgrounds meant to layer onto a
   // profile picture, not stand in for one) — equipping one takes priority
@@ -1431,19 +1572,19 @@ export default function GamePage() {
     ) > LOOP_CLOSURE_THRESHOLD_METERS
 
   const menuTabs = [
-    { id: 'leaderboard', label: 'Leaderboard', Icon: FaTrophy, tone: 'gold' },
-    { id: 'club', label: 'Club', Icon: FaUsers, tone: 'green' },
+    { id: 'leaderboard', label: 'Leaderboard', Icon: IconTrophy, tone: 'gold' },
+    { id: 'club', label: 'Club', Icon: IconUsers, tone: 'green' },
     {
       id: 'race',
       label: 'Race',
-      Icon: RaceTabIcon,
+      Icon: IconSwords,
       tone: 'battle',
       badge: pvp.actionCount > 0 ? String(pvp.actionCount) : null,
     },
     {
       id: 'mail',
       label: 'Mail',
-      Icon: FaEnvelope,
+      Icon: IconEnvelope,
       tone: 'stone',
       badge:
         mailbox.unreadCount > 0
@@ -1452,9 +1593,9 @@ export default function GamePage() {
             : String(mailbox.unreadCount)
           : null,
     },
-    { id: 'me', label: 'Me', Icon: FaUser, tone: 'green' },
-    { id: 'heroes', label: 'Heroes', Icon: GiSpartanHelmet, tone: 'red' },
-    { id: 'shop', label: 'Shop', Icon: FaStore, tone: 'wood' },
+    { id: 'me', label: 'Me', Icon: IconUser, tone: 'green' },
+    { id: 'shop', label: 'Shop', Icon: IconStore, tone: 'wood' },
+    { id: 'settings', label: 'Settings', Icon: IconSettings, tone: 'stone' },
   ]
   const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
   // Collapsed picker shows one dot summing what's waiting on other tabs.
@@ -1474,14 +1615,16 @@ export default function GamePage() {
       formatMeters(raceChallenge.distanceMeters)
     : ''
   const raceOpponentName = raceChallenge
-    ? raceChallenge.challengerId === user?.id
-      ? raceChallenge.opponentName
-      : raceChallenge.challengerName
+    ? playerName(
+        null,
+        raceChallenge.challengerId === user?.id
+          ? raceChallenge.opponentName
+          : raceChallenge.challengerName
+      )
     : ''
 
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
-  const currentAreaEmoji = getAreaEmojiById(areaEmojiId)
   const avatarSrc =
     (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
     currentAvatar?.src ||
@@ -1531,17 +1674,12 @@ export default function GamePage() {
     }
   }
 
-  // Map style and area emoji are purely cosmetic/local, so unlike the avatar
+  // Map style is purely cosmetic/local, so unlike the avatar
   // picker (which can override a real owned Sticker) there's nothing to
   // confirm - clicking applies immediately.
   function handleChooseMapStyle(style) {
     setMapStyleId(style.id)
     saveMapStyleId(style.id)
-  }
-
-  function handleChooseAreaEmoji(areaEmoji) {
-    setAreaEmojiId(areaEmoji.id)
-    saveAreaEmojiId(areaEmoji.id)
   }
 
   // Territories, runs, and Fahhcoin are all tied to a real account server-side
@@ -1649,35 +1787,13 @@ export default function GamePage() {
             setMenuOpen(true)
           }}
         >
-          <span className="game-hud-level-badge">
-            <span className="game-hud-level-num">{profile.level}</span>
-          </span>
-          <div className="game-hud-level-track">
-            {user?.fullName && (
-              <span className="game-hud-level-name">
-                {user.fullName.split(' ')[0]}
-              </span>
-            )}
-            <div className="game-hud-level-bar">
-              <div
-                className="game-hud-level-bar-fill"
-                style={{
-                  width: `${Math.round(levelProgress(profile.level, profile.xp ?? 0).pct * 100)}%`,
-                }}
-              />
-            </div>
-          </div>
+          <LevelBar
+            level={profile.level}
+            xp={profile.xp}
+            name={playerNameOf(user)}
+          />
         </button>
       )}
-
-      <button
-        type="button"
-        className="game-mute-btn"
-        onClick={toggleMusicMuted}
-        aria-label={musicMuted ? 'Unmute music' : 'Mute music'}
-      >
-        {musicMuted ? <BsVolumeMuteFill /> : <BsVolumeUpFill />}
-      </button>
 
       <div className="game-hud">
         <button
@@ -1690,22 +1806,6 @@ export default function GamePage() {
             {formatCoins(profile?.fahhcoinBalance ?? 0)}
           </span>
           <span className="game-hud-icon game-hud-icon-coin" />
-        </button>
-        <button
-          type="button"
-          className="game-hud-stat game-hud-stat-bar game-hud-stat-clickable"
-          aria-label="Territories held - view your territories"
-          onClick={() => {
-            switchTab('me')
-            setMenuOpen(true)
-          }}
-        >
-          <span className="game-hud-value">
-            {formatCoins(myTerritories.length)}
-          </span>
-          <span className="game-hud-icon game-hud-icon-flag">
-            <FaFlag />
-          </span>
         </button>
       </div>
 
@@ -1736,6 +1836,16 @@ export default function GamePage() {
           </motion.button>
         )}
       </AnimatePresence>
+
+      {tracker.clubWarId && tracker.status === 'tracking' && (
+        <div className="pvp-race-hud" role="status">
+          ⚔️ Club war run
+          {activeWarRun?.id === tracker.clubWarId && activeWarRun.theirName
+            ? ` · ${activeWarRun.ourName} vs ${activeWarRun.theirName}`
+            : ''}{' '}
+          · every meter scores for the squad
+        </div>
+      )}
 
       {raceChallenge && tracker.status === 'tracking' && (
         <div
@@ -1787,6 +1897,20 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {incomingChallenge && (
+          <ChallengePrompt
+            key={incomingChallenge.id}
+            challenge={incomingChallenge}
+            busy={challengeBusy}
+            error={challengeBusy ? null : pvp.error}
+            onAccept={() => answerChallenge(true)}
+            onDecline={() => answerChallenge(false)}
+            onLater={putOffChallenge}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {idleNudgeOpen && (
           <IdleNudge
             key="idle-nudge"
@@ -1826,37 +1950,59 @@ export default function GamePage() {
       <div className="game-fab-wrap">
         <AnimatePresence>
           {radialOpen &&
-            RADIAL_ITEMS.map((item, i) => (
-              <motion.div
-                key={item.tab}
-                className="game-radial-item"
-                initial={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
-                animate={{ opacity: 1, scale: 1, x: item.x, y: item.y }}
-                exit={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
-                transition={{
-                  type: 'spring',
-                  stiffness: 420,
-                  damping: 24,
-                  delay: i * 0.035,
-                }}
-              >
-                <button
-                  type="button"
-                  className={`game-radial-btn radial-${item.tone}`}
-                  onClick={() => {
-                    if (item.tab === 'conquer') {
-                      setRadialOpen(false)
-                      handleStartRun()
-                      return
-                    }
-                    openMenu(item.tab)
-                  }}
-                  aria-label={item.label}
-                >
-                  <item.Icon />
-                </button>
-              </motion.div>
-            ))}
+            (radialMode === 'play' ? PLAY_OPTIONS : RADIAL_ITEMS).map(
+              (item, i) => {
+                const badge =
+                  item.tab === 'mail'
+                    ? mailbox.unreadCount
+                    : item.tab === 'race'
+                      ? pvp.actionCount
+                      : 0
+                return (
+                  <motion.div
+                    key={item.tab}
+                    className="game-radial-item"
+                    initial={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
+                    animate={{ opacity: 1, scale: 1, x: item.x, y: item.y }}
+                    exit={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 420,
+                      damping: 24,
+                      delay: i * 0.035,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`game-radial-btn radial-${item.tone}`}
+                      onClick={() => {
+                        if (item.tab === 'play') {
+                          setRadialMode('play')
+                          return
+                        }
+                        if (item.tab === 'conquer') {
+                          setRadialOpen(false)
+                          handleStartRun()
+                          return
+                        }
+                        openMenu(item.tab)
+                      }}
+                      aria-label={item.label}
+                    >
+                      <item.Icon />
+                      {badge > 0 && (
+                        <span className="game-menu-tab-badge game-radial-badge">
+                          {badge > 9 ? '9+' : badge}
+                        </span>
+                      )}
+                    </button>
+                    {item.tone !== 'mini' && (
+                      <span className="game-radial-label">{item.label}</span>
+                    )}
+                  </motion.div>
+                )
+              }
+            )}
         </AnimatePresence>
 
         <button
@@ -1866,7 +2012,18 @@ export default function GamePage() {
           aria-label={radialOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={radialOpen}
         >
-          <FaListUl />
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={radialOpen ? 'close' : 'open'}
+              className="game-menu-btn-icon"
+              initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
+              animate={{ rotate: 0, scale: 1, opacity: 1 }}
+              exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
+              transition={{ duration: 0.14 }}
+            >
+              {radialOpen ? <IconClose /> : <IconList />}
+            </motion.span>
+          </AnimatePresence>
         </button>
       </div>
 
@@ -2024,6 +2181,12 @@ export default function GamePage() {
                     Check the Race tab.
                   </p>
                 )}
+                {completedRun?.isWar && (
+                  <p className="game-controls-hint">
+                    ⚔️ War run logged for your club. Check Club Wars for the
+                    score once the battle ends.
+                  </p>
+                )}
               </>
             )}
             {runResult.phase === 'rejected' && (
@@ -2034,6 +2197,11 @@ export default function GamePage() {
                 {completedRun?.isRace && (
                   <p className="game-controls-hint">
                     🏁 Your race time still counts. Check the Race tab.
+                  </p>
+                )}
+                {completedRun?.isWar && (
+                  <p className="game-controls-hint">
+                    ⚔️ Your war run still counts for the club.
                   </p>
                 )}
                 <button
@@ -2113,7 +2281,7 @@ export default function GamePage() {
             <h3>
               {isMyEntry(highlightedEntry)
                 ? 'Your territory'
-                : `${highlightedEntry.fullName}'s territory`}
+                : `${playerNameOf(highlightedEntry)}'s territory`}
             </h3>
             <p>{formatArea(highlightedEntry.areaSqMeters)} held</p>
             {!highlightHasVisibleParcels && (
@@ -2152,7 +2320,7 @@ export default function GamePage() {
               }}
               aria-label="Close menu"
             >
-              <FaTimes />
+              <IconClose />
             </button>
 
             {/* Desktop: one row of tabs. Phones: a single game-style
@@ -2209,7 +2377,7 @@ export default function GamePage() {
                 <span
                   className={`game-menu-picker-knob ${tabPickerOpen ? 'is-open' : ''}`}
                 >
-                  <FaChevronDown />
+                  <IconChevronDown />
                 </span>
               </button>
               <AnimatePresence>
@@ -2259,7 +2427,7 @@ export default function GamePage() {
                           )}
                           {menuTab === tab.id && (
                             <span className="game-menu-picker-here">
-                              <FaCheck />
+                              <IconCheck />
                             </span>
                           )}
                         </button>
@@ -2271,65 +2439,67 @@ export default function GamePage() {
             </div>
 
             {menuTab === 'leaderboard' && (
-              <div className="game-menu-panel">
-                <div className="game-menu-subtabs">
-                  <button
-                    type="button"
-                    className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
-                    onClick={() => switchLeaderboardMode('individual')}
-                  >
-                    Solo
-                  </button>
-                  <button
-                    type="button"
-                    className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
-                    onClick={() => switchLeaderboardMode('club')}
-                  >
-                    Club
-                  </button>
-                </div>
+              <div className="game-menu-panel game-cards">
+                <section className="game-card game-card-dark">
+                  <div className="game-menu-subtabs">
+                    <button
+                      type="button"
+                      className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
+                      onClick={() => switchLeaderboardMode('individual')}
+                    >
+                      Solo
+                    </button>
+                    <button
+                      type="button"
+                      className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
+                      onClick={() => switchLeaderboardMode('club')}
+                    >
+                      Club
+                    </button>
+                  </div>
 
-                {leaderboardMode === 'individual' ? (
-                  leaderboardError ? (
+                  {leaderboardMode === 'individual' ? (
+                    leaderboardError ? (
+                      <p className="game-menu-empty">{leaderboardError}</p>
+                    ) : leaderboard.length === 0 ? (
+                      <p className="game-menu-empty">
+                        No territory claimed yet — be the first.
+                      </p>
+                    ) : (
+                      <LeaderboardPodium
+                        nameLabel="Runner"
+                        entries={leaderboard.map((entry) => ({
+                          key: entry.userId,
+                          rank: entry.rank,
+                          name: isMyEntry(entry) ? 'You' : playerNameOf(entry),
+                          area: formatArea(entry.areaSqMeters),
+                          avatarSrc: isMyEntry(entry)
+                            ? resolveFileUrl(user?.profilePictureUrl)
+                            : null,
+                          isPlayer: isMyEntry(entry),
+                          onClick: () => setViewingProfile(entry),
+                        }))}
+                      />
+                    )
+                  ) : leaderboardError ? (
                     <p className="game-menu-empty">{leaderboardError}</p>
-                  ) : leaderboard.length === 0 ? (
+                  ) : clubLeaderboard.length === 0 ? (
                     <p className="game-menu-empty">
-                      No territory claimed yet — be the first.
+                      No club has claimed territory yet.
                     </p>
                   ) : (
                     <LeaderboardPodium
-                      nameLabel="Runner"
-                      entries={leaderboard.map((entry) => ({
-                        key: entry.userId,
+                      nameLabel="Club"
+                      entries={clubLeaderboard.map((entry) => ({
+                        key: entry.clubId,
                         rank: entry.rank,
-                        name: isMyEntry(entry) ? 'You' : entry.fullName,
-                        area: formatArea(entry.areaSqMeters),
-                        avatarSrc: isMyEntry(entry)
-                          ? resolveFileUrl(user?.profilePictureUrl)
-                          : null,
-                        isPlayer: isMyEntry(entry),
-                        onClick: () => setViewingProfile(entry),
+                        name: entry.clubName,
+                        area: formatArea(entry.totalAreaSqMeters),
+                        isPlayer: entry.clubName === profile?.clubName,
                       }))}
                     />
-                  )
-                ) : leaderboardError ? (
-                  <p className="game-menu-empty">{leaderboardError}</p>
-                ) : clubLeaderboard.length === 0 ? (
-                  <p className="game-menu-empty">
-                    No club has claimed territory yet.
-                  </p>
-                ) : (
-                  <LeaderboardPodium
-                    nameLabel="Club"
-                    entries={clubLeaderboard.map((entry) => ({
-                      key: entry.clubId,
-                      rank: entry.rank,
-                      name: entry.clubName,
-                      area: formatArea(entry.totalAreaSqMeters),
-                      isPlayer: entry.clubName === profile?.clubName,
-                    }))}
-                  />
-                )}
+                  )}
+                </section>
               </div>
             )}
 
@@ -2337,7 +2507,15 @@ export default function GamePage() {
               <div className="game-menu-panel">
                 <ClubPanel
                   hasClub={Boolean(profile?.clubName)}
+                  userId={user?.id}
+                  balance={profile?.fahhcoinBalance ?? 0}
                   onClubChanged={refreshProfile}
+                  onViewProfile={setViewingProfile}
+                  ownedItems={ownedItems}
+                  storeCatalog={storeCatalog}
+                  onEquipHero={handleEquipWarHero}
+                  onStartWarRun={handleStartWarRun}
+                  racing={tracker.status === 'tracking' || Boolean(pendingRun)}
                 />
               </div>
             )}
@@ -2350,6 +2528,10 @@ export default function GamePage() {
                   balance={profile?.fahhcoinBalance ?? 0}
                   onStartRace={handleStartRace}
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
+                />
+                <NearbyRunners
+                  pvp={pvp}
+                  balance={profile?.fahhcoinBalance ?? 0}
                 />
               </div>
             )}
@@ -2403,321 +2585,284 @@ export default function GamePage() {
                     e.currentTarget.src = defaultAvatarImage
                   }}
                 />
-                {user?.fullName && (
-                  <p className="game-menu-player-name">{user.fullName}</p>
+                {playerNameOf(user) && (
+                  <p className="game-menu-player-name">{playerNameOf(user)}</p>
+                )}
+                {user && !user.nickname?.trim() && (
+                  <NicknameCard onSaved={replaceUser} />
                 )}
                 {equippedPhrase && (
                   <p className="game-menu-phrase">
                     “{equippedPhrase.storeItem.name}”
                   </p>
                 )}
-                {profile?.level != null &&
-                  (() => {
-                    const { into, span, pct } = levelProgress(
-                      profile.level,
-                      profile.xp ?? 0
-                    )
-                    return (
-                      <>
-                        <div className="game-level-track">
-                          <span className="game-level-badge">
-                            {profile.level}
-                          </span>
-                          <div className="game-xp-bar">
-                            <div
-                              className="game-xp-bar-fill"
-                              style={{ width: `${Math.round(pct * 100)}%` }}
-                            >
-                              <span className="game-xp-bar-marker" />
-                            </div>
-                          </div>
-                        </div>
-                        <span className="game-xp-bar-text">
-                          {into} / {span} XP
-                        </span>
-                      </>
-                    )
-                  })()}
+                {profile?.level != null && (
+                  <div className="game-level-hud">
+                    <LevelBar level={profile.level} xp={profile.xp} showXp />
+                  </div>
+                )}
                 <div className="game-menu-summary">
                   <span className="game-menu-summary-value">
                     {formatArea(profile?.totalAreaSqMeters)}
                   </span>
-                  <span
-                    className="game-menu-parcel-flags"
-                    aria-label={`${myTerritories.length} territor${myTerritories.length === 1 ? 'y' : 'ies'} held (each flag = ${PARCELS_PER_FLAG})`}
-                    title={`Each flag = ${PARCELS_PER_FLAG} territories`}
-                  >
-                    {Array.from({
-                      length: Math.min(
-                        Math.ceil(myTerritories.length / PARCELS_PER_FLAG),
-                        8
-                      ),
-                    }).map((_, i) => (
-                      <FaFlag key={i} />
-                    ))}
-                    {myTerritories.length > 8 * PARCELS_PER_FLAG && (
-                      <span className="game-menu-parcel-flags-more">
-                        +{myTerritories.length - 8 * PARCELS_PER_FLAG}
-                      </span>
-                    )}
-                  </span>
                   {profile?.clubName && (
-                    <span className="game-menu-summary-label">
+                    <span className="game-menu-summary-label game-menu-summary-club">
+                      <ClubBadge name={profile.clubName} size={24} />
                       {profile.clubName}
                     </span>
                   )}
                 </div>
-                <p className="game-menu-section-title">My Territories</p>
-                {myTerritories.length === 0 ? (
-                  <p className="game-menu-empty">
-                    Finish a GPS run that closes a loop to see territory here.
-                  </p>
-                ) : (
-                  <ul className="game-menu-list">
-                    {[...myTerritories]
-                      .sort((a, b) => b.area - a.area)
-                      .map((t) => (
-                        <li key={t.id}>
-                          <button
-                            type="button"
-                            className="game-menu-list-row"
-                            onClick={() => handleViewMyParcel(t)}
-                          >
-                            <span className="game-menu-list-area">
-                              {currentAreaEmoji?.emoji} {formatArea(t.area)}
-                            </span>
-                            <span className="game-menu-list-meta">
-                              score {Math.round(t.currentScore || 0)}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                )}
+                <div className="game-cards">
+                  <section className="game-me-section">
+                    <p className="game-menu-section-title">My Territories</p>
+                    {myTerritories.length === 0 ? (
+                      <p className="game-menu-empty">
+                        Finish a GPS run that closes a loop to see territory
+                        here.
+                      </p>
+                    ) : (
+                      <ul className="game-menu-list">
+                        {[...myTerritories]
+                          .sort((a, b) => b.area - a.area)
+                          .map((t) => (
+                            <li key={t.id}>
+                              <button
+                                type="button"
+                                className="game-menu-list-row"
+                                onClick={() => handleViewMyParcel(t)}
+                              >
+                                <span className="game-menu-list-area">
+                                  {formatArea(t.area)}
+                                </span>
+                                <span className="game-menu-list-meta">
+                                  score {Math.round(t.currentScore || 0)}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </section>
 
-                <p className="game-menu-section-title">History</p>
-                {myRuns.length === 0 ? (
-                  <p className="game-menu-empty">
-                    Finish a GPS run to see its map here.
-                  </p>
-                ) : (
-                  <ul className="game-menu-list">
-                    {myRuns.map((r) => (
-                      <li key={r.id}>
-                        <button
-                          type="button"
-                          className="game-menu-list-row"
-                          onClick={() => handleViewRun(r.id)}
-                          disabled={loadingRunId === r.id}
-                        >
-                          <span className="game-menu-list-area">
-                            {formatRunDate(r.startedAt)}
-                          </span>
-                          <span className="game-menu-list-meta">
-                            {loadingRunId === r.id
-                              ? 'Loading…'
-                              : `${formatDistance(r.distance)} · ${formatDuration(r.duration)}`}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                  <section className="game-me-section">
+                    <p className="game-menu-section-title">History</p>
+                    {myRuns.length === 0 ? (
+                      <p className="game-menu-empty">
+                        Finish a GPS run to see its map here.
+                      </p>
+                    ) : (
+                      <ul className="game-menu-list">
+                        {myRuns.map((r) => (
+                          <li key={r.id}>
+                            <button
+                              type="button"
+                              className="game-menu-list-row"
+                              onClick={() => handleViewRun(r.id)}
+                              disabled={loadingRunId === r.id}
+                            >
+                              <span className="game-menu-list-area">
+                                {formatDistance(r.distance)} ·{' '}
+                                {formatDuration(r.duration)}
+                              </span>
+                              <span className="game-menu-list-meta">
+                                {loadingRunId === r.id
+                                  ? 'Loading…'
+                                  : formatRunDate(r.startedAt)}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </div>
               </div>
             )}
 
-            {menuTab === 'heroes' && (
-              <div className="game-menu-panel game-menu-heroes">
-                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
-                  Choose your hero
-                </p>
-                <HeroGallery
-                  heroes={galleryHeroes}
-                  ownedItems={ownedItems}
-                  activeHeroId={activeHeroId}
-                  loading={heroesLoading}
-                  onSelect={(hero) => {
-                    setStoreActionError(null)
-                    setSelectedHeroId(hero.id)
+            {menuTab === 'settings' && (
+              <div className="game-menu-panel game-menu-settings game-cards">
+                {/* TEMP: free Avatar picker hidden - it duplicated the Heroes
+                    (now in the Shop tab). Its images back the matching heroes
+                    instead (see HeroFigure). Restore from git to bring it
+                    back. Map style now lives in the Shop. */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!musicMuted}
+                  className="game-settings-row"
+                  onClick={toggleMusicMuted}
+                >
+                  <span className="game-settings-row-label">
+                    {musicMuted ? <IconVolumeMute /> : <IconVolumeUp />}
+                    <span className="game-settings-row-text">
+                      Sound
+                      <span className="game-settings-row-sub">
+                        {musicMuted ? 'Silent running' : 'Theme music on'}
+                      </span>
+                    </span>
+                  </span>
+                  <span
+                    className={`game-switch ${musicMuted ? '' : 'is-on'}`}
+                    aria-hidden="true"
+                  >
+                    <span className="game-switch-knob" />
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={pvp.discoverable}
+                  className="game-settings-row"
+                  onClick={() => {
+                    const next = !pvp.discoverable
+                    // Turning Visibility on = open to challenges, so ask
+                    // (once) to notify them while the app is in the background.
+                    if (
+                      next &&
+                      typeof Notification !== 'undefined' &&
+                      Notification.permission === 'default'
+                    ) {
+                      Notification.requestPermission().catch(() => {})
+                    }
+                    pvp.toggleDiscoverable(next)
                   }}
-                />
+                  disabled={pvp.busy === 'discoverable'}
+                >
+                  <span className="game-settings-row-label">
+                    <IconCrosshairs />
+                    <span className="game-settings-row-text">
+                      Visibility
+                      <span className="game-settings-row-sub">
+                        {pvp.discoverable
+                          ? 'Nearby runners can find & challenge you'
+                          : 'Hidden from nearby runners'}
+                      </span>
+                    </span>
+                  </span>
+                  <span
+                    className={`game-switch ${pvp.discoverable ? 'is-on' : ''}`}
+                    aria-hidden="true"
+                  >
+                    <span className="game-switch-knob" />
+                  </span>
+                </button>
+                {pvp.error && (
+                  <p className="game-controls-hint game-controls-hint-error">
+                    {pvp.error}
+                  </p>
+                )}
               </div>
             )}
 
             {menuTab === 'shop' && (
-              <div className="game-menu-panel game-menu-shop">
-                {/* TEMP: free Avatar picker hidden - it duplicated the Heroes
-                    tab. Its images now back the matching heroes instead
-                    (see HeroFigure). Restore from git to bring it back. */}
-                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
-                  Map
-                </p>
-                <div className="game-menu-avatar-grid">
-                  {MAP_STYLES.map((style) => {
-                    const isSelected = style.id === mapStyleId
-                    return (
-                      <button
-                        key={style.id}
-                        type="button"
-                        className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
-                        onClick={() => handleChooseMapStyle(style)}
-                        disabled={isSelected}
-                      >
-                        <span className="game-menu-avatar-name">
-                          {style.name}
-                        </span>
-                        <span className="game-menu-avatar-tag">
-                          {isSelected ? (
-                            <>
-                              <FaCheck /> Selected
-                            </>
-                          ) : (
-                            'Free'
-                          )}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <p className="game-menu-avatars-title game-menu-avatars-title-centered">
-                  Emoji
-                </p>
-                <div className="game-menu-avatar-grid">
-                  {AREA_EMOJIS.map((emoji) => {
-                    const isSelected = emoji.id === areaEmojiId
-                    return (
-                      <button
-                        key={emoji.id}
-                        type="button"
-                        className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
-                        onClick={() => handleChooseAreaEmoji(emoji)}
-                        disabled={isSelected}
-                      >
-                        <span className="game-menu-emoji-glyph">
-                          {emoji.emoji}
-                        </span>
-                        <span className="game-menu-avatar-name">
-                          {emoji.label}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {galleryHeroes.length > 0 && (
+              <div className="game-menu-panel game-menu-shop game-cards">
+                <div className="game-shop-wallet">
+                  <span className="game-hud-icon game-hud-icon-coin" />
+                  <span className="game-shop-wallet-value">
+                    {profile?.fahhcoinBalance ?? 0}
+                  </span>
                   <button
                     type="button"
-                    className="btn btn-outline game-menu-heroes-link"
-                    onClick={() => switchTab('heroes')}
+                    className="game-btn game-btn-green game-btn-sm"
+                    onClick={openCoinShop}
                   >
-                    <GiSpartanHelmet /> Meet the Heroes - stats &amp; lore
+                    + Get more
                   </button>
-                )}
-
-                {storeError ? (
-                  <p className="game-menu-empty">{storeError}</p>
-                ) : storeCatalog.length === 0 ? (
-                  <>
-                    <FaStore className="game-menu-shop-icon" />
-                    <p className="game-menu-shop-title">
-                      Nothing in the shop yet
-                    </p>
-                  </>
-                ) : (
-                  <ul className="game-menu-list game-store-list">
-                    {storeCatalog.map((item) => {
-                      const owned = ownedItems.find(
-                        (o) => o.storeItem.id === item.id
-                      )
-                      return (
-                        <li key={item.id} className="game-store-item">
-                          <span
-                            className="game-store-item-swatch"
-                            style={
-                              item.colorValue
-                                ? { background: item.colorValue }
-                                : undefined
-                            }
-                          >
-                            {item.assetUrl && (
-                              <img
-                                src={resolveFileUrl(item.assetUrl)}
-                                alt={item.name}
-                                onError={(e) => {
-                                  // Same broken-asset-URL issue as the Hero
-                                  // avatar (see buildPlayerMarkerIcon) - hide
-                                  // the swatch image instead of leaving a
-                                  // broken-image glyph in the shop list.
-                                  e.currentTarget.style.display = 'none'
-                                }}
-                              />
-                            )}
-                          </span>
-                          <span className="game-store-item-info">
-                            <span className="game-menu-list-area">
-                              {item.name}
-                            </span>
-                            {item.heroId &&
-                              heroes.find((h) => h.id === item.heroId)
-                                ?.abilities?.length > 0 && (
-                                <span className="game-store-item-perk">
-                                  ⚡{' '}
-                                  {heroes
-                                    .find((h) => h.id === item.heroId)
-                                    .abilities.map(describeHeroAbility)
-                                    .join(' · ')}
-                                </span>
-                              )}
-                            <span className="game-menu-list-meta">
-                              {owned
-                                ? owned.equipped
-                                  ? item.category === 'HERO'
-                                    ? 'Equipped · your map avatar'
-                                    : 'Equipped'
-                                  : 'Owned'
-                                : item.priceFahhcoin > 0
-                                  ? `${item.priceFahhcoin} Fahhcoin`
-                                  : 'Free'}
-                            </span>
-                          </span>
-                          {owned ? (
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              onClick={() => handleEquip(item, owned.equipped)}
-                            >
-                              {owned.equipped ? (
-                                'Unequip'
-                              ) : (
-                                <>
-                                  <FaCheck /> Equip
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              onClick={() => setStoreChoice(item)}
-                            >
-                              Buy
-                            </button>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-                {storeActionError && (
+                </div>
+                {(storeError || storeActionError) && (
                   <p className="game-controls-hint game-controls-hint-error">
-                    {storeActionError}
+                    {storeError || storeActionError}
                   </p>
                 )}
-                <p className="game-menu-shop-balance">
-                  <FaCoins />
-                  {profile?.fahhcoinBalance ?? 0} Fahhcoin
-                </p>
+
+                <div className="game-menu-subtabs game-shop-tabs">
+                  {SHOP_SECTIONS.map((section) => (
+                    <button
+                      key={section.id}
+                      type="button"
+                      className={`game-menu-subtab ${shopSection === section.id ? 'active' : ''}`}
+                      onClick={() => setShopSection(section.id)}
+                    >
+                      <section.Icon /> {section.label}
+                    </button>
+                  ))}
+                </div>
+
+                {shopSection === 'heroes' && (
+                  <HeroGallery
+                    heroes={galleryHeroes}
+                    ownedItems={ownedItems}
+                    activeHeroId={activeHeroId}
+                    loading={heroesLoading}
+                    onSelect={(hero) => {
+                      setStoreActionError(null)
+                      setSelectedHeroId(hero.id)
+                    }}
+                  />
+                )}
+
+                {shopSection === 'territory' && (
+                  <ColorShelf
+                    title="Territory"
+                    Icon={IconFlag}
+                    items={shadeItems}
+                    ownedItems={ownedItems}
+                    Preview={ShadeFlag}
+                    onBuy={setStoreChoice}
+                    onEquip={handleEquip}
+                    emptyText="No territory colours in stock yet."
+                  />
+                )}
+
+                {shopSection === 'trail' && (
+                  <ColorShelf
+                    title="Trail"
+                    Icon={IconRunning}
+                    items={trailItems}
+                    ownedItems={ownedItems}
+                    Preview={TrailPreview}
+                    onBuy={setStoreChoice}
+                    onEquip={handleEquip}
+                    emptyText="Fresh trail colours are on their way - check back soon!"
+                  />
+                )}
+
+                {/* Map style moved here from Settings - free, local-only. */}
+                {shopSection === 'map' && (
+                  <section className="game-card game-card-dark">
+                    <p className="game-menu-avatars-title game-menu-avatars-title-centered">
+                      <IconMap /> Map
+                    </p>
+                    <div className="game-menu-avatar-grid">
+                      {MAP_STYLES.map((style) => {
+                        const isSelected = style.id === mapStyleId
+                        return (
+                          <button
+                            key={style.id}
+                            type="button"
+                            className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
+                            onClick={() => handleChooseMapStyle(style)}
+                            disabled={isSelected}
+                          >
+                            <span className="game-menu-avatar-name">
+                              {style.name}
+                            </span>
+                            <span className="game-menu-avatar-tag">
+                              {isSelected ? (
+                                <>
+                                  <IconCheck /> Selected
+                                </>
+                              ) : (
+                                'Free'
+                              )}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </motion.div>
@@ -2731,10 +2876,17 @@ export default function GamePage() {
             fullName={
               isMyEntry(viewingProfile) ? 'You' : viewingProfile.fullName
             }
-            areaEmoji={currentAreaEmoji?.emoji}
+            nickname={viewingProfile.nickname}
             onClose={() => setViewingProfile(null)}
-            canInvite={canInviteToClub && !isMyEntry(viewingProfile)}
+            // A join requester is already asking in - Accept/Decline in
+            // the Club tab covers it, so no separate invite button.
+            canInvite={
+              canInviteToClub &&
+              !isMyEntry(viewingProfile) &&
+              !viewingProfile.fromJoinRequest
+            }
             onInvite={handleInviteToClub}
+            actions={viewingProfile.clubActions}
           />
         )}
       </AnimatePresence>
@@ -2761,7 +2913,7 @@ export default function GamePage() {
                 aria-label="Close"
                 onClick={() => setViewingRun(null)}
               >
-                <FaTimes />
+                <IconClose />
               </button>
               <ShareRunCarousel run={viewingRun} />
             </motion.div>
@@ -2829,7 +2981,7 @@ export default function GamePage() {
                 aria-label="Close"
                 onClick={() => setCoinShopOpen(false)}
               >
-                <FaTimes />
+                <IconClose />
               </button>
               <p className="game-menu-avatars-title">Buy Fahhcoin</p>
               {coinBundlesError ? (
@@ -2840,7 +2992,6 @@ export default function GamePage() {
                 <ul className="game-menu-list game-coin-bundle-list">
                   {coinBundles.map((bundle) => (
                     <li key={bundle.fahhcoinAmount} className="game-store-item">
-                      <span className="game-hud-icon game-hud-icon-coin" />
                       <span className="game-store-item-info">
                         <span className="game-menu-list-area">
                           {bundle.fahhcoinAmount} Fahhcoin
@@ -2907,6 +3058,12 @@ export default function GamePage() {
               exit={{ opacity: 0, scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
             >
+              {storeChoice.category === 'TERRITORY_SHADE' && (
+                <ShadeFlag
+                  className="game-confirm-shade-preview"
+                  color={storeChoice.colorValue}
+                />
+              )}
               <p>
                 {storeChoice.priceFahhcoin > 0
                   ? `Buy ${storeChoice.name} for ${storeChoice.priceFahhcoin} Fahhcoin?`

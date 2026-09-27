@@ -1,0 +1,219 @@
+/* The game's shared panel design - first built for the Club tab after
+   Clash of Clans' clan screens, now used by every menu tab: chunky rounded
+   cards (dark wood for content, cream for a call to action), white titles
+   with an ink outline, list rows, and fat cel-shaded buttons. Colors are
+   the game palette from GamePage.css (--game-*). */
+.game-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 12px;
+}
+
+.game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 var(--game-ink);
+}
+
+.game-card-dark {
+  background: linear-gradient(180deg, #5a4633 0%, #46362a 100%);
+  color: var(--game-cream);
+}
+
+.game-card-light {
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
+  color: var(--game-ink);
+}
+
+/* White lettering with a hard ink outline - the Clash title treatment. */
+.game-card-title {
+  margin: 0;
+  font-family: inherit;
+  text-align: center;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    1px 1px 0 var(--game-ink),
+    -1px -1px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
+}
+
+.game-card-title-sm {
+  font-size: 17px;
+  text-align: left;
+}
+
+/* --- Buttons: fat cel-shaded slabs with outlined white text. --- */
+.game-btn {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 3px solid var(--game-ink);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
+  transition: transform 0.1s ease;
+}
+
+.game-btn:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.game-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.game-btn-green {
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 45%,
+    var(--game-green-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-green-dark),
+    0 3px 0 var(--game-ink);
+}
+
+.game-btn-red {
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light) 0%,
+    var(--game-red) 45%,
+    var(--game-red-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-red-dark),
+    0 3px 0 var(--game-ink);
+}
+
+.game-btn-wood {
+  background: linear-gradient(
+    180deg,
+    var(--game-wood-light) 0%,
+    var(--game-wood) 45%,
+    var(--game-wood-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-wood-dark),
+    0 3px 0 var(--game-ink);
+}
+
+.game-btn-lg {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 19px;
+  border-radius: 14px;
+}
+
+.game-btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-width: 2px;
+}
+
+.game-row-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(246, 236, 217, 0.75);
+}
+
+/* --- Rows (join requests, roster, browse list) --- */
+.game-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Wraps so a row's buttons drop onto their own line on a narrow phone
+   instead of squeezing the name (the info block keeps >= 140px). */
+.game-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.game-row.is-me {
+  background: rgba(255, 201, 77, 0.16);
+  border-color: var(--game-gold);
+}
+
+.game-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.game-row-clickable:hover,
+.game-row-clickable:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+
+.game-row-info {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.game-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+}
+
+.game-row-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.game-card-empty {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.7);
+}
+
+.game-row-meta.is-error {
+  color: var(--game-red-light);
+}

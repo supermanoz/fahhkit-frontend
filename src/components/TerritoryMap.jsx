@@ -1,18 +1,17 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { IconCrosshairs } from './GameIcons'
 import {
   MapContainer,
   Polygon,
   Polyline,
   Marker,
-  Popup,
   useMap,
   useMapEvents,
 } from 'react-leaflet'
 import L from 'leaflet'
-import { setWorkerUrl } from 'maplibre-gl'
+import { Map as MapLibreMap, setWorkerUrl } from 'maplibre-gl'
 import '@maplibre/maplibre-gl-leaflet'
-import { FaCrosshairs } from 'react-icons/fa'
 
 // maplibre-gl resolves its worker script relative to wherever Vite's
 // production build happens to place its own chunk, and that chunk isn't
@@ -25,12 +24,7 @@ import { FaCrosshairs } from 'react-icons/fa'
 // public/mlgl (so their relative import of each other still resolves) —
 // this just has to point maplibre-gl at the copy before it creates one.
 setWorkerUrl(`${import.meta.env.BASE_URL}mlgl/maplibre-gl-worker.mjs`)
-import {
-  PLAYER_COLOR,
-  formatArea,
-  mergeTouchingParcels,
-} from '../utils/territoryGame'
-import { resolveFileUrl } from '../api/client'
+import { PLAYER_COLOR, mergeTouchingParcels } from '../utils/territoryGame'
 // Same fallback image GamePage.jsx uses (its own defaultAvatarImage) - this
 // used to be a different local avatar (Wind), so a broken avatarSrc (e.g.
 // the account's equipped Hero's assetUrl 404ing) showed one character on
@@ -43,6 +37,7 @@ import blazeRunLeftSheet from '../assets/images/blaze-map-run-left.png'
 import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
 import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import './TerritoryMap.css'
 
 // A free, keyless vector basemap (OpenFreeMap) instead of a raster tile
@@ -136,18 +131,46 @@ function hideSymbolLayers(glMap) {
 // Renders the vector basemap via MapLibre GL (through the maplibre-gl-leaflet
 // bridge) so it lives in the same tile pane a raster TileLayer would have
 // used, underneath all the Polygon/Marker overlays below.
-function PokemonStyleBaseLayer({ styleUrl, onReady }) {
+// maplibre-gl-leaflet's end-of-zoom handoff snaps the canvas back to 1:1
+// *before* MapLibre has redrawn at the new zoom, so for a frame the old
+// picture shows at the wrong scale - the flicker/jump at the end of every
+// scroll or pinch zoom. This waits for MapLibre's first frame at the new
+// camera and swaps the transform in that same frame instead.
+const SmoothMaplibreGL = L.MaplibreGL.extend({
+  _transitionEnd() {
+    L.Util.requestAnimFrame(() => {
+      if (!this._map) return
+      const center = this._map.getCenter()
+      this._resizeContainer()
+      this._glMap.once('render', () => this._zoomEnd())
+      this._glMap.jumpTo({
+        center: [center.lng, center.lat],
+        zoom: this._map.getZoom() - 1,
+      })
+      this._glMap.triggerRepaint()
+    })
+  },
+})
+
+function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
   const map = useMap()
 
   useEffect(() => {
-    const glLayer = L.maplibreGL({
+    const glLayer = new SmoothMaplibreGL({
       style: styleUrl || BASEMAP_STYLE_URL,
+      // Extra off-screen margin so a zoom-out animation (which shrinks the
+      // canvas until the redraw) doesn't expose bare edges mid-gesture.
+      padding: 0.3,
+      // A bigger tile cache means zooming back in/out over ground you've
+      // already seen redraws from memory instead of re-fetching.
+      maxTileCacheSize: 1000,
       className: 'territory-map-tiles',
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
 
     const glMap = glLayer.getMaplibreMap()
+    if (glMapRef) glMapRef.current = glMap
     glMap.on('styledata', () => hideSymbolLayers(glMap))
     hideSymbolLayers(glMap)
     // "idle" fires once every source has actually finished loading tiles -
@@ -156,6 +179,7 @@ function PokemonStyleBaseLayer({ styleUrl, onReady }) {
     glMap.once('idle', () => onReady?.())
 
     return () => {
+      if (glMapRef) glMapRef.current = null
       map.removeLayer(glLayer)
     }
     // Re-created (not just re-styled) on a style change - simplest way to
@@ -163,7 +187,7 @@ function PokemonStyleBaseLayer({ styleUrl, onReady }) {
     // internal style-diffing. The real-world weather/time look is a CSS
     // filter driven from .territory-map (see --ambience-filter), so it
     // never forces a re-create.
-  }, [map, styleUrl, onReady])
+  }, [map, styleUrl, onReady, glMapRef])
 
   return null
 }
@@ -241,30 +265,8 @@ function buildBlazeMarkerIcon(pose) {
   })
 }
 
-// Territories read as Pokémon GO gyms: just a colored, ink-outlined badge
-// planted at the centroid — no name floating on the map. Tapping it still
-// reveals who holds it via a popup, so the information isn't lost, just not
-// cluttering the default view.
-//
-// t.emojiUrl is the owner's equipped TERRITORY_EMOJI Store item (see
-// toDisplayParcel) — an uploaded image, not a literal emoji glyph, despite
-// the category's name. Falls back to the default crown/flag glyph when the
-// owner has nothing equipped there.
-function territoryBadgeIcon(t, isMine, playerColor) {
-  const background = isMine ? playerColor || PLAYER_COLOR : t.color
-  const badgeContent = t.emojiUrl
-    ? `<img src="${resolveFileUrl(t.emojiUrl)}" alt="" onerror="this.replaceWith(document.createTextNode('${isMine ? '👑' : '🚩'}'))" />`
-    : isMine
-      ? '👑'
-      : '🚩'
-  return L.divIcon({
-    className: 'territory-badge-icon',
-    html: `<div class="territory-badge" style="background:${background}">${badgeContent}</div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-  })
-}
-
+// Territories are just their coloured polygons - no marker planted on
+// them (the player's own flag was removed). Centroid still used below.
 function polygonCentroid(points) {
   const lat = points.reduce((sum, p) => sum + p.lat, 0) / points.length
   const lng = points.reduce((sum, p) => sum + p.lng, 0) / points.length
@@ -378,7 +380,7 @@ function TerritoryPolygon({
   )
 }
 
-// Zoom level (the max of the 14-19 range ZoomRangeLimiter allows) at which
+// Zoom level (the max zoom ZoomRangeLimiter allows) at which
 // the map settles into its tilted "close-up" view, Google Maps/Pokémon GO
 // style — only at the very last zoom step (scrolled or pinched all the way
 // in), not partway through zooming closer.
@@ -433,17 +435,253 @@ function NavigationCameraEffect({ isNavigating, playerLocation }) {
   return null
 }
 
-// Keeps zoom within a sane range (close enough to read the map, not so far
-// out it's the whole city) without fencing where the player can pan to —
-// the map view itself is free to explore now, unlike the pan-locked-to-a-
-// radius behavior this used to also do.
+// Leaflet only draws flat Web Mercator, so past GLOBE_ENTER_ZOOM the map
+// hands off to a native MapLibre globe (see TerritoryGlobe) and zooming back
+// in to GLOBE_EXIT_ZOOM hands back. The one-level gap between the two keeps a
+// gesture that ends right on the boundary from ping-ponging between them.
+// Both are Leaflet zoom levels - MapLibre's 512px tiles put its own zoom
+// one level lower for the same scale.
+const GLOBE_ENTER_ZOOM = 4
+const GLOBE_EXIT_ZOOM = 5
+// From this zoom out, the globe is already mounted (invisible) and tracking
+// the Leaflet camera, so its tiles are loaded by the time it fades in -
+// otherwise the handoff flashes an empty sphere while they stream in.
+const GLOBE_WARM_ZOOM = 6
+// Street-level zoom a tapped territory dot dives down to.
+const GLOBE_DIVE_ZOOM = 16
+// Longest the globe waits on the flat map's tiles before fading out anyway.
+const GLOBE_EXIT_WAIT_MS = 1500
+
+// Leaflet bottoms out at GLOBE_ENTER_ZOOM - the globe takes over from there,
+// all the way out to the whole earth. No pan bounds either way.
 function ZoomRangeLimiter() {
   const map = useMap()
   useEffect(() => {
-    map.setMinZoom(14)
+    map.setMinZoom(GLOBE_ENTER_ZOOM)
     map.setMaxZoom(19)
   }, [map])
   return null
+}
+
+// Warms the globe up as the player zooms out toward it, keeps its camera in
+// step with Leaflet's, and reveals it once Leaflet is zoomed all the way out.
+// Never during a tracked run - NavigationCameraEffect owns the camera then.
+function GlobeHandoff({ isNavigating, onGlobeCamera, onRevealGlobe }) {
+  const map = useMapEvents({
+    moveend() {
+      const zoom = map.getZoom()
+      if (isNavigating || zoom > GLOBE_WARM_ZOOM) {
+        onGlobeCamera(null)
+        return
+      }
+      const c = map.getCenter()
+      onGlobeCamera({ lat: c.lat, lng: c.lng, zoom: zoom - 1 })
+      if (zoom <= GLOBE_ENTER_ZOOM) onRevealGlobe()
+    },
+  })
+  return null
+}
+
+function territoryDotsGeoJSON(territories, currentUserId, playerColor) {
+  return {
+    type: 'FeatureCollection',
+    features: territories.map((t) => {
+      const [lat, lng] = polygonCentroid(t.points)
+      const isMine = Boolean(currentUserId) && t.ownerId === currentUserId
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lng, lat] },
+        properties: {
+          color: isMine ? playerColor || PLAYER_COLOR : t.color || '#2B2140',
+          mine: isMine,
+        },
+      }
+    }),
+  }
+}
+
+// Zoom at which the whole sphere fits on screen with some space around it.
+// A MapLibre globe's radius is its world size over 2π, shrunk by the
+// cosine of the center latitude (MapLibre's globe zoom correction).
+function globeFitZoom(glMap) {
+  const { clientWidth, clientHeight } = glMap.getContainer()
+  const targetRadius = 0.42 * Math.min(clientWidth, clientHeight)
+  const latScale = Math.max(
+    Math.cos((glMap.getCenter().lat * Math.PI) / 180),
+    0.3
+  )
+  return Math.max(Math.log2((targetRadius * 2 * Math.PI) / (512 * latScale)), 0)
+}
+
+// The zoomed-out "whole earth" view - a native MapLibre map (not the Leaflet
+// bridge, which is locked to Mercator) in globe projection, laid over the
+// Leaflet map while it's active. Territories show up as glowing dots, since
+// the real polygons are far too small to see from orbit; tapping one dives
+// straight back down to it. Mounted invisible from GLOBE_WARM_ZOOM out (see
+// GlobeHandoff) and cross-faded in and out over the Leaflet map.
+function TerritoryGlobe({
+  camera,
+  visible,
+  styleUrl,
+  territories,
+  currentUserId,
+  playerColor,
+  onExit,
+}) {
+  const containerRef = useRef(null)
+  const glMapRef = useRef(null)
+  const onExitRef = useRef(onExit)
+  onExitRef.current = onExit
+  const dots = useMemo(
+    () => territoryDotsGeoJSON(territories, currentUserId, playerColor),
+    [territories, currentUserId, playerColor]
+  )
+  const dotsRef = useRef(dots)
+  dotsRef.current = dots
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
+  const cameraRef = useRef(camera)
+  cameraRef.current = camera
+
+  useEffect(() => {
+    const glMap = new MapLibreMap({
+      container: containerRef.current,
+      style: styleUrl || BASEMAP_STYLE_URL,
+      center: [camera.lng, camera.lat],
+      zoom: camera.zoom,
+      minZoom: 0,
+      maxZoom: GLOBE_EXIT_ZOOM - 1,
+      dragRotate: false,
+      pitchWithRotate: false,
+      attributionControl: { compact: true },
+    })
+    glMap.touchZoomRotate.disableRotation()
+    glMapRef.current = glMap
+
+    // Pre-render the whole-earth zoom while still hidden, so pulling back
+    // into space on reveal draws from cached tiles instead of popping them
+    // in mid-flight - then go back to shadowing the Leaflet camera.
+    glMap.once('load', () => {
+      if (visibleRef.current) return
+      glMap.jumpTo({ zoom: globeFitZoom(glMap) })
+      glMap.once('idle', () => {
+        if (visibleRef.current) return
+        const c = cameraRef.current
+        glMap.jumpTo({ center: [c.lng, c.lat], zoom: c.zoom })
+      })
+    })
+
+    glMap.on('styledata', () => hideSymbolLayers(glMap))
+    glMap.on('style.load', () => {
+      glMap.setProjection({ type: 'globe' })
+      glMap.setSky({ 'atmosphere-blend': 1 })
+      hideSymbolLayers(glMap)
+      glMap.addSource('territory-dots', {
+        type: 'geojson',
+        data: dotsRef.current,
+      })
+      glMap.addLayer({
+        id: 'territory-dots-glow',
+        type: 'circle',
+        source: 'territory-dots',
+        paint: {
+          'circle-color': ['get', 'color'],
+          'circle-radius': ['case', ['get', 'mine'], 14, 10],
+          'circle-opacity': 0.3,
+          'circle-blur': 0.8,
+        },
+      })
+      glMap.addLayer({
+        id: 'territory-dots',
+        type: 'circle',
+        source: 'territory-dots',
+        paint: {
+          'circle-color': ['get', 'color'],
+          'circle-radius': ['case', ['get', 'mine'], 6, 4],
+          'circle-stroke-color': '#FFFFFF',
+          'circle-stroke-width': 2,
+        },
+      })
+    })
+    glMap.on('click', 'territory-dots', (e) => {
+      const [lng, lat] = e.features[0].geometry.coordinates
+      // The whole dive happens in MapLibre (which flattens the globe into a
+      // regular map as it nears the ground) - one continuous camera move
+      // instead of two maps handing off halfway down.
+      glMap.setMaxZoom(GLOBE_DIVE_ZOOM - 1)
+      glMap.flyTo({
+        center: [lng, lat],
+        zoom: GLOBE_DIVE_ZOOM - 1,
+        duration: 2600,
+        curve: 1.6,
+      })
+    })
+    glMap.on('mouseenter', 'territory-dots', () => {
+      glMap.getCanvas().style.cursor = 'pointer'
+    })
+    glMap.on('mouseleave', 'territory-dots', () => {
+      glMap.getCanvas().style.cursor = ''
+    })
+    glMap.on('zoomend', () => {
+      // Hidden, it's only following Leaflet (see the camera effect below).
+      if (!visibleRef.current) return
+      if (glMap.getZoom() < GLOBE_EXIT_ZOOM - 1 - 0.05) return
+      const c = glMap.getCenter()
+      onExitRef.current({
+        lat: c.lat,
+        lng: c.lng,
+        zoom: Math.round(glMap.getZoom() + 1),
+      })
+    })
+
+    return () => {
+      glMap.remove()
+      glMapRef.current = null
+    }
+    // The camera is only the starting view - re-creating on every change
+    // would fight the player's own panning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [styleUrl])
+
+  // While hidden, mirror the Leaflet camera so the reveal lines up exactly
+  // with the flat map it fades in over.
+  useEffect(() => {
+    if (visibleRef.current) return
+    glMapRef.current?.jumpTo({
+      center: [camera.lng, camera.lat],
+      zoom: camera.zoom,
+    })
+  }, [camera])
+
+  // The handoff zoom is still close enough that the sphere overflows the
+  // screen - on reveal, pull back into space until the whole round globe
+  // fits, while it fades in.
+  useEffect(() => {
+    const glMap = glMapRef.current
+    if (!visible || !glMap) return
+    // Undo a previous dot dive's raised cap (resetting it at the end of the
+    // dive itself would clamp the zoom and fire a second handoff).
+    glMap.setMaxZoom(GLOBE_EXIT_ZOOM - 1)
+    // The reveal and Leaflet's last camera update land in the same render,
+    // so the camera effect above skipped it - start from it here instead.
+    glMap.jumpTo({
+      center: [camera.lng, camera.lat],
+      zoom: camera.zoom,
+    })
+    glMap.flyTo({ zoom: globeFitZoom(glMap), duration: 1600, curve: 1.2 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
+  useEffect(() => {
+    glMapRef.current?.getSource('territory-dots')?.setData(dots)
+  }, [dots])
+
+  return (
+    <div
+      className={`territory-globe${visible ? ' is-visible' : ''}`}
+      ref={containerRef}
+    />
+  )
 }
 
 // Captures the Leaflet map instance for controls that render outside
@@ -470,7 +708,7 @@ function locateErrorMessage(error) {
   return 'Could not find your location right now.'
 }
 
-function LocateButton({ map }) {
+function LocateButton({ map, onLocated }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -488,6 +726,7 @@ function LocateButton({ map }) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setError(null)
+        onLocated?.()
         map.flyTo(
           [position.coords.latitude, position.coords.longitude],
           Math.max(map.getZoom(), 17)
@@ -513,7 +752,7 @@ function LocateButton({ map }) {
         onDoubleClick={(e) => e.stopPropagation()}
         aria-label="Recenter on my location"
       >
-        <FaCrosshairs />
+        <IconCrosshairs />
       </button>
       {error && (
         <div
@@ -558,6 +797,38 @@ export default function TerritoryMap({
   const showPreview = livePath.length >= 3
   const tiltRef = useRef(null)
   const [mapInstance, setMapInstance] = useState(null)
+  // Non-null while the globe is mounted (warm or showing) - the Leaflet
+  // camera it follows while hidden. See GlobeHandoff.
+  const [globeCamera, setGlobeCamera] = useState(null)
+  const [globeVisible, setGlobeVisible] = useState(false)
+  const baseGlMapRef = useRef(null)
+  // Leaflet is lined up underneath first, and the globe only fades once the
+  // flat map has finished drawing there - otherwise the fade reveals tiles
+  // still popping in.
+  function exitGlobe(view) {
+    const baseGl = baseGlMapRef.current
+    if (!view || !mapInstance || !baseGl) {
+      setGlobeVisible(false)
+      return
+    }
+    mapInstance.setView([view.lat, view.lng], view.zoom, { animate: false })
+    let done = false
+    const reveal = () => {
+      if (done) return
+      done = true
+      setGlobeVisible(false)
+    }
+    baseGl.once('idle', reveal)
+    setTimeout(reveal, GLOBE_EXIT_WAIT_MS)
+  }
+
+  // Anything that moves the Leaflet camera itself (a tracked run, flying to
+  // a highlighted territory) needs the globe out of the way to be seen.
+  useEffect(() => {
+    if (isNavigating || highlightOwnerId || highlightParcelId) {
+      setGlobeVisible(false)
+    }
+  }, [isNavigating, highlightOwnerId, highlightParcelId])
   // While navigating, the whole map rotates to point the travel direction
   // up (see .territory-map-heading below) - the marker's own heading cone
   // would otherwise double up on that rotation, so it just points straight
@@ -610,7 +881,7 @@ export default function TerritoryMap({
 
   return (
     <div
-      className="territory-map"
+      className={`territory-map${globeVisible ? ' is-globe' : ''}`}
       style={
         ambience?.filter ? { '--ambience-filter': ambience.filter } : undefined
       }
@@ -639,6 +910,7 @@ export default function TerritoryMap({
             <PokemonStyleBaseLayer
               styleUrl={mapStyleUrl}
               onReady={onMapReady}
+              glMapRef={baseGlMapRef}
             />
 
             {mergedTerritories.map((t) => {
@@ -657,24 +929,6 @@ export default function TerritoryMap({
                   onParcelClick={onParcelClick}
                   onTapEffect={handleTapEffect}
                 />
-              )
-            })}
-
-            {mergedTerritories.map((t) => {
-              const isMine =
-                Boolean(currentUserId) && t.ownerId === currentUserId
-              return (
-                <Marker
-                  key={`${t.id}-badge`}
-                  position={polygonCentroid(t.points)}
-                  icon={territoryBadgeIcon(t, isMine, playerColor)}
-                >
-                  <Popup>
-                    <strong>{isMine ? 'You' : t.ownerName}</strong>
-                    <br />
-                    {formatArea(t.area)}
-                  </Popup>
-                </Marker>
               )
             })}
 
@@ -719,6 +973,11 @@ export default function TerritoryMap({
             />
             <InvalidateSizeOnMount />
             <ZoomRangeLimiter />
+            <GlobeHandoff
+              isNavigating={isNavigating}
+              onGlobeCamera={setGlobeCamera}
+              onRevealGlobe={() => setGlobeVisible(true)}
+            />
             <ZoomTiltEffect tiltRef={tiltRef} />
             <NavigationCameraEffect
               isNavigating={isNavigating}
@@ -735,6 +994,17 @@ export default function TerritoryMap({
           </MapContainer>
         </div>
       </div>
+      {globeCamera && (
+        <TerritoryGlobe
+          camera={globeCamera}
+          visible={globeVisible}
+          styleUrl={mapStyleUrl}
+          territories={mergedTerritories}
+          currentUserId={currentUserId}
+          playerColor={playerColor}
+          onExit={exitGlobe}
+        />
+      )}
       {ambience && (
         <div
           className={`territory-map-sky sky-phase-${ambience.phase} sky-${ambience.sky}`}
@@ -744,7 +1014,9 @@ export default function TerritoryMap({
         </div>
       )}
       <div className="territory-map-vignette" aria-hidden="true" />
-      {mapInstance && <LocateButton map={mapInstance} />}
+      {mapInstance && (
+        <LocateButton map={mapInstance} onLocated={() => exitGlobe()} />
+      )}
     </div>
   )
 }
