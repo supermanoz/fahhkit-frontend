@@ -17,7 +17,7 @@ export default function ColorShelf({
   emptyText = 'Nothing here yet.',
 }) {
   return (
-    <section className="game-card game-card-dark">
+    <section className="color-shelf">
       <p className="game-menu-avatars-title game-menu-avatars-title-centered">
         {Icon && <Icon />} {title}
       </p>

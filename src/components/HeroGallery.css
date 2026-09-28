@@ -277,3 +277,9 @@
     transform: none;
   }
 }
+
+/* Limited (not for sale) heroes: gold-tinged floor, art stays in colour. */
+.hero-card.tier-limited {
+  --tier: #d4a017;
+  --tier-light: #ffe58a;
+}

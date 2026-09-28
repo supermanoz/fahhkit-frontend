@@ -71,13 +71,16 @@ export default function HeroGallery({
             .map((sk) => sk.priceFahhcoin || 0)
             .filter((n) => n > 0)
           const fromPrice = prices.length ? Math.min(...prices) : 0
+          // Limited = not purchasable right now (event/reward heroes).
           const tier = equipped
             ? 'equipped'
             : owned
               ? 'owned'
               : comingSoon
                 ? 'soon'
-                : 'locked'
+                : hero.limited
+                  ? 'limited'
+                  : 'locked'
           return (
             <button
               key={hero.id}
@@ -102,10 +105,10 @@ export default function HeroGallery({
                 <span className="hero-card-level">⚡ {perkCount} perks</span>
               )}
 
-              {tier === 'soon' ? (
+              {tier === 'soon' || tier === 'limited' ? (
                 <span className="hero-card-foot is-locked">
                   <IconLock />
-                  <span>Coming soon</span>
+                  <span>{tier === 'limited' ? 'Limited' : 'Coming soon'}</span>
                 </span>
               ) : (
                 <span className={`hero-card-foot is-${tier}`}>

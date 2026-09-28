@@ -20,11 +20,16 @@ export function findClubs(pageNumber = 1, noOfRecords = 20, searchText = '') {
   })
 }
 
-// Leader/co-leader edits their own club's description (the server works
-// out which club from the caller's membership). Returns the updated club.
-export function updateClubDescription(description) {
-  return postJson('/v1/club/description', { description })
+// Captain/vice-captain edits their club's description. The server works
+// out the club from the caller's membership - {id} is required by the route
+// but unused (same as leave/kick/promote). Returns the updated club.
+export function updateClubDescription(clubId, description) {
+  return postJson(`/v1/club/${clubId}/update`, { description })
 }
+
+// Server-side ClubProperties.creationCostFahhcoin - debited on create, not
+// exposed by any endpoint, so mirrored here for the Create form. Keep in sync.
+export const CLUB_CREATION_COST = 500
 
 // null if the logged-in athlete isn't in a club.
 export function getMyClub() {

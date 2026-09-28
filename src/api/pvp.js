@@ -6,11 +6,13 @@ import { getJson, postJson } from './client'
 // direct challenge to a nearby player, and they only resolve through
 // createRun({ challengeId }) or the server's expiry job.
 
-// Mirrors run-challenge.* in the backend's application.properties.
+// Mirrors run-challenge.queue-stake-amounts.* in the backend's
+// application.properties - the server charges its own value, so keep these
+// in sync (display only; also the default stake for a direct challenge).
 export const PVP_MODES = [
-  { id: 'FIVE_HUNDRED_M', label: '500 m', meters: 500, queueStake: 10 },
-  { id: 'ONE_KM', label: '1 km', meters: 1000, queueStake: 20 },
-  { id: 'FIVE_KM', label: '5 km', meters: 5000, queueStake: 50 },
+  { id: 'FIVE_HUNDRED_M', label: '500 m', meters: 500, queueStake: 50 },
+  { id: 'ONE_KM', label: '1 km', meters: 1000, queueStake: 100 },
+  { id: 'FIVE_KM', label: '5 km', meters: 5000, queueStake: 500 },
 ]
 
 export function getPvpMode(id) {
@@ -70,4 +72,11 @@ export function reviewChallenge(id, accept) {
 
 export function cancelChallenge(id) {
   return postJson(`/v1/run-challenge/${id}/cancel`, {})
+}
+
+// Concede an IN_PROGRESS race you haven't submitted a run for yet: an
+// immediate loss - the rival takes the whole pot (WIN_BY_FORFEIT), even if
+// they haven't run yet. Returns the resolved challenge.
+export function forfeitChallenge(id) {
+  return postJson(`/v1/run-challenge/${id}/forfeit`, {})
 }

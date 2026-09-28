@@ -515,3 +515,10 @@
   background: rgba(255, 255, 255, 0.06);
   border-radius: 8px;
 }
+
+.club-create-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}

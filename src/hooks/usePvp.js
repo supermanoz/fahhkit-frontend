@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
 import {
+  getPvpMode,
   cancelChallenge,
+  forfeitChallenge,
   findMyChallenges,
   findNearbyPlayers,
   getPvpQueueStatus,
@@ -21,6 +23,8 @@ const LOCATION_PING_MS = 2 * 60 * 1000
 // Queue matching sweeps every 5s server-side; the socket normally tells us
 // first, this is the fallback if it's not connected.
 const CHALLENGE_POLL_MS = 20000
+const CHALLENGE_FAST_POLL_MS = 5000
+const CHALLENGE_OPEN_POLL_MS = 8000
 const QUEUE_POLL_MS = 5000
 
 function loadDiscoverable() {
@@ -74,10 +78,27 @@ export function usePvp({ userId, playerLocation }) {
   const locationRef = useRef(playerLocation)
   locationRef.current = playerLocation
 
+  // Last list seen, to spot status changes a poll picks up (the socket push
+  // that would normally announce them may never arrive - see below).
+  const challengesRef = useRef([])
+  challengesRef.current = challenges
+
   const refreshChallenges = useCallback(async () => {
     try {
       const page = await findMyChallenges(1, 20)
-      setChallenges(page?.content || [])
+      const next = page?.content || []
+      // A poll that finds a race newly started / finished gets the same
+      // callout the push would have given.
+      const prevById = new Map(challengesRef.current.map((c) => [c.id, c]))
+      for (const c of next) {
+        const prev = prevById.get(c.id)
+        if (!prev || prev.status === c.status) continue
+        if (c.status === 'IN_PROGRESS')
+          setAlert({ kind: 'started', challenge: c })
+        else if (c.status === 'COMPLETED')
+          setAlert({ kind: 'resolved', challenge: c })
+      }
+      setChallenges(next)
     } catch {
       // Keep whatever's loaded - a background refresh isn't worth an error.
     } finally {
@@ -110,11 +131,33 @@ export function usePvp({ userId, playerLocation }) {
   }, [userId, refreshChallenges, refreshQueue])
 
   // Backstop for the socket push: re-check challenges every so often (and
-  // when the tab comes back) so an incoming challenge still pops up if the
-  // live connection dropped.
+  // when the tab comes back) so updates still land if the live connection
+  // is down. NOTE: the backend's WebSocket endpoint only accepts origins in
+  // fks.allowed.origins (default http://localhost:8000) - the dev app's
+  // origins get a 403 handshake, so in dev this polling is the ONLY way
+  // PvP updates arrive.
+  // Waiting on the rival (they still have to confirm, or to run): poll
+  // fast so their move shows up within seconds even without the socket.
+  const waitingOnThem = challenges.some((c) => {
+    const side = mySide(c, userId)
+    return (
+      (c.status === 'PENDING' && side.confirmed) ||
+      (c.status === 'IN_PROGRESS' && Boolean(side.myRunId))
+    )
+  })
   useEffect(() => {
     if (!userId) return
-    const interval = setInterval(refreshChallenges, CHALLENGE_POLL_MS)
+    // Visible to nearby runners = someone can challenge us any moment, so
+    // check often enough that the challenge pop-up shows within seconds
+    // (the "challenge received" push doesn't reach the dev app).
+    const interval = setInterval(
+      refreshChallenges,
+      waitingOnThem
+        ? CHALLENGE_FAST_POLL_MS
+        : discoverable
+          ? CHALLENGE_OPEN_POLL_MS
+          : CHALLENGE_POLL_MS
+    )
     const onVisible = () => {
       if (!document.hidden) refreshChallenges()
     }
@@ -123,7 +166,7 @@ export function usePvp({ userId, playerLocation }) {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [userId, refreshChallenges])
+  }, [userId, refreshChallenges, waitingOnThem, discoverable])
 
   // While discoverable, keep our last-known location fresh so we show up in
   // other players' nearby lists.
@@ -135,19 +178,63 @@ export function usePvp({ userId, playerLocation }) {
   }, [userId, discoverable, ping])
 
   const waiting = queueEntry?.status === 'WAITING'
+  const queueEntryRef = useRef(queueEntry)
+  queueEntryRef.current = queueEntry
   useEffect(() => {
     if (!waiting) return
     const interval = setInterval(async () => {
       try {
         const entry = await getPvpQueueStatus()
-        setQueueEntry(entry || null)
-        if (entry?.status === 'MATCHED') refreshChallenges()
+        if (entry?.status === 'WAITING') {
+          setQueueEntry(entry)
+          return
+        }
+        if (entry?.status === 'MATCHED' && entry.matchedChallengeId) {
+          markMatched(entry, entry.matchedChallengeId)
+          return
+        }
+        // The server's /status only returns WAITING entries - once we're
+        // matched (or the search expired) it answers null. Work out which
+        // from our races: a fresh, unanswered quick-match race at this
+        // distance means we got paired.
+        const prev = queueEntryRef.current
+        if (!prev || prev.status !== 'WAITING') return
+        const page = await findMyChallenges(1, 20)
+        const list = page?.content || []
+        setChallenges(list)
+        const meters = getPvpMode(prev.mode)?.meters
+        const match = list.find(
+          (c) =>
+            c.source === 'QUEUE' &&
+            c.status === 'PENDING' &&
+            (meters == null || c.distanceMeters === meters) &&
+            !mySide(c, userId).confirmed
+        )
+        if (match) {
+          markMatched(prev, match.id)
+        } else {
+          setQueueEntry({ ...prev, status: 'EXPIRED' })
+          setAlert({ kind: 'expired' })
+        }
       } catch {
         // Try again next tick.
       }
     }, QUEUE_POLL_MS)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waiting, refreshChallenges])
+
+  // Queue → matched: record the race id (PvpPanel jumps to it) and give the
+  // same callout + redirect the match-found push would.
+  function markMatched(base, challengeId) {
+    setQueueEntry({
+      ...base,
+      status: 'MATCHED',
+      matchedChallengeId: challengeId,
+    })
+    refreshChallenges()
+    setAlert({ kind: 'matched', challenge: { id: challengeId } })
+  }
 
   async function act(key, fn, fallback) {
     setBusy(key)
@@ -217,6 +304,7 @@ export function usePvp({ userId, playerLocation }) {
       setQueueEntry(entry)
       if (entry.status === 'MATCHED') refreshChallenges()
     }
+    return entry
   }
 
   async function leaveQueue() {
@@ -258,6 +346,16 @@ export function usePvp({ userId, playerLocation }) {
     if (updated) upsertChallenge(updated)
   }
 
+  async function forfeit(challenge) {
+    const updated = await act(
+      `forfeit-${challenge.id}`,
+      () => forfeitChallenge(challenge.id),
+      'Could not forfeit that race.'
+    )
+    if (updated) upsertChallenge(updated)
+    return updated
+  }
+
   // Socket pushes from useGameSocket's onPvp.
   const handlePush = useCallback((eventName, payload) => {
     if (eventName === 'pvp-queue-expired') {
@@ -273,7 +371,16 @@ export function usePvp({ userId, playerLocation }) {
       )
     }
     if (eventName === 'pvp-match-found') {
-      setQueueEntry((prev) => prev && { ...prev, status: 'MATCHED' })
+      // Carry the race id too, so the PvP panel's searching screen jumps
+      // straight to it (it keys off queueEntry.matchedChallengeId).
+      setQueueEntry(
+        (prev) =>
+          prev && {
+            ...prev,
+            status: 'MATCHED',
+            matchedChallengeId: payload?.id ?? prev.matchedChallengeId,
+          }
+      )
       setAlert({ kind: 'matched', challenge: payload })
     } else if (eventName === 'pvp-challenge-received') {
       setAlert({ kind: 'received', challenge: payload })
@@ -315,6 +422,7 @@ export function usePvp({ userId, playerLocation }) {
     leaveQueue,
     review,
     cancel,
+    forfeit,
     handlePush,
   }
 }

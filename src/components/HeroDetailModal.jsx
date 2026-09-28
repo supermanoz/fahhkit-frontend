@@ -175,10 +175,15 @@ export default function HeroDetailModal({
                         type="button"
                         className="btn btn-outline"
                         onClick={() => onBuy(skin)}
+                        // Limited heroes can't be bought (server rejects
+                        // with HERO_LIMITED) - reserved for events/rewards.
+                        disabled={hero.limited}
                       >
-                        {skin.priceFahhcoin > 0
-                          ? `${skin.priceFahhcoin} Fahhcoin`
-                          : 'Free'}
+                        {hero.limited
+                          ? 'Not for sale'
+                          : skin.priceFahhcoin > 0
+                            ? `${skin.priceFahhcoin} Fahhcoin`
+                            : 'Free'}
                       </button>
                     )}
                   </li>

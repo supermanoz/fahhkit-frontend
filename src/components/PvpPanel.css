@@ -1,34 +1,5 @@
-/* Race (PvP) tab - list rows reuse .game-menu-list; these cover the race
-   cards, quick-match/nearby boxes and the inline stake form. */
-.pvp-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.pvp-panel .game-menu-section-title svg,
-.pvp-card-title svg {
-  vertical-align: -2px;
-  margin-right: 4px;
-}
-
-.game-menu-list li.pvp-race,
-.game-menu-list li.pvp-nearby {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.pvp-race-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pvp-race-head .btn {
-  flex-shrink: 0;
-  padding: 7px 14px;
-  font-size: 12px;
-}
+/* PvP tab (PvpPanel.jsx) - a step-by-step flow: home, distance, rival,
+   searching / nearby, race screen, history. */
 
 .pvp-race-status {
   flex-shrink: 0;
@@ -51,121 +22,6 @@
   50% {
     box-shadow: 0 0 10px rgba(255, 90, 77, 0.8);
   }
-}
-
-.pvp-race-note {
-  margin: 0;
-  font-size: 12px;
-  color: rgba(246, 236, 217, 0.8);
-}
-
-.pvp-race-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pvp-race-actions .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 12px;
-}
-
-.pvp-race-actions:empty {
-  display: none;
-}
-
-/* Quick Match / Nearby Runners - same dark card as .game-card-dark
-   (GameCards.css). */
-.pvp-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(180deg, #5a4633 0%, #46362a 100%);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.12),
-    0 3px 0 var(--game-ink);
-  color: var(--game-cream);
-}
-
-.pvp-card > .game-menu-section-title:first-child {
-  margin-top: 0;
-}
-
-.pvp-card .game-menu-subtabs {
-  width: 100%;
-}
-
-.pvp-card .game-menu-list {
-  width: 100%;
-}
-
-.pvp-card-title {
-  margin: 0;
-  font-weight: 900;
-  font-size: 17px;
-  color: #fff;
-  text-shadow:
-    1.5px 0 0 var(--game-ink),
-    -1.5px 0 0 var(--game-ink),
-    0 1.5px 0 var(--game-ink),
-    0 -1.5px 0 var(--game-ink),
-    0 3px 0 var(--game-ink);
-}
-
-.pvp-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.pvp-toggle input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--game-gold);
-}
-
-.pvp-searching {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--game-gold-light);
-}
-
-.pvp-searching-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--game-gold);
-  animation: pvp-live-pulse 1s ease-in-out infinite;
-}
-
-.pvp-challenge-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.pvp-challenge-form .btn {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.pvp-stake-input {
-  width: 80px;
 }
 
 .pvp-won {
@@ -216,4 +72,731 @@
     var(--game-green-light),
     var(--game-green)
   );
+}
+
+/* Inline gold coin sitting on the text line. */
+.pvp-coin {
+  width: 14px;
+  height: 14px;
+  margin: 0 1px;
+  vertical-align: -2px;
+}
+
+/* ===================== Step-by-step PvP flow ===================== */
+.pvp-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0 12px;
+  color: var(--game-cream);
+}
+
+/* Back button + title + step dots. */
+.pvp-step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pvp-back {
+  all: unset;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, var(--game-wood-light), var(--game-wood));
+  color: var(--game-ink);
+  box-shadow:
+    inset 0 -4px 0 var(--game-wood-dark),
+    0 3px 0 var(--game-ink);
+  cursor: pointer;
+}
+
+.pvp-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pvp-back:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -4px 0 var(--game-wood-dark),
+    0 1px 0 var(--game-ink);
+}
+
+.pvp-step-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 20px;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-step-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.pvp-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.pvp-step-dot.is-done {
+  background: var(--game-green);
+}
+
+.pvp-section-label {
+  margin: 4px 0 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--game-gold-light);
+}
+
+.pvp-big-line {
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+  color: #fff;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-sub-line {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.75);
+}
+
+.pvp-actions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pvp-actions-col .game-btn,
+.pvp-flow > .game-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* --- Home hero --- */
+.pvp-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 16px 18px;
+  border-radius: 18px;
+  border: 3px solid var(--game-ink);
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      rgba(255, 90, 77, 0.35),
+      transparent 70%
+    ),
+    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 4px 0 var(--game-ink);
+}
+
+.pvp-hero-emblem {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light),
+    var(--game-red) 50%,
+    var(--game-red-dark)
+  );
+  color: #fff;
+  font-size: 30px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 3px 0 var(--game-ink),
+    0 0 20px rgba(255, 90, 77, 0.5);
+}
+
+.pvp-hero-title {
+  margin: 4px 0 0;
+  font-size: 24px;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 var(--game-ink);
+}
+
+.pvp-hero-btn {
+  margin-top: 6px;
+  min-width: 200px;
+}
+
+.pvp-history-link {
+  all: unset;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
+  color: var(--game-gold-light);
+  cursor: pointer;
+}
+
+.pvp-history-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- Big tappable choice rows (distance / opponent) --- */
+.pvp-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pvp-choice {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 14px 16px;
+  border-radius: 16px;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, #6a4f37 0%, #4a3727 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.25),
+    0 4px 0 var(--game-ink);
+  color: var(--game-cream);
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.pvp-choice:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.25),
+    0 1px 0 var(--game-ink);
+}
+
+.pvp-choice:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pvp-choice > svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--game-gold-light);
+}
+
+.pvp-choice-big {
+  flex-shrink: 0;
+  min-width: 78px;
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 22px;
+  color: #fff;
+  border-radius: 12px;
+  border: 3px solid var(--game-ink);
+  -webkit-text-stroke: 1.5px var(--game-ink);
+  paint-order: stroke fill;
+  background: linear-gradient(180deg, #7cc6ff, #2f8ee8 55%, #1a5fb4);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.pvp-mode-ONE_KM .pvp-choice-big {
+  background: linear-gradient(180deg, #a8f07a, #4fc85e 55%, #268a3a);
+}
+
+.pvp-mode-FIVE_KM .pvp-choice-big {
+  background: linear-gradient(180deg, #ffab9e, #ff5a4d 55%, #c72a20);
+}
+
+.pvp-choice-icon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  font-size: 24px;
+  color: #fff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.pvp-choice-icon.tone-gold {
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light),
+    var(--game-gold) 55%,
+    var(--game-gold-dark)
+  );
+}
+
+.pvp-choice-icon.tone-red {
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light),
+    var(--game-red) 55%,
+    var(--game-red-dark)
+  );
+}
+
+.pvp-choice-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.pvp-choice-title {
+  font-size: 19px;
+  color: #fff;
+  -webkit-text-stroke: 1.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-choice-line {
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.8);
+}
+
+.pvp-choice-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--game-gold-light);
+}
+
+.pvp-picked {
+  margin: -4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: rgba(246, 236, 217, 0.8);
+}
+
+.pvp-picked-chip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--game-gold);
+  color: #fff;
+  -webkit-text-stroke: 1px var(--game-ink);
+  paint-order: stroke fill;
+}
+
+/* --- Searching radar --- */
+.pvp-radar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+}
+
+.pvp-radar {
+  position: relative;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: radial-gradient(
+    circle,
+    rgba(79, 200, 94, 0.18) 0%,
+    rgba(20, 40, 20, 0.85) 70%
+  );
+  overflow: hidden;
+  box-shadow:
+    0 0 0 4px rgba(79, 200, 94, 0.25),
+    0 4px 0 var(--game-ink);
+}
+
+.pvp-radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(120, 255, 140, 0.55),
+    rgba(120, 255, 140, 0) 70deg
+  );
+  animation: pvp-sweep 2s linear infinite;
+}
+
+.pvp-radar-ring {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  border: 2px solid rgba(160, 255, 170, 0.35);
+}
+
+.pvp-radar-ring.is-2 {
+  inset: 12%;
+}
+
+.pvp-radar-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light),
+    var(--game-red) 50%,
+    var(--game-red-dark)
+  );
+  color: #fff;
+  font-size: 22px;
+}
+
+.pvp-radar.is-idle .pvp-radar-sweep {
+  animation: none;
+  opacity: 0.2;
+}
+
+@keyframes pvp-sweep {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* --- Runner / race rows --- */
+.pvp-runner-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pvp-runner {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+}
+
+.pvp-runner:hover,
+.pvp-runner:focus-visible {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.pvp-runner.needs-me {
+  border-color: var(--game-gold);
+  background: rgba(255, 122, 41, 0.14);
+}
+
+.pvp-runner > svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--game-gold-light);
+}
+
+.pvp-runner-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pvp-runner-name {
+  font-size: 17px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-runner-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.7);
+}
+
+.pvp-runner-meta.pvp-won {
+  color: var(--game-green-light);
+}
+
+.pvp-runner-meta.pvp-lost {
+  color: var(--game-red-light);
+}
+
+/* --- Race screen --- */
+.pvp-versus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px 10px;
+  border-radius: 16px;
+  border: 3px solid var(--game-ink);
+  background:
+    linear-gradient(90deg, rgba(47, 142, 232, 0.35), transparent 45%),
+    linear-gradient(270deg, rgba(255, 90, 77, 0.35), transparent 45%),
+    linear-gradient(180deg, #4a3727, #2e2118);
+  box-shadow: 0 4px 0 var(--game-ink);
+}
+
+.pvp-versus.is-compact {
+  padding: 10px;
+}
+
+.pvp-versus-side {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 20px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-text-stroke: 1.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-versus-vs {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light),
+    var(--game-gold) 55%,
+    var(--game-gold-dark)
+  );
+  color: #fff;
+  font-size: 16px;
+  -webkit-text-stroke: 1.2px var(--game-ink);
+  paint-order: stroke fill;
+}
+
+.pvp-race-terms {
+  display: flex;
+  gap: 8px;
+}
+
+.pvp-term {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.pvp-term-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(246, 236, 217, 0.6);
+}
+
+.pvp-term-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 17px;
+  color: #fff;
+}
+
+/* Matched → Locked in → Run → Result. */
+.pvp-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+}
+
+.pvp-timeline::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 8px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.pvp-timeline li {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.5);
+}
+
+.pvp-timeline-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: #5a4633;
+}
+
+.pvp-timeline li.is-done {
+  color: var(--game-green-light);
+}
+
+.pvp-timeline li.is-done .pvp-timeline-dot {
+  background: var(--game-green);
+}
+
+.pvp-timeline li.is-now {
+  color: #fff;
+}
+
+.pvp-timeline li.is-now .pvp-timeline-dot {
+  background: var(--game-gold);
+  box-shadow: 0 0 10px rgba(255, 122, 41, 0.8);
+}
+
+.pvp-result {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 20px;
+  color: #fff;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-result.is-won {
+  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
+}
+
+.pvp-result.is-lost {
+  background: linear-gradient(180deg, #ff7a6d, var(--game-red-dark));
+}
+
+.pvp-run-btn svg,
+.pvp-forfeit-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pvp-forfeit-btn.is-confirming {
+  box-shadow:
+    inset 0 -4px 0 #6e130d,
+    0 0 0 3px rgba(255, 90, 77, 0.45);
+}
+
+/* --- Stake step (nearby challenge) --- */
+.pvp-stake {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pvp-stake-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pvp-stake-coin {
+  width: 28px;
+  height: 28px;
+}
+
+.pvp-stake-input {
+  width: 140px;
+  text-align: center;
+  font-size: 24px;
+}
+
+.pvp-stake .game-btn {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pvp-radar-sweep {
+    animation: none;
+  }
+}
+
+/* Match found: radar stops and flashes gold. */
+.pvp-radar.is-found {
+  box-shadow:
+    0 0 0 4px rgba(255, 180, 0, 0.5),
+    0 0 24px rgba(255, 180, 0, 0.6),
+    0 4px 0 var(--game-ink);
+}
+
+.pvp-radar.is-found .pvp-radar-sweep {
+  animation: none;
+  opacity: 0;
 }

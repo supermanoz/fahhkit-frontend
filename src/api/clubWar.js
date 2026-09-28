@@ -25,9 +25,9 @@ export const CLUB_WAR_PREP_HOURS = 24
 export const CLUB_WAR_BATTLE_HOURS = 24
 export const CLUB_WAR_MAX_QUEUE_HOURS = 48
 export const CLUB_WAR_REWARDS = {
-  winTrophies: 34,
-  lossTrophiesFavorite: 36,
-  lossTrophiesUnderdog: 29,
+  // Trophy changes aren't mirrored here: the server assigns them
+  // (ClubWarProperties - win gain, favourite/underdog loss) and can retune
+  // them without a frontend release, so the UI just says "system-assigned".
   winXp: 500,
   winCoins: 200,
 }

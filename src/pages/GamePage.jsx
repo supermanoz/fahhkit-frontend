@@ -30,6 +30,7 @@ import { useRunTracker } from '../hooks/useRunTracker'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
 import { mySide, usePvp } from '../hooks/usePvp'
+import { useClubWarWatch } from '../hooks/useClubWarWatch'
 import { ApiError, resolveFileUrl } from '../api/client'
 import { createRun, getRun, getRuns } from '../api/runs'
 import {
@@ -94,7 +95,6 @@ import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
 import MailPanel from '../components/MailPanel'
 import PvpPanel from '../components/PvpPanel'
-import NearbyRunners from '../components/NearbyRunners'
 import HeroGallery from '../components/HeroGallery'
 import ShadeFlag from '../components/ShadeFlag'
 import TrailPreview from '../components/TrailPreview'
@@ -197,7 +197,7 @@ const PLAY_OPTIONS = [
   },
   {
     tab: 'race',
-    label: 'PvP Race',
+    label: 'PvP',
     Icon: IconSwords,
     tone: 'red',
     x: 80,
@@ -403,6 +403,9 @@ export default function GamePage() {
   const [leaderboardError, setLeaderboardError] = useState(null)
   const [storeCatalog, setStoreCatalog] = useState([])
   const [shopSection, setShopSection] = useState('heroes')
+  // Buy confirm pop-up: request in flight / its own error line.
+  const [purchasing, setPurchasing] = useState(false)
+  const [purchaseError, setPurchaseError] = useState(null)
   const [ownedItems, setOwnedItems] = useState([])
   const [storeError, setStoreError] = useState(null)
   const [storeActionError, setStoreActionError] = useState(null)
@@ -602,6 +605,72 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pvp.alert])
 
+  // Race the PvP tab should open on (a challenge accepted from the pop-up,
+  // a race that just went live, a queue match).
+  const [pvpFocusId, setPvpFocusId] = useState(null)
+
+  // A race of mine just went live (the rival accepted my challenge) or the
+  // queue found me a rival → take me straight to that race screen, whether
+  // it came by socket push or by usePvp's polling. Not while I'm mid-run -
+  // the callout pill still shows then.
+  useEffect(() => {
+    const a = pvp.alert
+    if (!a?.challenge?.id) return
+    if (a.kind !== 'started' && a.kind !== 'matched') return
+    if (tracker.status === 'tracking') return
+    // Already watching the search in the PvP tab - the panel shows
+    // "Rival found!" and opens the race itself.
+    if (a.kind === 'matched' && menuOpen && menuTab === 'race') return
+    setPvpFocusId(a.challenge.id)
+    openMenu('race')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvp.alert])
+
+  // Club war phase flips / result, announced over the map (no socket push
+  // for wars - see useClubWarWatch).
+  const { warAlert, clearWarAlert } = useClubWarWatch(
+    isAuthed && Boolean(profile?.clubName)
+  )
+  useEffect(() => {
+    if (!warAlert) return
+    navigator.vibrate?.([120, 60, 120])
+    playMilestoneChime()
+    refreshProfile()
+    const hide = setTimeout(clearWarAlert, 9000)
+    return () => clearTimeout(hide)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warAlert])
+  const warAlertCopy = (() => {
+    if (!warAlert) return null
+    const w = warAlert.war
+    const mineIsA = w.clubAName === profile?.clubName
+    const rival = mineIsA ? w.clubBName : w.clubAName
+    if (warAlert.kind === 'battle')
+      return {
+        emoji: '⚔️',
+        title: 'Battle has begun!',
+        line: `Club war vs ${rival} is live - get your run in.`,
+      }
+    const myId = mineIsA ? w.clubAId : w.clubBId
+    if (!w.winnerClubId)
+      return {
+        emoji: '🤝',
+        title: 'Club war: draw',
+        line: `Dead even with ${rival}.`,
+      }
+    return w.winnerClubId === myId
+      ? {
+          emoji: '🏆',
+          title: 'Victory!',
+          line: `Your club beat ${rival}. Tap for the results.`,
+        }
+      : {
+          emoji: '💀',
+          title: 'Defeat',
+          line: `${rival} took this one. Tap for the results.`,
+        }
+  })()
+
   // Incoming race challenge prompt: the newest PENDING challenge someone
   // else sent me that I haven't answered. "Decide later" hides that one for
   // this session (it's still in the Race tab).
@@ -655,7 +724,10 @@ export default function GamePage() {
     setChallengeBusy(null)
     if (updated) {
       refreshProfile()
-      if (accept) openMenu('race')
+      if (accept) {
+        setPvpFocusId(updated.id)
+        openMenu('race')
+      }
     }
   }
 
@@ -1470,16 +1542,27 @@ export default function GamePage() {
 
   async function handlePurchase(item) {
     setStoreActionError(null)
+    setPurchaseError(null)
+    setPurchasing(true)
     try {
       await purchaseStoreItem(item.id)
       await loadStore()
       refreshProfile()
       setStoreChoice(null)
     } catch (err) {
-      setStoreActionError(
+      // Shown inside the confirm pop-up - the Shop's own error line sits
+      // behind it (and behind the hero modal), where nobody sees it.
+      setPurchaseError(
         err instanceof ApiError ? err.message : 'Could not complete purchase.'
       )
+    } finally {
+      setPurchasing(false)
     }
+  }
+
+  function closeStoreChoice() {
+    setStoreChoice(null)
+    setPurchaseError(null)
   }
 
   async function handleEquip(item, isEquipped) {
@@ -1576,7 +1659,7 @@ export default function GamePage() {
     { id: 'club', label: 'Club', Icon: IconUsers, tone: 'green' },
     {
       id: 'race',
-      label: 'Race',
+      label: 'PvP',
       Icon: IconSwords,
       tone: 'battle',
       badge: pvp.actionCount > 0 ? String(pvp.actionCount) : null,
@@ -1865,6 +1948,36 @@ export default function GamePage() {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {warAlertCopy && (
+          <motion.button
+            type="button"
+            key={`war-${warAlert.kind}-${warAlert.war.id}`}
+            className={`game-weather-hype game-pvp-alert game-war-alert ${warAlert.kind === 'ended' ? 'is-ended' : ''}`}
+            onClick={() => {
+              clearWarAlert()
+              openMenu('club')
+            }}
+            initial={{ opacity: 0, y: -40, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+          >
+            <span className="game-weather-hype-emoji" aria-hidden="true">
+              {warAlertCopy.emoji}
+            </span>
+            <span className="game-weather-hype-body">
+              <strong className="game-weather-hype-title">
+                {warAlertCopy.title}
+              </strong>
+              <span className="game-weather-hype-line">
+                {warAlertCopy.line}
+              </span>
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {pvp.alert && PVP_ALERT_COPY[pvp.alert.kind] && (
@@ -2178,7 +2291,7 @@ export default function GamePage() {
                 {completedRun?.isRace && (
                   <p className="game-controls-hint">
                     🏁 Race time logged. Results land once your rival runs too.
-                    Check the Race tab.
+                    Check the PvP tab.
                   </p>
                 )}
                 {completedRun?.isWar && (
@@ -2196,7 +2309,7 @@ export default function GamePage() {
                 <p>{runResult.message}</p>
                 {completedRun?.isRace && (
                   <p className="game-controls-hint">
-                    🏁 Your race time still counts. Check the Race tab.
+                    🏁 Your race time still counts. Check the PvP tab.
                   </p>
                 )}
                 {completedRun?.isWar && (
@@ -2527,11 +2640,10 @@ export default function GamePage() {
                   userId={user?.id}
                   balance={profile?.fahhcoinBalance ?? 0}
                   onStartRace={handleStartRace}
+                  onForfeited={() => refreshProfile()}
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
-                />
-                <NearbyRunners
-                  pvp={pvp}
-                  balance={profile?.fahhcoinBalance ?? 0}
+                  focusRaceId={pvpFocusId}
+                  onFocusHandled={() => setPvpFocusId(null)}
                 />
               </div>
             )}
@@ -2962,7 +3074,7 @@ export default function GamePage() {
       <AnimatePresence>
         {coinShopOpen && (
           <motion.div
-            className="game-confirm-overlay"
+            className="game-confirm-overlay game-coin-shop-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -3043,51 +3155,94 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {storeChoice && (
-          <motion.div
-            className="game-confirm-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setStoreChoice(null)}
-          >
-            <motion.div
-              className="game-confirm-card"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {storeChoice.category === 'TERRITORY_SHADE' && (
-                <ShadeFlag
-                  className="game-confirm-shade-preview"
-                  color={storeChoice.colorValue}
-                />
-              )}
-              <p>
-                {storeChoice.priceFahhcoin > 0
-                  ? `Buy ${storeChoice.name} for ${storeChoice.priceFahhcoin} Fahhcoin?`
-                  : `Unlock ${storeChoice.name} for free?`}
-              </p>
-              <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setStoreChoice(null)}
+        {storeChoice &&
+          (() => {
+            const price = storeChoice.priceFahhcoin || 0
+            const balance = profile?.fahhcoinBalance ?? 0
+            const short = price > balance
+            return (
+              <motion.div
+                className="game-confirm-overlay game-buy-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={closeStoreChoice}
+              >
+                <motion.div
+                  className="game-confirm-card game-buy-card"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => handlePurchase(storeChoice)}
-                >
-                  Buy
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
+                  {storeChoice.category === 'TERRITORY_SHADE' && (
+                    <ShadeFlag
+                      className="game-confirm-shade-preview"
+                      color={storeChoice.colorValue}
+                    />
+                  )}
+                  {storeChoice.category === 'TRAIL_COLOR' && (
+                    <TrailPreview
+                      className="game-confirm-shade-preview"
+                      color={storeChoice.colorValue}
+                    />
+                  )}
+                  <p className="game-buy-title">
+                    {price > 0 ? (
+                      <>
+                        Buy {storeChoice.name} for {price}{' '}
+                        <span className="game-coin" aria-label="Fahhcoin" />?
+                      </>
+                    ) : (
+                      `Unlock ${storeChoice.name} for free?`
+                    )}
+                  </p>
+                  {short && (
+                    <p className="game-buy-short">
+                      Not enough Fahhcoin - you have {balance}, need{' '}
+                      {price - balance} more.
+                    </p>
+                  )}
+                  {purchaseError && (
+                    <p className="game-controls-hint game-controls-hint-error">
+                      {purchaseError}
+                    </p>
+                  )}
+                  <div className="game-confirm-actions">
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={closeStoreChoice}
+                      disabled={purchasing}
+                    >
+                      Cancel
+                    </button>
+                    {short ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          closeStoreChoice()
+                          openCoinShop()
+                        }}
+                      >
+                        Get Fahhcoin
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handlePurchase(storeChoice)}
+                        disabled={purchasing}
+                      >
+                        {purchasing ? 'Buying…' : 'Buy'}
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )
+          })()}
       </AnimatePresence>
 
       <AnimatePresence>

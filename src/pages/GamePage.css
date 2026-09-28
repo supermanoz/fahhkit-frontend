@@ -1067,17 +1067,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Blue, matching the level badge / XP bar. */
   background: radial-gradient(
     circle at 32% 28%,
-    var(--game-gold-light),
-    var(--game-gold) 55%,
-    var(--game-gold-dark) 100%
+    #7cc6ff,
+    #2f8ee8 55%,
+    #1a5fb4 100%
   );
   color: #000;
   border: 4px solid #000;
   box-shadow:
     inset 0 3px 3px rgba(255, 255, 255, 0.6),
-    inset 0 -9px 0 var(--game-gold-dark),
+    inset 0 -9px 0 #1a5fb4,
     0 5px 0 #000;
   font-size: 24px;
   cursor: pointer;
@@ -1096,7 +1097,7 @@
   transform: translateY(4px);
   box-shadow:
     inset 0 3px 3px rgba(255, 255, 255, 0.6),
-    inset 0 -9px 0 var(--game-gold-dark),
+    inset 0 -9px 0 #1a5fb4,
     0 1px 0 #000;
 }
 
@@ -2345,9 +2346,7 @@
   gap: 24px;
   width: 100%;
   box-sizing: border-box;
-  padding: 18px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 4px;
 }
 
 .shade-tile {
@@ -2511,12 +2510,12 @@
   }
 }
 
-/* Phones: 3 tiles a row (4 on wider phones), near-square, small type. */
+/* Phones: 3 tiles a row, near-square, small type. */
 @media (max-width: 520px) {
   .shade-shop-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
-    padding: 14px;
+    padding: 6px 2px;
   }
 
   .shade-tile {
@@ -2880,12 +2879,16 @@
   min-width: 0;
 }
 
-/* HUD coin counter: no bar behind it any more - just the number beside the
-   coin, with an ink outline (no shadow). */
+/* HUD coin counter: no bar - the coin on top with the amount sitting
+   below it, tucked up so it overlaps the coin's bottom edge a little.
+   Outlined number, no shadow. */
 .game-hud .game-hud-stat-coin {
   min-width: 0;
   margin-right: 0;
-  padding: 0 44px 0 0;
+  padding: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   background: none;
   border: none;
   box-shadow: none;
@@ -2896,11 +2899,23 @@
 }
 
 .game-hud .game-hud-stat-coin .game-hud-icon {
-  right: 0;
+  order: 0;
+  position: relative;
+  right: auto;
+  top: auto;
+  transform: none;
+  width: 40px;
+  height: 40px;
 }
 
 .game-hud .game-hud-stat-coin .game-hud-value {
-  font-size: 22px;
+  order: 1;
+  position: relative;
+  z-index: 1;
+  margin-top: -12px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
   color: #fff;
   -webkit-text-stroke: 2.5px var(--game-ink);
   paint-order: stroke fill;
@@ -2912,12 +2927,14 @@
 }
 
 @media (max-width: 560px) {
-  .game-hud .game-hud-stat-coin {
-    padding-right: 40px;
+  .game-hud .game-hud-stat-coin .game-hud-icon {
+    width: 34px;
+    height: 34px;
   }
 
   .game-hud .game-hud-stat-coin .game-hud-value {
-    font-size: 19px;
+    margin-top: -10px;
+    font-size: 17px;
   }
 }
 
@@ -2932,4 +2949,50 @@
   filter: drop-shadow(1px 0 0 var(--game-ink))
     drop-shadow(-1px 0 0 var(--game-ink)) drop-shadow(0 1px 0 var(--game-ink))
     drop-shadow(0 -1px 0 var(--game-ink));
+}
+
+/* Club war callouts reuse the PvP pill; the result one goes gold. */
+.game-weather-hype.game-war-alert.is-ended {
+  --hype-a: #ffe58a;
+  --hype-b: #d98a00;
+  --hype-glow: rgba(255, 180, 0, 0.55);
+}
+
+/* Territory / Trail shelves sit straight on the Shop panel - no card box
+   and no dark tray behind the tiles. */
+.game-menu-shop > .color-shelf {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Buy confirm sits above the hero modal it's opened from; the coin shop
+   sits above everything so "Get Fahhcoin" is never hidden behind a modal. */
+.game-confirm-overlay.game-buy-overlay {
+  z-index: 1420;
+}
+
+.game-confirm-overlay.game-coin-shop-overlay {
+  z-index: 1450;
+}
+
+.game-buy-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.game-buy-short {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--game-red-dark);
+  background: rgba(255, 90, 77, 0.15);
+  color: var(--game-red-light);
+  font-size: 13px;
+  text-align: center;
 }

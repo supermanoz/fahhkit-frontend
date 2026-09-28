@@ -5,7 +5,6 @@ import { ApiError, resolveFileUrl } from '../api/client'
 import {
   CLUB_WAR_BATTLE_HOURS,
   CLUB_WAR_ENTRY_FEE,
-  CLUB_WAR_MAX_QUEUE_HOURS,
   CLUB_WAR_PREP_HOURS,
   CLUB_WAR_REWARDS,
   CLUB_WAR_SQUAD_SIZES,
@@ -25,6 +24,8 @@ import { playerNameOf } from '../utils/playerName'
 // While queued or at war, re-check this often - matching and the phase
 // changes happen server-side on a schedule, with no push event for them.
 const POLL_MS = 20000
+const FAST_POLL_MS = 5000
+const NEAR_FLIP_WINDOW_MS = 60 * 1000
 
 // The backend only exposes the *current* war, so the last war seen is
 // remembered here (per club) to show its result once it's over.
@@ -138,17 +139,31 @@ export default function ClubWarPanel({
     refresh()
   }, [refresh])
 
-  // Poll while something's in motion; tick the countdowns every 30s.
+  // Poll while something's in motion; tick the countdowns every 30s. No
+  // socket push exists for wars and the server flips phases once a minute,
+  // so from a minute before the prep/battle deadline until the flip lands,
+  // poll (and tick) every 5s - the result shows up within seconds.
   const inMotion = Boolean(queueEntry) || (war && war.status !== 'COMPLETED')
+  const phaseDeadline =
+    war && war.status !== 'COMPLETED'
+      ? new Date(
+          war.status === 'PREPARING' ? war.prepEndsAt : war.battleEndsAt
+        ).getTime()
+      : null
+  const nearFlip =
+    phaseDeadline != null && now > phaseDeadline - NEAR_FLIP_WINDOW_MS
   useEffect(() => {
     if (!inMotion) return undefined
-    const poll = setInterval(refresh, POLL_MS)
+    const poll = setInterval(refresh, nearFlip ? FAST_POLL_MS : POLL_MS)
     return () => clearInterval(poll)
-  }, [inMotion, refresh])
+  }, [inMotion, nearFlip, refresh])
   useEffect(() => {
-    const tick = setInterval(() => setNow(Date.now()), 30000)
+    const tick = setInterval(
+      () => setNow(Date.now()),
+      nearFlip ? FAST_POLL_MS : 30000
+    )
     return () => clearInterval(tick)
-  }, [])
+  }, [nearFlip])
 
   async function runAction(key, action, fallback) {
     setBusy(key)
@@ -236,9 +251,8 @@ export default function ClubWarPanel({
           <span className="club-perk-icon tone-gold">
             <IconTrophy />
           </span>
-          Winners: +{CLUB_WAR_REWARDS.winTrophies} trophies, and{' '}
-          {CLUB_WAR_REWARDS.winXp} XP + {CLUB_WAR_REWARDS.winCoins} Fahhcoin for
-          everyone who ran.
+          Winners: system-assigned trophies, and {CLUB_WAR_REWARDS.winXp} XP +{' '}
+          {CLUB_WAR_REWARDS.winCoins} Fahhcoin for everyone who ran.
         </li>
       </ul>
     </section>
@@ -356,7 +370,7 @@ export default function ClubWarPanel({
           <p className="game-row-meta club-war-sub">
             {war.squadSize} vs {war.squadSize}
             {completed && won
-              ? ` · +${CLUB_WAR_REWARDS.winTrophies} trophies, and ${CLUB_WAR_REWARDS.winXp} XP + ${CLUB_WAR_REWARDS.winCoins} Fahhcoin to every runner`
+              ? ` · system-assigned trophies, and ${CLUB_WAR_REWARDS.winXp} XP + ${CLUB_WAR_REWARDS.winCoins} Fahhcoin to every runner`
               : ''}
           </p>
           {completed && (
@@ -528,22 +542,7 @@ export default function ClubWarPanel({
             <IconSwords />
           </span>
           <p className="game-row-meta club-war-sub">
-            {queueEntry.squadSize}-member squad · {queueEntry.entryFee} Fahhcoin
-            paid · matched on 🏆 {queueEntry.trophySnapshot ?? 0}
-          </p>
-          <p className="game-row-meta club-war-sub">
-            No match within {CLUB_WAR_MAX_QUEUE_HOURS}h and the fee comes back
-            to the treasury
-            {queueEntry.joinedAt
-              ? ` (${formatCountdown(
-                  new Date(
-                    new Date(queueEntry.joinedAt).getTime() +
-                      CLUB_WAR_MAX_QUEUE_HOURS * 3600000
-                  ),
-                  now
-                )} left)`
-              : ''}
-            .
+            {queueEntry.squadSize}-member squad
           </p>
           {isLeader && (
             <button

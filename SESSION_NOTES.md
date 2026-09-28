@@ -271,3 +271,65 @@ Frontend for backend commits `ea0f213`…`d528e87` on `feature/territory-game`:
   still needs a backend deploy - a DB/admin-managed bundle table would be a backend change.
 - Map: the flag marker on the player's own territories is removed (and its `.territory-flag` CSS) -
   territories are just their coloured polygons now. Tapping a parcel still opens the owner flow.
+
+## Backend catch-up 2 (2026-09-28) - commits 8f06940…6c1b82d
+
+- **PvP forfeit** (6c1b82d): `forfeitChallenge` → `POST /v1/run-challenge/{id}/forfeit`, `pvp.forfeit`.
+  Race tab shows a Forfeit button on IN_PROGRESS races whose run I haven't submitted (server rule),
+  two taps ("Give up N 🪙?"), disabled while a run is being tracked. Instant loss, rival takes the pot
+  (`WIN_BY_FORFEIT` → "Lost by forfeit"). The response has no invalid-reason fields, so "you
+  forfeited" vs "ran out of time" can't be told apart client-side.
+- **Club description endpoint moved** back to `POST /v1/club/{id}/update` (id unused server-side).
+- **Club creation costs 500 Fahhcoin** (8f06940, `ClubProperties.creationCostFahhcoin`) - mirrored as
+  `CLUB_CREATION_COST`; Create button shows the cost and is disabled when the balance is short.
+- **Nickname lookup** (f991ee9): `findPlayerByNickname` (`GET /v1/user/search-by-nickname`, exact,
+  case-insensitive) runs alongside the leaderboard scan in club invite search; a hit is listed first.
+- **Limited heroes** (6c1b82d): `hero.limited` = not purchasable (Blaze is limited; Phantom, Bolt,
+  Cyclone, Pulse now sold at 5000). Gallery shows a gold "🔒 Limited" foot; the hero modal's buy
+  buttons read "Not for sale" and are disabled.
+- Also server-side only: join requests now mail the captain/vice-captains, challenge accept/decline/
+  forfeit send mailbox notices, cancelled/declined races drop out of race history.
+
+## PvP flow redesign (2026-09-28)
+
+- PvP tab (renamed from Race; tab id still `race`) is now a step flow in `PvpPanel`:
+  home (hero "Find a Race" + your active races + history link) → 1 Pick a distance (Sprint / Classic /
+  Endurance cards) → 2 Choose your rival (Quick Match | Challenge Nearby) → 3 Searching radar (queue)
+  or runners near you → stake step → 4 Race screen (You VS rival, distance/pot/clock, Matched → Locked
+  in → Run → Result timeline, Accept/Decline/Cancel/Start Race Run/Forfeit, result, Race Again).
+- Queue match auto-opens its race via `queueEntry.matchedChallengeId`; accepting from the challenge
+  pop-up opens it via `focusRaceId` (GamePage `pvpFocusId`, cleared by `onFocusHandled`).
+- `NearbyRunners.jsx` deleted - nearby scan/challenge lives in the flow. Old PvP CSS removed.
+- All coins in PvP use `.game-coin`; `usePvp.joinQueue` now returns the entry (null on failure).
+- **Pushes don't arrive in dev**: backend `/ws` only allows `fks.allowed.origins` (default
+  `http://localhost:8000`); the test server 403s the handshake from `https://localhost:5173` and
+  `https://192.168.1.69:5173`. Backend fix: add the frontend origins to that property. Frontend
+  backstop: `usePvp` polls every 5s while waiting on the rival (20s otherwise) and fires the same
+  "Race is ON" / "results are in" alerts when a poll sees a status change.
+- **Club war phase flips / results** (no socket push exists for wars; the server's phase scheduler
+  runs once a minute): `useClubWarWatch` (page level, only when in a club) polls the active war -
+  every 60s, every 5s from a minute before the prep/battle deadline, every 2 min with no war - and
+  announces "Battle has begun!" and Victory / Defeat / draw over the map (tap → Club tab). Your side
+  is matched by club name (profiles carry no club id). `ClubWarPanel` also polls/ticks every 5s near
+  a deadline so the open panel flips within seconds.
+- Incoming challenges: while Visibility (discoverable) is on, `usePvp` polls challenges every 8s so the
+  challenge pop-up shows within seconds without the socket push. Poll cadence: 5s waiting on rival /
+  8s discoverable / 20s otherwise (+ on tab focus).
+- **Auto-redirect to the race**: when a race of mine goes live (rival accepted my direct challenge) or
+  the queue matches me - via push or via polling (`usePvp` now also raises the `matched` alert from the
+  queue poll) - GamePage sets `pvpFocusId` and opens the PvP tab on that race screen (skipped while a
+  run is being tracked; the callout pill still shows). Accepting from the challenge pop-up already did.
+  Direct challenges: the challenger is auto-confirmed, so the opponent's accept makes it IN_PROGRESS.
+- Match-found push now also stores `matchedChallengeId` on `queueEntry` (it only set status before),
+  so PvpPanel's searching screen jumps to the race itself. If the race is still loading, the searching
+  screen shows "Rival found!" (gold radar) with a "Go to Race" button instead of "Joining the queue…".
+- **Queue status gotcha**: backend `GET /v1/pvp/queue/status` only returns WAITING entries - after a
+  match (or expiry) it returns null, never MATCHED/EXPIRED. `usePvp`'s queue poll now treats
+  WAITING → null as "resolved" and checks the race list: a PENDING, unconfirmed QUEUE race at that
+  distance = matched (`markMatched` stores `matchedChallengeId`, raises the `matched` alert), else
+  expired. The searching screen then shows "Rival found!" for 1.5s (`FOUND_FLASH_MS`) and opens the
+  race; GamePage's redirect skips `matched` when the PvP tab is already open so the flash is seen.
+  Backend improvement (optional): have /status return the latest entry (incl. MATCHED + id).
+- PvP quick-match stakes: frontend `PVP_MODES` now 500 m = 50, 1 km = 100, 5 km = 500. The server
+  charges its own `run-challenge.queue-stake-amounts.*` (still 10/20/50 in application.properties) -
+  backend config must be updated to match.

@@ -11,6 +11,7 @@ import {
 } from './GameIcons'
 import { ApiError } from '../api/client'
 import {
+  CLUB_CREATION_COST,
   CLUB_MAX_MEMBERS,
   createClub,
   demoteClubMember,
@@ -32,6 +33,7 @@ import {
   updateClubDescription,
 } from '../api/club'
 import { findIndividualLeaderboard } from '../api/territory'
+import { findPlayerByNickname } from '../api/user'
 import { findNearbyPlayers } from '../api/pvp'
 import ClubWarPanel from './ClubWarPanel'
 import ClubBadge from './ClubBadge'
@@ -39,10 +41,11 @@ import { playerName, playerNameOf } from '../utils/playerName'
 import './GameCards.css'
 import './ClubPanel.css'
 
-// How much of the season leaderboard the invite search scans. There's no
-// player-search endpoint open to athletes (/v1/athlete/find and
-// /v1/user/find are moderator-only), so the name search filters leaderboard
-// pages client-side - it only finds players holding territory this season.
+// How much of the season leaderboard the invite search scans. Name search
+// filters leaderboard pages client-side (/v1/athlete/find and /v1/user/find
+// are moderator-only), so it only finds players holding territory this
+// season - plus an exact nickname lookup (/v1/user/search-by-nickname),
+// which finds anyone.
 const INVITE_SEARCH_PAGE_SIZE = 100
 const INVITE_SEARCH_MAX_PAGES = 3
 
@@ -254,6 +257,8 @@ export default function ClubPanel({
     setInviteSearching(true)
     setInviteSearchError(null)
     try {
+      // Exact nickname hit (any player) runs alongside the leaderboard scan.
+      const nicknameHitPromise = findPlayerByNickname(inviteQuery.trim())
       const entries = []
       for (let page = 1; page <= INVITE_SEARCH_MAX_PAGES; page++) {
         const result = await findIndividualLeaderboard(
@@ -263,15 +268,27 @@ export default function ClubPanel({
         entries.push(...(result?.content || []))
         if (!result || result.last !== false) break
       }
+      const nameMatches = entries
+        .filter((entry) => entry.fullName?.toLowerCase().includes(text))
+        .map((entry) => ({
+          userId: entry.userId,
+          fullName: entry.fullName,
+          nickname: entry.nickname,
+          meta: `#${entry.rank} on the leaderboard`,
+        }))
+      const nicknameHit = await nicknameHitPromise
       setInviteResults(
-        entries
-          .filter((entry) => entry.fullName?.toLowerCase().includes(text))
-          .map((entry) => ({
-            userId: entry.userId,
-            fullName: entry.fullName,
-            nickname: entry.nickname,
-            meta: `#${entry.rank} on the leaderboard`,
-          }))
+        nicknameHit && nicknameHit.id !== userId
+          ? [
+              {
+                userId: nicknameHit.id,
+                fullName: nicknameHit.fullName,
+                nickname: nicknameHit.nickname,
+                meta: `@${nicknameHit.nickname}`,
+              },
+              ...nameMatches.filter((m) => m.userId !== nicknameHit.id),
+            ]
+          : nameMatches
       )
       setInviteSource('search')
     } catch (err) {
@@ -329,7 +346,7 @@ export default function ClubPanel({
     setDescError(null)
     try {
       const description = descDraft.trim()
-      const updated = await updateClubDescription(description)
+      const updated = await updateClubDescription(myClub.id, description)
       setMyClub((prev) => ({ ...prev, ...(updated || {}), description }))
       setDescDraft(null)
     } catch (err) {
@@ -735,7 +752,7 @@ export default function ClubPanel({
                   <input
                     type="text"
                     className="game-club-input"
-                    placeholder="Search runners by name"
+                    placeholder="Search by name or exact nickname"
                     value={inviteQuery}
                     onChange={(e) => setInviteQuery(e.target.value)}
                   />
@@ -760,11 +777,7 @@ export default function ClubPanel({
                   <p className="game-card-empty">{inviteSearchError}</p>
                 ) : inviteSearching ? (
                   <p className="game-card-empty">Searching…</p>
-                ) : inviteResults === null ? (
-                  <p className="game-card-empty">
-                    Search this season&apos;s runners, or find players nearby.
-                  </p>
-                ) : (
+                ) : inviteResults === null ? null : (
                   (() => {
                     const memberIds = new Set(roster.map((m) => m.userId))
                     const candidates = inviteResults.filter(
@@ -895,8 +908,6 @@ export default function ClubPanel({
                               >
                                 {ROLE_LABEL[member.role]}
                               </span>
-                              {member.joinedAt &&
-                                ` · joined ${new Date(member.joinedAt).toLocaleDateString()}`}
                             </span>
                           </span>
                           {actions.length > 0 && (
@@ -1142,11 +1153,27 @@ export default function ClubPanel({
             />
             <button
               type="submit"
-              className="game-btn game-btn-green game-btn-lg"
-              disabled={creating || !createName.trim()}
+              className="game-btn game-btn-green game-btn-lg club-create-btn"
+              disabled={
+                creating || !createName.trim() || balance < CLUB_CREATION_COST
+              }
             >
-              {creating ? 'Creating…' : 'Create Club'}
+              {creating ? (
+                'Creating…'
+              ) : (
+                <>
+                  Create Club ·{' '}
+                  <span className="game-coin" aria-hidden="true" />
+                  {CLUB_CREATION_COST}
+                </>
+              )}
             </button>
+            {balance < CLUB_CREATION_COST && (
+              <p className="game-card-empty">
+                Starting a club costs {CLUB_CREATION_COST} Fahhcoin - you have{' '}
+                {balance}.
+              </p>
+            )}
             {createError && (
               <p className="game-controls-hint game-controls-hint-error">
                 {createError}
