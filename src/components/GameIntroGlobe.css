@@ -1,0 +1,14 @@
+/* Fills the loading overlay it's mounted inside of - see .game-loading-overlay
+   in GamePage.css, which is already position: fixed and so is the
+   containing block this sits absolute against. */
+.game-intro-globe {
+  position: absolute;
+  inset: 0;
+}
+
+.game-intro-globe .maplibregl-ctrl-bottom-left,
+.game-intro-globe .maplibregl-ctrl-bottom-right,
+.game-intro-globe .maplibregl-ctrl-top-left,
+.game-intro-globe .maplibregl-ctrl-top-right {
+  display: none;
+}

@@ -105,6 +105,7 @@ import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
 import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
+import GameIntroGlobe from '../components/GameIntroGlobe'
 import LeaderboardPodium from '../components/LeaderboardPodium'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import runConquestLogo from '../assets/images/run-conquest-logo.png'
@@ -141,10 +142,10 @@ function formatMeters(meters) {
 const RADIAL_ITEMS = [
   { tab: 'me', label: 'Me', Icon: IconUser, tone: 'green', x: -112, y: -300 },
   {
-    tab: 'shop',
-    label: 'Shop',
-    Icon: IconStore,
-    tone: 'wood',
+    tab: 'club',
+    label: 'Club',
+    Icon: IconUsers,
+    tone: 'green',
     x: 112,
     y: -300,
   },
@@ -158,10 +159,10 @@ const RADIAL_ITEMS = [
     y: -100,
   },
   {
-    tab: 'club',
-    label: 'Club',
-    Icon: IconUsers,
-    tone: 'green',
+    tab: 'shop',
+    label: 'Shop',
+    Icon: IconStore,
+    tone: 'wood',
     x: 112,
     y: -100,
   },
@@ -401,6 +402,9 @@ export default function GamePage() {
   const [leaderboardMode, setLeaderboardMode] = useState('individual')
   const [clubLeaderboard, setClubLeaderboard] = useState([])
   const [leaderboardError, setLeaderboardError] = useState(null)
+  // Set when a club leaderboard row is tapped - the Club tab jumps straight
+  // to that club's info instead of wherever it was left.
+  const [openClubId, setOpenClubId] = useState(null)
   const [storeCatalog, setStoreCatalog] = useState([])
   const [shopSection, setShopSection] = useState('heroes')
   // Buy confirm pop-up: request in flight / its own error line.
@@ -559,7 +563,16 @@ export default function GamePage() {
       : liveLocation || center
 
   const mailbox = useMailbox()
-  const pvp = usePvp({ userId: isAuthed ? user?.id : null, playerLocation })
+  // Whether the player is actually looking at the PvP tab right now - the
+  // recurring challenge/discoverable-ping polls only run while this is
+  // true (see usePvp); the incoming-challenge pop-up itself still works
+  // everywhere via the socket push, which needs no polling.
+  const pvpOpen = menuOpen && menuTab === 'race'
+  const pvp = usePvp({
+    userId: isAuthed ? user?.id : null,
+    playerLocation,
+    pvpOpen,
+  })
 
   // Run-processing outcomes pushed over the socket, keyed by run id - the
   // push can land before OR after createRun() resolves, so it's parked here
@@ -812,9 +825,13 @@ export default function GamePage() {
     return () => clearTimeout(done)
   }, [loadPct, loadingDone])
   const gameReady = introReady && loadingDone
+  // Plays the globe rotate-and-dive reveal (GameIntroGlobe) once gameReady
+  // flips true, right before the loading overlay lifts - see the overlay's
+  // render below.
+  const [introPlaying, setIntroPlaying] = useState(true)
 
   useEffect(() => {
-    if (!gameReady || weatherHypeShownRef.current) return
+    if (!gameReady || introPlaying || weatherHypeShownRef.current) return
     // Marked shown inside the timeout, not before it - StrictMode's dev-only
     // effect double-run would otherwise clear the timer and never show it.
     const show = setTimeout(() => {
@@ -822,10 +839,10 @@ export default function GamePage() {
       setWeatherHype(pickWeatherHype(mapAmbience))
     }, 600)
     return () => clearTimeout(show)
-    // Only the moment the game first becomes ready matters, not later sky
+    // Only the moment the intro reveal finishes matters, not later sky
     // refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameReady])
+  }, [gameReady, introPlaying])
   useEffect(() => {
     if (!weatherHype) return
     const hide = setTimeout(() => setWeatherHype(null), 6000)
@@ -991,6 +1008,7 @@ export default function GamePage() {
   // waiting to submit, no menu/sheet/toast in the way.
   const canNudge =
     gameReady &&
+    !introPlaying &&
     tracker.status !== 'tracking' &&
     !tracker.pendingRun &&
     !menuOpen &&
@@ -1835,30 +1853,48 @@ export default function GamePage() {
         />
       )}
 
-      {!gameReady && (
-        <div className="game-loading-overlay">
-          <img
-            src={runConquestLogo}
-            alt="Run Conquest"
-            className="game-loading-logo"
-          />
-          <div className="game-loading-footer">
-            <p className="game-loading-text">
-              {locating
-                ? 'Finding your location…'
-                : !skyLoaded
-                  ? 'Checking the sky…'
-                  : 'Preparing your run…'}
-            </p>
-            <div className="game-loading-bar">
-              <div
-                className="game-loading-bar-fill"
-                style={{ width: `${loadPct}%` }}
+      <AnimatePresence>
+        {(!gameReady || introPlaying) && (
+          <motion.div
+            key="game-loading-overlay"
+            className="game-loading-overlay"
+            initial={false}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7, ease: 'easeInOut' }}
+          >
+            {gameReady && introPlaying ? (
+              <GameIntroGlobe
+                center={center}
+                styleUrl={currentMapStyle?.styleUrl}
+                onDone={() => setIntroPlaying(false)}
               />
-            </div>
-          </div>
-        </div>
-      )}
+            ) : (
+              <>
+                <img
+                  src={runConquestLogo}
+                  alt="Run Conquest"
+                  className="game-loading-logo"
+                />
+                <div className="game-loading-footer">
+                  <p className="game-loading-text">
+                    {locating
+                      ? 'Finding your location…'
+                      : !skyLoaded
+                        ? 'Checking the sky…'
+                        : 'Preparing your run…'}
+                  </p>
+                  <div className="game-loading-bar">
+                    <div
+                      className="game-loading-bar-fill"
+                      style={{ width: `${loadPct}%` }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {profile?.level != null && (
         <button
@@ -2609,6 +2645,10 @@ export default function GamePage() {
                         name: entry.clubName,
                         area: formatArea(entry.totalAreaSqMeters),
                         isPlayer: entry.clubName === profile?.clubName,
+                        onClick: () => {
+                          setOpenClubId(entry.clubId)
+                          switchTab('club')
+                        },
                       }))}
                     />
                   )}
@@ -2629,6 +2669,8 @@ export default function GamePage() {
                   onEquipHero={handleEquipWarHero}
                   onStartWarRun={handleStartWarRun}
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
+                  openClubId={openClubId}
+                  onOpenClubHandled={() => setOpenClubId(null)}
                 />
               </div>
             )}

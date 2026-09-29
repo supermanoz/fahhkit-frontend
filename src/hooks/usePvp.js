@@ -64,7 +64,15 @@ export function mySide(challenge, userId) {
 
 // All PvP race state for the game page - owned here rather than inside the
 // Race panel so the menu badge and socket pushes work while it's closed.
-export function usePvp({ userId, playerLocation }) {
+// `pvpOpen` (the PvP tab actually being on screen) gates the two recurring
+// REST polls below (challenge list, discoverable location ping) - they're
+// a backstop for the socket push (see useGameSocket), not what drives the
+// background "you got challenged" pop-up itself, so restricting them to
+// only-while-open doesn't lose that pop-up anywhere the socket is actually
+// connected (i.e. everywhere but this dev setup - see the note further
+// down). It just stops re-polling every few seconds while the player is
+// off browsing the map/Club/etc.
+export function usePvp({ userId, playerLocation, pvpOpen }) {
   const [challenges, setChallenges] = useState([])
   const [challengesLoaded, setChallengesLoaded] = useState(false)
   const [queueEntry, setQueueEntry] = useState(null)
@@ -135,7 +143,14 @@ export function usePvp({ userId, playerLocation }) {
   // is down. NOTE: the backend's WebSocket endpoint only accepts origins in
   // fks.allowed.origins (default http://localhost:8000) - the dev app's
   // origins get a 403 handshake, so in dev this polling is the ONLY way
-  // PvP updates arrive.
+  // PvP updates arrive (in dev, closing the PvP tab means no more updates
+  // until it's reopened - a real socket connection doesn't have that gap).
+  // Only runs while the PvP tab is actually open - it was previously
+  // running non-stop in the background (every 5-20s for the whole session)
+  // purely so a challenge pop-up could show up a few seconds sooner; the
+  // pop-up itself is driven by the socket push (handlePush, wired at the
+  // page level), not by this poll, so it keeps working everywhere the
+  // socket is connected.
   // Waiting on the rival (they still have to confirm, or to run): poll
   // fast so their move shows up within seconds even without the socket.
   const waitingOnThem = challenges.some((c) => {
@@ -146,10 +161,7 @@ export function usePvp({ userId, playerLocation }) {
     )
   })
   useEffect(() => {
-    if (!userId) return
-    // Visible to nearby runners = someone can challenge us any moment, so
-    // check often enough that the challenge pop-up shows within seconds
-    // (the "challenge received" push doesn't reach the dev app).
+    if (!userId || !pvpOpen) return
     const interval = setInterval(
       refreshChallenges,
       waitingOnThem
@@ -166,16 +178,17 @@ export function usePvp({ userId, playerLocation }) {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [userId, refreshChallenges, waitingOnThem, discoverable])
+  }, [userId, pvpOpen, refreshChallenges, waitingOnThem, discoverable])
 
-  // While discoverable, keep our last-known location fresh so we show up in
-  // other players' nearby lists.
+  // While discoverable AND the PvP tab is open, keep our last-known
+  // location fresh so we show up in other players' nearby lists - same
+  // only-while-open reasoning as the poll above.
   useEffect(() => {
-    if (!userId || !discoverable) return
+    if (!userId || !discoverable || !pvpOpen) return
     ping()
     const interval = setInterval(ping, LOCATION_PING_MS)
     return () => clearInterval(interval)
-  }, [userId, discoverable, ping])
+  }, [userId, discoverable, pvpOpen, ping])
 
   const waiting = queueEntry?.status === 'WAITING'
   const queueEntryRef = useRef(queueEntry)

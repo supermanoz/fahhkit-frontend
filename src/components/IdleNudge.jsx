@@ -47,8 +47,10 @@ const NUDGE_LINES = [
 ]
 
 // Pops up when the player's been sitting on the map doing nothing (see the
-// idle timer in GamePage). The character is Blaze's run-cycle sprite by
-// default; pass `character` (any node, e.g. an <img>) to swap in other art.
+// idle timer in GamePage) - a centered card over a dark scrim, same as the
+// game's other pop-ups (ChallengePrompt, the confirm/buy cards), with Blaze
+// leaning over the top of the speech bubble instead of standing beside it.
+// Tapping the scrim dismisses it, same as everywhere else in the game.
 export default function IdleNudge({ onRun, onBattle, onDismiss, character }) {
   const { shout, line, cta, action } = useMemo(
     () => NUDGE_LINES[Math.floor(Math.random() * NUDGE_LINES.length)],
@@ -57,43 +59,57 @@ export default function IdleNudge({ onRun, onBattle, onDismiss, character }) {
 
   return (
     <motion.div
-      className="idle-nudge"
-      role="dialog"
-      aria-label="Time to run?"
-      initial={{ opacity: 0, y: 80, scale: 0.8 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 60, scale: 0.85 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 20 }}
+      className="idle-nudge-backdrop"
+      onClick={onDismiss}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
       <motion.div
-        className="idle-nudge-character"
-        initial={{ x: -60, rotate: -8 }}
-        animate={{ x: 0, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 14, delay: 0.1 }}
+        className="idle-nudge"
+        role="dialog"
+        aria-label="Time to run?"
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, y: 40, scale: 0.85 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 30, scale: 0.9 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 20 }}
       >
-        {character || <HeroSprite size={128} />}
-      </motion.div>
+        <motion.div
+          className="idle-nudge-character"
+          initial={{ scale: 0.6, rotate: -10, opacity: 0 }}
+          animate={{ scale: 1, rotate: 0, opacity: 1 }}
+          transition={{
+            type: 'spring',
+            stiffness: 300,
+            damping: 14,
+            delay: 0.1,
+          }}
+        >
+          {character || <HeroSprite size={148} />}
+        </motion.div>
 
-      <div className="idle-nudge-bubble">
-        <p className="idle-nudge-shout">{shout}</p>
-        <p className="idle-nudge-line">{line}</p>
-        <div className="idle-nudge-actions">
-          <button
-            type="button"
-            className={`idle-nudge-go ${action === 'battle' ? 'is-battle' : ''}`}
-            onClick={action === 'battle' ? onBattle : onRun}
-          >
-            {cta}
-          </button>
-          <button
-            type="button"
-            className="idle-nudge-later"
-            onClick={onDismiss}
-          >
-            Not now
-          </button>
+        <div className="idle-nudge-bubble">
+          <p className="idle-nudge-shout">{shout}</p>
+          <p className="idle-nudge-line">{line}</p>
+          <div className="idle-nudge-actions">
+            <button
+              type="button"
+              className={`idle-nudge-go ${action === 'battle' ? 'is-battle' : ''}`}
+              onClick={action === 'battle' ? onBattle : onRun}
+            >
+              {cta}
+            </button>
+            <button
+              type="button"
+              className="idle-nudge-later"
+              onClick={onDismiss}
+            >
+              Not now
+            </button>
+          </div>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   )
 }

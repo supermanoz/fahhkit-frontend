@@ -109,6 +109,7 @@ export default function AthleteTerritoryProfilePanel({
   return (
     <motion.div
       className="athlete-profile-overlay"
+      onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -124,6 +125,7 @@ export default function AthleteTerritoryProfilePanel({
 
       <div
         className="athlete-profile-content game-menu-panel"
+        onClick={(e) => e.stopPropagation()}
         style={
           background?.storeItem?.assetUrl
             ? {

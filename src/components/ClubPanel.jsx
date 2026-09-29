@@ -77,6 +77,12 @@ export default function ClubPanel({
   onEquipHero,
   onStartWarRun,
   racing,
+  // Set by GamePage when a leaderboard club row is tapped - jumps straight
+  // to that club's info (own club: its normal "mine" view; any other club:
+  // the same public info/roster view browsing uses). Cleared right away via
+  // onOpenClubHandled so it only fires once per tap.
+  openClubId,
+  onOpenClubHandled,
 }) {
   // In a club: 'mine' (the club itself) or 'wars' (Club Wars).
   const [clubSection, setClubSection] = useState('mine')
@@ -443,6 +449,21 @@ export default function ClubPanel({
       setViewingError(errorText(roster.reason, 'Could not load members.'))
     }
   }
+
+  // Waits for loadMyClub's mount effect to settle so "it's my own club" can
+  // be told apart from "some other club" - the former just shows the normal
+  // member view instead of the join-request browse card.
+  useEffect(() => {
+    if (!openClubId || loadingMyClub) return
+    if (myClub && myClub.id === openClubId) {
+      setViewingClub(null)
+      setClubSection('mine')
+    } else {
+      openClubInfo({ id: openClubId })
+    }
+    onOpenClubHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openClubId, loadingMyClub])
 
   async function handleJoin(club) {
     setJoiningId(club.id)

@@ -482,6 +482,7 @@
 
 .club-create-title {
   text-align: center;
+  word-spacing: 0.3em;
 }
 
 /* Member lists: names sit straight on the card (no box per row) with a
