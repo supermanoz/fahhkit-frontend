@@ -227,14 +227,17 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc, heading) {
 
 // Blaze gets a full-body animated sprite on the map instead of the round
 // avatar photo: idle when standing still, and a run cycle facing the
-// on-screen direction of travel while moving. Each sheet is a 4-frame
-// horizontal strip stepped through by CSS (see .territory-map-blaze).
+// on-screen direction of travel while moving. Each sheet is a horizontal
+// strip stepped through by CSS (see .territory-map-blaze) - 4 frames for
+// idle/down/left/right, but "up" is a finer 15-frame cycle at 24fps (see
+// the [data-frames="15"] override in TerritoryMap.css), so frame count
+// travels with the sheet here instead of being hard-coded in one class.
 const BLAZE_SHEETS = {
-  idle: blazeIdleSheet,
-  up: blazeRunUpSheet,
-  down: blazeRunDownSheet,
-  left: blazeRunLeftSheet,
-  right: blazeRunRightSheet,
+  idle: { src: blazeIdleSheet, frames: 4 },
+  up: { src: blazeRunUpSheet, frames: 15 },
+  down: { src: blazeRunDownSheet, frames: 4 },
+  left: { src: blazeRunLeftSheet, frames: 4 },
+  right: { src: blazeRunRightSheet, frames: 4 },
 }
 
 // Compass heading -> which way he runs on screen (north is up on the
@@ -250,6 +253,7 @@ function blazePoseForHeading(heading) {
 // Anchored at his feet (not the icon's center) so he stands on the GPS
 // point; the sonar pulse sits flattened on the ground underneath him.
 function buildBlazeMarkerIcon(pose) {
+  const sheet = BLAZE_SHEETS[pose]
   return L.divIcon({
     className: 'territory-map-player-icon territory-map-blaze-icon',
     html:
@@ -258,7 +262,7 @@ function buildBlazeMarkerIcon(pose) {
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
       '</span>' +
-      `<span class="territory-map-blaze is-${pose === 'idle' ? 'idle' : 'running'}" style="background-image:url('${BLAZE_SHEETS[pose]}')"></span>` +
+      `<span class="territory-map-blaze is-${pose === 'idle' ? 'idle' : 'running'}" data-frames="${sheet.frames}" style="background-image:url('${sheet.src}')"></span>` +
       '</span>',
     iconSize: [48, 64],
     iconAnchor: [24, 58],
@@ -859,7 +863,7 @@ export default function TerritoryMap({
   // Warm the cache so switching idle -> running never shows a blank frame.
   useEffect(() => {
     if (!blazeSprite) return
-    Object.values(BLAZE_SHEETS).forEach((src) => {
+    Object.values(BLAZE_SHEETS).forEach(({ src }) => {
       new Image().src = src
     })
   }, [blazeSprite])

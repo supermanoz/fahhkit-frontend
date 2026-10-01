@@ -462,6 +462,24 @@
   }
 }
 
+/* Blaze's "up" (back-view) sheet is a hand-cut 15-frame cycle played at
+   24fps (see heroSprites poses/BLAZE_SHEETS) - a finer strip than the
+   other three directions' 4-frame sheets, so it needs its own frame
+   count and background-size rather than reusing blaze-frames above. */
+.territory-map-blaze[data-frames='15'] {
+  background-size: 720px 64px;
+  animation: blaze-frames-15 0.625s steps(15) infinite;
+}
+
+@keyframes blaze-frames-15 {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -720px 0;
+  }
+}
+
 @keyframes territoryPulse {
   0% {
     transform: scale(0.5);
