@@ -52,3 +52,20 @@ export function findClubLeaderboard(pageNumber = 1, noOfRecords = 20) {
 export function getTopClubs(limit = 10) {
   return getJson(`/v1/leaderboard/club/top?limit=${limit}`)
 }
+
+// Ranked within the given city only (not globally) - omit cityId to let the
+// backend resolve it from the caller's own last-known GPS fix.
+export function getTopIndividualsLocal(limit = 20, cityId) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (cityId != null) params.set('cityId', String(cityId))
+  return getJson(`/v1/leaderboard/individual/top/local?${params.toString()}`)
+}
+
+// Ranked within the given country only (every city in it pooled together) -
+// omit countryId to let the backend resolve it from the caller's own
+// last-known GPS fix.
+export function getTopClubsNational(limit = 20, countryId) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (countryId != null) params.set('countryId', String(countryId))
+  return getJson(`/v1/leaderboard/club/top/national?${params.toString()}`)
+}

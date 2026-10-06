@@ -55,7 +55,18 @@
   overflow: hidden;
   background: #0a0806;
   font-family: 'Passion One', 'Trebuchet MS', sans-serif;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  /* A thin black outline on every bit of text, not just button labels -
+     the same fake-stroke-via-text-shadow trick the .game-btn family
+     already uses (see GameCards.css), just promoted here so it's inherited
+     everywhere instead of re-declared per component. Any element that sets
+     its own text-shadow (buttons included) overrides this, not stacks
+     with it. */
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink);
 }
 
 .game-page button,
@@ -63,6 +74,11 @@
 .game-page select,
 .game-page textarea {
   font-family: inherit;
+  /* Browsers' UA stylesheet sets letter-spacing: normal directly on form
+     controls - a non-inherited override that silently dropped the game's
+     own letter-spacing (see .game-page above) from every button label in
+     the app, Club's included. */
+  letter-spacing: inherit;
 }
 
 /* --- Loading screen: shown from page-open until the basemap has actually
@@ -766,18 +782,99 @@
   font-size: 12px;
 }
 
-/* Running View <-> Normal View toggle, shown only while a run is being
-   tracked (see GamePage.jsx's navViewOn) - deliberately smaller/quieter
-   than End/Cancel above it, since it's a secondary preference toggle, not
-   a primary run action. */
-.game-view-toggle {
-  padding: 8px 16px;
-  font-size: 13px;
+/* One extra tap before End/Cancel/Discard actually fire - see GamePage.jsx's
+   confirmAction. Swaps in over the normal action row rather than a separate
+   modal, matching the inline two-tap confirm already used elsewhere
+   (TrackRunPanel's Stop Run, PvpPanel's Forfeit). */
+.game-controls-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.game-controls-confirm-text {
+  margin: 0;
+  color: var(--game-cream);
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* "3 2 1 GO" pre-run countdown (Conquer or PvP) - see GamePage.jsx's
+   startCountdown. Sits above the map/HUD but below the loading overlay
+   (2000), since it only ever shows once the game itself is already up. */
+.game-countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 6, 0.45);
+  pointer-events: none;
+}
+
+.game-countdown-value {
+  font-size: 140px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--game-gold);
+  text-shadow:
+    3px 0 0 var(--game-ink),
+    -3px 0 0 var(--game-ink),
+    0 3px 0 var(--game-ink),
+    0 -3px 0 var(--game-ink),
+    0 8px 0 var(--game-ink);
+}
+
+.game-countdown-value.is-go {
+  color: var(--game-green);
+  font-size: 110px;
 }
 
 .game-controls-hint-error {
   color: #e8895f;
   font-weight: 600;
+}
+
+/* Collapse handle for the in-run HUD (see GamePage.jsx's statsOnly) - a
+   small round chevron, centered under the stats row, that flips 180deg
+   open/closed (same rotate-on-toggle convention as SearchFilters' chevron)
+   to reveal/hide End/Cancel/the view toggle below it. */
+.game-controls-handle {
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--game-wood);
+  color: var(--game-cream);
+  box-shadow: inset 0 -2px 0 var(--game-wood-dark);
+  cursor: pointer;
+}
+
+.game-controls-handle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.game-controls-handle.is-open svg {
+  transform: rotate(180deg);
+}
+
+.game-controls-expand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  width: 100%;
 }
 
 /* Buttons inside the game match the shared .game-btn look (see
@@ -929,7 +1026,7 @@
   left: 50%;
   top: 50%;
   z-index: 1200;
-  padding: 16px 22px;
+  padding: 20px 34px 16px 22px;
   text-align: center;
   max-width: 90vw;
   background: var(--game-panel);
@@ -940,6 +1037,27 @@
     0 5px 0 var(--game-ink);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* Corner dismiss, separate from the primary action button below the text -
+   lets "View Profile" stay a real commitment while this stays the quick
+   "never mind" out. */
+.game-highlight-toast-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: var(--game-stone);
+  color: var(--game-ink);
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .game-highlight-toast h3 {
@@ -955,10 +1073,37 @@
   font-size: 13px;
 }
 
+/* Bolder cartoon treatment for the route-viewer popup specifically - a
+   thick gold-edged wood frame instead of the plain dark panel every other
+   .game-highlight-toast uses, so it reads as its own distinct "card" (it
+   has more going on than the others: name, stat line, Run/Share actions). */
+.game-route-popup {
+  padding-bottom: 22px;
+  border-width: 4px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #5a3e24, #3a2816);
+  box-shadow:
+    inset 0 0 0 3px rgba(224, 163, 85, 0.35),
+    inset 0 3px 0 rgba(255, 255, 255, 0.12),
+    0 6px 0 var(--game-ink),
+    0 14px 28px rgba(0, 0, 0, 0.45);
+}
+
 .game-highlight-toast-actions {
   display: flex;
   gap: 10px;
   justify-content: center;
+}
+
+/* Clear gap between Run This Route and the Share with Club/Private row
+   below it in the route popup - two separate, differently-weighted
+   actions, not steps in the same flow. Only matches when there IS a row
+   above it (Run This Route hidden mid-run/mid-save), so it doesn't add a
+   phantom gap above a lone row. */
+.game-route-popup
+  .game-highlight-toast-actions
+  + .game-highlight-toast-actions {
+  margin-top: 22px;
 }
 
 .game-confirm-overlay {
@@ -1056,6 +1201,51 @@
   height: 60px;
 }
 
+/* Recenter FAB, shown only once a manual pinch/drag has suspended
+   nav-follow mid-run (see GamePage.jsx's navSuspended) - same chunky
+   cel-shaded badge recipe as .game-menu-btn below, just in the game's
+   blue (matching the route/trail lines it's recentering back onto) so it
+   doesn't read as "another menu button". Bottom-right, the conventional
+   spot for a map app's own recenter control (not the bottom-center FAB
+   spot, which is reserved for the main menu button). */
+.game-locate-btn {
+  position: absolute;
+  right: 16px;
+  bottom: calc(var(--sheet-h, 90px) + 20px);
+  z-index: 700;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    circle at 32% 28%,
+    #8fc4ff,
+    #4d9bff 55%,
+    #2a6fcf 100%
+  );
+  color: #000;
+  border: 4px solid #000;
+  box-shadow:
+    inset 0 3px 3px rgba(255, 255, 255, 0.6),
+    inset 0 -9px 0 #2a6fcf,
+    0 5px 0 #000;
+  font-size: 22px;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.game-locate-btn:active {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 3px 3px rgba(255, 255, 255, 0.6),
+    inset 0 -9px 0 #2a6fcf,
+    0 1px 0 #000;
+}
+
 /* "List" badge (per reference) with a bold near-black ring, but shaded
    the same way as the other HUD/radial badges (radial-gradient body +
    inset top sheen + inset bottom shade band) instead of a flat fill. */
@@ -1089,6 +1279,7 @@
 /* Wraps the list/close glyph so the swap between them can spin in place. */
 .game-menu-btn-icon {
   display: flex;
+  font-size: 38px;
 }
 
 .game-menu-btn:active,
@@ -1598,12 +1789,15 @@
   color: var(--game-green-light);
 }
 
-/* PvP callouts reuse the weather-hype pill, in fight colours. */
+/* PvP callouts reuse the weather-hype pill, in fight colours. Above the
+   full-screen menu sheet (1300) - a match/challenge/war alert needs to be
+   seen whether or not the player happens to have a menu tab open, not just
+   while looking at the map. */
 .game-weather-hype.game-pvp-alert {
   --hype-a: #ff8a7a;
   --hype-b: #c72a20;
   --hype-glow: rgba(255, 90, 77, 0.55);
-  z-index: 710;
+  z-index: 1350;
 }
 
 .game-menu-tab {
@@ -1667,6 +1861,106 @@
     0 -1px 0 var(--game-ink),
     0 2px 0 var(--game-ink);
   cursor: pointer;
+}
+
+/* Solo/Club chooser for the Leaderboard tab - a compact dropdown (same
+   chevron-flip + tap-outside-to-close convention as the main
+   .game-menu-picker, just without its medals/badges - this only ever
+   has two plain text options). */
+.game-leaderboard-mode {
+  position: relative;
+  z-index: 3;
+  margin-bottom: 14px;
+}
+
+.game-leaderboard-mode-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.game-leaderboard-mode-toggle {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-wood-light) 0%,
+    var(--game-wood) 45%,
+    var(--game-wood-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-wood-dark),
+    0 3px 0 var(--game-ink);
+  color: #fff;
+  font-weight: 900;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.game-leaderboard-mode-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.game-leaderboard-mode-toggle.is-open svg {
+  transform: rotate(180deg);
+}
+
+.game-leaderboard-mode-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, #5a3e24, #3a2816);
+  box-shadow:
+    0 6px 0 var(--game-ink),
+    0 14px 28px rgba(0, 0, 0, 0.5);
+}
+
+.game-leaderboard-mode-option {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--game-ink);
+  background: linear-gradient(180deg, #7a5634, #5e4027);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-leaderboard-mode-option.active {
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light),
+    var(--game-gold) 55%,
+    var(--game-gold-dark)
+  );
+}
+
+/* Global/City (Solo) or Global/National (Club) scope row under the
+   Solo/Club row - a secondary choice, so it reads smaller/quieter than the
+   primary tabs above it. */
+.game-menu-subtabs-scope .game-menu-subtab {
+  padding: 5px;
+  font-size: 11px;
+  border-width: 2px;
 }
 
 .game-menu-subtab.active {
@@ -1815,6 +2109,109 @@
 }
 
 /* Same outlined white lettering as .game-card-title-sm. */
+.game-me-draw-route-btn {
+  margin-bottom: 10px;
+}
+
+/* My Routes rows need a second control (visibility toggle) the shared
+   .game-menu-list row (Territories/History) doesn't - stacks the view
+   button over the toggle instead of the default single-row flex, scoped
+   to this class so the other two Me-tab lists are untouched. */
+.game-route-list-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.game-route-view-btn {
+  width: 100%;
+}
+
+.game-route-visibility-btn {
+  align-self: flex-end;
+  margin-top: 10px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-stone-light) 0%,
+    var(--game-stone) 55%,
+    var(--game-stone-dark) 100%
+  );
+  box-shadow:
+    inset 0 -3px 0 var(--game-stone-dark),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 2px 0 var(--game-ink);
+  color: #fff;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.game-route-visibility-btn.is-shared {
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 55%,
+    var(--game-green-dark) 100%
+  );
+  box-shadow:
+    inset 0 -3px 0 var(--game-green-dark),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 2px 0 var(--game-ink);
+}
+
+.game-route-visibility-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -1px 0 var(--game-stone-dark),
+    0 1px 0 var(--game-ink);
+}
+
+.game-route-visibility-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.game-route-run-btn {
+  align-self: stretch;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2.5px solid var(--game-ink);
+  background: var(--game-green);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 3px 0 var(--game-ink);
+  cursor: pointer;
+}
+
+.game-route-run-btn:active {
+  box-shadow: none;
+  transform: translateY(3px);
+}
+
+.game-route-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.game-route-pager-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(246, 236, 217, 0.75);
+}
+
 .game-menu-section-title {
   width: 100%;
   text-align: left;
@@ -1847,6 +2244,17 @@
   color: rgba(246, 236, 217, 0.7);
   font-size: 13px;
   padding: 12px 0 4px;
+}
+
+/* One-line scope notice above the Solo/Club leaderboard list (see
+   GamePage.jsx's leaderboard panel) - smaller and left-aligned so it reads
+   as a quiet caveat, not another empty-state message. */
+.game-leaderboard-notice {
+  margin: 10px 0 0;
+  text-align: center;
+  color: rgba(246, 236, 217, 0.6);
+  font-size: 12px;
+  font-style: italic;
 }
 
 .game-menu-list {

@@ -6,9 +6,9 @@ import {
   IconFlag,
   IconSearch,
   IconSwords,
-  IconTrophy,
   IconUsers,
 } from './GameIcons'
+import ClubTrophyIcon from './ClubTrophyIcon'
 import { ApiError } from '../api/client'
 import {
   CLUB_CREATION_COST,
@@ -35,6 +35,8 @@ import {
 import { findIndividualLeaderboard } from '../api/territory'
 import { findPlayerByNickname } from '../api/user'
 import { findNearbyPlayers } from '../api/pvp'
+import { findClubRoutes } from '../api/routes'
+import { formatDistance } from '../utils/run'
 import ClubWarPanel from './ClubWarPanel'
 import ClubBadge from './ClubBadge'
 import { playerName, playerNameOf } from '../utils/playerName'
@@ -77,6 +79,9 @@ export default function ClubPanel({
   onEquipHero,
   onStartWarRun,
   racing,
+  // Tapping a shared route row - GamePage fetches the full point list and
+  // draws it on the map (see Me > My Routes, same callback shape).
+  onViewRoute,
   // Set by GamePage when a leaderboard club row is tapped - jumps straight
   // to that club's info (own club: its normal "mine" view; any other club:
   // the same public info/roster view browsing uses). Cleared right away via
@@ -84,8 +89,13 @@ export default function ClubPanel({
   openClubId,
   onOpenClubHandled,
 }) {
-  // In a club: 'mine' (the club itself) or 'wars' (Club Wars).
+  // In a club: 'mine' (the club itself), 'wars' (Club Wars), or 'routes'
+  // (routes clubmates have shared).
   const [clubSection, setClubSection] = useState('mine')
+  const [sharedRoutes, setSharedRoutes] = useState([])
+  const [sharedRoutesLoaded, setSharedRoutesLoaded] = useState(false)
+  const [sharedRoutesError, setSharedRoutesError] = useState(null)
+  const [loadingRouteId, setLoadingRouteId] = useState(null)
   const [myClub, setMyClub] = useState(null)
   const [loadingMyClub, setLoadingMyClub] = useState(true)
   const [myClubError, setMyClubError] = useState(null)
@@ -465,6 +475,36 @@ export default function ClubPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openClubId, loadingMyClub])
 
+  useEffect(() => {
+    if (clubSection !== 'routes' || sharedRoutesLoaded) return
+    let cancelled = false
+    setSharedRoutesError(null)
+    findClubRoutes(1, 50)
+      .then((page) => {
+        if (!cancelled) setSharedRoutes(page?.content || [])
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSharedRoutesError(errorText(err, 'Could not load shared routes.'))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSharedRoutesLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [clubSection, sharedRoutesLoaded])
+
+  async function handleViewSharedRoute(routeId) {
+    setLoadingRouteId(routeId)
+    try {
+      await onViewRoute?.(routeId)
+    } finally {
+      setLoadingRouteId(null)
+    }
+  }
+
   async function handleJoin(club) {
     setJoiningId(club.id)
     setJoinError(null)
@@ -508,7 +548,10 @@ export default function ClubPanel({
     return <p className="game-menu-empty">{myClubError}</p>
   }
 
-  if (myClub) {
+  // Guarded by !viewingClub: tapping a club leaderboard row (or any other
+  // club) sets viewingClub even while the player has their own club, and
+  // that other-club view (below) must win over the "my club" view.
+  if (myClub && !viewingClub) {
     const myRole = roster.find((m) => m.userId === userId)?.role
     const isLeader = myRole === 'LEADER'
     const canManage = isLeader || myRole === 'CO_LEADER'
@@ -536,9 +579,51 @@ export default function ClubPanel({
           >
             Club Wars
           </button>
+          <button
+            type="button"
+            className={`game-menu-subtab ${clubSection === 'routes' ? 'active' : ''}`}
+            onClick={() => setClubSection('routes')}
+          >
+            Shared Routes
+          </button>
         </div>
 
-        {clubSection === 'wars' ? (
+        {clubSection === 'routes' ? (
+          <section className="game-card game-card-dark">
+            <h3 className="game-card-title game-card-title-sm">
+              Shared Routes
+            </h3>
+            {sharedRoutesError ? (
+              <p className="game-card-empty">{sharedRoutesError}</p>
+            ) : !sharedRoutesLoaded ? (
+              <p className="game-card-empty">Loading…</p>
+            ) : sharedRoutes.length === 0 ? (
+              <p className="game-card-empty">
+                No one&apos;s shared a route with the club yet.
+              </p>
+            ) : (
+              <ul className="game-rows">
+                {sharedRoutes.map((route) => (
+                  <li key={route.id}>
+                    <button
+                      type="button"
+                      className="game-row game-row-clickable"
+                      disabled={loadingRouteId === route.id}
+                      onClick={() => handleViewSharedRoute(route.id)}
+                    >
+                      <span className="game-row-name">{route.name}</span>
+                      <span className="game-row-meta">
+                        {loadingRouteId === route.id
+                          ? 'Loading…'
+                          : formatDistance(route.distanceMeters)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : clubSection === 'wars' ? (
           <ClubWarPanel
             club={myClub}
             roster={roster}
@@ -683,83 +768,78 @@ export default function ClubPanel({
               </div>
             </section>
 
-            {canManage && (
+            {canManage && joinRequests.length > 0 && (
               <section className="game-card game-card-dark">
                 <h3 className="game-card-title game-card-title-sm">
-                  Join Requests
-                  {joinRequests.length > 0 ? ` (${joinRequests.length})` : ''}
+                  Join Requests ({joinRequests.length})
                 </h3>
-                {joinRequests.length === 0 ? (
-                  <p className="game-card-empty">No pending requests.</p>
-                ) : (
-                  <ul className="game-rows">
-                    {joinRequests.map((req) => {
-                      const openProfile = () =>
-                        onViewProfile?.({
-                          userId: req.requesterId,
-                          fullName: req.requesterName,
-                          fromJoinRequest: true,
-                        })
-                      return (
-                        <li key={req.id}>
-                          {/* The whole row opens the requester's game profile
+                <ul className="game-rows">
+                  {joinRequests.map((req) => {
+                    const openProfile = () =>
+                      onViewProfile?.({
+                        userId: req.requesterId,
+                        fullName: req.requesterName,
+                        fromJoinRequest: true,
+                      })
+                    return (
+                      <li key={req.id}>
+                        {/* The whole row opens the requester's game profile
                           (level, territory, medals) before deciding. */}
-                          <div
-                            className="game-row game-row-clickable"
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`View ${playerName(null, req.requesterName)}'s profile`}
-                            onClick={openProfile}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault()
-                                openProfile()
-                              }
-                            }}
+                        <div
+                          className="game-row game-row-clickable"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`View ${playerName(null, req.requesterName)}'s profile`}
+                          onClick={openProfile}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openProfile()
+                            }
+                          }}
+                        >
+                          <span className="game-row-name">
+                            {playerName(null, req.requesterName)}
+                          </span>
+                          <span
+                            className="game-row-actions"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
                           >
-                            <span className="game-row-name">
-                              {playerName(null, req.requesterName)}
-                            </span>
-                            <span
-                              className="game-row-actions"
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
+                            <button
+                              type="button"
+                              className="game-btn game-btn-green game-btn-sm"
+                              disabled={busyId === req.id}
+                              onClick={() =>
+                                runAction(
+                                  req.id,
+                                  () => reviewJoinRequest(req.id, true),
+                                  'Could not accept that request.'
+                                )
+                              }
                             >
-                              <button
-                                type="button"
-                                className="game-btn game-btn-green game-btn-sm"
-                                disabled={busyId === req.id}
-                                onClick={() =>
-                                  runAction(
-                                    req.id,
-                                    () => reviewJoinRequest(req.id, true),
-                                    'Could not accept that request.'
-                                  )
-                                }
-                              >
-                                Accept
-                              </button>
-                              <button
-                                type="button"
-                                className="game-btn game-btn-red game-btn-sm"
-                                disabled={busyId === req.id}
-                                onClick={() =>
-                                  runAction(
-                                    req.id,
-                                    () => reviewJoinRequest(req.id, false),
-                                    'Could not decline that request.'
-                                  )
-                                }
-                              >
-                                Decline
-                              </button>
-                            </span>
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
+                              Accept
+                            </button>
+                            <button
+                              type="button"
+                              className="game-btn game-btn-red game-btn-sm"
+                              disabled={busyId === req.id}
+                              onClick={() =>
+                                runAction(
+                                  req.id,
+                                  () => reviewJoinRequest(req.id, false),
+                                  'Could not decline that request.'
+                                )
+                              }
+                            >
+                              Decline
+                            </button>
+                          </span>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
               </section>
             )}
 
@@ -1131,8 +1211,8 @@ export default function ClubPanel({
               Claim territory together and climb the club leaderboard!
             </li>
             <li>
-              <span className="club-perk-icon tone-gold">
-                <IconTrophy />
+              <span className="club-perk-icon tone-gold club-perk-icon-trophy">
+                <ClubTrophyIcon size={26} />
               </span>
               Win club medals every season!
             </li>

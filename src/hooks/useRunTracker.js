@@ -20,6 +20,25 @@ const BACKGROUND_GAP_THRESHOLD_MS = 10000
 // a real run never needs sub-2.5s point density anyway.
 const MIN_POINT_INTERVAL_MS = 2500
 
+// --- Live "is this actually a run" sanity check (gyroscope + pace) ---
+// Entirely client-side - the backend only validates speed asynchronously
+// after a run is already saved (see TerritoryAntiCheatValidator server-side),
+// so there's nothing to call out to here. This is a warning, not a kill
+// switch: phone-sensor heuristics alone can't be 100% certain (bridges,
+// downhill stretches, a bumpy road), so it never auto-stops or discards data.
+const SPEED_VIOLATION_WINDOW_MS = 12000 // rolling window used to average out single-fix GPS noise
+const SPEED_VIOLATION_SUSTAIN_MS = 8000 // how long the violation must hold before it's shown
+// ~25.2 km/h sustained, corroborated by zero detected footstrike cadence - well
+// beyond even elite distance-running pace, but still reachable on a bike/scooter.
+const SPEED_WARN_MPS = 7
+// No motion sensor to corroborate with, so speed alone needs to look faster
+// still before it's worth a warning (~30.6 km/h sustained).
+const SPEED_ONLY_FALLBACK_MPS = 8.5
+const BRISK_RUN_MPS = 3 // below this, "no cadence detected" could just be walking/standing
+const GAIT_CHECK_WINDOW_MS = 8000 // trailing window used to look for footstrike peaks
+const STEP_MIN_INTERVAL_MS = 250 // debounce between counted steps (caps ~4Hz)
+const STEP_ACCEL_DEVIATION_MPS2 = 3 // deviation from the rolling gravity baseline that counts as a footstrike
+
 // status: idle | tracking | permission-denied | unsupported | error
 export function useRunTracker() {
   const [status, setStatus] = useState('idle')
@@ -34,6 +53,10 @@ export function useRunTracker() {
   // because there was no connection) — kept in localStorage until it succeeds, so
   // it survives closing the app rather than being lost.
   const [pendingRun, setPendingRun] = useState(null)
+  // Sustained implausible pace (optionally corroborated by missing footstrike
+  // cadence) — see the SPEED_VIOLATION_* constants above. Null when nothing's
+  // currently flagged.
+  const [invalidMotion, setInvalidMotion] = useState(null)
 
   const pointsRef = useRef([])
   const distanceRef = useRef(0)
@@ -41,6 +64,13 @@ export function useRunTracker() {
   const timerRef = useRef(null)
   const startedAtRef = useRef(null)
   const eventIdRef = useRef(null)
+  const speedSamplesRef = useRef([])
+  const stepTimestampsRef = useRef([])
+  const motionBaselineRef = useRef(9.81)
+  const motionAvailableRef = useRef(false)
+  const motionAttachedRef = useRef(false)
+  const lastStepAtRef = useRef(0)
+  const violationStartedAtRef = useRef(null)
   // PvP race this run counts for (see api/pvp.js) - persisted with the run
   // like eventId so a reload mid-race still submits it against the race.
   const challengeIdRef = useRef(null)
@@ -86,6 +116,116 @@ export function useRunTracker() {
     []
   )
 
+  // Rough step/cadence detector off the accelerometer - a running gait has a
+  // clear rhythmic footstrike (~1.5-4Hz) that a smooth vehicle ride doesn't.
+  // Not trying to be a precise pedometer, just "is *any* cadence present".
+  const handleDeviceMotion = useCallback((event) => {
+    const acc = event.accelerationIncludingGravity || event.acceleration
+    if (!acc || acc.x == null) return
+    const magnitude = Math.sqrt(
+      (acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2
+    )
+    // Slow-moving baseline (not a fixed 9.81) so a tilted phone still reads
+    // deviations relative to its own resting magnitude.
+    motionBaselineRef.current += (magnitude - motionBaselineRef.current) * 0.05
+    const deviation = Math.abs(magnitude - motionBaselineRef.current)
+    const now = Date.now()
+    if (
+      deviation > STEP_ACCEL_DEVIATION_MPS2 &&
+      now - lastStepAtRef.current > STEP_MIN_INTERVAL_MS
+    ) {
+      lastStepAtRef.current = now
+      stepTimestampsRef.current = [
+        ...stepTimestampsRef.current.filter(
+          (t) => t > now - GAIT_CHECK_WINDOW_MS
+        ),
+        now,
+      ]
+    }
+  }, [])
+
+  const detachMotionSensing = useCallback(() => {
+    if (motionAttachedRef.current) {
+      window.removeEventListener('devicemotion', handleDeviceMotion)
+      motionAttachedRef.current = false
+    }
+  }, [handleDeviceMotion])
+
+  // iOS 13+ Safari requires an explicit, gesture-triggered permission prompt;
+  // every other browser exposes devicemotion with no permission step at all.
+  // Called from start()/the resume-on-mount effect, both already inside a
+  // user-gesture call stack (or a page load that already had geolocation
+  // permission), so the synchronous call here still counts as "from a
+  // gesture" even though the rest of this function is async.
+  const armMotionSensing = useCallback(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof DeviceMotionEvent === 'undefined'
+    ) {
+      motionAvailableRef.current = false
+      return
+    }
+    const attach = () => {
+      if (motionAttachedRef.current) return
+      motionAttachedRef.current = true
+      window.addEventListener('devicemotion', handleDeviceMotion)
+    }
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then((result) => {
+          motionAvailableRef.current = result === 'granted'
+          if (motionAvailableRef.current) attach()
+        })
+        .catch(() => {
+          motionAvailableRef.current = false
+        })
+      return
+    }
+    motionAvailableRef.current = true
+    attach()
+  }, [handleDeviceMotion])
+
+  // Checked after every accepted GPS point - samples is a rolling window of
+  // {t, speedMps, distance, dt} built in the watchPosition callback below.
+  const evaluateMotionPlausibility = useCallback((now) => {
+    const samples = speedSamplesRef.current
+    if (samples.length === 0) return
+    const windowDistance = samples.reduce((sum, s) => sum + s.distance, 0)
+    const windowTime = samples.reduce((sum, s) => sum + s.dt, 0)
+    if (windowTime <= 0) return
+    const avgSpeed = windowDistance / windowTime
+
+    const hasGaitData = motionAvailableRef.current
+    const recentSteps = stepTimestampsRef.current.filter(
+      (t) => t > now - GAIT_CHECK_WINDOW_MS
+    )
+    const noGait =
+      hasGaitData && avgSpeed > BRISK_RUN_MPS && recentSteps.length === 0
+    const speedTooHigh = hasGaitData
+      ? avgSpeed > SPEED_WARN_MPS
+      : avgSpeed > SPEED_ONLY_FALLBACK_MPS
+    const violating = speedTooHigh || noGait
+
+    if (!violating) {
+      violationStartedAtRef.current = null
+      return
+    }
+    if (violationStartedAtRef.current == null) {
+      violationStartedAtRef.current = now
+      return
+    }
+    if (now - violationStartedAtRef.current >= SPEED_VIOLATION_SUSTAIN_MS) {
+      setInvalidMotion(
+        (current) => current || { reason: noGait ? 'no-gait' : 'speed' }
+      )
+    }
+  }, [])
+
+  const dismissInvalidMotion = useCallback(() => {
+    setInvalidMotion(null)
+    violationStartedAtRef.current = null
+  }, [])
+
   const clearTimers = useCallback(() => {
     if (watchIdRef.current != null) {
       navigator.geolocation.clearWatch(watchIdRef.current)
@@ -95,7 +235,8 @@ export function useRunTracker() {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
-  }, [])
+    detachMotionSensing()
+  }, [detachMotionSensing])
 
   // Stops the browser-level watch/timer if the component unmounts mid-run
   // (e.g. SPA navigation away from the tracker) — the collected points stay
@@ -105,6 +246,7 @@ export function useRunTracker() {
   const beginWatch = useCallback(() => {
     setStatus('tracking')
     wakeLock.request()
+    armMotionSensing()
 
     timerRef.current = setInterval(() => {
       setElapsedSeconds(
@@ -148,8 +290,19 @@ export function useRunTracker() {
         pointsRef.current = [...pointsRef.current, point]
         setPath(pointsRef.current)
         if (previous) {
-          distanceRef.current += haversineDistance(previous, point)
+          const segmentDistance = haversineDistance(previous, point)
+          distanceRef.current += segmentDistance
           setDistance(distanceRef.current)
+
+          const dtSeconds = (point.timestamp - previous.timestamp) / 1000
+          if (dtSeconds > 0) {
+            const cutoff = point.timestamp - SPEED_VIOLATION_WINDOW_MS
+            speedSamplesRef.current = [
+              ...speedSamplesRef.current.filter((s) => s.t > cutoff),
+              { t: point.timestamp, distance: segmentDistance, dt: dtSeconds },
+            ]
+            evaluateMotionPlausibility(point.timestamp)
+          }
         }
 
         saveActiveRun({
@@ -170,7 +323,7 @@ export function useRunTracker() {
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     )
-  }, [clearTimers, wakeLock])
+  }, [clearTimers, wakeLock, armMotionSensing, evaluateMotionPlausibility])
 
   // Resumes a run that was already in progress when this component mounted —
   // covers a page refresh or the tracker being reopened after SPA navigation.
@@ -239,11 +392,16 @@ export function useRunTracker() {
       distanceRef.current = 0
       fixCountRef.current = 0
       lastAccuracyRef.current = null
+      speedSamplesRef.current = []
+      stepTimestampsRef.current = []
+      motionBaselineRef.current = 9.81
+      violationStartedAtRef.current = null
       setPath([])
       setDistance(0)
       setElapsedSeconds(0)
       setBackgroundGapSeconds(null)
       setPendingRun(null)
+      setInvalidMotion(null)
       startedAtRef.current = new Date()
       eventIdRef.current = eventId ?? null
       challengeIdRef.current = challengeId
@@ -267,6 +425,8 @@ export function useRunTracker() {
     wakeLock.release()
     setStatus('idle')
     setBackgroundGapSeconds(null)
+    setInvalidMotion(null)
+    violationStartedAtRef.current = null
 
     const endedAt = new Date()
     const startedAt = startedAtRef.current ?? endedAt
@@ -329,5 +489,7 @@ export function useRunTracker() {
     dismissBackgroundGap,
     pendingRun,
     clearPendingRun,
+    invalidMotion,
+    dismissInvalidMotion,
   }
 }

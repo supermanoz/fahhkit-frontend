@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconCheck,
   IconChevronDown,
+  IconChevronRight,
   IconClose,
   IconCrosshairs,
   IconEnvelope,
   IconFlag,
   IconHelmet,
-  IconList,
   IconMap,
+  IconMenuOrb,
   IconPlay,
   IconRunning,
   IconSettings,
@@ -20,7 +21,7 @@ import {
   IconVolumeMute,
   IconVolumeUp,
 } from '../components/GameIcons'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
@@ -40,8 +41,10 @@ import {
   findMyTerritoryEvents,
   findParcelsNear,
   getTerritoryProfile,
+  getTopClubsNational,
+  getTopIndividualsLocal,
 } from '../api/territory'
-import { getMyClub, inviteToClub } from '../api/club'
+import { findClubs, getMyClub, inviteToClub } from '../api/club'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
@@ -53,6 +56,13 @@ import {
   unequipStoreItem,
 } from '../api/store'
 import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
+import {
+  createRoute,
+  findMyRoutes,
+  getRoute,
+  toggleRouteVisibility,
+} from '../api/routes'
+import { snapSegment } from '../utils/routeSnapping'
 import {
   DEFAULT_CENTER,
   LOOP_CLOSURE_THRESHOLD_METERS,
@@ -69,6 +79,7 @@ import {
   toDisplayParcel,
 } from '../utils/territoryGame'
 import {
+  MIN_DISTANCE_FOR_PACE_METERS,
   MIN_VALID_RUN_DISTANCE_METERS,
   MIN_VALID_RUN_DURATION_SECONDS,
   calculatePaceMinPerKm,
@@ -107,6 +118,8 @@ import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
 import LeaderboardPodium from '../components/LeaderboardPodium'
+import RouteTurnIndicator from '../components/RouteTurnIndicator'
+import { getRouteGuidance } from '../utils/routeNav'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import runConquestLogo from '../assets/images/run-conquest-logo.png'
 // TEMP: AVATARS / COMING_SOON_AVATARS / loadAvatarId return with the
@@ -292,6 +305,7 @@ const IDLE_NUDGE_SNOOZE_MS = 3 * 60 * 1000
 
 const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
+const ROUTES_PAGE_SIZE = 5
 // Clash-style digit grouping with spaces ("4 138 274") for the HUD counters.
 const formatCoins = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 // Minimum time the loading screen stays up, even on a fast load.
@@ -325,6 +339,7 @@ function summarizeRunEvents(events) {
 }
 
 export default function GamePage() {
+  const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const tracker = useRunTracker()
   // The live "Distance" stat during a run - throttled to refresh once every
@@ -350,21 +365,14 @@ export default function GamePage() {
     return () => clearInterval(interval)
   }, [tracker.status])
   // "Running View" (Google Maps nav-mode - auto-follow, rotate to heading,
-  // see TerritoryMap's isNavigating) is the default the moment a run
-  // starts, but not everyone wants the map spinning under them - this lets
-  // the player flip back to the normal, manually-pannable north-up map
-  // and back again as often as they like during the same run (see the
-  // toggle button in the tracking controls below). Defaults back to
-  // Running View at the start of each new run rather than remembering the
-  // last run's choice.
-  const [navViewOn, setNavViewOn] = useState(true)
-  const wasTrackingRef = useRef(false)
-  useEffect(() => {
-    const isTracking = tracker.status === 'tracking'
-    if (isTracking && !wasTrackingRef.current) setNavViewOn(true)
-    wasTrackingRef.current = isTracking
-  }, [tracker.status])
-  const isNavigating = tracker.status === 'tracking' && navViewOn
+  // see TerritoryMap's isNavigating) is the default the moment tracking
+  // starts, but a manual pinch/drag suspends the auto-follow (Google Maps'
+  // own "free look" behavior) until the locate button taps it back on -
+  // see handleUserPan/handleRecenter and the locate FAB below.
+  const [navSuspended, setNavSuspended] = useState(false)
+  const isNavigating = tracker.status === 'tracking' && !navSuspended
+  const handleUserPan = useCallback(() => setNavSuspended(true), [])
+  const handleRecenter = useCallback(() => setNavSuspended(false), [])
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
@@ -398,8 +406,59 @@ export default function GamePage() {
   const [viewingRun, setViewingRun] = useState(null)
   const [loadingRunId, setLoadingRunId] = useState(null)
   const [nearbyParcels, setNearbyParcels] = useState([])
+
+  // --- Saved routes (draw a route, name it, keep it private or share to
+  // your club - see src/api/routes.js) ---
+  const [myRoutes, setMyRoutes] = useState([])
+  const [myRoutesLoaded, setMyRoutesLoaded] = useState(false)
+  const [myRoutesPage, setMyRoutesPage] = useState(1)
+  const [myRoutesTotalPages, setMyRoutesTotalPages] = useState(1)
+  const [myRoutesError, setMyRoutesError] = useState(null)
+  const [routeVisibilityBusyId, setRouteVisibilityBusyId] = useState(null)
+  // Every route the player owns, drawn on the map at all times (not just
+  // while explicitly "viewing" one) - [{ id, points }]. Loaded once on
+  // game load alongside the other bootstrap data, and kept in sync
+  // locally (no refetch) when a route is created.
+  const [myRouteOverlays, setMyRouteOverlays] = useState([])
+  // A route currently drawn on the map read-only (tapped from My Routes or
+  // Club > Shared Routes) - { id, name, visibility, distanceMeters, points }.
+  const [viewingRoute, setViewingRoute] = useState(null)
+  const [loadingRouteId, setLoadingRouteId] = useState(null)
+  // True while actively running the route in viewingRoute (see
+  // handleRunViewedRoute) - swaps the route's info/share toast for the
+  // cartoon turn-by-turn HUD (RouteTurnIndicator) until the run ends.
+  const [followingRoute, setFollowingRoute] = useState(false)
+  // Drawing a new route: raw taps + the OSRM-snapped geometry for each
+  // segment between them (kept separate per segment so Undo can pop
+  // exactly one tap's worth of geometry instead of guessing where in a
+  // flat point list it ended).
+  const [routeDraftMode, setRouteDraftMode] = useState(false)
+  const [routeDraftWaypoints, setRouteDraftWaypoints] = useState([])
+  const [routeDraftSegments, setRouteDraftSegments] = useState([])
+  const [routeSnapBusy, setRouteSnapBusy] = useState(false)
+  const [routeDraftError, setRouteDraftError] = useState(null)
+  const [routeNamePromptOpen, setRouteNamePromptOpen] = useState(false)
+  const [routeNameInput, setRouteNameInput] = useState('')
+  const [routeConfirmCancel, setRouteConfirmCancel] = useState(false)
+  const [savingRoute, setSavingRoute] = useState(false)
+  const [saveRouteError, setSaveRouteError] = useState(null)
+  // Flattened for rendering/distance - every segment's points back to back.
+  const routeDraftPoints = routeDraftSegments.flat()
+  const routeDraftDistance = routeDraftSegments.reduce((sum, segment) => {
+    let segSum = 0
+    for (let i = 1; i < segment.length; i++) {
+      segSum += haversineDistance(segment[i - 1], segment[i])
+    }
+    return sum + segSum
+  }, 0)
   const [leaderboard, setLeaderboard] = useState([])
   const [leaderboardMode, setLeaderboardMode] = useState('individual')
+  // Solo: ranked worldwide, or just within the city the backend resolves
+  // from your last-known GPS fix. Club: worldwide, or just within your
+  // country (every city in it pooled together) - see loadLeaderboard/
+  // loadClubLeaderboard below.
+  const [individualScope, setIndividualScope] = useState('global')
+  const [clubScope, setClubScope] = useState('global')
   const [clubLeaderboard, setClubLeaderboard] = useState([])
   const [leaderboardError, setLeaderboardError] = useState(null)
   // Set when a club leaderboard row is tapped - the Club tab jumps straight
@@ -437,6 +496,7 @@ export default function GamePage() {
     if (!radialOpen) setRadialMode('main')
   }, [radialOpen])
   const [tabPickerOpen, setTabPickerOpen] = useState(false)
+  const [leaderboardModeOpen, setLeaderboardModeOpen] = useState(false)
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   const [viewingProfile, setViewingProfile] = useState(null)
@@ -494,6 +554,52 @@ export default function GamePage() {
   // breakpoint values that were consistently wrong on real phones.
   const controlsRef = useRef(null)
   const [controlsHeight, setControlsHeight] = useState(90)
+  // Collapsed by default while tracking - just distance/pace/time, with the
+  // handle arrow revealing End/Cancel underneath. Reset to collapsed every
+  // time a new run starts (see handleStartRun/handleStartRace).
+  const [statsOnly, setStatsOnly] = useState(true)
+  // One extra tap before End/Cancel/Discard actually fire - null | 'end' |
+  // 'cancel' | 'discard'. Mirrors the two-tap confirm already used for
+  // TrackRunPanel's Stop Run and PvpPanel's Forfeit, just inline in the
+  // button row instead of a separate state var per button.
+  const [confirmAction, setConfirmAction] = useState(null)
+  // Guards the auto-finish-on-target-distance effect below so it fires at
+  // most once per race, keyed by challenge id (effects can re-run before
+  // tracker.status actually flips to 'idle').
+  const autoFinishedRaceIdRef = useRef(null)
+
+  // "3 2 1 GO" pre-run countdown (Conquer or PvP) - null when idle, else a
+  // number counting down or the literal 'GO' flash right before the actual
+  // tracker.start() call fires (held in pendingStartRef, since the start
+  // function needed differs between a plain run and a race).
+  const [startCountdown, setStartCountdown] = useState(null)
+  const pendingStartRef = useRef(null)
+
+  function beginCountdownThenStart(startFn) {
+    setGpsErrorDismissed(false)
+    setStatsOnly(true)
+    setConfirmAction(null)
+    setNavSuspended(false)
+    pendingStartRef.current = startFn
+    setStartCountdown(3)
+  }
+
+  useEffect(() => {
+    if (startCountdown == null) return
+    if (startCountdown === 'GO') {
+      const timeout = setTimeout(() => {
+        setStartCountdown(null)
+        const startFn = pendingStartRef.current
+        pendingStartRef.current = null
+        if (startFn) startFn()
+      }, 500)
+      return () => clearTimeout(timeout)
+    }
+    const timeout = setTimeout(() => {
+      setStartCountdown((count) => (count === 1 ? 'GO' : count - 1))
+    }, 800)
+    return () => clearTimeout(timeout)
+  }, [startCountdown])
 
   useEffect(() => {
     const el = controlsRef.current
@@ -931,6 +1037,24 @@ export default function GamePage() {
     lastBearingFixRef.current = playerLocation
   }, [playerLocation])
 
+  // Turn-by-turn cue for RouteTurnIndicator, live while actually running a
+  // viewed route (see handleRunViewedRoute) - null the rest of the time so
+  // nothing is computed (or rendered) on every GPS fix otherwise.
+  const routeGuidance =
+    followingRoute && tracker.status === 'tracking' && playerLocation
+      ? getRouteGuidance(viewingRoute?.points, playerLocation, playerHeading)
+      : null
+
+  // The full remaining path to the route's destination, not just a short
+  // stretch ahead - Google Maps' own "line to destination" while driving.
+  // Re-derived fresh on every GPS fix, so the covered ground drops off the
+  // front of this line as the runner progresses instead of the line
+  // staying the fixed length it started at.
+  const routeGuidanceLine =
+    routeGuidance && !routeGuidance.arrived
+      ? routeGuidance.remainingPoints
+      : null
+
   // Drives Blaze's idle vs. running sprite on the map. A phone sitting on a
   // table (or being waved around in a hand) still produces GPS fixes that
   // drift a few metres and can report small speeds, so a single fast-ish
@@ -1110,6 +1234,7 @@ export default function GamePage() {
     refreshNearbyParcels()
     refreshOwnedItems()
     mailbox.refresh()
+    loadMyRouteOverlays()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locating, isAuthed])
 
@@ -1176,30 +1301,44 @@ export default function GamePage() {
     }
   }
 
-  async function loadLeaderboard() {
+  async function loadLeaderboard(scope = individualScope) {
     setLeaderboardError(null)
     try {
-      const page = await findIndividualLeaderboard(1, 20)
-      setLeaderboard(page?.content || [])
+      if (scope === 'city') {
+        const list = await getTopIndividualsLocal(20)
+        setLeaderboard(list || [])
+      } else {
+        const page = await findIndividualLeaderboard(1, 20)
+        setLeaderboard(page?.content || [])
+      }
     } catch (err) {
       setLeaderboardError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the leaderboard.'
+          : scope === 'city'
+            ? "Could not load your city's leaderboard."
+            : 'Could not load the leaderboard.'
       )
     }
   }
 
-  async function loadClubLeaderboard() {
+  async function loadClubLeaderboard(scope = clubScope) {
     setLeaderboardError(null)
     try {
-      const page = await findClubLeaderboard(1, 20)
-      setClubLeaderboard(page?.content || [])
+      if (scope === 'national') {
+        const list = await getTopClubsNational(20)
+        setClubLeaderboard(list || [])
+      } else {
+        const page = await findClubLeaderboard(1, 20)
+        setClubLeaderboard(page?.content || [])
+      }
     } catch (err) {
       setLeaderboardError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the club leaderboard.'
+          : scope === 'national'
+            ? "Could not load your country's club leaderboard."
+            : 'Could not load the club leaderboard.'
       )
     }
   }
@@ -1208,6 +1347,18 @@ export default function GamePage() {
     setLeaderboardMode(mode)
     if (mode === 'club' && clubLeaderboard.length === 0) loadClubLeaderboard()
     if (mode === 'individual' && leaderboard.length === 0) loadLeaderboard()
+  }
+
+  function switchIndividualScope(scope) {
+    if (scope === individualScope) return
+    setIndividualScope(scope)
+    loadLeaderboard(scope)
+  }
+
+  function switchClubScope(scope) {
+    if (scope === clubScope) return
+    setClubScope(scope)
+    loadClubLeaderboard(scope)
   }
 
   async function loadStore() {
@@ -1256,6 +1407,26 @@ export default function GamePage() {
     await inviteToClub(club.id, targetUserId)
   }
 
+  // A profile panel only knows the club's name (TerritoryProfileResponse has
+  // no clubId), so this resolves it via the same exact-name search the
+  // leaderboard's club rows skip past (they already have clubId) before
+  // reusing the same openClubId/switchTab('club') flow.
+  async function handleViewClubByName(clubName) {
+    if (!clubName) return
+    try {
+      const page = await findClubs(1, 5, clubName)
+      const match =
+        (page?.content || []).find((c) => c.name === clubName) ||
+        page?.content?.[0]
+      if (!match) return
+      setViewingProfile(null)
+      setOpenClubId(match.id)
+      switchTab('club')
+    } catch {
+      // Silent - worst case the badge just doesn't navigate this time.
+    }
+  }
+
   function handleMailClaimed(item) {
     if (item.type === 'STORE_ITEM_GRANT') {
       refreshOwnedItems()
@@ -1282,8 +1453,10 @@ export default function GamePage() {
 
   function handleStartRace(challenge) {
     setMenuOpen(false)
-    setGpsErrorDismissed(false)
-    tracker.start(null, { challengeId: challenge.id })
+    autoFinishedRaceIdRef.current = null
+    beginCountdownThenStart(() =>
+      tracker.start(null, { challengeId: challenge.id })
+    )
   }
 
   function openMenu(tab) {
@@ -1360,6 +1533,189 @@ export default function GamePage() {
     }
   }
 
+  async function loadMyRoutes(pageNumber = 1) {
+    try {
+      const page = await findMyRoutes(pageNumber, ROUTES_PAGE_SIZE)
+      setMyRoutes(page?.content || [])
+      setMyRoutesPage(pageNumber)
+      setMyRoutesTotalPages(Math.max(1, page?.totalPages || 1))
+    } catch {
+      // Leave whatever's already loaded in place - same as loadMyRuns.
+    } finally {
+      setMyRoutesLoaded(true)
+    }
+  }
+
+  // Always-on map layer (not gated by the Me tab or tapping a row) - every
+  // route the player owns, so a route they drew keeps showing up on every
+  // visit, not just right after they draw it. Capped at the 20 most recent
+  // so a player with a long history doesn't trigger dozens of requests.
+  async function loadMyRouteOverlays() {
+    try {
+      const page = await findMyRoutes(1, 20)
+      const summaries = page?.content || []
+      const details = await Promise.all(
+        summaries.map((r) => getRoute(r.id).catch(() => null))
+      )
+      setMyRouteOverlays(
+        details
+          .filter((d) => d && d.points?.length > 0)
+          .map((d) => ({ id: d.id, points: d.points }))
+      )
+    } catch {
+      // Leave whatever's already loaded in place.
+    }
+  }
+
+  // Shared by the My Routes list rows and the map-viewer toast, so flipping
+  // visibility from either place keeps both in sync. Only updates state on
+  // a confirmed server response - never flips the shown label optimistically.
+  async function handleToggleRouteVisibility(route) {
+    const nextVisibility = route.visibility === 'CLUB' ? 'PRIVATE' : 'CLUB'
+    setRouteVisibilityBusyId(route.id)
+    setMyRoutesError(null)
+    try {
+      const updated = await toggleRouteVisibility(route.id)
+      const resolvedVisibility = updated?.visibility ?? nextVisibility
+      setMyRoutes((prev) =>
+        prev.map((r) =>
+          r.id === route.id ? { ...r, visibility: resolvedVisibility } : r
+        )
+      )
+      setViewingRoute((prev) =>
+        prev && prev.id === route.id
+          ? { ...prev, visibility: resolvedVisibility }
+          : prev
+      )
+    } catch (err) {
+      setMyRoutesError(
+        err instanceof ApiError ? err.message : 'Could not update that route.'
+      )
+    } finally {
+      setRouteVisibilityBusyId(null)
+    }
+  }
+
+  // Shared by Me > My Routes and Club > Shared Routes - only getRoute()
+  // carries the full point list the other two list endpoints don't.
+  async function handleViewRoute(routeId) {
+    setLoadingRouteId(routeId)
+    try {
+      const detail = await getRoute(routeId)
+      setViewingRoute(detail)
+      setMenuOpen(false)
+    } catch {
+      // Leave the list as-is; the row just stops showing a loading state.
+    } finally {
+      setLoadingRouteId(null)
+    }
+  }
+
+  function handleCloseViewingRoute() {
+    setViewingRoute(null)
+  }
+
+  function handleStartDrawRoute() {
+    setMenuOpen(false)
+    setRadialOpen(false)
+    setViewingRoute(null)
+    setRouteDraftWaypoints([])
+    setRouteDraftSegments([])
+    setRouteDraftError(null)
+    setSaveRouteError(null)
+    setRouteConfirmCancel(false)
+    setRouteDraftMode(true)
+  }
+
+  // First tap just plants the start - every tap after that snaps the new
+  // stretch to a road via OSRM (see utils/routeSnapping.js) before it's
+  // added, so the saved route is a real path, not a straight line through
+  // buildings.
+  async function handleDrawMapClick(point) {
+    if (routeSnapBusy) return
+    setRouteDraftError(null)
+    if (routeDraftWaypoints.length === 0) {
+      setRouteDraftWaypoints([point])
+      setRouteDraftSegments([[point]])
+      return
+    }
+    const previous = routeDraftWaypoints[routeDraftWaypoints.length - 1]
+    setRouteSnapBusy(true)
+    try {
+      const { points, snapped } = await snapSegment(previous, point)
+      setRouteDraftWaypoints((prev) => [...prev, point])
+      setRouteDraftSegments((prev) => [...prev, points])
+      if (!snapped) {
+        setRouteDraftError(
+          "Couldn't snap that stretch to a road — drew a straight line instead."
+        )
+      }
+    } finally {
+      setRouteSnapBusy(false)
+    }
+  }
+
+  function handleUndoRoutePoint() {
+    if (routeDraftWaypoints.length === 0) return
+    setRouteDraftWaypoints((prev) => prev.slice(0, -1))
+    setRouteDraftSegments((prev) => prev.slice(0, -1))
+    setRouteDraftError(null)
+  }
+
+  function handleRequestCancelDrawing() {
+    setRouteConfirmCancel(true)
+  }
+
+  function handleConfirmCancelDrawing() {
+    setRouteConfirmCancel(false)
+    setRouteDraftMode(false)
+    setRouteDraftWaypoints([])
+    setRouteDraftSegments([])
+    setRouteDraftError(null)
+  }
+
+  function handleFinishDrawing() {
+    if (routeDraftWaypoints.length < 2) {
+      setRouteDraftError('Tap at least two points before finishing.')
+      return
+    }
+    setRouteNameInput('')
+    setSaveRouteError(null)
+    setRouteNamePromptOpen(true)
+  }
+
+  async function handleSaveRoute({ name, visibility }) {
+    setSavingRoute(true)
+    setSaveRouteError(null)
+    try {
+      const created = await createRoute({
+        name,
+        visibility,
+        points: routeDraftPoints,
+      })
+      setRouteNamePromptOpen(false)
+      setRouteDraftMode(false)
+      setRouteDraftWaypoints([])
+      setRouteDraftSegments([])
+      // Keeps the just-drawn route on the map instead of it vanishing the
+      // moment it's saved - the points are already in hand (what was just
+      // sent to create it), so no need to re-fetch them.
+      setViewingRoute({ ...created, points: routeDraftPoints })
+      setMyRouteOverlays((prev) => [
+        { id: created.id, points: routeDraftPoints },
+        ...prev,
+      ])
+      setMyRoutesLoaded(false)
+      loadMyRoutes()
+    } catch (err) {
+      setSaveRouteError(
+        err instanceof ApiError ? err.message : 'Could not save that route.'
+      )
+    } finally {
+      setSavingRoute(false)
+    }
+  }
+
   function switchTab(nextTab) {
     // Heroes now live inside the Shop tab.
     const tab = nextTab === 'heroes' ? 'shop' : nextTab
@@ -1370,19 +1726,56 @@ export default function GamePage() {
     // Club Wars' hero lock-in needs owned heroes + the catalog for names.
     if (tab === 'club' && storeCatalog.length === 0) loadStore()
     if (tab === 'me' && myRuns.length === 0) loadMyRuns()
+    if (tab === 'me' && !myRoutesLoaded) loadMyRoutes()
     if (tab === 'mail') mailbox.refresh()
     if (tab === 'race') pvp.refreshChallenges()
   }
 
   function handleStartRun() {
-    setGpsErrorDismissed(false)
-    tracker.start(null)
+    beginCountdownThenStart(() => tracker.start(null))
+  }
+
+  // "Run This Route" on the viewingRoute toast - same plain loop run as
+  // Start Run, just with followingRoute on so the turn-by-turn HUD guides
+  // the runner along viewingRoute.points instead of leaving them to eyeball
+  // the blue line. Ending the run (Submit/Discard) is the same existing
+  // flow every other run uses - a closed loop is still what gets saved as
+  // territory, the route is only ever a guide, never submitted itself.
+  function handleRunViewedRoute() {
+    setFollowingRoute(true)
+    beginCountdownThenStart(() => tracker.start(null))
   }
 
   function handleCancelTracking() {
     tracker.stop()
     tracker.clearPendingRun()
   }
+
+  // The run stops (End, or GPS/motion kicks it back to idle) -> nothing
+  // left for the turn HUD to guide, and the route's own info toast would
+  // just overlap the pendingRun save card that takes over the bottom sheet
+  // next, so both clear together instead of reappearing stale.
+  // tracker.status reads 'idle' both BEFORE the run has actually started
+  // (the 3-2-1-GO countdown runs with followingRoute already true, since
+  // handleRunViewedRoute sets it before the countdown even begins) and
+  // AFTER it ends - this ref is what tells those two apart, so the guide
+  // line doesn't get wiped out before the run ever gets going.
+  const routeRunStartedRef = useRef(false)
+  useEffect(() => {
+    if (!followingRoute) {
+      routeRunStartedRef.current = false
+      return
+    }
+    if (tracker.status === 'tracking') {
+      routeRunStartedRef.current = true
+      return
+    }
+    if (routeRunStartedRef.current) {
+      routeRunStartedRef.current = false
+      setFollowingRoute(false)
+      setViewingRoute(null)
+    }
+  }, [tracker.status, followingRoute])
 
   // The territory info box closes itself after a few seconds (the Close
   // button still works). Each new tap sets a fresh object, restarting the
@@ -1398,6 +1791,14 @@ export default function GamePage() {
   // skips the "view on map?" confirm dialog and goes straight to the same
   // highlight/focus toast the leaderboard flow produces.
   function handleParcelClick(parcel) {
+    // A territory polygon's own click bubbles up to the map's click too
+    // (it isn't stopped - see DrawClickCatcher), so while drawing a route
+    // this still also plants a point under the tap, same as anywhere
+    // else on the map - routes aren't claims, so there's nothing stopping
+    // one from crossing someone else's territory. Only the "whose ground
+    // is this" popup is suppressed, since it has nothing to do with
+    // drawing and would just get in the way.
+    if (routeDraftMode) return
     setHighlightedEntry({
       userId: parcel.ownerId,
       fullName: parcel.ownerName,
@@ -1724,6 +2125,24 @@ export default function GamePage() {
       )
     : ''
 
+  // Once the race's target distance is covered, the run ends and submits
+  // itself - no more "hit End, then hit Submit". Guarded by a ref keyed on
+  // the race id so it only fires once even though this effect re-runs on
+  // every GPS fix while raceProgress keeps climbing.
+  useEffect(() => {
+    if (!raceChallenge) return
+    if (tracker.status !== 'tracking') return
+    if (raceProgress < 1) return
+    if (autoFinishedRaceIdRef.current === raceChallenge.id) return
+    autoFinishedRaceIdRef.current = raceChallenge.id
+    const result = tracker.stop()
+    attemptSubmit(result)
+    // tracker.stop/attemptSubmit are stable enough across a run's lifetime
+    // that re-running this on their identity isn't needed - only the race
+    // progress actually crossing the finish line should retrigger it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceProgress, raceChallenge, tracker.status])
+
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
   const avatarSrc =
@@ -1848,6 +2267,16 @@ export default function GamePage() {
           blazeSprite={showBlazeHeroSprite}
           playerMoving={playerMoving}
           isNavigating={isNavigating}
+          onUserPan={handleUserPan}
+          isLoopRun={!tracker.challengeId && !tracker.clubWarId}
+          drawActive={routeDraftMode}
+          onDrawPoint={handleDrawMapClick}
+          drawPoints={routeDraftPoints}
+          viewRoutePoints={routeGuidanceLine ? null : viewingRoute?.points}
+          ownRoutesOverlay={myRouteOverlays}
+          onRouteClick={handleViewRoute}
+          routeGuidanceLine={routeGuidanceLine}
+          routeOffCourse={Boolean(routeGuidance?.offRoute)}
           onParcelClick={handleParcelClick}
           onMapReady={handleMapReady}
         />
@@ -1892,6 +2321,32 @@ export default function GamePage() {
                 </div>
               </>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {startCountdown != null && (
+          <motion.div
+            className="game-countdown-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={startCountdown}
+                className={`game-countdown-value${
+                  startCountdown === 'GO' ? ' is-go' : ''
+                }`}
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 1.4, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                {startCountdown}
+              </motion.span>
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1956,6 +2411,11 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
+      <RouteTurnIndicator
+        guidance={routeGuidance}
+        onFinish={() => tracker.stop()}
+      />
+
       {tracker.clubWarId && tracker.status === 'tracking' && (
         <div className="pvp-race-hud" role="status">
           ⚔️ Club war run
@@ -1972,7 +2432,7 @@ export default function GamePage() {
           role="status"
         >
           {raceProgress >= 1
-            ? `🏁 ${raceModeLabel} done! Hit End and submit your race.`
+            ? `🏁 ${raceModeLabel} done! Submitting your race…`
             : `⚡ Race vs ${raceOpponentName} · ${formatMeters(
                 Math.max(0, raceChallenge.distanceMeters - tracker.distance)
               )} to go`}
@@ -2089,96 +2549,116 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
-      {radialOpen && (
+      {tracker.status !== 'tracking' && radialOpen && (
         <div
           className="game-radial-scrim"
           onClick={() => setRadialOpen(false)}
         />
       )}
 
-      <div className="game-fab-wrap">
-        <AnimatePresence>
-          {radialOpen &&
-            (radialMode === 'play' ? PLAY_OPTIONS : RADIAL_ITEMS).map(
-              (item, i) => {
-                const badge =
-                  item.tab === 'mail'
-                    ? mailbox.unreadCount
-                    : item.tab === 'race'
-                      ? pvp.actionCount
-                      : 0
-                return (
-                  <motion.div
-                    key={item.tab}
-                    className="game-radial-item"
-                    initial={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
-                    animate={{ opacity: 1, scale: 1, x: item.x, y: item.y }}
-                    exit={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 420,
-                      damping: 24,
-                      delay: i * 0.035,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className={`game-radial-btn radial-${item.tone}`}
-                      onClick={() => {
-                        if (item.tab === 'play') {
-                          setRadialMode('play')
-                          return
-                        }
-                        if (item.tab === 'conquer') {
-                          setRadialOpen(false)
-                          handleStartRun()
-                          return
-                        }
-                        openMenu(item.tab)
+      {tracker.status !== 'tracking' && (
+        <div className="game-fab-wrap">
+          <AnimatePresence>
+            {radialOpen &&
+              (radialMode === 'play' ? PLAY_OPTIONS : RADIAL_ITEMS).map(
+                (item, i) => {
+                  const badge =
+                    item.tab === 'mail'
+                      ? mailbox.unreadCount
+                      : item.tab === 'race'
+                        ? pvp.actionCount
+                        : 0
+                  return (
+                    <motion.div
+                      key={item.tab}
+                      className="game-radial-item"
+                      initial={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
+                      animate={{ opacity: 1, scale: 1, x: item.x, y: item.y }}
+                      exit={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 420,
+                        damping: 24,
+                        delay: i * 0.035,
                       }}
-                      aria-label={item.label}
                     >
-                      <item.Icon />
-                      {badge > 0 && (
-                        <span className="game-menu-tab-badge game-radial-badge">
-                          {badge > 9 ? '9+' : badge}
-                        </span>
+                      <button
+                        type="button"
+                        className={`game-radial-btn radial-${item.tone}`}
+                        onClick={() => {
+                          if (item.tab === 'play') {
+                            setRadialMode('play')
+                            return
+                          }
+                          if (item.tab === 'conquer') {
+                            setRadialOpen(false)
+                            handleStartRun()
+                            return
+                          }
+                          openMenu(item.tab)
+                        }}
+                        aria-label={item.label}
+                      >
+                        <item.Icon />
+                        {badge > 0 && (
+                          <span className="game-menu-tab-badge game-radial-badge">
+                            {badge > 9 ? '9+' : badge}
+                          </span>
+                        )}
+                      </button>
+                      {item.tone !== 'mini' && (
+                        <span className="game-radial-label">{item.label}</span>
                       )}
-                    </button>
-                    {item.tone !== 'mini' && (
-                      <span className="game-radial-label">{item.label}</span>
-                    )}
-                  </motion.div>
-                )
-              }
-            )}
-        </AnimatePresence>
+                    </motion.div>
+                  )
+                }
+              )}
+          </AnimatePresence>
 
+          <button
+            type="button"
+            className={`game-menu-btn ${radialOpen ? 'is-open' : ''}`}
+            onClick={() => setRadialOpen((open) => !open)}
+            aria-label={radialOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={radialOpen}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={radialOpen ? 'close' : 'open'}
+                className="game-menu-btn-icon"
+                initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
+                animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
+                transition={{ duration: 0.14 }}
+              >
+                {radialOpen ? (
+                  <IconClose strokeWidth={4.5} />
+                ) : (
+                  <IconMenuOrb strokeWidth={4.5} />
+                )}
+              </motion.span>
+            </AnimatePresence>
+          </button>
+        </div>
+      )}
+
+      {/* Google Maps' own "recenter" FAB - only shows once a manual pinch/
+          drag has suspended nav-follow (see handleUserPan), sitting where
+          the menu FAB would be since that's hidden while tracking anyway. */}
+      {tracker.status === 'tracking' && navSuspended && (
         <button
           type="button"
-          className={`game-menu-btn ${radialOpen ? 'is-open' : ''}`}
-          onClick={() => setRadialOpen((open) => !open)}
-          aria-label={radialOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={radialOpen}
+          className="game-locate-btn"
+          aria-label="Recenter on your run"
+          onClick={handleRecenter}
         >
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={radialOpen ? 'close' : 'open'}
-              className="game-menu-btn-icon"
-              initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
-              animate={{ rotate: 0, scale: 1, opacity: 1 }}
-              exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
-              transition={{ duration: 0.14 }}
-            >
-              {radialOpen ? <IconClose /> : <IconList />}
-            </motion.span>
-          </AnimatePresence>
+          <IconCrosshairs />
         </button>
-      </div>
+      )}
 
       <div
         className={`game-controls${
-          tracker.status === 'tracking' || pendingRun
+          tracker.status === 'tracking' || pendingRun || routeDraftMode
             ? ''
             : ' game-controls-empty'
         }`}
@@ -2196,10 +2676,13 @@ export default function GamePage() {
               <span className="game-stat">
                 <span className="game-stat-value">
                   {formatPace(
-                    calculatePaceMinPerKm(
-                      tracker.distance,
-                      tracker.elapsedSeconds
-                    )
+                    tracker.elapsedSeconds < 30 ||
+                      tracker.distance < MIN_DISTANCE_FOR_PACE_METERS
+                      ? null
+                      : calculatePaceMinPerKm(
+                          tracker.distance,
+                          tracker.elapsedSeconds
+                        )
                   )}
                 </span>
                 <span className="game-stat-label">Pace</span>
@@ -2211,29 +2694,78 @@ export default function GamePage() {
                 <span className="game-stat-label">Time</span>
               </span>
             </div>
-            <div className="game-controls-actions">
-              <button
-                type="button"
-                className="btn btn-primary btn-lg"
-                onClick={() => tracker.stop()}
-              >
-                End
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-lg"
-                onClick={handleCancelTracking}
-              >
-                Cancel
-              </button>
-            </div>
             <button
               type="button"
-              className="btn btn-outline game-view-toggle"
-              onClick={() => setNavViewOn((on) => !on)}
+              className={`game-controls-handle${statsOnly ? '' : ' is-open'}`}
+              aria-label={statsOnly ? 'Show run controls' : 'Hide run controls'}
+              aria-expanded={!statsOnly}
+              onClick={() => setStatsOnly((collapsed) => !collapsed)}
             >
-              {navViewOn ? 'Switch to Normal View' : 'Switch to Running View'}
+              <IconChevronDown />
             </button>
+            <AnimatePresence initial={false}>
+              {!statsOnly && (
+                <motion.div
+                  key="run-actions"
+                  className="game-controls-expand"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  {confirmAction === 'end' || confirmAction === 'cancel' ? (
+                    <div className="game-controls-confirm">
+                      <p className="game-controls-confirm-text">
+                        {confirmAction === 'end'
+                          ? 'End this run now?'
+                          : 'Cancel and discard this run? Nothing will be saved.'}
+                      </p>
+                      <div className="game-controls-actions">
+                        <button
+                          type="button"
+                          className="game-btn game-btn-wood"
+                          onClick={() => setConfirmAction(null)}
+                        >
+                          Keep Running
+                        </button>
+                        <button
+                          type="button"
+                          className={`game-btn ${
+                            confirmAction === 'end'
+                              ? 'game-btn-green'
+                              : 'game-btn-red'
+                          }`}
+                          onClick={() => {
+                            setConfirmAction(null)
+                            if (confirmAction === 'end') tracker.stop()
+                            else handleCancelTracking()
+                          }}
+                        >
+                          {confirmAction === 'end' ? 'Yes, End' : 'Yes, Cancel'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="game-controls-actions">
+                      <button
+                        type="button"
+                        className="game-btn game-btn-green game-btn-lg"
+                        onClick={() => setConfirmAction('end')}
+                      >
+                        End
+                      </button>
+                      <button
+                        type="button"
+                        className="game-btn game-btn-wood game-btn-lg"
+                        onClick={() => setConfirmAction('cancel')}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </>
         )}
 
@@ -2243,24 +2775,51 @@ export default function GamePage() {
               <span>Loop area: {formatArea(draftArea)}</span>
               <span>Perimeter: {formatMeters(draftPerimeter)}</span>
             </div>
-            <div className="game-controls-actions">
-              <button
-                type="button"
-                className="btn btn-primary btn-lg"
-                onClick={() => attemptSubmit(pendingRun)}
-                disabled={saving}
-              >
-                {saving ? 'Submitting…' : 'Submit Run'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-lg"
-                onClick={discardDraft}
-                disabled={saving}
-              >
-                Discard
-              </button>
-            </div>
+            {confirmAction === 'discard' ? (
+              <div className="game-controls-confirm">
+                <p className="game-controls-confirm-text">
+                  Discard this run? It won&apos;t be saved.
+                </p>
+                <div className="game-controls-actions">
+                  <button
+                    type="button"
+                    className="game-btn game-btn-wood"
+                    onClick={() => setConfirmAction(null)}
+                  >
+                    Keep It
+                  </button>
+                  <button
+                    type="button"
+                    className="game-btn game-btn-red"
+                    onClick={() => {
+                      setConfirmAction(null)
+                      discardDraft()
+                    }}
+                  >
+                    Yes, Discard
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="game-controls-actions">
+                <button
+                  type="button"
+                  className="game-btn game-btn-green game-btn-lg"
+                  onClick={() => attemptSubmit(pendingRun)}
+                  disabled={saving}
+                >
+                  {saving ? 'Submitting…' : 'Submit Run'}
+                </button>
+                <button
+                  type="button"
+                  className="game-btn game-btn-red game-btn-lg"
+                  onClick={() => setConfirmAction('discard')}
+                  disabled={saving}
+                >
+                  Discard
+                </button>
+              </div>
+            )}
             {draftLoopOpen ? (
               <p className="game-controls-hint game-controls-hint-error">
                 This loop isn&apos;t closed — your capture might not be complete
@@ -2274,6 +2833,80 @@ export default function GamePage() {
                 </p>
               )
             )}
+          </>
+        )}
+
+        {routeDraftMode && (
+          <>
+            <div className="game-controls-stats">
+              <span className="game-stat">
+                <span className="game-stat-value">
+                  {formatMeters(routeDraftDistance)}
+                </span>
+                <span className="game-stat-label">Distance</span>
+              </span>
+              <span className="game-stat">
+                <span className="game-stat-value">
+                  {routeDraftWaypoints.length}
+                </span>
+                <span className="game-stat-label">Points</span>
+              </span>
+            </div>
+            {routeConfirmCancel ? (
+              <div className="game-controls-confirm">
+                <p className="game-controls-confirm-text">
+                  Discard this route? Nothing will be saved.
+                </p>
+                <div className="game-controls-actions">
+                  <button
+                    type="button"
+                    className="game-btn game-btn-wood"
+                    onClick={() => setRouteConfirmCancel(false)}
+                  >
+                    Keep Drawing
+                  </button>
+                  <button
+                    type="button"
+                    className="game-btn game-btn-red"
+                    onClick={handleConfirmCancelDrawing}
+                  >
+                    Yes, Discard
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="game-controls-actions">
+                <button
+                  type="button"
+                  className="game-btn game-btn-wood"
+                  onClick={handleUndoRoutePoint}
+                  disabled={routeDraftWaypoints.length === 0 || routeSnapBusy}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  className="game-btn game-btn-green"
+                  onClick={handleFinishDrawing}
+                  disabled={routeSnapBusy}
+                >
+                  Finish
+                </button>
+                <button
+                  type="button"
+                  className="game-btn game-btn-red"
+                  onClick={handleRequestCancelDrawing}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            <p className="game-controls-hint">
+              {routeSnapBusy
+                ? 'Snapping to the road…'
+                : routeDraftError ||
+                  'Tap the map to add a point. Tap near a road for the best path.'}
+            </p>
           </>
         )}
       </div>
@@ -2292,7 +2925,7 @@ export default function GamePage() {
               {pendingRun && (
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="game-btn game-btn-green"
                   onClick={() => attemptSubmit(pendingRun)}
                   disabled={saving}
                 >
@@ -2301,10 +2934,44 @@ export default function GamePage() {
               )}
               <button
                 type="button"
-                className="btn btn-outline"
+                className="game-btn game-btn-wood"
                 onClick={() => setSaveError(null)}
               >
                 Dismiss
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {tracker.invalidMotion && (
+          <motion.div
+            className="game-claim-toast glass-card"
+            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
+          >
+            <h3>That pace looks more scooter than sneakers 🛵</h3>
+            <p>
+              {tracker.invalidMotion.reason === 'no-gait'
+                ? "You're covering ground fast with no running stride detected — mind stopping if you're not on foot?"
+                : "That's a faster sustained pace than running allows — mind stopping if you're not on foot?"}
+            </p>
+            <div className="game-highlight-toast-actions">
+              <button
+                type="button"
+                className="game-btn game-btn-green"
+                onClick={() => tracker.stop()}
+              >
+                Stop Run
+              </button>
+              <button
+                type="button"
+                className="game-btn game-btn-wood"
+                onClick={tracker.dismissInvalidMotion}
+              >
+                Keep Going
               </button>
             </div>
           </motion.div>
@@ -2427,6 +3094,14 @@ export default function GamePage() {
             animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
             exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
           >
+            <button
+              type="button"
+              className="game-highlight-toast-close"
+              aria-label="Close"
+              onClick={() => setHighlightedEntry(null)}
+            >
+              <IconClose />
+            </button>
             <h3>
               {isMyEntry(highlightedEntry)
                 ? 'Your territory'
@@ -2441,10 +3116,13 @@ export default function GamePage() {
             <div className="game-highlight-toast-actions">
               <button
                 type="button"
-                className="btn btn-outline"
-                onClick={() => setHighlightedEntry(null)}
+                className="btn btn-primary"
+                onClick={() => {
+                  setViewingProfile(highlightedEntry)
+                  setHighlightedEntry(null)
+                }}
               >
-                Close
+                View Profile
               </button>
             </div>
           </motion.div>
@@ -2590,29 +3268,116 @@ export default function GamePage() {
             {menuTab === 'leaderboard' && (
               <div className="game-menu-panel game-cards">
                 <section className="game-card game-card-dark">
-                  <div className="game-menu-subtabs">
+                  <div className="game-leaderboard-mode">
+                    {leaderboardModeOpen && (
+                      <div
+                        className="game-leaderboard-mode-scrim"
+                        onClick={() => setLeaderboardModeOpen(false)}
+                      />
+                    )}
                     <button
                       type="button"
-                      className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
-                      onClick={() => switchLeaderboardMode('individual')}
+                      className={`game-leaderboard-mode-toggle ${leaderboardModeOpen ? 'is-open' : ''}`}
+                      aria-expanded={leaderboardModeOpen}
+                      onClick={() => setLeaderboardModeOpen((open) => !open)}
                     >
-                      Solo
+                      {leaderboardMode === 'individual'
+                        ? 'Top Players'
+                        : 'Top Clubs'}
+                      <IconChevronDown />
                     </button>
-                    <button
-                      type="button"
-                      className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
-                      onClick={() => switchLeaderboardMode('club')}
-                    >
-                      Club
-                    </button>
+                    {leaderboardModeOpen && (
+                      <ul className="game-leaderboard-mode-list">
+                        <li>
+                          <button
+                            type="button"
+                            className={`game-leaderboard-mode-option ${leaderboardMode === 'individual' ? 'active' : ''}`}
+                            onClick={() => {
+                              switchLeaderboardMode('individual')
+                              setLeaderboardModeOpen(false)
+                            }}
+                          >
+                            Top Players
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            type="button"
+                            className={`game-leaderboard-mode-option ${leaderboardMode === 'club' ? 'active' : ''}`}
+                            onClick={() => {
+                              switchLeaderboardMode('club')
+                              setLeaderboardModeOpen(false)
+                            }}
+                          >
+                            Top Clubs
+                          </button>
+                        </li>
+                      </ul>
+                    )}
                   </div>
+
+                  {leaderboardMode === 'individual' ? (
+                    <div className="game-menu-subtabs game-menu-subtabs-scope">
+                      <button
+                        type="button"
+                        className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
+                        onClick={() => switchIndividualScope('global')}
+                      >
+                        Global
+                      </button>
+                      <button
+                        type="button"
+                        className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
+                        onClick={() => switchIndividualScope('city')}
+                      >
+                        {(individualScope === 'city' &&
+                          leaderboard[0]?.cityName) ||
+                          'District'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="game-menu-subtabs game-menu-subtabs-scope">
+                      <button
+                        type="button"
+                        className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
+                        onClick={() => switchClubScope('global')}
+                      >
+                        Global
+                      </button>
+                      <button
+                        type="button"
+                        className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
+                        onClick={() => switchClubScope('national')}
+                      >
+                        {(clubScope === 'national' &&
+                          clubLeaderboard[0]?.countryName) ||
+                          'Country'}
+                      </button>
+                    </div>
+                  )}
+
+                  {leaderboardMode === 'individual' &&
+                    individualScope === 'city' && (
+                      <p className="game-leaderboard-notice">
+                        Showing conquered area in{' '}
+                        {leaderboard[0]?.cityName || 'your district'} only.
+                      </p>
+                    )}
+                  {leaderboardMode === 'club' && clubScope === 'national' && (
+                    <p className="game-leaderboard-notice">
+                      Showing clubs in{' '}
+                      {clubLeaderboard[0]?.countryName || 'your country'} only.
+                    </p>
+                  )}
 
                   {leaderboardMode === 'individual' ? (
                     leaderboardError ? (
                       <p className="game-menu-empty">{leaderboardError}</p>
                     ) : leaderboard.length === 0 ? (
                       <p className="game-menu-empty">
-                        No territory claimed yet — be the first.
+                        {individualScope === 'city'
+                          ? 'No territory claimed in your district yet — be the first.'
+                          : 'No territory claimed yet — be the first.'}
                       </p>
                     ) : (
                       <LeaderboardPodium
@@ -2622,9 +3387,16 @@ export default function GamePage() {
                           rank: entry.rank,
                           name: isMyEntry(entry) ? 'You' : playerNameOf(entry),
                           area: formatArea(entry.areaSqMeters),
+                          // Your own row uses the exact same avatar everywhere
+                          // else in the game (hero skin > profile picture >
+                          // default), so changing it anywhere picks it up here
+                          // too instead of re-deriving a different value.
+                          // Other rows fall back to resolveFileUrl(null) = null
+                          // (colored initials) until the leaderboard API
+                          // starts returning a picture for other players.
                           avatarSrc: isMyEntry(entry)
-                            ? resolveFileUrl(user?.profilePictureUrl)
-                            : null,
+                            ? avatarSrc
+                            : resolveFileUrl(entry.profilePictureUrl),
                           isPlayer: isMyEntry(entry),
                           onClick: () => setViewingProfile(entry),
                         }))}
@@ -2634,16 +3406,25 @@ export default function GamePage() {
                     <p className="game-menu-empty">{leaderboardError}</p>
                   ) : clubLeaderboard.length === 0 ? (
                     <p className="game-menu-empty">
-                      No club has claimed territory yet.
+                      {clubScope === 'national'
+                        ? 'No club has claimed territory in your country yet.'
+                        : 'No club has claimed territory yet.'}
                     </p>
                   ) : (
                     <LeaderboardPodium
                       nameLabel="Club"
+                      statLabel="Trophies"
                       entries={clubLeaderboard.map((entry) => ({
                         key: entry.clubId,
                         rank: entry.rank,
                         name: entry.clubName,
-                        area: formatArea(entry.totalAreaSqMeters),
+                        badge: <ClubBadge name={entry.clubName} size={40} />,
+                        area: (
+                          <span className="lb-trophy-stat">
+                            <IconTrophy />
+                            {formatCoins(entry.trophies ?? 0)}
+                          </span>
+                        ),
                         isPlayer: entry.clubName === profile?.clubName,
                         onClick: () => {
                           setOpenClubId(entry.clubId)
@@ -2671,6 +3452,7 @@ export default function GamePage() {
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
                   openClubId={openClubId}
                   onOpenClubHandled={() => setOpenClubId(null)}
+                  onViewRoute={handleViewRoute}
                 />
               </div>
             )}
@@ -2799,6 +3581,97 @@ export default function GamePage() {
                   </section>
 
                   <section className="game-me-section">
+                    <p className="game-menu-section-title">My Routes</p>
+                    <button
+                      type="button"
+                      className="game-btn game-btn-green game-btn-sm game-me-draw-route-btn"
+                      onClick={handleStartDrawRoute}
+                    >
+                      + Draw New Route
+                    </button>
+                    {myRoutesError && (
+                      <p className="game-controls-hint game-controls-hint-error">
+                        {myRoutesError}
+                      </p>
+                    )}
+                    {myRoutes.length === 0 ? (
+                      <p className="game-menu-empty">
+                        Draw a route on the map to see it here.
+                      </p>
+                    ) : (
+                      <>
+                        <ul className="game-menu-list">
+                          {myRoutes.map((r) => (
+                            <li key={r.id} className="game-route-list-item">
+                              <button
+                                type="button"
+                                className="game-menu-list-row game-route-view-btn"
+                                onClick={() => handleViewRoute(r.id)}
+                                disabled={loadingRouteId === r.id}
+                              >
+                                <span className="game-menu-list-area">
+                                  {r.name}
+                                </span>
+                                <span className="game-menu-list-meta">
+                                  {loadingRouteId === r.id
+                                    ? 'Loading…'
+                                    : formatDistance(r.distanceMeters)}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className={`game-route-visibility-btn ${
+                                  r.visibility === 'CLUB' ? 'is-shared' : ''
+                                }`}
+                                disabled={
+                                  routeVisibilityBusyId === r.id ||
+                                  (r.visibility !== 'CLUB' &&
+                                    !profile?.clubName)
+                                }
+                                title={
+                                  r.visibility !== 'CLUB' && !profile?.clubName
+                                    ? 'Join a club to share routes with it'
+                                    : undefined
+                                }
+                                onClick={() => handleToggleRouteVisibility(r)}
+                              >
+                                {routeVisibilityBusyId === r.id
+                                  ? '…'
+                                  : r.visibility === 'CLUB'
+                                    ? 'Shared with Club'
+                                    : 'Private'}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        {myRoutesTotalPages > 1 && (
+                          <div className="game-route-pager">
+                            <button
+                              type="button"
+                              className="game-btn game-btn-wood game-btn-sm"
+                              disabled={myRoutesPage <= 1}
+                              onClick={() => loadMyRoutes(myRoutesPage - 1)}
+                            >
+                              Prev
+                            </button>
+                            <span className="game-route-pager-label">
+                              Page {myRoutesPage} of {myRoutesTotalPages}
+                            </span>
+                            <button
+                              type="button"
+                              className="game-btn game-btn-wood game-btn-sm"
+                              disabled={myRoutesPage >= myRoutesTotalPages}
+                              onClick={() => loadMyRoutes(myRoutesPage + 1)}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </section>
+
+                  <section className="game-me-section">
                     <p className="game-menu-section-title">History</p>
                     {myRuns.length === 0 ? (
                       <p className="game-menu-empty">
@@ -2906,6 +3779,23 @@ export default function GamePage() {
                     {pvp.error}
                   </p>
                 )}
+
+                <button
+                  type="button"
+                  className="game-settings-row"
+                  onClick={() => navigate('/profile/edit')}
+                >
+                  <span className="game-settings-row-label">
+                    <IconUser />
+                    <span className="game-settings-row-text">
+                      Edit Profile
+                      <span className="game-settings-row-sub">
+                        You&apos;ll be redirected to your FahhKit account
+                      </span>
+                    </span>
+                  </span>
+                  <IconChevronRight />
+                </button>
               </div>
             )}
 
@@ -3032,6 +3922,7 @@ export default function GamePage() {
             }
             nickname={viewingProfile.nickname}
             onClose={() => setViewingProfile(null)}
+            onViewClub={handleViewClubByName}
             // A join requester is already asking in - Accept/Decline in
             // the Club tab covers it, so no separate invite button.
             canInvite={
@@ -3071,6 +3962,156 @@ export default function GamePage() {
               </button>
               <ShareRunCarousel run={viewingRun} />
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {routeNamePromptOpen && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+            >
+              <p>Name your route</p>
+              <input
+                type="text"
+                className="game-club-input"
+                placeholder="e.g. Riverside Loop"
+                value={routeNameInput}
+                onChange={(e) => setRouteNameInput(e.target.value)}
+                maxLength={60}
+                autoFocus
+              />
+              <p>
+                {formatMeters(routeDraftDistance)} ·{' '}
+                {routeDraftWaypoints.length} points
+              </p>
+              {saveRouteError && (
+                <p className="game-controls-hint game-controls-hint-error">
+                  {saveRouteError}
+                </p>
+              )}
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setRouteNamePromptOpen(false)}
+                  disabled={savingRoute}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  disabled={savingRoute || !profile?.clubName}
+                  title={
+                    profile?.clubName
+                      ? undefined
+                      : 'Join a club to share routes with it'
+                  }
+                  onClick={() =>
+                    handleSaveRoute({
+                      name: routeNameInput.trim() || 'My Route',
+                      visibility: 'CLUB',
+                    })
+                  }
+                >
+                  {savingRoute ? 'Saving…' : 'Share with Club'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={savingRoute}
+                  onClick={() =>
+                    handleSaveRoute({
+                      name: routeNameInput.trim() || 'My Route',
+                      visibility: 'PRIVATE',
+                    })
+                  }
+                >
+                  {savingRoute ? 'Saving…' : 'Just Me'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viewingRoute && !followingRoute && (
+          <motion.div
+            className="game-highlight-toast glass-card game-route-popup"
+            initial={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
+          >
+            <button
+              type="button"
+              className="game-highlight-toast-close"
+              aria-label="Close"
+              onClick={handleCloseViewingRoute}
+            >
+              <IconClose />
+            </button>
+            <h3>{viewingRoute.name}</h3>
+            <p>
+              {formatMeters(viewingRoute.distanceMeters)} ·{' '}
+              {viewingRoute.visibility === 'CLUB'
+                ? 'Shared with club'
+                : 'Private'}
+            </p>
+            {tracker.status === 'idle' &&
+              !pendingRun &&
+              (viewingRoute.points?.length || 0) >= 2 && (
+                <div className="game-highlight-toast-actions">
+                  <button
+                    type="button"
+                    className="game-route-run-btn"
+                    onClick={handleRunViewedRoute}
+                  >
+                    🏃 Run This Route
+                  </button>
+                </div>
+              )}
+            {viewingRoute.ownerId === user?.id && (
+              <div className="game-highlight-toast-actions">
+                <button
+                  type="button"
+                  className={`game-route-visibility-btn ${
+                    viewingRoute.visibility === 'CLUB' ? 'is-shared' : ''
+                  }`}
+                  disabled={
+                    routeVisibilityBusyId === viewingRoute.id ||
+                    (viewingRoute.visibility !== 'CLUB' && !profile?.clubName)
+                  }
+                  title={
+                    viewingRoute.visibility !== 'CLUB' && !profile?.clubName
+                      ? 'Join a club to share routes with it'
+                      : undefined
+                  }
+                  onClick={() => handleToggleRouteVisibility(viewingRoute)}
+                >
+                  {routeVisibilityBusyId === viewingRoute.id
+                    ? '…'
+                    : viewingRoute.visibility === 'CLUB'
+                      ? 'Make Private'
+                      : 'Share with Club'}
+                </button>
+              </div>
+            )}
+            {viewingRoute.ownerId === user?.id && myRoutesError && (
+              <p className="game-controls-hint game-controls-hint-error">
+                {myRoutesError}
+              </p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -215,11 +215,15 @@ function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
 function buildPlayerMarkerIcon(avatarSrc, fallbackSrc, heading) {
   return L.divIcon({
     className: 'territory-map-player-icon',
+    // Pulses then avatar then the heading cone LAST, so it paints on top
+    // of the avatar's edge instead of being hidden under it - it used to
+    // render first (underneath), which buried its brightest, most visible
+    // part (closest to the dot's center) behind the opaque avatar photo.
     html:
-      `<span class="territory-map-player-heading" style="transform:rotate(${heading || 0}deg)"></span>` +
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
-      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />`,
+      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />` +
+      `<span class="territory-map-player-heading" style="transform:rotate(${heading || 0}deg)"></span>`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
   })
@@ -354,6 +358,7 @@ function TerritoryPolygon({
   playerColor,
   onParcelClick,
   onTapEffect,
+  drawActive,
 }) {
   return (
     <Polygon
@@ -375,6 +380,13 @@ function TerritoryPolygon({
       }}
       eventHandlers={{
         click: (e) => {
+          // While drawing a route, a tap on a parcel is a draw point like
+          // anywhere else on the map - routes aren't claims, so there's no
+          // reason someone else's territory should block a tap from
+          // reaching DrawClickCatcher the way it normally does (stopping
+          // propagation here is what makes the parcel "claim-able" from a
+          // tap in every other context).
+          if (drawActive) return
           L.DomEvent.stopPropagation(e)
           onTapEffect(t.points)
           onParcelClick?.(t)
@@ -426,17 +438,194 @@ function ZoomTiltEffect({ tiltRef }) {
 // manual pan/zoom, at a close enough zoom to actually read as navigation.
 // playerLocation gets a new object reference on every GPS fix (see
 // GamePage.jsx), so this re-centers on each real position update.
-function NavigationCameraEffect({ isNavigating, playerLocation }) {
+// programmaticMoveRef is set right before the setView call below so
+// UserPanDetector (a sibling under the same map) can tell this move apart
+// from a real pinch/drag and not mistake it for one.
+function NavigationCameraEffect({
+  isNavigating,
+  playerLocation,
+  programmaticMoveRef,
+}) {
   const map = useMap()
   useEffect(() => {
     if (!isNavigating || !playerLocation) return
+    programmaticMoveRef.current = true
     map.setView(
       [playerLocation.lat, playerLocation.lng],
       Math.max(map.getZoom(), 18),
       { animate: true, duration: 0.8 }
     )
-  }, [map, isNavigating, playerLocation])
+  }, [map, isNavigating, playerLocation, programmaticMoveRef])
   return null
+}
+
+// Suspends nav-follow the moment the player actually pinches/drags the map
+// themselves (Google Maps' "free look" while navigating) - active only
+// while isNavigating, so it's a no-op the rest of the time. dragstart only
+// ever fires for a real pointer/touch drag (setView's own pan doesn't go
+// through Leaflet's Draggable), but setView's zoom change DOES fire
+// zoomstart, so that one needs programmaticMoveRef to tell a real pinch
+// apart from the camera's own re-center.
+function UserPanDetector({ isNavigating, programmaticMoveRef, onUserPan }) {
+  useMapEvents({
+    dragstart() {
+      if (isNavigating) onUserPan?.()
+    },
+    zoomstart() {
+      if (isNavigating && !programmaticMoveRef.current) onUserPan?.()
+    },
+    moveend() {
+      programmaticMoveRef.current = false
+    },
+  })
+  return null
+}
+
+// Route-drawing mode (see GamePage.jsx's routeDraftMode) - tapping the map
+// adds a waypoint. Same useMapEvents shape as ZoomTiltEffect/GlobeHandoff
+// above, just for clicks instead of zoom/move.
+function DrawClickCatcher({ active, onPoint }) {
+  useMapEvents({
+    click(e) {
+      if (!active) return
+      onPoint?.({ lat: e.latlng.lat, lng: e.latlng.lng })
+    },
+  })
+  return null
+}
+
+// Brings a saved/shared route into view the moment it's opened (My Routes /
+// Club shared routes) instead of leaving the player to pan/zoom to find it.
+// Only runs once per route - re-fitting on every render would fight a
+// manual pan/zoom the player does afterward.
+function FitRouteBounds({ points }) {
+  const map = useMap()
+  const fittedForRef = useRef(null)
+  useEffect(() => {
+    if (!points || points.length === 0) {
+      fittedForRef.current = null
+      return
+    }
+    if (fittedForRef.current === points) return
+    fittedForRef.current = points
+    map.fitBounds(L.latLngBounds(toLatLngs(points)), { padding: [40, 40] })
+  }, [map, points])
+  return null
+}
+
+// A new GPS fix lands at most every ~2.5s (see useRunTracker's
+// MIN_POINT_INTERVAL_MS) and playerLocation just snapped straight to it on
+// every render, so the hero dot visibly teleported between fixes instead of
+// gliding like Google Maps' moving-vehicle dot. This tweens the *Leaflet
+// marker itself* via requestAnimationFrame + setLatLng, imperatively,
+// deliberately bypassing React state/props for the position — going through
+// React would mean the <Marker position> prop keeps resetting the marker
+// back to the raw (un-smoothed) fix on every render that the tween is also
+// trying to animate away from, fighting itself and flickering. The tween
+// duration is matched to how long actually elapsed since the previous fix
+// (clamped to a sane range) so the dot arrives right around when the next
+// fix is expected, rather than under/overshooting a fixed guess.
+const MARKER_TWEEN_MIN_MS = 400
+const MARKER_TWEEN_MAX_MS = 2500
+const MARKER_TWEEN_DEFAULT_MS = 1500
+
+function useSmoothMarkerPosition(markerRef, target) {
+  const currentRef = useRef(null)
+  const fromRef = useRef(null)
+  const toRef = useRef(null)
+  const startRef = useRef(0)
+  const durationRef = useRef(MARKER_TWEEN_DEFAULT_MS)
+  const lastArrivalRef = useRef(null)
+  const rafRef = useRef(null)
+
+  useEffect(() => {
+    const marker = markerRef.current
+    if (!target || !marker) return
+
+    if (!currentRef.current) {
+      // First fix for this marker instance - nothing to tween from yet.
+      currentRef.current = target
+      toRef.current = target
+      lastArrivalRef.current = performance.now()
+      marker.setLatLng([target.lat, target.lng])
+      return
+    }
+    if (toRef.current === target) return // re-render with no new fix
+
+    const now = performance.now()
+    const gap =
+      lastArrivalRef.current == null
+        ? MARKER_TWEEN_DEFAULT_MS
+        : now - lastArrivalRef.current
+    durationRef.current = Math.min(
+      MARKER_TWEEN_MAX_MS,
+      Math.max(MARKER_TWEEN_MIN_MS, gap)
+    )
+    lastArrivalRef.current = now
+    fromRef.current = currentRef.current
+    toRef.current = target
+    startRef.current = now
+
+    // A tween is already mid-flight - it reads from/to/start fresh every
+    // frame, so just updating the refs above is enough to smoothly
+    // re-target it from wherever it currently is.
+    if (rafRef.current != null) return
+
+    const tick = () => {
+      const m = markerRef.current
+      if (!m) {
+        rafRef.current = null
+        return
+      }
+      const t = Math.min(
+        1,
+        (performance.now() - startRef.current) / durationRef.current
+      )
+      const from = fromRef.current
+      const to = toRef.current
+      const next = {
+        lat: from.lat + (to.lat - from.lat) * t,
+        lng: from.lng + (to.lng - from.lng) * t,
+      }
+      currentRef.current = next
+      m.setLatLng([next.lat, next.lng])
+      rafRef.current = t < 1 ? requestAnimationFrame(tick) : null
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }, [markerRef, target])
+
+  useEffect(
+    () => () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+    },
+    []
+  )
+}
+
+// react-leaflet forwards a Marker's ref to the underlying Leaflet marker
+// instance, which is what lets useSmoothMarkerPosition drive it directly.
+// The `position` prop is only ever the very first fix this instance sees
+// (captured once, frozen) - every fix after that is applied imperatively,
+// never through a changing prop, so react-leaflet's own prop-sync effect
+// never fights the tween.
+function PlayerMarker({ playerLocation, icon }) {
+  const markerRef = useRef(null)
+  const originRef = useRef(playerLocation)
+  useSmoothMarkerPosition(markerRef, playerLocation)
+  return (
+    <Marker
+      ref={markerRef}
+      position={[originRef.current.lat, originRef.current.lng]}
+      icon={icon}
+      zIndexOffset={1000}
+      // Tapping your own avatar shows nothing - interactive so the tap
+      // doesn't fall through to a territory badge/polygon it happens to be
+      // sitting on and pop that up instead.
+      eventHandlers={{
+        click: (e) => L.DomEvent.stopPropagation(e),
+      }}
+    />
+  )
 }
 
 // Leaflet only draws flat Web Mercator, so past GLOBE_ENTER_ZOOM the map
@@ -795,11 +984,27 @@ export default function TerritoryMap({
   blazeSprite,
   playerMoving,
   isNavigating,
+  onUserPan,
+  isLoopRun = true,
+  drawActive = false,
+  onDrawPoint,
+  drawPoints,
+  viewRoutePoints,
+  ownRoutesOverlay,
+  onRouteClick,
+  routeGuidanceLine,
+  routeOffCourse = false,
   onParcelClick,
   onMapReady,
 }) {
-  const showPreview = livePath.length >= 3
+  // The dashed closing preview only makes sense for a territory-conquer loop
+  // run - a PvP race or club-war run has no "loop" to close, so drawing a
+  // line from the last point back to the first there was just visual noise.
+  const showPreview = isLoopRun && livePath.length >= 3
   const tiltRef = useRef(null)
+  // Shared between NavigationCameraEffect and UserPanDetector so the
+  // latter can ignore the former's own programmatic re-center.
+  const programmaticMoveRef = useRef(false)
   const [mapInstance, setMapInstance] = useState(null)
   // Non-null while the globe is mounted (warm or showing) - the Leaflet
   // camera it follows while hidden. See GlobeHandoff.
@@ -932,6 +1137,7 @@ export default function TerritoryMap({
                   playerColor={playerColor}
                   onParcelClick={onParcelClick}
                   onTapEffect={handleTapEffect}
+                  drawActive={drawActive}
                 />
               )
             })}
@@ -957,18 +1163,88 @@ export default function TerritoryMap({
             )}
 
             {playerLocation && (
-              <Marker
-                position={[playerLocation.lat, playerLocation.lng]}
+              <PlayerMarker
+                playerLocation={playerLocation}
                 icon={playerMarkerIcon}
-                zIndexOffset={1000}
-                // Tapping your own avatar shows nothing - interactive so the
-                // tap doesn't fall through to a territory badge/polygon it
-                // happens to be sitting on and pop that up instead.
-                eventHandlers={{
-                  click: (e) => L.DomEvent.stopPropagation(e),
+              />
+            )}
+
+            {/* Route drawing/viewing - always a plain line, never a filled
+                polygon (that's reserved for the territory-conquer loop
+                preview above). */}
+            {/* Every route the owner has drawn, always on (not gated by
+                "viewing" one) - thinner than the actively-viewed line
+                below so that one still reads as the highlighted one if
+                they happen to be the same route. */}
+            {/* Dashed, not solid, on every route line - against a filled
+                territory polygon underneath it (same-ish blue/dark
+                palette as some territory colours), a solid line can
+                nearly disappear into the fill; a dash pattern keeps
+                reading as "a line" no matter what's under it. */}
+            {ownRoutesOverlay?.map(
+              (route) =>
+                route.points?.length > 0 && (
+                  <Polyline
+                    key={route.id}
+                    positions={toLatLngs(route.points)}
+                    pathOptions={{
+                      color: '#4d9bff',
+                      weight: 3,
+                      opacity: 0.6,
+                      dashArray: '10 8',
+                    }}
+                    eventHandlers={{
+                      click: (e) => {
+                        // While drawing, let the tap fall through to the
+                        // map (plants a point) instead of opening this.
+                        if (drawActive) return
+                        // Same as tapping it from My Routes - opens the
+                        // same popup (Run This Route / Share with Club).
+                        L.DomEvent.stopPropagation(e)
+                        onRouteClick?.(route.id)
+                      },
+                    }}
+                  />
+                )
+            )}
+            {drawPoints && drawPoints.length > 0 && (
+              <Polyline
+                positions={toLatLngs(drawPoints)}
+                pathOptions={{ color: '#4d9bff', weight: 5, dashArray: '10 8' }}
+              />
+            )}
+            {viewRoutePoints && viewRoutePoints.length > 0 && (
+              <Polyline
+                positions={toLatLngs(viewRoutePoints)}
+                pathOptions={{
+                  color: '#4d9bff',
+                  weight: 5,
+                  dashArray: '10 8',
                 }}
               />
             )}
+            {/* Google Maps' own "line to destination" while driving/
+                walking - the whole remaining path from wherever the
+                runner actually is right now to the route's end, not just
+                a short stretch ahead. Re-rendered fresh on every GPS fix
+                (routeGuidanceLine is a new array each time), so the
+                covered ground drops off the front of it live as they
+                progress instead of the line staying a fixed length -
+                this replaces the static full-route line (see
+                viewRoutePoints above) while actually running it. Red
+                while off-route, same as the turn HUD's own cue. */}
+            {routeGuidanceLine && routeGuidanceLine.length > 1 && (
+              <Polyline
+                positions={toLatLngs(routeGuidanceLine)}
+                pathOptions={{
+                  color: routeOffCourse ? '#ff5a4d' : '#4d9bff',
+                  weight: 6,
+                  opacity: 0.95,
+                }}
+              />
+            )}
+            <DrawClickCatcher active={drawActive} onPoint={onDrawPoint} />
+            <FitRouteBounds points={viewRoutePoints} />
 
             <FocusHighlight
               highlightOwnerId={highlightOwnerId}
@@ -986,6 +1262,12 @@ export default function TerritoryMap({
             <NavigationCameraEffect
               isNavigating={isNavigating}
               playerLocation={playerLocation}
+              programmaticMoveRef={programmaticMoveRef}
+            />
+            <UserPanDetector
+              isNavigating={isNavigating}
+              programmaticMoveRef={programmaticMoveRef}
+              onUserPan={onUserPan}
             />
             <CaptureMapInstance onReady={setMapInstance} />
             {activeTapEffects.map((effect) => (

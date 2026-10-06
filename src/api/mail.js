@@ -1,4 +1,4 @@
-import { deleteJson, postJson } from './client'
+import { deleteJson, postForm, postJson } from './client'
 
 // Player inbox (see MailController in the FahhKit backend). Personal mail is
 // NOTICE (read-only), CLUB_INVITE (claim = join the club, or decline) or
@@ -33,4 +33,14 @@ export function findBroadcastMail(pageNumber = 1, noOfRecords = 20) {
 
 export function readBroadcastMail(id) {
   return postJson(`/v1/mail/broadcast/${id}/read`, {})
+}
+
+// Admin only - publishes a new broadcast every player sees in their News
+// tab. image is optional.
+export function publishBroadcast(title, body, image) {
+  const formData = new FormData()
+  formData.append('title', title)
+  formData.append('body', body)
+  if (image) formData.append('image', image)
+  return postForm('/v1/mail/admin/broadcast', formData)
 }

@@ -33,13 +33,16 @@
   color: var(--game-red-light);
 }
 
-/* Live race strip over the map while a race run is being tracked. */
+/* Live race strip over the map while a race run is being tracked. Above
+   the full-screen menu sheet (GamePage.css's .game-menu-sheet, z-index
+   1300) - checking Mail or Club mid-race shouldn't hide how the race is
+   going. */
 .pvp-race-hud {
   position: fixed;
   left: 50%;
   top: calc(env(safe-area-inset-top, 0px) + 64px);
   transform: translateX(-50%);
-  z-index: 1100;
+  z-index: 1350;
   width: min(340px, calc(100vw - 32px));
   padding: 8px 14px;
   border-radius: 14px;

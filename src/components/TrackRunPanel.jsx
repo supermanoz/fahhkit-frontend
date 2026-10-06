@@ -33,6 +33,8 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     dismissBackgroundGap,
     pendingRun,
     clearPendingRun,
+    invalidMotion,
+    dismissInvalidMotion,
   } = useRunTracker()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -166,6 +168,23 @@ export default function TrackRunPanel({ eventId, onSaved }) {
             <p className="track-run-error-title">{saveError.title}</p>
             <p className="track-run-error-message">{saveError.message}</p>
           </div>
+        </div>
+      )}
+
+      {invalidMotion && (
+        <div className="banner error track-run-gap-banner">
+          <span>
+            {invalidMotion.reason === 'no-gait'
+              ? "That pace looks more scooter than sneakers — you're covering ground fast with no running stride detected. Mind stopping if you're not on foot?"
+              : "That's a faster sustained pace than running allows. Mind stopping if you're not on foot?"}
+          </span>
+          <button
+            type="button"
+            onClick={dismissInvalidMotion}
+            aria-label="Dismiss"
+          >
+            <FaTimes />
+          </button>
         </div>
       )}
 

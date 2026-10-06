@@ -55,6 +55,15 @@
     0 3px 0 var(--game-ink, #3d2b1a);
 }
 
+.athlete-profile-club-clickable {
+  cursor: pointer;
+}
+
+.athlete-profile-club-clickable:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--game-ink, #3d2b1a);
+}
+
 .athlete-profile-club .club-badge {
   flex-shrink: 0;
 }

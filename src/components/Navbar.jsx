@@ -97,6 +97,11 @@ export default function Navbar() {
               Moderators
             </Link>
           )}
+          {isAdmin(user) && (
+            <Link to="/admin/game-mechanics" onClick={close}>
+              Game Mechanics
+            </Link>
+          )}
           <Link to="/contact" onClick={close}>
             Contact
           </Link>

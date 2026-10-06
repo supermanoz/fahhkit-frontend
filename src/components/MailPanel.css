@@ -6,6 +6,16 @@
   gap: 8px;
 }
 
+/* Invisible trigger row watched by MailPanel's IntersectionObserver - only
+   rendered while there's another page to fetch, so it never shows as a
+   dead-end empty row once the list is exhausted. */
+.mail-list-sentinel {
+  text-align: center;
+  color: rgba(246, 236, 217, 0.6);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
 .mail-item.is-unread {
   border-color: rgba(255, 177, 92, 0.55);
   background: rgba(255, 122, 41, 0.1);

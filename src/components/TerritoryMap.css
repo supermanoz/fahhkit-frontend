@@ -372,8 +372,8 @@
   clip-path: polygon(50% 50%, 38% 4%, 62% 4%);
   background: linear-gradient(
     to top,
-    rgba(224, 165, 55, 0.7),
-    rgba(224, 165, 55, 0)
+    rgba(255, 196, 77, 0.9),
+    rgba(255, 196, 77, 0)
   );
   transition: transform 0.3s ease;
   pointer-events: none;

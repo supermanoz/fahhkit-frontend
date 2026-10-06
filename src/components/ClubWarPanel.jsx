@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useCallback, useEffect, useState } from 'react'
-import { IconCheck, IconRunning, IconSwords, IconTrophy } from './GameIcons'
+import { IconCheck, IconRunning, IconSwords } from './GameIcons'
+import ClubTrophyIcon from './ClubTrophyIcon'
 import { ApiError, resolveFileUrl } from '../api/client'
 import {
   CLUB_WAR_BATTLE_HOURS,
@@ -248,8 +249,8 @@ export default function ClubWarPanel({
           equipped. Pace + effort points add up for the team.
         </li>
         <li>
-          <span className="club-perk-icon tone-gold">
-            <IconTrophy />
+          <span className="club-perk-icon tone-gold club-perk-icon-trophy">
+            <ClubTrophyIcon size={26} />
           </span>
           Winners: system-assigned trophies, and {CLUB_WAR_REWARDS.winXp} XP +{' '}
           {CLUB_WAR_REWARDS.winCoins} Fahhcoin for everyone who ran.

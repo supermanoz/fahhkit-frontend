@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toClubRoleWords } from '../api/client'
 import {
   IconEnvelope,
@@ -33,6 +33,29 @@ function isResolved(item) {
   return item.status === 'CLAIMED' || item.status === 'DECLINED'
 }
 
+// Neither list has its own scroll box - the whole menu sheet scrolls (see
+// GamePage.css's .game-menu-sheet) - so this watches a sentinel row at the
+// bottom of the list instead of a scroll-position listener. Fires
+// onLoadMore once the sentinel comes within 200px of the viewport; onLoadMore
+// itself (useMailbox's loadMoreMail/loadMoreBroadcasts) already no-ops while
+// a previous page is still loading, so re-firing mid-load is harmless.
+function useLoadMoreSentinel(hasMore, onLoadMore) {
+  const sentinelRef = useRef(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) onLoadMore()
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, onLoadMore])
+  return sentinelRef
+}
+
 // The in-game inbox. Personal mail and broadcasts (announcements every
 // player sees) are separate lists server-side, so they're separate sub-tabs
 // here too. Tapping a row expands it and marks it read; claimable mail
@@ -52,10 +75,22 @@ export default function MailPanel({ mailbox, onClaimed }) {
     decline,
     remove,
     openBroadcast,
+    mailHasMore,
+    loadingMoreMail,
+    loadMoreMail,
+    broadcastHasMore,
+    loadingMoreBroadcasts,
+    loadMoreBroadcasts,
   } = mailbox
 
   const unreadInbox = mail.filter((m) => m.status === 'UNREAD').length
   const unreadNews = broadcasts.filter((b) => !b.readAt).length
+
+  const mailSentinelRef = useLoadMoreSentinel(mailHasMore, loadMoreMail)
+  const newsSentinelRef = useLoadMoreSentinel(
+    broadcastHasMore,
+    loadMoreBroadcasts
+  )
 
   function toggle(item) {
     const next = openId === item.id ? null : item.id
@@ -193,6 +228,11 @@ export default function MailPanel({ mailbox, onClaimed }) {
                   </li>
                 )
               })}
+              {mailHasMore && (
+                <li ref={mailSentinelRef} className="mail-list-sentinel">
+                  {loadingMoreMail ? 'Loading more…' : ''}
+                </li>
+              )}
             </ul>
           )
         ) : broadcasts.length === 0 ? (
@@ -236,6 +276,11 @@ export default function MailPanel({ mailbox, onClaimed }) {
                 </li>
               )
             })}
+            {broadcastHasMore && (
+              <li ref={newsSentinelRef} className="mail-list-sentinel">
+                {loadingMoreBroadcasts ? 'Loading more…' : ''}
+              </li>
+            )}
           </ul>
         )}
 

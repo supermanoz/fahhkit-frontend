@@ -209,6 +209,19 @@ export function IconList(props) {
   )
 }
 
+// One big bold ring ("O") instead of IconList's thin lines-and-dots, for
+// the main radial-menu FAB (see GamePage.jsx's .game-menu-btn) - an
+// outline, not a filled dot, so it reads as the same weight/style as the
+// bold IconClose "X" it swaps with when the menu opens (GamePage.jsx
+// passes a matching strokeWidth to both).
+export function IconMenuOrb(props) {
+  return (
+    <GameIcon {...props}>
+      <circle cx="12" cy="12" r="9" />
+    </GameIcon>
+  )
+}
+
 export function IconClose(props) {
   return (
     <GameIcon {...props}>

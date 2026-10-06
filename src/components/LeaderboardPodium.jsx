@@ -4,9 +4,11 @@ import './LeaderboardPodium.css'
 
 // Top-3 podium (2 · 1 · 3, winner raised with light rays) above a ranked
 // list for everyone else. Shared by the Solo and Club leaderboards, so it
-// takes pre-shaped rows: { key, rank, name, area, avatarSrc?, isPlayer?,
-// onClick? }. The leaderboard API has no profile pictures, so anyone
-// without an avatarSrc gets coloured initials instead.
+// takes pre-shaped rows: { key, rank, name, area, avatarSrc?, badge?,
+// isPlayer?, onClick? }. The leaderboard API has no profile pictures, so
+// anyone without an avatarSrc gets coloured initials instead; the Club
+// leaderboard passes `badge` (a <ClubBadge>) to show the same badge used
+// everywhere else a club appears, instead of an avatar.
 
 const AVATAR_COLORS = [
   '#ff7a29',
@@ -78,11 +80,15 @@ function PodiumSpot({ entry, place }) {
             />
           ))}
         <span className="lb-podium-border">
-          <Avatar
-            name={entry.name}
-            src={entry.avatarSrc}
-            className="lb-podium-avatar"
-          />
+          {entry.badge ? (
+            <span className="lb-podium-badge">{entry.badge}</span>
+          ) : (
+            <Avatar
+              name={entry.name}
+              src={entry.avatarSrc}
+              className="lb-podium-avatar"
+            />
+          )}
         </span>
         <span className="lb-podium-medal">{place}</span>
       </span>
@@ -92,7 +98,11 @@ function PodiumSpot({ entry, place }) {
   )
 }
 
-export default function LeaderboardPodium({ entries, nameLabel = 'Runner' }) {
+export default function LeaderboardPodium({
+  entries,
+  nameLabel = 'Runner',
+  statLabel = 'Territory',
+}) {
   const [first, second, third] = entries
   const rest = entries.slice(3)
 
@@ -109,7 +119,7 @@ export default function LeaderboardPodium({ entries, nameLabel = 'Runner' }) {
           <div className="lb-list-head">
             <span className="lb-col-rank">Rank</span>
             <span className="lb-col-name">{nameLabel}</span>
-            <span className="lb-col-area">Territory</span>
+            <span className="lb-col-area">{statLabel}</span>
           </div>
           <ul className="lb-list">
             {rest.map((entry) => (
@@ -121,11 +131,15 @@ export default function LeaderboardPodium({ entries, nameLabel = 'Runner' }) {
                   disabled={!entry.onClick}
                 >
                   <span className="lb-col-rank">{entry.rank}</span>
-                  <Avatar
-                    name={entry.name}
-                    src={entry.avatarSrc}
-                    className="lb-row-avatar"
-                  />
+                  {entry.badge ? (
+                    <span className="lb-row-badge">{entry.badge}</span>
+                  ) : (
+                    <Avatar
+                      name={entry.name}
+                      src={entry.avatarSrc}
+                      className="lb-row-avatar"
+                    />
+                  )}
                   <span className="lb-col-name">{entry.name}</span>
                   <span className="lb-col-area">{entry.area}</span>
                 </button>

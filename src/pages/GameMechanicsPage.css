@@ -1,0 +1,136 @@
+.game-mechanics-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-mechanics-wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.game-mechanics-header h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.game-mechanics-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.game-mechanics-section {
+  padding: 24px;
+}
+
+.game-mechanics-section h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.game-mechanics-hint {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.game-mechanics-muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.game-mechanics-section .field {
+  margin-bottom: 16px;
+}
+
+.game-mechanics-section label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.game-mechanics-section label .opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.game-mechanics-section input,
+.game-mechanics-section textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.game-mechanics-section textarea {
+  resize: vertical;
+}
+
+.game-mechanics-section input:focus,
+.game-mechanics-section textarea:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.game-mechanics-section input[type='file'] {
+  padding: 8px;
+}
+
+.game-mechanics-city-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-mechanics-city-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.game-mechanics-city-name {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.game-mechanics-city-country {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.game-mechanics-add-city {
+  display: flex;
+  gap: 10px;
+}
+
+.game-mechanics-add-city input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}

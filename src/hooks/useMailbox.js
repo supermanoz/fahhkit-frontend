@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
 import {
   claimMail,
@@ -10,6 +10,9 @@ import {
   readMail,
 } from '../api/mail'
 
+const MAIL_PAGE_SIZE = 30
+const BROADCAST_PAGE_SIZE = 20
+
 // Inbox state lives here (not inside MailPanel) so the game's menu tab can
 // show an unread badge before the panel is ever opened, and so socket pushes
 // (useGameSocket's onMail/onBroadcastMail) can drop new mail straight in.
@@ -20,16 +23,29 @@ export function useMailbox() {
   const [error, setError] = useState(null)
   const [busyId, setBusyId] = useState(null)
   const [actionError, setActionError] = useState(null)
+  // Scroll-triggered pagination for each list (see MailPanel's sentinel
+  // elements) - the page counters are refs since only the derived
+  // hasMore/loadingMore flags need to drive a render.
+  const mailPageRef = useRef(1)
+  const broadcastPageRef = useRef(1)
+  const [mailHasMore, setMailHasMore] = useState(false)
+  const [broadcastHasMore, setBroadcastHasMore] = useState(false)
+  const [loadingMoreMail, setLoadingMoreMail] = useState(false)
+  const [loadingMoreBroadcasts, setLoadingMoreBroadcasts] = useState(false)
 
   const refresh = useCallback(async () => {
     setError(null)
     try {
       const [mailPage, broadcastPage] = await Promise.all([
-        findMyMail(1, 30),
-        findBroadcastMail(1, 20),
+        findMyMail(1, MAIL_PAGE_SIZE),
+        findBroadcastMail(1, BROADCAST_PAGE_SIZE),
       ])
       setMail(mailPage?.content || [])
       setBroadcasts(broadcastPage?.content || [])
+      mailPageRef.current = 1
+      broadcastPageRef.current = 1
+      setMailHasMore(1 < (mailPage?.totalPages || 1))
+      setBroadcastHasMore(1 < (broadcastPage?.totalPages || 1))
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not load your mail.'
@@ -38,6 +54,54 @@ export function useMailbox() {
       setLoaded(true)
     }
   }, [])
+
+  // Appends the next page instead of replacing the list - a live-pushed item
+  // (receiveMail/receiveBroadcast prepend) can land in between, so incoming
+  // ids already in the list are dropped rather than duplicated.
+  const loadMoreMail = useCallback(async () => {
+    if (loadingMoreMail || !mailHasMore) return
+    setLoadingMoreMail(true)
+    try {
+      const nextPage = mailPageRef.current + 1
+      const page = await findMyMail(nextPage, MAIL_PAGE_SIZE)
+      const incoming = page?.content || []
+      if (incoming.length > 0) {
+        mailPageRef.current = nextPage
+        setMail((prev) => {
+          const seen = new Set(prev.map((m) => m.id))
+          return [...prev, ...incoming.filter((m) => !seen.has(m.id))]
+        })
+      }
+      setMailHasMore(nextPage < (page?.totalPages || nextPage))
+    } catch {
+      // Leave the list as-is - the sentinel stays in view, so scrolling
+      // (or the next refresh) just tries again.
+    } finally {
+      setLoadingMoreMail(false)
+    }
+  }, [loadingMoreMail, mailHasMore])
+
+  const loadMoreBroadcasts = useCallback(async () => {
+    if (loadingMoreBroadcasts || !broadcastHasMore) return
+    setLoadingMoreBroadcasts(true)
+    try {
+      const nextPage = broadcastPageRef.current + 1
+      const page = await findBroadcastMail(nextPage, BROADCAST_PAGE_SIZE)
+      const incoming = page?.content || []
+      if (incoming.length > 0) {
+        broadcastPageRef.current = nextPage
+        setBroadcasts((prev) => {
+          const seen = new Set(prev.map((b) => b.id))
+          return [...prev, ...incoming.filter((b) => !seen.has(b.id))]
+        })
+      }
+      setBroadcastHasMore(nextPage < (page?.totalPages || nextPage))
+    } catch {
+      // Same as loadMoreMail - silently retryable by scrolling again.
+    } finally {
+      setLoadingMoreBroadcasts(false)
+    }
+  }, [loadingMoreBroadcasts, broadcastHasMore])
 
   const replace = (updated) =>
     setMail((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
@@ -139,5 +203,11 @@ export function useMailbox() {
     decline,
     remove,
     openBroadcast,
+    mailHasMore,
+    loadingMoreMail,
+    loadMoreMail,
+    broadcastHasMore,
+    loadingMoreBroadcasts,
+    loadMoreBroadcasts,
   }
 }

@@ -30,6 +30,9 @@ export default function AthleteTerritoryProfilePanel({
   // Shown instead of the full name when set (else the first name).
   nickname,
   onClose,
+  // Navigates to the Club tab for this profile's club (GamePage resolves
+  // the name to a clubId - this panel never sees one).
+  onViewClub,
   canInvite = false,
   onInvite,
   // Club management buttons for a clubmate ({ id, label, tone, confirm?,
@@ -202,7 +205,19 @@ export default function AthleteTerritoryProfilePanel({
             </div>
 
             {profile.clubName && (
-              <div className="athlete-profile-club">
+              <div
+                className="athlete-profile-club athlete-profile-club-clickable"
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${profile.clubName}`}
+                onClick={() => onViewClub?.(profile.clubName)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onViewClub?.(profile.clubName)
+                  }
+                }}
+              >
                 <ClubBadge name={profile.clubName} size={40} />
                 <span className="athlete-profile-club-text">
                   <span className="athlete-profile-club-label">Club</span>

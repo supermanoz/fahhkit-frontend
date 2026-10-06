@@ -12,6 +12,15 @@
   gap: 10px;
 }
 
+/* Club leaderboard's trophy count - the game's own flat cup icon instead
+   of the realistic 🏆 emoji, to match the rest of the icon set. */
+.lb-trophy-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lb-gold);
+}
+
 /* --- Podium: 2 · 1 · 3, winner raised --- */
 .lb-podium {
   display: grid;
@@ -102,6 +111,22 @@
 
 .lb-podium-avatar.lb-avatar-initials {
   font-size: 22px;
+}
+
+/* Club badge sits inside the medal-coloured frame instead of being clipped
+   to it - the shield shape is the frame already. */
+.lb-podium-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.lb-podium-badge .club-badge {
+  width: 82%;
+  height: auto;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 
 .place-1 .lb-podium-avatar.lb-avatar-initials {
@@ -301,4 +326,16 @@
   font-weight: 800;
   font-size: 15px;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.lb-row-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+}
+
+.lb-row-badge .club-badge {
+  width: 32px;
+  height: auto;
 }
