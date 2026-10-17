@@ -1,6 +1,8 @@
 .hero-sprite {
   background-repeat: no-repeat;
-  background-size: 500% 500%;
+  /* Single row of 48 frames (see HeroSprite.jsx) - width scales the full
+     strip to 48x the element, height stays 1x since there's only one row. */
+  background-size: 4800% 100%;
   image-rendering: -webkit-optimize-contrast;
   will-change: background-position;
 }

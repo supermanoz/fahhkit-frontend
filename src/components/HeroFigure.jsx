@@ -12,18 +12,28 @@ import './HeroFigure.css'
 export default function HeroFigure({ hero, pose = 'idle', height = 170 }) {
   const sprite = getHeroSprite(hero?.name)
   if (sprite) {
-    const sheet = sprite.poses[pose] || sprite.poses.idle
-    const width = Math.round((height * sprite.frameWidth) / sprite.frameHeight)
+    const isIdle = pose === 'idle'
+    const { src, frames, frameWidth, frameHeight } =
+      sprite.poses[pose] || sprite.poses.idle
+    const width = Math.round((height * frameWidth) / frameHeight)
+    // Idle's strip (a full-body stretch) has far more frames than a run/
+    // charge cycle - a flat animation-duration tuned for 4 frames would
+    // blur straight through all 48 of them. Pace per-frame instead so any
+    // strip plays at a readable speed regardless of its frame count: ~150ms
+    // for a relaxed stretch (matches HeroSprite.jsx's own idle), ~125ms for
+    // a snappy run/charge loop (the pre-existing 0.5s / 4-frame feel).
+    const frameMs = isIdle ? 150 : 125
     return (
       <span
-        key={sheet}
-        className={`hero-figure-sprite is-${pose === 'idle' ? 'idle' : 'moving'}`}
+        key={src}
+        className={`hero-figure-sprite is-${isIdle ? 'idle' : 'moving'}`}
         style={{
           width,
           height,
-          backgroundImage: `url(${sheet})`,
-          '--hero-strip-width': `${width * sprite.frames}px`,
-          '--hero-frames': sprite.frames,
+          backgroundImage: `url(${src})`,
+          '--hero-strip-width': `${width * frames}px`,
+          '--hero-frames': frames,
+          animationDuration: `${frames * frameMs}ms`,
         }}
         aria-hidden="true"
       />

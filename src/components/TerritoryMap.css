@@ -480,6 +480,23 @@
   }
 }
 
+/* Idle's sheet is a much slower 48-frame stretch cycle (shoulder, then
+   arm - see BLAZE_SHEETS), paced close to real time rather than a quick
+   breathing loop like the old 4-frame idle. */
+.territory-map-blaze[data-frames='48'] {
+  background-size: 2304px 64px;
+  animation: blaze-frames-48 7.2s steps(48) infinite;
+}
+
+@keyframes blaze-frames-48 {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -2304px 0;
+  }
+}
+
 @keyframes territoryPulse {
   0% {
     transform: scale(0.5);

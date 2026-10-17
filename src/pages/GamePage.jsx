@@ -407,6 +407,26 @@ export default function GamePage() {
   const [loadingRunId, setLoadingRunId] = useState(null)
   const [nearbyParcels, setNearbyParcels] = useState([])
 
+  // "My Territories" only shows 3 at a time (largest first), with arrow
+  // buttons paging through the rest instead of dumping a long list.
+  const TERRITORIES_PAGE_SIZE = 3
+  const [myTerritoriesPage, setMyTerritoriesPage] = useState(1)
+  const sortedMyTerritories = useMemo(
+    () => [...myTerritories].sort((a, b) => b.area - a.area),
+    [myTerritories]
+  )
+  const myTerritoriesTotalPages = Math.max(
+    1,
+    Math.ceil(sortedMyTerritories.length / TERRITORIES_PAGE_SIZE)
+  )
+  useEffect(() => {
+    setMyTerritoriesPage((p) => Math.min(p, myTerritoriesTotalPages))
+  }, [myTerritoriesTotalPages])
+  const visibleMyTerritories = sortedMyTerritories.slice(
+    (myTerritoriesPage - 1) * TERRITORIES_PAGE_SIZE,
+    myTerritoriesPage * TERRITORIES_PAGE_SIZE
+  )
+
   // --- Saved routes (draw a route, name it, keep it private or share to
   // your club - see src/api/routes.js) ---
   const [myRoutes, setMyRoutes] = useState([])
@@ -3557,10 +3577,9 @@ export default function GamePage() {
                         here.
                       </p>
                     ) : (
-                      <ul className="game-menu-list">
-                        {[...myTerritories]
-                          .sort((a, b) => b.area - a.area)
-                          .map((t) => (
+                      <>
+                        <ul className="game-menu-list">
+                          {visibleMyTerritories.map((t) => (
                             <li key={t.id}>
                               <button
                                 type="button"
@@ -3576,7 +3595,36 @@ export default function GamePage() {
                               </button>
                             </li>
                           ))}
-                      </ul>
+                        </ul>
+                        {myTerritoriesTotalPages > 1 && (
+                          <div className="game-route-pager">
+                            <button
+                              type="button"
+                              className="game-btn game-btn-wood game-btn-sm"
+                              aria-label="Show previous territories"
+                              disabled={myTerritoriesPage <= 1}
+                              onClick={() => setMyTerritoriesPage((p) => p - 1)}
+                            >
+                              ◀
+                            </button>
+                            <span className="game-route-pager-label">
+                              Page {myTerritoriesPage} of{' '}
+                              {myTerritoriesTotalPages}
+                            </span>
+                            <button
+                              type="button"
+                              className="game-btn game-btn-wood game-btn-sm"
+                              aria-label="Show more territories"
+                              disabled={
+                                myTerritoriesPage >= myTerritoriesTotalPages
+                              }
+                              onClick={() => setMyTerritoriesPage((p) => p + 1)}
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </section>
 

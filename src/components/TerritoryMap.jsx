@@ -30,7 +30,7 @@ import { PLAYER_COLOR, mergeTouchingParcels } from '../utils/territoryGame'
 // the account's equipped Hero's assetUrl 404ing) showed one character on
 // the map and a different one in the Me panel instead of matching.
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
-import blazeIdleSheet from '../assets/images/blaze-map-idle.png'
+import blazeIdleSheet from '../assets/images/blaze-map-idle-stretch.png'
 import blazeRunUpSheet from '../assets/images/blaze-map-run-up.png'
 import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
 import blazeRunLeftSheet from '../assets/images/blaze-map-run-left.png'
@@ -232,12 +232,14 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc, heading) {
 // Blaze gets a full-body animated sprite on the map instead of the round
 // avatar photo: idle when standing still, and a run cycle facing the
 // on-screen direction of travel while moving. Each sheet is a horizontal
-// strip stepped through by CSS (see .territory-map-blaze) - 4 frames for
-// idle/down/left/right, but "up" is a finer 15-frame cycle at 24fps (see
-// the [data-frames="15"] override in TerritoryMap.css), so frame count
-// travels with the sheet here instead of being hard-coded in one class.
+// strip stepped through by CSS (see .territory-map-blaze) - running is a
+// 4-frame cycle for down/left/right, but idle is a slower 48-frame stretch
+// (shoulder, then arm - see scripts/build_blaze_stretch_strips.py) and "up"
+// is its own finer 15-frame cycle at 24fps (see the [data-frames] overrides
+// in TerritoryMap.css), so frame count travels with the sheet here instead
+// of being hard-coded in one class.
 const BLAZE_SHEETS = {
-  idle: { src: blazeIdleSheet, frames: 4 },
+  idle: { src: blazeIdleSheet, frames: 48 },
   up: { src: blazeRunUpSheet, frames: 15 },
   down: { src: blazeRunDownSheet, frames: 4 },
   left: { src: blazeRunLeftSheet, frames: 4 },
