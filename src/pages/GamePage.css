@@ -55,18 +55,18 @@
   overflow: hidden;
   background: #0a0806;
   font-family: 'Passion One', 'Trebuchet MS', sans-serif;
-  letter-spacing: 0.06em;
-  /* A thin black outline on every bit of text, not just button labels -
-     the same fake-stroke-via-text-shadow trick the .game-btn family
-     already uses (see GameCards.css), just promoted here so it's inherited
-     everywhere instead of re-declared per component. Any element that sets
-     its own text-shadow (buttons included) overrides this, not stacks
-     with it. */
-  text-shadow:
-    1px 0 0 var(--game-ink),
-    -1px 0 0 var(--game-ink),
-    0 1px 0 var(--game-ink),
-    0 -1px 0 var(--game-ink);
+  letter-spacing: 0.08em;
+  /* No default text-shadow here any more - it used to put the same dark
+     ink outline behind every bit of text, buttons included. That's fine
+     for white lettering on a busy wood/stone card (see .game-card-title,
+     .game-btn - they still carry their own explicit outline recipe), but
+     stacked behind text that's ALREADY --game-ink coloured it just blurred
+     the glyph into a dark smudge - the actual cause of the "black text is
+     unreadable" reports. Dark-on-light labels now opt out of Passion One
+     entirely instead (see .game-card-light, .club-role, .game-menu-avatar-
+     name/-tag and friends) - a plain bold UI face reads far better at
+     small sizes than a display/poster font with no outline to prop up its
+     strokes. */
 }
 
 .game-page button,
@@ -1009,17 +1009,33 @@
   color: var(--game-gold);
 }
 
-.game-claim-toast-run-stats {
-  margin: 0 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(246, 236, 217, 0.65);
+/* Distance/pace/time as the same neat .game-stat boxes used everywhere
+   else in the run flow, not a cramped single line of muted text. */
+.game-claim-toast-stats {
+  margin: 0 0 14px;
 }
 
 .game-claim-toast p {
   margin: 0 0 14px;
   font-weight: 600;
   color: var(--game-cream);
+}
+
+/* "Saved to your run history" - shown on every phase of this toast, since
+   the run itself is already persisted by the time any of them render,
+   whatever the territory outcome turns out to be (see GamePage.jsx). */
+.game-claim-toast-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(79, 200, 94, 0.18);
+  border: 1.5px solid var(--game-green);
+  color: var(--game-green-light);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .game-claim-toast-actions {
@@ -2445,10 +2461,17 @@
   object-fit: cover;
 }
 
+/* Plain bold UI face, not Passion One - reads cleanly at this size on the
+   card's near-white gradient without needing an outline. */
 .game-menu-avatar-name {
   max-width: 100%;
-  font-weight: 800;
-  font-size: 13px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-shadow: none;
   color: var(--game-ink);
   overflow-wrap: anywhere;
 }
@@ -2457,8 +2480,13 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
-  font-weight: 800;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: none;
   color: var(--game-green-dark);
 }
 

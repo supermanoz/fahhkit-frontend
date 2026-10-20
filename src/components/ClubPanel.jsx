@@ -636,6 +636,7 @@ export default function ClubPanel({
             onStartWarRun={onStartWarRun}
             racing={racing}
             onTreasuryChanged={() => loadClubDetails(myClub.id)}
+            onViewProfile={onViewProfile}
           />
         ) : (
           <div className="game-cards">

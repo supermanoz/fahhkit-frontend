@@ -1,4 +1,5 @@
 import blazeIdleStretchSheet from '../assets/images/blaze-profile-idle-stretch.png'
+import blazeHipHopSheet from '../assets/images/blaze-profile-hiphop.png'
 import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
 import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
 
@@ -22,6 +23,15 @@ const HERO_SPRITES = {
         frameWidth: 200,
         frameHeight: 320,
       },
+      // Shop hero card hover pose (HeroGallery.jsx) - also pickable on the
+      // Hero Detail Modal's pose tabs. 24 frames, see
+      // scripts/build_blaze_stretch_strips.py (the "hip_hop" set).
+      hiphop: {
+        src: blazeHipHopSheet,
+        frames: 24,
+        frameWidth: 230,
+        frameHeight: 320,
+      },
       run: {
         src: blazeRunRightSheet,
         frames: 4,
@@ -38,7 +48,10 @@ const HERO_SPRITES = {
   },
 }
 
+// TEMP: no other hero has its own render yet, so every hero borrows
+// Blaze's strips for now (shows Blaze's look under a different name) until
+// each one gets its own set - see scripts/build_blaze_stretch_strips.py.
 export function getHeroSprite(name) {
-  if (typeof name !== 'string') return null
-  return HERO_SPRITES[name.trim().toLowerCase()] || null
+  if (typeof name !== 'string') return HERO_SPRITES.blaze
+  return HERO_SPRITES[name.trim().toLowerCase()] || HERO_SPRITES.blaze
 }

@@ -74,6 +74,11 @@
 .hero-modal-poses button.is-active {
   background: var(--game-gold);
   color: var(--game-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 700;
+  text-shadow: none;
 }
 
 .hero-modal-poses button:focus-visible {
@@ -228,8 +233,12 @@
   vertical-align: middle;
   border-radius: 999px;
   border: 1.5px solid var(--game-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 700;
   font-size: 10px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-shadow: none;
   background: var(--game-gold);
   color: var(--game-ink);

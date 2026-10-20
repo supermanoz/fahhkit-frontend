@@ -116,6 +116,11 @@
 .idle-nudge-go.is-battle {
   background: var(--game-gold);
   color: var(--game-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 700;
+  text-shadow: none;
   box-shadow:
     inset 0 -5px 0 var(--game-gold-dark),
     inset 0 2px 0 var(--game-gold-light),

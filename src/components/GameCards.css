@@ -27,11 +27,22 @@
   color: var(--game-cream);
 }
 
+/* Dark ink text reads better in a plain bold UI face than in Passion One
+   (a display/poster font meant to be filled white with a hard outline -
+   see .game-card-title below - not set solid in a dark colour at small
+   sizes). Every light-card descendant inherits this instead of the
+   game's usual font. */
 .game-card-light {
   align-items: center;
   text-align: center;
   background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
   color: var(--game-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: none;
 }
 
 /* White lettering with a hard ink outline - the Clash title treatment. */
@@ -56,6 +67,15 @@
 .game-card-title-sm {
   font-size: 17px;
   text-align: left;
+}
+
+/* On a light/cream card, the white fill above goes nearly invisible
+   against the near-white background - only the thin ink outline shows,
+   so the heading reads as hollow, hard-to-read strokes. Flip to a solid
+   ink fill with a soft parchment highlight instead. */
+.game-card-light .game-card-title {
+  color: var(--game-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 /* --- Buttons: fat cel-shaded slabs with outlined white text. --- */

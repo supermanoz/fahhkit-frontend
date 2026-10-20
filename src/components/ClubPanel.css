@@ -113,6 +113,12 @@
   background: #fff;
   border-color: rgba(61, 43, 26, 0.35);
   color: var(--game-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: none;
 }
 
 .game-club-input.club-input-light::placeholder {
@@ -252,15 +258,22 @@
   margin-bottom: 0;
 }
 
-/* Role pill - on the banner ("You: Leader") and on every roster row. */
+/* Role pill - on the banner ("You: Leader") and on every roster row. A
+   plain bold UI face (not Passion One) reads cleanly at this size without
+   needing an outline to prop up its strokes. */
 .club-role {
   display: inline-block;
   white-space: nowrap;
   margin-top: 2px;
   padding: 1px 8px;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: none;
   background: rgba(246, 236, 217, 0.18);
   color: var(--game-cream);
 }
@@ -363,12 +376,24 @@
   background: var(--game-green-dark);
 }
 
+/* Dota-draft-style team split - a faint gold-to-red wash behind the
+   matchup instead of a flat card background, so "us" and "them" read as
+   two sides even before you look at the shields. */
 .club-war-vs {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 8px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 179, 92, 0.2) 0%,
+    rgba(255, 179, 92, 0.04) 42%,
+    rgba(255, 90, 77, 0.04) 58%,
+    rgba(255, 90, 77, 0.2) 100%
+  );
 }
 
 .club-war-side {
@@ -382,16 +407,6 @@
 .club-war-side .game-row-name {
   max-width: 100%;
   text-align: center;
-}
-
-/* The rival's shield is red - ours stays gold. */
-.club-emblem-enemy {
-  background: linear-gradient(
-    180deg,
-    var(--game-red-light) 0%,
-    var(--game-red) 50%,
-    var(--game-red-dark) 100%
-  );
 }
 
 .club-war-vs-label {
@@ -425,17 +440,125 @@
   text-align: center;
 }
 
+.club-war-mine-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.club-war-mine-head .club-war-mine-title {
+  text-align: left;
+}
+
+/* "3/10 ready" - the same prep-progress readout a Clash of Clans war
+   roster shows before battle opens, so the squad feels the clock. */
+.club-war-prep-progress {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(61, 43, 26, 0.1);
+  color: var(--game-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* A hero pick is a bigger moment than choosing a map skin, so these cards
+   run larger than the plain .game-menu-avatar-card grid used elsewhere
+   (Map/Avatar shop) - a Dota-draft-style pick, not a settings list. */
 .club-war-heroes {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 14px;
+}
+
+.club-war-heroes .game-menu-avatar-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 8px 12px;
+  gap: 8px;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.club-war-heroes .game-menu-avatar-card:not(:disabled):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 0 var(--game-ink);
+}
+
+.club-war-heroes .game-menu-avatar-card img {
+  width: 72px;
+  height: 72px;
+}
+
+.club-war-heroes .club-war-hero-figure {
+  height: 88px;
+}
+
+.club-war-heroes .game-menu-avatar-name {
+  font-size: 15px;
+}
+
+/* Diagonal "LOCKED" ribbon across the selected card's corner - the
+   classic mobile-game "equipped" badge, replacing the plain inline tag. */
+.club-war-heroes .game-menu-avatar-card.is-selected::after {
+  content: 'LOCKED';
+  position: absolute;
+  top: 12px;
+  right: -30px;
+  width: 110px;
+  padding: 2px 0;
+  transform: rotate(45deg);
+  background: var(--game-green);
+  border: 1px solid var(--game-ink);
+  color: #fff;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
 }
 
 .club-war-points {
   flex-shrink: 0;
   font-weight: 900;
   color: var(--game-gold-light);
+}
+
+/* Ran/missed/pending badge on a war-roster row, standing in for the
+   stars-per-attack indicator a Clash of Clans war log shows instead of a
+   plain "· ran" text suffix. */
+.club-war-run-badge {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.club-war-run-badge.is-done {
+  background: var(--game-green);
+  color: #fff;
+}
+
+.club-war-run-badge.is-missed {
+  background: var(--game-red-dark);
+  color: #fff;
+}
+
+.club-war-run-badge.is-pending {
+  background: rgba(246, 236, 217, 0.15);
+  color: rgba(246, 236, 217, 0.6);
 }
 
 .club-war-picker-head {
@@ -466,6 +589,82 @@
 
 .club-war-check.is-on {
   background: var(--game-green);
+}
+
+/* Final score split under the VS row (completed wars only) - a COC-style
+   "momentum bar" rather than just the two numbers. */
+.club-war-score-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--game-red);
+  border: 2px solid var(--game-ink);
+}
+
+.club-war-score-bar-fill {
+  height: 100%;
+  background: var(--game-gold);
+}
+
+/* Squad roster row (ClubWarPanel's squadList) - rank number, hero avatar
+   (or a lock/helmet placeholder), then name + status, same shape as every
+   other .game-row but clickable through to the player's profile. */
+.club-war-row {
+  cursor: pointer;
+}
+
+.club-war-rank {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(246, 236, 217, 0.75);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.club-war-avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: var(--game-wood);
+  color: var(--game-cream);
+  overflow: hidden;
+}
+
+.club-war-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Enemy hero still under wraps - a lock badge standing in for it. */
+.club-war-avatar.is-masked {
+  background: var(--game-red-dark);
+}
+
+/* Own/allied squad member who hasn't picked a hero yet. */
+.club-war-avatar.is-empty {
+  background: var(--game-stone-dark);
+}
+
+/* The "Lock In Your Hero" picker's animated card (Blaze) - a taller stage
+   above the name instead of the flat 48x48 circular portrait. */
+.club-war-hero-figure {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 64px;
 }
 
 /* My Club / Club Wars switch at the top of the Club tab. */

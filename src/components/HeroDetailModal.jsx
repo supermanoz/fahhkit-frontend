@@ -12,7 +12,12 @@ import './HeroDetailModal.css'
 // still reads as a solid chunk instead of a sliver.
 const STAT_BAR_MAX_PCT = 25
 
-const POSE_LABELS = { idle: 'Idle', run: 'Run', charge: 'Charge' }
+const POSE_LABELS = {
+  idle: 'Idle',
+  hiphop: 'Hip Hop',
+  run: 'Run',
+  charge: 'Charge',
+}
 
 // A hero's codex page: big animated figure, stats (score perks), lore and
 // skins. Rendered at page level by GamePage (inside AnimatePresence) so the

@@ -583,6 +583,12 @@ export default function GamePage() {
   // TrackRunPanel's Stop Run and PvpPanel's Forfeit, just inline in the
   // button row instead of a separate state var per button.
   const [confirmAction, setConfirmAction] = useState(null)
+  // Shows the "loop not closed" popup once right after a run ends open -
+  // dismissible so it doesn't nag while the athlete decides whether to
+  // submit anyway or go back out and close it. Reset to false every time
+  // End is confirmed (see the end-confirm button below), so a fresh draft
+  // always gets its own first look at the warning.
+  const [loopWarningDismissed, setLoopWarningDismissed] = useState(false)
   // Guards the auto-finish-on-target-distance effect below so it fires at
   // most once per race, keyed by challenge id (effects can re-run before
   // tracker.status actually flips to 'idle').
@@ -1860,11 +1866,26 @@ export default function GamePage() {
   function renderCompletedRunStats() {
     if (!completedRun) return null
     return (
-      <p className="game-claim-toast-run-stats">
-        {formatDistance(completedRun.distance)} ·{' '}
-        {formatPace(completedRun.avgPace)} ·{' '}
-        {formatDuration(completedRun.duration)}
-      </p>
+      <div className="game-controls-stats game-claim-toast-stats">
+        <span className="game-stat">
+          <span className="game-stat-value">
+            {formatDistance(completedRun.distance)}
+          </span>
+          <span className="game-stat-label">Distance</span>
+        </span>
+        <span className="game-stat">
+          <span className="game-stat-value">
+            {formatPace(completedRun.avgPace)}
+          </span>
+          <span className="game-stat-label">Pace</span>
+        </span>
+        <span className="game-stat">
+          <span className="game-stat-value">
+            {formatDuration(completedRun.duration)}
+          </span>
+          <span className="game-stat-label">Time</span>
+        </span>
+      </div>
     )
   }
 
@@ -2757,8 +2778,10 @@ export default function GamePage() {
                           }`}
                           onClick={() => {
                             setConfirmAction(null)
-                            if (confirmAction === 'end') tracker.stop()
-                            else handleCancelTracking()
+                            if (confirmAction === 'end') {
+                              setLoopWarningDismissed(false)
+                              tracker.stop()
+                            } else handleCancelTracking()
                           }}
                         >
                           {confirmAction === 'end' ? 'Yes, End' : 'Yes, Cancel'}
@@ -2792,8 +2815,16 @@ export default function GamePage() {
         {pendingRun && (
           <>
             <div className="game-controls-stats">
-              <span>Loop area: {formatArea(draftArea)}</span>
-              <span>Perimeter: {formatMeters(draftPerimeter)}</span>
+              <span className="game-stat">
+                <span className="game-stat-value">{formatArea(draftArea)}</span>
+                <span className="game-stat-label">Loop Area</span>
+              </span>
+              <span className="game-stat">
+                <span className="game-stat-value">
+                  {formatMeters(draftPerimeter)}
+                </span>
+                <span className="game-stat-label">Perimeter</span>
+              </span>
             </div>
             {confirmAction === 'discard' ? (
               <div className="game-controls-confirm">
@@ -3006,6 +3037,15 @@ export default function GamePage() {
             animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
             exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
           >
+            {/* By the time any phase below renders, attemptSubmit() has
+                already created the run server-side - whatever the
+                territory outcome turns out to be, the run itself is
+                already safely in the athlete's history. */}
+            {completedRun && (
+              <p className="game-claim-toast-saved">
+                <IconCheck /> Saved to your run history
+              </p>
+            )}
             {runResult.phase === 'processing' && (
               <>
                 <h3>Run submitted!</h3>
@@ -3087,11 +3127,11 @@ export default function GamePage() {
               })()}
             {runResult.phase === 'timeout' && (
               <>
-                <h3>Run saved!</h3>
+                <h3>Still checking your territory…</h3>
                 {renderCompletedRunStats()}
                 <p>
-                  If your loop closed cleanly, territory should show up here
-                  shortly — check back in a bit if you don’t see it yet.
+                  Taking a bit longer than usual to confirm whether your loop
+                  closed — check back in a bit if it doesn’t show up here.
                 </p>
                 <button
                   type="button"
@@ -4160,6 +4200,51 @@ export default function GamePage() {
                 {myRoutesError}
               </p>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* One-time nudge right after End, when the GPS path never made it
+          back near its start - draftLoopOpen below is the same client-side
+          hint shown inline under Submit/Discard, just surfaced as a popup
+          so it can't be scrolled past unnoticed. Doesn't block Submit -
+          the run still saves to history either way (see
+          game-claim-toast-saved below). */}
+      <AnimatePresence>
+        {pendingRun && draftLoopOpen && !loopWarningDismissed && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLoopWarningDismissed(true)}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p>
+                <strong>Heads up — your loop&apos;s still open</strong>
+              </p>
+              <p>
+                You finished away from where you started, so this run might not
+                close out as territory. It&apos;ll still be saved to your run
+                history either way - submit now, or head back out and close the
+                loop first.
+              </p>
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setLoopWarningDismissed(true)}
+                >
+                  Got it
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

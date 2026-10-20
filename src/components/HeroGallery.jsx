@@ -95,7 +95,7 @@ export default function HeroGallery({
               <span className="hero-card-stage">
                 <HeroFigure
                   hero={hero}
-                  pose={active ? 'run' : 'idle'}
+                  pose={active ? 'hiphop' : 'idle'}
                   height={150}
                 />
               </span>

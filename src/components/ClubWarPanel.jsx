@@ -1,7 +1,17 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useCallback, useEffect, useState } from 'react'
-import { IconCheck, IconRunning, IconSwords } from './GameIcons'
+import {
+  IconCheck,
+  IconClose,
+  IconHelmet,
+  IconLock,
+  IconRunning,
+  IconSwords,
+} from './GameIcons'
 import ClubTrophyIcon from './ClubTrophyIcon'
+import ClubBadge from './ClubBadge'
+import HeroFigure from './HeroFigure'
+import { getHeroSprite } from '../utils/heroSprites'
 import { ApiError, resolveFileUrl } from '../api/client'
 import {
   CLUB_WAR_BATTLE_HOURS,
@@ -86,6 +96,7 @@ export default function ClubWarPanel({
   onStartWarRun,
   racing,
   onTreasuryChanged,
+  onViewProfile,
 }) {
   const isLeader = myRole === 'LEADER'
   const [loading, setLoading] = useState(true)
@@ -224,6 +235,13 @@ export default function ClubWarPanel({
     ownedItems.find((o) => o.storeItem.id === storeItemId)?.storeItem.name ||
     'Hero'
 
+  const heroAssetUrl = (storeItemId) => {
+    const item =
+      storeCatalog.find((i) => i.id === storeItemId) ||
+      ownedItems.find((o) => o.storeItem.id === storeItemId)?.storeItem
+    return item?.assetUrl ? resolveFileUrl(item.assetUrl) : null
+  }
+
   const rules = (
     <section className="game-card game-card-dark">
       <h3 className="game-card-title game-card-title-sm">How Club Wars Work</h3>
@@ -294,36 +312,83 @@ export default function ClubWarPanel({
       equippedHero?.storeItem.id === me?.lockedHeroStoreItemId
 
     const squadList = (squad, masked) => (
-      <ul className="game-rows">
-        {squad.map((p) => (
-          <li key={p.userId}>
-            <div className={`game-row ${p.userId === userId ? 'is-me' : ''}`}>
-              <span className="game-row-info">
-                <span className="game-row-name">
-                  {p.userId === userId ? 'You' : playerNameOf(p)}
+      <ul className="game-rows club-war-roster">
+        {squad.map((p, i) => {
+          const isMe = p.userId === userId
+          const avatarUrl =
+            !masked && p.lockedHeroStoreItemId
+              ? heroAssetUrl(p.lockedHeroStoreItemId)
+              : null
+          const openProfile = () =>
+            onViewProfile?.({
+              userId: p.userId,
+              fullName: p.fullName,
+              nickname: p.nickname,
+            })
+          return (
+            <li key={p.userId}>
+              <div
+                className={`game-row club-war-row game-row-clickable ${isMe ? 'is-me' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${isMe ? 'your' : `${playerNameOf(p)}'s`} profile`}
+                onClick={openProfile}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openProfile()
+                  }
+                }}
+              >
+                <span className="club-war-rank">{i + 1}</span>
+                <span
+                  className={`club-war-avatar ${masked ? 'is-masked' : ''} ${!masked && !p.lockedHeroStoreItemId ? 'is-empty' : ''}`}
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  ) : masked ? (
+                    <IconLock />
+                  ) : (
+                    <IconHelmet />
+                  )}
                 </span>
-                <span className="game-row-meta">
-                  {masked
-                    ? 'Hero hidden until battle'
-                    : p.lockedHeroStoreItemId
-                      ? `${heroName(p.lockedHeroStoreItemId)} locked in`
-                      : 'No hero yet'}
-                  {war.status !== 'PREPARING' &&
-                    (p.runId
-                      ? ' · ran ✓'
-                      : completed
-                        ? " · didn't run"
-                        : ' · no run yet')}
+                <span className="game-row-info">
+                  <span className="game-row-name">
+                    {isMe ? 'You' : playerNameOf(p)}
+                  </span>
+                  <span className="game-row-meta">
+                    {masked
+                      ? 'Hero hidden until battle'
+                      : p.lockedHeroStoreItemId
+                        ? `${heroName(p.lockedHeroStoreItemId)} locked in`
+                        : 'No hero yet'}
+                  </span>
                 </span>
-              </span>
-              {completed && (
-                <span className="club-war-points">
-                  {formatScore(p.contributedScore)}
-                </span>
-              )}
-            </div>
-          </li>
-        ))}
+                {war.status !== 'PREPARING' && (
+                  <span
+                    className={`club-war-run-badge ${p.runId ? 'is-done' : completed ? 'is-missed' : 'is-pending'}`}
+                    title={
+                      p.runId ? 'Ran' : completed ? "Didn't run" : 'No run yet'
+                    }
+                  >
+                    {p.runId ? <IconCheck /> : completed ? <IconClose /> : '·'}
+                  </span>
+                )}
+                {completed && (
+                  <span className="club-war-points">
+                    {formatScore(p.contributedScore)}
+                  </span>
+                )}
+              </div>
+            </li>
+          )
+        })}
       </ul>
     )
 
@@ -343,9 +408,7 @@ export default function ClubWarPanel({
           </span>
           <div className="club-war-vs">
             <div className="club-war-side">
-              <span className="club-emblem">
-                <IconSwords />
-              </span>
+              <ClubBadge name={ours.name} size={56} />
               <span className="game-row-name">{ours.name}</span>
               <span className="game-row-meta">🏆 {ours.trophies ?? 0}</span>
               {completed && (
@@ -356,9 +419,7 @@ export default function ClubWarPanel({
             </div>
             <span className="game-card-title club-war-vs-label">VS</span>
             <div className="club-war-side">
-              <span className="club-emblem club-emblem-enemy">
-                <IconSwords />
-              </span>
+              <ClubBadge name={theirs.name} size={56} />
               <span className="game-row-name">{theirs.name}</span>
               <span className="game-row-meta">🏆 {theirs.trophies ?? 0}</span>
               {completed && (
@@ -368,6 +429,16 @@ export default function ClubWarPanel({
               )}
             </div>
           </div>
+          {completed && (ours.score > 0 || theirs.score > 0) && (
+            <div className="club-war-score-bar" aria-hidden="true">
+              <div
+                className="club-war-score-bar-fill"
+                style={{
+                  width: `${(ours.score / (ours.score + theirs.score || 1)) * 100}%`,
+                }}
+              />
+            </div>
+          )}
           <p className="game-row-meta club-war-sub">
             {war.squadSize} vs {war.squadSize}
             {completed && won
@@ -393,9 +464,15 @@ export default function ClubWarPanel({
           <section className="game-card game-card-light club-war-mine">
             {war.status === 'PREPARING' ? (
               <>
-                <h3 className="game-card-title game-card-title-sm club-war-mine-title">
-                  Lock In Your Hero
-                </h3>
+                <div className="club-war-mine-head">
+                  <h3 className="game-card-title game-card-title-sm club-war-mine-title">
+                    Lock In Your Hero
+                  </h3>
+                  <span className="club-war-prep-progress">
+                    {ourSquad.filter((p) => p.lockedHeroStoreItemId).length}/
+                    {ourSquad.length} ready
+                  </span>
+                </div>
                 <p className="club-blurb">
                   {me.lockedHeroStoreItemId
                     ? `${heroName(me.lockedHeroStoreItemId)} is locked in. You can switch until the battle starts.`
@@ -409,11 +486,12 @@ export default function ClubWarPanel({
                   <div className="club-war-heroes">
                     {ownedHeroes.map((o) => {
                       const locked = o.storeItem.id === me.lockedHeroStoreItemId
+                      const animated = Boolean(getHeroSprite(o.storeItem.name))
                       return (
                         <button
                           key={o.storeItem.id}
                           type="button"
-                          className={`game-menu-avatar-card ${locked ? 'is-selected' : ''}`}
+                          className={`game-menu-avatar-card ${locked ? 'is-selected' : ''} ${animated ? 'is-animated' : ''}`}
                           disabled={locked || busy === 'lock'}
                           onClick={() =>
                             runAction(
@@ -423,23 +501,28 @@ export default function ClubWarPanel({
                             )
                           }
                         >
-                          {o.storeItem.assetUrl && (
-                            <img
-                              src={resolveFileUrl(o.storeItem.assetUrl)}
-                              alt=""
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none'
-                              }}
-                            />
+                          {animated ? (
+                            <span className="club-war-hero-figure">
+                              <HeroFigure
+                                hero={{ name: o.storeItem.name }}
+                                pose="idle"
+                                height={88}
+                              />
+                            </span>
+                          ) : (
+                            o.storeItem.assetUrl && (
+                              <img
+                                src={resolveFileUrl(o.storeItem.assetUrl)}
+                                alt=""
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none'
+                                }}
+                              />
+                            )
                           )}
                           <span className="game-menu-avatar-name">
                             {o.storeItem.name}
                           </span>
-                          {locked && (
-                            <span className="game-menu-avatar-tag">
-                              <IconCheck /> Locked
-                            </span>
-                          )}
                         </button>
                       )
                     })}
@@ -539,9 +622,11 @@ export default function ClubWarPanel({
           <span className="club-war-phase phase-searching">
             Searching for an opponent…
           </span>
-          <span className="club-emblem club-emblem-lg club-war-searching">
-            <IconSwords />
-          </span>
+          <ClubBadge
+            name={club.name}
+            size={84}
+            className="club-war-searching"
+          />
           <p className="game-row-meta club-war-sub">
             {queueEntry.squadSize}-member squad
           </p>
@@ -573,9 +658,7 @@ export default function ClubWarPanel({
     <div className="game-cards">
       {!isLeader ? (
         <section className="game-card game-card-dark club-war-banner">
-          <span className="club-emblem club-emblem-lg">
-            <IconSwords />
-          </span>
+          <ClubBadge name={club.name} size={84} />
           <h3 className="game-card-title">No War Right Now</h3>
           <p className="game-row-meta club-war-sub">
             Your club captain picks the squad and starts the search. If
@@ -585,9 +668,7 @@ export default function ClubWarPanel({
         </section>
       ) : eligibleSizes.length === 0 ? (
         <section className="game-card game-card-dark club-war-banner">
-          <span className="club-emblem club-emblem-lg">
-            <IconSwords />
-          </span>
+          <ClubBadge name={club.name} size={84} />
           <h3 className="game-card-title">Recruit to Go to War</h3>
           <p className="game-row-meta club-war-sub">
             Wars need a squad of at least {CLUB_WAR_SQUAD_SIZES[0]}. You have{' '}

@@ -63,6 +63,15 @@ SETS = {
         "profile_out": "blaze-profile-hello-neck-stretch.png",
         "map_out": None,
     },
+    # Shop hero card hover pose (heroSprites.js's "hiphop" pose) - also
+    # selectable as a pose tab on the Hero Detail Modal.
+    "hip_hop": {
+        "folders": [
+            ("Hip Hop", "Straight View"),
+        ],
+        "profile_out": "blaze-profile-hiphop.png",
+        "map_out": None,
+    },
 }
 
 
