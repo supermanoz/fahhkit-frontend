@@ -1021,21 +1021,32 @@
   color: var(--game-cream);
 }
 
-/* "Saved to your run history" - shown on every phase of this toast, since
-   the run itself is already persisted by the time any of them render,
-   whatever the territory outcome turns out to be (see GamePage.jsx). */
-.game-claim-toast-saved {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 10px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(79, 200, 94, 0.18);
-  border: 1.5px solid var(--game-green);
-  color: var(--game-green-light);
-  font-size: 12px;
-  font-weight: 700;
+/* The post-run result popup (Run submitted! / Checking your territory… /
+   territory outcome) - centered in the middle of the screen instead of
+   anchored to the bottom sheet, and sized up so it reads as the main thing
+   on screen right after a run instead of a small toast. */
+.game-claim-toast-center {
+  top: 50%;
+  bottom: auto;
+  width: 92vw;
+  max-width: 420px;
+  padding: 30px 32px;
+}
+
+.game-claim-toast-center h3 {
+  font-size: 26px;
+}
+
+.game-claim-toast-center .game-claim-toast-stats {
+  margin: 4px 0 16px;
+}
+
+.game-claim-toast-center .game-stat-value {
+  font-size: 24px;
+}
+
+.game-claim-toast-center p {
+  font-size: 15px;
 }
 
 .game-claim-toast-actions {
@@ -3234,16 +3245,191 @@
   }
 }
 
-/* Shop section tabs (Heroes / Territory / Trail / Map). */
-.game-shop-tabs {
-  align-self: stretch;
+/* Broadcast/news announcement popup - same card recipe as .challenge-prompt
+   above, themed gold (an announcement) instead of red (a challenge). */
+/* Centered dead in the middle of the screen (not anchored near the top
+   like the other toasts) and sized to actually be the main thing on
+   screen, same "Events" dialog shape as a mobile game's title-barred popup:
+   a labeled header strip with a round close button overlapping its edge,
+   then a banner image, title and body in the body below. */
+.broadcast-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 6, 3, 0.65);
 }
 
+.broadcast-prompt {
+  position: relative;
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  border: 3px solid var(--game-ink);
+  /* Light parchment body (same recipe as .game-card-light) instead of the
+     dark wood most of this game's UI uses - this is the one popup meant to
+     read like a mobile game's "Events" dialog, cream card and all. */
+  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
+  color: var(--game-ink);
+  overflow: hidden;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    0 5px 0 var(--game-ink),
+    0 24px 50px rgba(0, 0, 0, 0.65);
+}
+
+.broadcast-prompt-titlebar {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 50px;
+  background: linear-gradient(180deg, #6b645c 0%, #3f3a34 100%);
+  border-bottom: 3px solid var(--game-ink);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.broadcast-prompt-close {
+  all: unset;
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 2.5px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-red-light),
+    var(--game-red) 60%,
+    var(--game-red-dark)
+  );
+  color: #fff;
+  cursor: pointer;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 2px 0 var(--game-ink);
+}
+
+.broadcast-prompt-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 24px 26px;
+  text-align: center;
+}
+
+.broadcast-prompt-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--game-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.broadcast-prompt-image {
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 2px solid var(--game-ink);
+}
+
+.broadcast-prompt-body {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(61, 43, 26, 0.85);
+  font-weight: 500;
+}
+
+.broadcast-prompt-meta {
+  margin: -4px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--game-wood-dark);
+}
+
+.broadcast-prompt-action {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px;
+  font-size: 16px;
+}
+
+/* Shop section tabs (Heroes / Territory / Trail / Map) - icon-only, so
+   centered as a tight group instead of stretching edge to edge. */
+.game-shop-tabs {
+  align-self: stretch;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Icon-only now (no Heroes/Territory/Trail/Map text) - a chunky, glossy
+   squircle per section instead of a thin flat rectangle, so it reads as a
+   toy-like game icon (think mobile-game app icons) rather than a plain web
+   tab. Bigger glyph since the icon alone carries the meaning, a soft top
+   highlight for the glossy "candy button" look, and a drop shadow under the
+   icon itself for a bit of pop. */
 .game-shop-tabs .game-menu-subtab {
+  position: relative;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border-width: 3px;
+  border-radius: 18px;
+  font-size: 25px;
+  overflow: hidden;
+  transition: transform 0.08s ease;
+}
+
+.game-shop-tabs .game-menu-subtab::before {
+  content: '';
+  position: absolute;
+  inset: 3px 3px auto 3px;
+  height: 46%;
+  border-radius: 14px 14px 50% 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0)
+  );
+  pointer-events: none;
+}
+
+.game-shop-tabs .game-menu-subtab svg {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.35));
+}
+
+.game-shop-tabs .game-menu-subtab:active {
+  transform: translateY(2px);
 }
 
 /* The hero roster sits straight on the panel (no card box). */

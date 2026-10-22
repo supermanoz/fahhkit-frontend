@@ -333,3 +333,25 @@ Frontend for backend commits `ea0f213`…`d528e87` on `feature/territory-game`:
 - PvP quick-match stakes: frontend `PVP_MODES` now 500 m = 50, 1 km = 100, 5 km = 500. The server
   charges its own `run-challenge.queue-stake-amounts.*` (still 10/20/50 in application.properties) -
   backend config must be updated to match.
+
+## Blaze asset refresh (2026-10-22)
+
+- All of Blaze's animated strips rebuilt from a new source drop ("Blaze animation png sequence",
+  319MB, not checked into this repo) via the updated `scripts/build_blaze_stretch_strips.py` -
+  `SRC_ROOT` now points there instead of the old "Blaze assets library" drop. Frame counts kept
+  identical to before (48 idle, 24 hiphop, 48 hello/neck [24+24], 4 per map run direction, 15 for
+  "up") so no frontend logic changed, just the art.
+- **Map run cycles are real now**: the old `blaze-map-run-{up,down,left,right}.png` were hand-cut (no
+  build script ever existed for them, SESSION_NOTES just called it out as such) - the new source's
+  "Blaze running png sequence" folder has an actual 18-frame run cycle per direction (front/back/left/
+  right, plus unused 45° diagonals and top views), sampled down to the existing 4/15-frame counts.
+  `blaze-map-run-up-left.png` / `-up-right.png` stay as orphaned, unrebuilt leftovers - nothing imports
+  them (TerritoryMap.jsx only ever used 4 quadrants).
+- **Pose source mapping** (new source has no exact folder-name match for some old picks):
+  idle → "Arm stretching" alone (was "Shoulder stretch" + "Arm Stretching" combined - no matching
+  "Shoulder stretch" folder this time); hiphop → "break dance" (no "Hip Hop" folder); hello/neck →
+  "waving" + "neck stretch" (direct match, just renamed from "Hello").
+- Cell geometry drifted with the new art's proportions (profile strips only - map strips are always
+  exactly 128x170 via contain-fit, unaffected): idle's `frameWidth` 200→151, hiphop's 230→233 (both
+  `src/utils/heroSprites.js`), and HeroSprite.jsx's `CELL_ASPECT` 203/320→197/320. Re-run the script
+  and check its printed `cell=` line before trusting these if the source art changes again.

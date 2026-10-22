@@ -54,6 +54,7 @@
   font-size: 22px;
   font-weight: 900;
   line-height: 1.15;
+  letter-spacing: 0.04em;
   text-shadow:
     1.5px 0 0 var(--game-ink),
     -1.5px 0 0 var(--game-ink),
@@ -216,6 +217,7 @@
   white-space: nowrap;
   font-weight: 800;
   font-size: 14px;
+  letter-spacing: 0.03em;
   color: #fff;
 }
 

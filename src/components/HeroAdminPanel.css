@@ -1,0 +1,202 @@
+/* Rendered inside GameMechanicsPage's Territory Rollout-style section body,
+   so it reuses that page's .game-mechanics-search-box / -pagination /
+   -muted / -section-chevron classes (see GameMechanicsPage.css) rather than
+   redefining them - this file only covers what's specific to hero rows. */
+
+.hero-admin-new-btn {
+  margin-bottom: 16px;
+}
+
+.hero-admin-create {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hero-admin-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-admin-form .field {
+  margin-bottom: 12px;
+}
+
+.hero-admin-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.hero-admin-form label .opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.hero-admin-form input,
+.hero-admin-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.hero-admin-form textarea {
+  resize: vertical;
+}
+
+.hero-admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.hero-admin-checkbox input {
+  width: auto;
+}
+
+.hero-admin-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hero-admin-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.hero-admin-row-head {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.hero-admin-row-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.hero-admin-row-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hero-admin-row-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.hero-admin-row-tagline {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.hero-admin-row-body {
+  padding: 0 14px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-admin-row-body .hero-admin-form {
+  margin-top: 14px;
+}
+
+.hero-admin-abilities {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.hero-admin-abilities h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.hero-admin-ability-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hero-admin-ability-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.hero-admin-ability-value {
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.hero-admin-attach-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hero-admin-attach-form select {
+  flex: 1 1 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.hero-admin-attach-form input {
+  width: 90px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}

@@ -15,9 +15,12 @@ const STAT_BAR_MAX_PCT = 25
 const POSE_LABELS = {
   idle: 'Idle',
   hiphop: 'Hip Hop',
-  run: 'Run',
-  charge: 'Charge',
 }
+
+// Run/Charge are map-only poses (the sprite's actual running cycles) - not
+// something to pick on the codex page, which only ever shows the hero
+// standing still or vibing.
+const MODAL_POSES = ['idle', 'hiphop']
 
 // A hero's codex page: big animated figure, stats (score perks), lore and
 // skins. Rendered at page level by GamePage (inside AnimatePresence) so the
@@ -32,8 +35,8 @@ export default function HeroDetailModal({
   onBuy,
 }) {
   const sprite = getHeroSprite(hero.name)
-  const poses = sprite ? Object.keys(sprite.poses) : []
-  const [pose, setPose] = useState('run')
+  const poses = sprite ? MODAL_POSES.filter((p) => sprite.poses[p]) : []
+  const [pose, setPose] = useState('idle')
 
   useEffect(() => {
     function onKey(e) {

@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
-import { toClubRoleWords } from '../api/client'
+import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import {
   IconEnvelope,
   IconEnvelopeOpen,
@@ -238,38 +238,52 @@ export default function MailPanel({ mailbox, onClaimed }) {
         ) : broadcasts.length === 0 ? (
           <p className="game-menu-empty">No announcements right now.</p>
         ) : (
-          <ul className="game-menu-list mail-list">
+          <ul className="news-card-list">
             {broadcasts.map((item) => {
               const expanded = openId === item.id
               return (
                 <li
                   key={item.id}
-                  className={`mail-item ${!item.readAt ? 'is-unread' : ''}`}
+                  className={`news-card ${!item.readAt ? 'is-unread' : ''}`}
                 >
                   <button
                     type="button"
-                    className="game-menu-list-row mail-item-row"
+                    className="news-card-trigger"
                     onClick={() => toggleBroadcast(item)}
                     aria-expanded={expanded}
                   >
-                    <span className="mail-item-icon type-BROADCAST">
-                      <IconMegaphone />
-                    </span>
-                    <span className="game-store-item-info">
-                      <span className="game-menu-list-area">
-                        {toClubRoleWords(item.title)}
+                    {item.imageUrl ? (
+                      <span className="news-card-image">
+                        <img
+                          src={resolveFileUrl(item.imageUrl)}
+                          alt=""
+                          onError={(e) => {
+                            e.currentTarget.parentElement.style.display = 'none'
+                          }}
+                        />
                       </span>
-                      <span className="game-menu-list-meta">
-                        {playerName(null, item.authorName) || 'Run Conquest'} ·{' '}
+                    ) : (
+                      <span className="news-card-image is-placeholder">
+                        <IconMegaphone />
+                      </span>
+                    )}
+                    <span className="news-card-content">
+                      <span className="news-card-head">
+                        <span className="news-card-title">
+                          {toClubRoleWords(item.title)}
+                        </span>
+                        {!item.readAt && (
+                          <span className="mail-item-dot" aria-label="Unread" />
+                        )}
+                      </span>
+                      <span className="news-card-meta">
+                        <IconMegaphone aria-hidden="true" /> Admin ·{' '}
                         {formatMailDate(item.publishedAt)}
                       </span>
                     </span>
-                    {!item.readAt && (
-                      <span className="mail-item-dot" aria-label="Unread" />
-                    )}
                   </button>
                   {expanded && item.body && (
-                    <div className="mail-item-body">
+                    <div className="news-card-body">
                       <p>{toClubRoleWords(item.body)}</p>
                     </div>
                   )}

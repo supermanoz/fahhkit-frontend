@@ -111,6 +111,8 @@ import ShadeFlag from '../components/ShadeFlag'
 import TrailPreview from '../components/TrailPreview'
 import ColorShelf from '../components/ColorShelf'
 import ChallengePrompt from '../components/ChallengePrompt'
+import BroadcastPrompt from '../components/BroadcastPrompt'
+import RunRewardAnimation from '../components/RunRewardAnimation'
 import ClubBadge from '../components/ClubBadge'
 import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
@@ -365,12 +367,12 @@ export default function GamePage() {
     return () => clearInterval(interval)
   }, [tracker.status])
   // "Running View" (Google Maps nav-mode - auto-follow, rotate to heading,
-  // see TerritoryMap's isNavigating) is the default the moment tracking
-  // starts, but a manual pinch/drag suspends the auto-follow (Google Maps'
-  // own "free look" behavior) until the locate button taps it back on -
-  // see handleUserPan/handleRecenter and the locate FAB below.
+  // see TerritoryMap's isNavigating) only kicks in for a guided run (PvP
+  // race, Club War, or following a saved route - see isNavigating below) -
+  // a manual pinch/drag suspends the auto-follow (Google Maps' own "free
+  // look" behavior) until the locate button taps it back on - see
+  // handleUserPan/handleRecenter and the locate FAB below.
   const [navSuspended, setNavSuspended] = useState(false)
-  const isNavigating = tracker.status === 'tracking' && !navSuspended
   const handleUserPan = useCallback(() => setNavSuspended(true), [])
   const handleRecenter = useCallback(() => setNavSuspended(false), [])
   const [center, setCenter] = useState(DEFAULT_CENTER)
@@ -448,6 +450,13 @@ export default function GamePage() {
   // handleRunViewedRoute) - swaps the route's info/share toast for the
   // cartoon turn-by-turn HUD (RouteTurnIndicator) until the run ends.
   const [followingRoute, setFollowingRoute] = useState(false)
+  // A plain territory draw stays on a flat, non-rotating map - no Google
+  // Maps-style nav view. PvP races, Club War runs, and a guided "Run This
+  // Route" replay keep it, since direction actually matters there.
+  const isGuidedRun =
+    followingRoute || Boolean(tracker.challengeId) || Boolean(tracker.clubWarId)
+  const isNavigating =
+    tracker.status === 'tracking' && !navSuspended && isGuidedRun
   // Drawing a new route: raw taps + the OSRM-snapped geometry for each
   // segment between them (kept separate per segment so Undo can pop
   // exactly one tap's worth of geometry instead of guessing where in a
@@ -594,18 +603,24 @@ export default function GamePage() {
   // tracker.status actually flips to 'idle').
   const autoFinishedRaceIdRef = useRef(null)
 
-  // "3 2 1 GO" pre-run countdown (Conquer or PvP) - null when idle, else a
-  // number counting down or the literal 'GO' flash right before the actual
-  // tracker.start() call fires (held in pendingStartRef, since the start
-  // function needed differs between a plain run and a race).
+  // "3 2 1 GO" pre-run countdown (PvP races and guided route runs) - null
+  // when idle, else a number counting down or the literal 'GO' flash right
+  // before the actual tracker.start() call fires (held in pendingStartRef,
+  // since the start function needed differs per run type). Plain territory
+  // draws (handleStartRun) skip the countdown entirely - just the shared
+  // pre-run reset, then straight into tracker.start().
   const [startCountdown, setStartCountdown] = useState(null)
   const pendingStartRef = useRef(null)
 
-  function beginCountdownThenStart(startFn) {
+  function resetForRunStart() {
     setGpsErrorDismissed(false)
     setStatsOnly(true)
     setConfirmAction(null)
     setNavSuspended(false)
+  }
+
+  function beginCountdownThenStart(startFn) {
+    resetForRunStart()
     pendingStartRef.current = startFn
     setStartCountdown(3)
   }
@@ -695,6 +710,43 @@ export default function GamePage() {
       : liveLocation || center
 
   const mailbox = useMailbox()
+  // Broadcasts (news/announcements), queued to pop up front and center the
+  // moment the game opens instead of waiting for the player to find them in
+  // the Mail tab - see BroadcastPrompt below. Deliberately NOT gated on
+  // readAt: the point is this reappears every time the game opens, even for
+  // a broadcast the player already saw last session (listActive has no
+  // expiry - everything published stays "active" until a moderator pulls
+  // it), so dismissing one just marks it read for the Mail tab's unread
+  // badge, it never permanently suppresses the popup. introducedIds tracks
+  // which broadcasts this session has already offered, so only the single
+  // newest one shows on open (not the whole backlog) while a broadcast
+  // published later in the same session (a live socket push) still queues
+  // immediately as its own pop-up.
+  const [broadcastQueue, setBroadcastQueue] = useState([])
+  const introducedBroadcastIdsRef = useRef(new Set())
+  const initialBroadcastShownRef = useRef(false)
+  useEffect(() => {
+    if (mailbox.broadcasts.length === 0) return
+    if (!initialBroadcastShownRef.current) {
+      initialBroadcastShownRef.current = true
+      mailbox.broadcasts.forEach((b) =>
+        introducedBroadcastIdsRef.current.add(b.id)
+      )
+      setBroadcastQueue([mailbox.broadcasts[0]])
+      return
+    }
+    const fresh = mailbox.broadcasts.filter(
+      (b) => !introducedBroadcastIdsRef.current.has(b.id)
+    )
+    if (fresh.length === 0) return
+    fresh.forEach((b) => introducedBroadcastIdsRef.current.add(b.id))
+    setBroadcastQueue((prev) => [...prev, ...fresh])
+  }, [mailbox.broadcasts])
+  function dismissBroadcastPrompt() {
+    const current = broadcastQueue[0]
+    if (current) mailbox.openBroadcast(current)
+    setBroadcastQueue((q) => q.slice(1))
+  }
   // Whether the player is actually looking at the PvP tab right now - the
   // recurring challenge/discoverable-ping polls only run while this is
   // true (see usePvp); the incoming-challenge pop-up itself still works
@@ -720,7 +772,11 @@ export default function GamePage() {
     if (!rejection) return false
     settledRunIdRef.current = outcome.runId
     setRunResult({ phase: 'rejected', ...rejection })
-    refreshProfile()
+    // Still worth checking for XP - a rejected loop (didn't close, or a
+    // rival contested it) still earns the run's effort-based distance XP;
+    // only CHEAT_DETECTED skips XP entirely, which this naturally shows as
+    // a zero diff (see refreshProfileAfterRun).
+    refreshProfileAfterRun()
     return true
   }
 
@@ -1213,9 +1269,33 @@ export default function GamePage() {
       ])
       setProfile(profileData)
       setMyParcels(myParcelsPage?.content || [])
+      return profileData
     } catch {
       // Leave whatever's already loaded in place - a background refresh
       // failing isn't worth surfacing as an error.
+      return null
+    }
+  }
+
+  // Snapshot of level/xp taken right before a run is submitted (see
+  // attemptSubmit) - compared against the fresh profile once the server has
+  // actually finished processing that run (territory outcome known, or a
+  // race/war run just logged) to drive the XP reward popup. Cleared after
+  // use, and on a failed submit, so it never pairs with some later run.
+  const runXpBeforeRef = useRef(null)
+  const [xpReward, setXpReward] = useState(null)
+  async function refreshProfileAfterRun() {
+    const before = runXpBeforeRef.current
+    runXpBeforeRef.current = null
+    const after = await refreshProfile()
+    if (!before || !after) return
+    if (after.xp > before.xp || after.level > before.level) {
+      setXpReward({
+        beforeLevel: before.level,
+        beforeXp: before.xp,
+        afterLevel: after.level,
+        afterXp: after.xp,
+      })
     }
   }
 
@@ -1757,8 +1837,11 @@ export default function GamePage() {
     if (tab === 'race') pvp.refreshChallenges()
   }
 
+  // Plain territory draw - no countdown, no nav-mode direction dressing.
+  // Tap it and you're drawing.
   function handleStartRun() {
-    beginCountdownThenStart(() => tracker.start(null))
+    resetForRunStart()
+    tracker.start(null)
   }
 
   // "Run This Route" on the viewingRoute toast - same plain loop run as
@@ -1926,6 +2009,9 @@ export default function GamePage() {
     setSaving(true)
     setSaveError(null)
     const submittedAt = new Date()
+    runXpBeforeRef.current = profile
+      ? { level: profile.level, xp: profile.xp }
+      : null
     try {
       const created = await createRun({
         eventId: null,
@@ -1938,10 +2024,12 @@ export default function GamePage() {
         clubWarId: pendingRun.clubWarId || undefined,
       })
       if (pendingRun.challengeId) pvp.refreshChallenges()
+      const isRace = Boolean(pendingRun.challengeId)
+      const isWar = Boolean(pendingRun.clubWarId)
       setCompletedRun({
         id: created.id,
-        isRace: Boolean(pendingRun.challengeId),
-        isWar: Boolean(pendingRun.clubWarId),
+        isRace,
+        isWar,
         points: pendingRun.points,
         distance: pendingRun.distance,
         duration: pendingRun.duration,
@@ -1949,8 +2037,25 @@ export default function GamePage() {
       })
       discardDraft()
       setSaving(false)
-      pollForTerritoryResult(submittedAt, created.id)
+      // Territory is only ever closed off a plain draw run - a PvP race or
+      // Club War entry logs the run for its own scoring and has nothing to
+      // do with claiming ground, so it skips the territory check/poll
+      // entirely instead of showing "Checking your territory…" for a check
+      // that was never going to happen.
+      if (isRace || isWar) {
+        setRunResult({ phase: 'submitted' })
+        // A race/war run's XP is awarded by the same async processing a
+        // conquer run's territory check waits on, but there's no
+        // poll/socket signal for these modes to know when it's landed - a
+        // short delay gives it a reasonable chance without building a full
+        // poll loop for it. If it's not there yet, the reward just quietly
+        // doesn't show (same as today) rather than showing a wrong number.
+        setTimeout(refreshProfileAfterRun, 3000)
+      } else {
+        pollForTerritoryResult(submittedAt, created.id)
+      }
     } catch (err) {
+      runXpBeforeRef.current = null
       // Deliberately not clearing the pending run - it stays saved (see
       // useRunTracker) so "Retry Save" works even after closing the app.
       setSaveError({
@@ -1986,7 +2091,7 @@ export default function GamePage() {
         )
         if (fresh.length > 0) {
           setRunResult({ phase: 'done', events: fresh })
-          refreshProfile()
+          refreshProfileAfterRun()
           refreshNearbyParcels()
           return
         }
@@ -1996,7 +2101,7 @@ export default function GamePage() {
     }
     if (settledRunIdRef.current === runId) return
     setRunResult({ phase: 'timeout' })
-    refreshProfile()
+    refreshProfileAfterRun()
     refreshNearbyParcels()
   }
 
@@ -2547,6 +2652,17 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {broadcastQueue[0] && (
+          <BroadcastPrompt
+            key={broadcastQueue[0].id}
+            broadcast={broadcastQueue[0]}
+            hasMore={broadcastQueue.length > 1}
+            onDismiss={dismissBroadcastPrompt}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {incomingChallenge && (
           <ChallengePrompt
             key={incomingChallenge.id}
@@ -3003,11 +3119,11 @@ export default function GamePage() {
             animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
             exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
           >
-            <h3>That pace looks more scooter than sneakers 🛵</h3>
+            <h3>Whoa there, speedster 🛵</h3>
             <p>
               {tracker.invalidMotion.reason === 'no-gait'
-                ? "You're covering ground fast with no running stride detected — mind stopping if you're not on foot?"
-                : "That's a faster sustained pace than running allows — mind stopping if you're not on foot?"}
+                ? "You're covering ground fast with no running stride detected. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."
+                : "This pace is faster than running allows. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."}
             </p>
             <div className="game-highlight-toast-actions">
               <button
@@ -3032,37 +3148,47 @@ export default function GamePage() {
       <AnimatePresence>
         {runResult && (
           <motion.div
-            className="game-claim-toast glass-card"
-            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
+            className="game-claim-toast game-claim-toast-center glass-card"
+            initial={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
           >
             {/* By the time any phase below renders, attemptSubmit() has
                 already created the run server-side - whatever the
                 territory outcome turns out to be, the run itself is
                 already safely in the athlete's history. */}
-            {completedRun && (
-              <p className="game-claim-toast-saved">
-                <IconCheck /> Saved to your run history
-              </p>
+            {/* A PvP race or Club War entry never checks territory - it's
+                logged for its own scoring and done, so this is a single
+                terminal phase instead of a processing/done pair. */}
+            {runResult.phase === 'submitted' && (
+              <>
+                <h3>Run submitted!</h3>
+                {renderCompletedRunStats()}
+                {completedRun?.isRace && (
+                  <p className="game-controls-hint">
+                    🏁 Race time logged. Check the PvP tab once your rival runs
+                    too.
+                  </p>
+                )}
+                {completedRun?.isWar && (
+                  <p className="game-controls-hint">
+                    ⚔️ War run logged. Check Club Wars once the battle ends.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setRunResult(null)}
+                >
+                  Nice
+                </button>
+              </>
             )}
             {runResult.phase === 'processing' && (
               <>
                 <h3>Run submitted!</h3>
                 {renderCompletedRunStats()}
                 <p>Checking your territory…</p>
-                {completedRun?.isRace && (
-                  <p className="game-controls-hint">
-                    🏁 Race time logged. Results land once your rival runs too.
-                    Check the PvP tab.
-                  </p>
-                )}
-                {completedRun?.isWar && (
-                  <p className="game-controls-hint">
-                    ⚔️ War run logged for your club. Check Club Wars for the
-                    score once the battle ends.
-                  </p>
-                )}
               </>
             )}
             {runResult.phase === 'rejected' && (
@@ -3070,16 +3196,6 @@ export default function GamePage() {
                 <h3>{runResult.title}</h3>
                 {renderCompletedRunStats()}
                 <p>{runResult.message}</p>
-                {completedRun?.isRace && (
-                  <p className="game-controls-hint">
-                    🏁 Your race time still counts. Check the PvP tab.
-                  </p>
-                )}
-                {completedRun?.isWar && (
-                  <p className="game-controls-hint">
-                    ⚔️ Your war run still counts for the club.
-                  </p>
-                )}
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -3143,6 +3259,19 @@ export default function GamePage() {
               </>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {/* Shown right after the run-result toast above is dismissed, never
+            layered on top of it - a run's XP is a separate "reward" beat
+            from the territory outcome itself. */}
+        {!runResult && xpReward && (
+          <RunRewardAnimation
+            key={`${xpReward.beforeXp}-${xpReward.afterXp}`}
+            {...xpReward}
+            onDismiss={() => setXpReward(null)}
+          />
         )}
       </AnimatePresence>
 
@@ -3436,7 +3565,7 @@ export default function GamePage() {
                     ) : leaderboard.length === 0 ? (
                       <p className="game-menu-empty">
                         {individualScope === 'city'
-                          ? 'No territory claimed in your district yet — be the first.'
+                          ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
                           : 'No territory claimed yet — be the first.'}
                       </p>
                     ) : (
@@ -3915,8 +4044,10 @@ export default function GamePage() {
                       type="button"
                       className={`game-menu-subtab ${shopSection === section.id ? 'active' : ''}`}
                       onClick={() => setShopSection(section.id)}
+                      title={section.label}
+                      aria-label={section.label}
                     >
-                      <section.Icon /> {section.label}
+                      <section.Icon />
                     </button>
                   ))}
                 </div>

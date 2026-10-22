@@ -177,12 +177,6 @@
   color: var(--tier-light);
 }
 
-.hero-card-level {
-  text-align: center;
-  font-size: 12px;
-  color: var(--game-green-light);
-}
-
 /* Fat action bar at the foot. */
 .hero-card-foot {
   margin: 4px 0 0;

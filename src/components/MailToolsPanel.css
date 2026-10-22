@@ -1,0 +1,81 @@
+/* Rendered inside GameMechanicsPage's section body, so it reuses that
+   page's .field / .banner / .game-mechanics-hint styles (see
+   GameMechanicsPage.css and index.css) - this file only covers what's
+   specific to these two forms. */
+
+.mail-tools-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.mail-tools-form h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.mail-tools-form .field {
+  margin-bottom: 14px;
+}
+
+.mail-tools-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.mail-tools-form label .opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.mail-tools-form input,
+.mail-tools-form select,
+.mail-tools-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.mail-tools-form textarea {
+  resize: vertical;
+}
+
+.mail-tools-recipient-lookup {
+  display: flex;
+  gap: 8px;
+}
+
+.mail-tools-recipient-lookup input {
+  flex: 1;
+}
+
+.mail-tools-recipient-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--error);
+}
+
+.mail-tools-recipient-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mail-tools-recipient-nickname {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--muted);
+}

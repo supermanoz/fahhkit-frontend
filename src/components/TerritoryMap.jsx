@@ -207,23 +207,14 @@ function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
 // else on the marker, which is what made the avatar appear to "vanish" after
 // the game had been open a while. onerror falls back to a guaranteed-local
 // bundled image and clears itself so it can't loop.
-// heading is course-over-ground in degrees (0 = north, clockwise) - see
-// bearingBetween in utils/territoryGame.js. The cone element overflows well
-// past the marker's own 40x40 box (same trick the pulse rings already use -
-// Leaflet doesn't clip icon overflow), pointing away from the dot's exact
-// center so rotating it in place sweeps correctly regardless of heading.
-function buildPlayerMarkerIcon(avatarSrc, fallbackSrc, heading) {
+// Plain GPS dot - no Google Maps-style heading cone fanning out from it.
+function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
   return L.divIcon({
     className: 'territory-map-player-icon',
-    // Pulses then avatar then the heading cone LAST, so it paints on top
-    // of the avatar's edge instead of being hidden under it - it used to
-    // render first (underneath), which buried its brightest, most visible
-    // part (closest to the dot's center) behind the opaque avatar photo.
     html:
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
-      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />` +
-      `<span class="territory-map-player-heading" style="transform:rotate(${heading || 0}deg)"></span>`,
+      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
   })
@@ -1040,11 +1031,6 @@ export default function TerritoryMap({
       setGlobeVisible(false)
     }
   }, [isNavigating, highlightOwnerId, highlightParcelId])
-  // While navigating, the whole map rotates to point the travel direction
-  // up (see .territory-map-heading below) - the marker's own heading cone
-  // would otherwise double up on that rotation, so it just points straight
-  // up (0deg, already "forward" on a rotated map) instead of the real
-  // compass heading.
   // Blaze's pose only changes on idle/running or a new quadrant, so the icon
   // (and its CSS animation) isn't rebuilt on every small heading update.
   const blazePose = blazeSprite
@@ -1054,17 +1040,15 @@ export default function TerritoryMap({
         ? 'up'
         : blazePoseForHeading(playerHeading)
     : null
-  const markerHeading = blazePose ? null : isNavigating ? 0 : playerHeading
   const playerMarkerIcon = useMemo(
     () =>
       blazePose
         ? buildBlazeMarkerIcon(blazePose)
         : buildPlayerMarkerIcon(
             avatarSrc || defaultAvatarImage,
-            defaultAvatarImage,
-            markerHeading
+            defaultAvatarImage
           ),
-    [blazePose, avatarSrc, markerHeading]
+    [blazePose, avatarSrc]
   )
 
   // Warm the cache so switching idle -> running never shows a blank frame.

@@ -1,0 +1,132 @@
+/* Centered popup, same recipe as .broadcast-prompt-backdrop - shown after
+   the run-result toast is dismissed (see GamePage's xpReward state), never
+   layered on top of it. */
+.run-reward-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 6, 3, 0.65);
+}
+
+.run-reward-card {
+  position: relative;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 24px 24px;
+  text-align: center;
+  border-radius: 20px;
+  border: 3px solid var(--game-ink);
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      rgba(111, 185, 255, 0.35),
+      transparent 70%
+    ),
+    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
+  color: var(--game-cream);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 5px 0 var(--game-ink),
+    0 24px 50px rgba(0, 0, 0, 0.65);
+}
+
+.run-reward-kicker {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(246, 236, 217, 0.65);
+}
+
+.run-reward-xp-gained {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 900;
+  color: #9ad4ff;
+  -webkit-text-stroke: 1.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 var(--game-ink);
+}
+
+.run-reward-level-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.run-reward-level-badge {
+  position: relative;
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #7cc6ff 0%, #2f8ee8 55%, #1a5fb4 100%);
+  border: 2.5px solid var(--game-ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.2),
+    0 3px 0 var(--game-ink);
+}
+
+.run-reward-level-num {
+  color: #fff;
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 1;
+  text-shadow:
+    1.5px 0 0 var(--game-ink),
+    -1.5px 0 0 var(--game-ink),
+    0 1.5px 0 var(--game-ink),
+    0 -1.5px 0 var(--game-ink),
+    0 3px 0 var(--game-ink);
+}
+
+.run-reward-bar-track {
+  position: relative;
+  flex: 1;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(225, 228, 218, 0.3);
+  border: 2.5px solid var(--game-ink);
+  overflow: hidden;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.run-reward-bar-fill {
+  height: 100%;
+  max-width: 100%;
+  background: linear-gradient(
+    180deg,
+    #9ad4ff 0%,
+    #9ad4ff 48%,
+    #2f8ee8 52%,
+    #1a5fb4 100%
+  );
+  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.25);
+  transition: width 0.9s ease;
+}
+
+.run-reward-level-up {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--game-gold-light);
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.run-reward-action {
+  width: 100%;
+  margin-top: 8px;
+}

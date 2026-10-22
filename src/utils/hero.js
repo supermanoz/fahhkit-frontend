@@ -18,8 +18,10 @@ export function isPlaceholderHero(name) {
 
 // ScoreComponentTypeConstant → what the boost actually does, in player
 // terms. RACE_TIME is the one where lower is better (a 0.95 multiplier
-// shaves 5% off your PvP race time), so it reads as a minus.
-const ABILITY_LABELS = {
+// shaves 5% off your PvP race time), so it reads as a minus. Exported too -
+// the Game Mechanics hero admin panel uses the same labels for its "attach
+// an ability" picker instead of showing the raw enum names.
+export const ABILITY_LABELS = {
   AREA: 'territory area score',
   PERIMETER_EFFICIENCY: 'perimeter efficiency score',
   PACE: 'pace score',
@@ -27,6 +29,8 @@ const ABILITY_LABELS = {
   BASE_EFFORT: 'base effort score',
   RACE_TIME: 'race time',
 }
+
+export const SCORE_COMPONENT_TYPES = Object.keys(ABILITY_LABELS)
 
 // The pieces of describeHeroAbility, for UIs that lay them out separately
 // (e.g. the stat bars in HeroDetailModal).

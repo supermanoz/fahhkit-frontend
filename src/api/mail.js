@@ -44,3 +44,20 @@ export function publishBroadcast(title, body, image) {
   if (image) formData.append('image', image)
   return postForm('/v1/mail/admin/broadcast', formData)
 }
+
+// Admin only - gifts one store item to a single player via a claimable
+// STORE_ITEM_GRANT mail (same claim flow as any other grant in their inbox).
+export function sendStoreItemGrant(recipientUserId, storeItemId, title, body) {
+  return postJson('/v1/mail/admin/store-item-grant', {
+    recipientUserId,
+    storeItemId,
+    title,
+    body,
+  })
+}
+
+// Admin only - a one-off personal NOTICE (read-only, not claimable) to a
+// single player - the private counterpart to a broadcast.
+export function sendNotice(recipientUserId, title, body) {
+  return postJson('/v1/mail/admin/notice', { recipientUserId, title, body })
+}

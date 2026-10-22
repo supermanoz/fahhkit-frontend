@@ -3,8 +3,8 @@ import blazeHipHopSheet from '../assets/images/blaze-profile-hiphop.png'
 import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
 import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
 
-// Heroes with hand-cut animated strips (see SESSION_NOTES "Blaze animated
-// map sprite"). Each pose is its own horizontal strip of `frames` cells,
+// Heroes with animated strips (see scripts/build_blaze_stretch_strips.py).
+// Each pose is its own horizontal strip of `frames` cells,
 // every cell frameWidth x frameHeight px - geometry is per-pose (not
 // shared across a hero) since idle's front-facing stretch strip is a
 // different render entirely from the map's run/charge cycles. Keyed by
@@ -14,13 +14,13 @@ import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
 const HERO_SPRITES = {
   blaze: {
     poses: {
-      // 48 frames (shoulder stretch + arm stretch, straight-on render) -
-      // see scripts/build_blaze_stretch_strips.py. Same strip HeroSprite.jsx
-      // plays on the Me tab/profile panel.
+      // 48 frames (arm-stretch, straight-on render) - see
+      // scripts/build_blaze_stretch_strips.py (the "idle" set). Same strip
+      // HeroSprite.jsx plays on the Me tab/profile panel.
       idle: {
         src: blazeIdleStretchSheet,
         frames: 48,
-        frameWidth: 200,
+        frameWidth: 151,
         frameHeight: 320,
       },
       // Shop hero card hover pose (HeroGallery.jsx) - also pickable on the
@@ -29,7 +29,7 @@ const HERO_SPRITES = {
       hiphop: {
         src: blazeHipHopSheet,
         frames: 24,
-        frameWidth: 230,
+        frameWidth: 233,
         frameHeight: 320,
       },
       run: {

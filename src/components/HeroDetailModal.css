@@ -14,6 +14,10 @@
   color: var(--game-cream);
 }
 
+/* Glassy white stage (not the dark wood/orange glow the rest of the modal
+   uses) so the hero's own art - idle or hiphop, both painted for a light
+   backdrop - actually reads clearly instead of fighting a busy dark glow
+   behind it. */
 .hero-modal-stage {
   position: relative;
   flex-shrink: 0;
@@ -24,18 +28,13 @@
   padding-bottom: 44px;
   border-radius: 17px 17px 0 0;
   overflow: hidden;
-  background:
-    radial-gradient(
-      ellipse 45% 12% at 50% 80%,
-      rgba(0, 0, 0, 0.55),
-      transparent 100%
-    ),
-    radial-gradient(
-      ellipse 70% 60% at 50% 70%,
-      rgba(255, 122, 41, 0.55),
-      transparent 70%
-    ),
-    linear-gradient(180deg, #2a1c12 0%, #120c07 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 3px solid var(--game-ink);
 }
 

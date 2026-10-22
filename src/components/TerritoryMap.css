@@ -361,24 +361,6 @@
   height: 40px;
 }
 
-/* Google Maps nav-view style heading cone - a soft beam from the dot's own
-   center pointing in the direction of travel (course-over-ground, see
-   bearingBetween/TerritoryMap.jsx), not the avatar photo itself rotating.
-   The polygon's tip sits at the icon's exact center (50% 50%) so rotating
-   it in place always sweeps from the dot, regardless of heading. */
-.territory-map-player-heading {
-  position: absolute;
-  inset: -30px;
-  clip-path: polygon(50% 50%, 38% 4%, 62% 4%);
-  background: linear-gradient(
-    to top,
-    rgba(255, 196, 77, 0.9),
-    rgba(255, 196, 77, 0)
-  );
-  transition: transform 0.3s ease;
-  pointer-events: none;
-}
-
 .territory-map-player-avatar {
   position: absolute;
   inset: 0;
@@ -462,10 +444,10 @@
   }
 }
 
-/* Blaze's "up" (back-view) sheet is a hand-cut 15-frame cycle played at
-   24fps (see heroSprites poses/BLAZE_SHEETS) - a finer strip than the
-   other three directions' 4-frame sheets, so it needs its own frame
-   count and background-size rather than reusing blaze-frames above. */
+/* Blaze's "up" (back-view) sheet is a 15-frame cycle played at 24fps (see
+   BLAZE_SHEETS and scripts/build_blaze_stretch_strips.py) - a finer strip
+   than the other three directions' 4-frame sheets, so it needs its own
+   frame count and background-size rather than reusing blaze-frames above. */
 .territory-map-blaze[data-frames='15'] {
   background-size: 720px 64px;
   animation: blaze-frames-15 0.625s steps(15) infinite;

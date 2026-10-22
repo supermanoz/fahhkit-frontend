@@ -8,7 +8,6 @@ import {
 } from './GameIcons'
 import HeroFigure from './HeroFigure'
 import { getHeroSprite } from '../utils/heroSprites'
-import { heroAbilityParts } from '../utils/hero'
 import './HeroGallery.css'
 
 // Hero roster for the Shop: a sideways-scrolling (swipe / arrow buttons)
@@ -64,9 +63,6 @@ export default function HeroGallery({
           const comingSoon = !equipped && !owned && hero.skins?.length === 0
           const animated = Boolean(getHeroSprite(hero.name))
           const active = activeId === hero.id
-          const perkCount = (hero.abilities || []).filter((a) =>
-            heroAbilityParts(a)
-          ).length
           const prices = (hero.skins || [])
             .map((sk) => sk.priceFahhcoin || 0)
             .filter((n) => n > 0)
@@ -101,9 +97,6 @@ export default function HeroGallery({
               </span>
 
               <span className="hero-card-name">{hero.name}</span>
-              {perkCount > 0 && (
-                <span className="hero-card-level">⚡ {perkCount} perks</span>
-              )}
 
               {tier === 'soon' || tier === 'limited' ? (
                 <span className="hero-card-foot is-locked">
