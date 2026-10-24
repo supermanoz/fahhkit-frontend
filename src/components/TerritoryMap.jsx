@@ -35,6 +35,11 @@ import blazeRunUpSheet from '../assets/images/blaze-map-run-up.png'
 import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
 import blazeRunLeftSheet from '../assets/images/blaze-map-run-left.png'
 import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
+import cometIdleSheet from '../assets/images/comet-map-idle-stretch.png'
+import cometRunUpSheet from '../assets/images/comet-map-run-up.png'
+import cometRunDownSheet from '../assets/images/comet-map-run-down.png'
+import cometRunLeftSheet from '../assets/images/comet-map-run-left.png'
+import cometRunRightSheet from '../assets/images/comet-map-run-right.png'
 import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -220,26 +225,39 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
   })
 }
 
-// Blaze gets a full-body animated sprite on the map instead of the round
-// avatar photo: idle when standing still, and a run cycle facing the
-// on-screen direction of travel while moving. Each sheet is a horizontal
-// strip stepped through by CSS (see .territory-map-blaze) - running is a
-// 4-frame cycle for down/left/right, but idle is a slower 48-frame stretch
-// (shoulder, then arm - see scripts/build_blaze_stretch_strips.py) and "up"
-// is its own finer 15-frame cycle at 24fps (see the [data-frames] overrides
-// in TerritoryMap.css), so frame count travels with the sheet here instead
-// of being hard-coded in one class.
-const BLAZE_SHEETS = {
-  idle: { src: blazeIdleSheet, frames: 48 },
-  up: { src: blazeRunUpSheet, frames: 15 },
-  down: { src: blazeRunDownSheet, frames: 4 },
-  left: { src: blazeRunLeftSheet, frames: 4 },
-  right: { src: blazeRunRightSheet, frames: 4 },
+// Blaze and Comet each get a full-body animated sprite on the map instead
+// of the round avatar photo: idle when standing still, and a run cycle
+// facing the on-screen direction of travel while moving. Each sheet is a
+// horizontal strip stepped through by CSS (see .territory-map-blaze) -
+// running is a 4-frame cycle for down/left/right, but idle is a slower
+// 48-frame stretch (shoulder, then arm) and "up" is its own finer
+// 15-frame cycle at 24fps (see the [data-frames] overrides in
+// TerritoryMap.css), so frame count travels with the sheet here instead
+// of being hard-coded in one class - that CSS keys purely off frame count,
+// not which hero, so both heroes' sheets reuse it unchanged. See
+// scripts/build_blaze_stretch_strips.py / build_comet_stretch_strips.py.
+// Any other hero has no entry here and falls back to the flat avatar photo
+// (see animatedMarkerHero in GamePage.jsx).
+const HERO_MAP_SHEETS = {
+  blaze: {
+    idle: { src: blazeIdleSheet, frames: 48 },
+    up: { src: blazeRunUpSheet, frames: 15 },
+    down: { src: blazeRunDownSheet, frames: 4 },
+    left: { src: blazeRunLeftSheet, frames: 4 },
+    right: { src: blazeRunRightSheet, frames: 4 },
+  },
+  comet: {
+    idle: { src: cometIdleSheet, frames: 48 },
+    up: { src: cometRunUpSheet, frames: 15 },
+    down: { src: cometRunDownSheet, frames: 4 },
+    left: { src: cometRunLeftSheet, frames: 4 },
+    right: { src: cometRunRightSheet, frames: 4 },
+  },
 }
 
 // Compass heading -> which way he runs on screen (north is up on the
 // non-rotated map).
-function blazePoseForHeading(heading) {
+function heroPoseForHeading(heading) {
   const h = (((heading || 0) % 360) + 360) % 360
   if (h >= 315 || h < 45) return 'up'
   if (h < 135) return 'right'
@@ -249,8 +267,8 @@ function blazePoseForHeading(heading) {
 
 // Anchored at his feet (not the icon's center) so he stands on the GPS
 // point; the sonar pulse sits flattened on the ground underneath him.
-function buildBlazeMarkerIcon(pose) {
-  const sheet = BLAZE_SHEETS[pose]
+function buildAnimatedMarkerIcon(heroKey, pose) {
+  const sheet = HERO_MAP_SHEETS[heroKey][pose]
   return L.divIcon({
     className: 'territory-map-player-icon territory-map-blaze-icon',
     html:
@@ -317,6 +335,24 @@ function InvalidateSizeOnMount() {
     const t = setTimeout(() => map.invalidateSize(), 100)
     return () => clearTimeout(t)
   }, [map])
+  return null
+}
+
+// Compass mode blows the Leaflet container up to spinSize x spinSize (see
+// the .territory-map-heading.is-spinning CSS and the ResizeObserver that
+// computes spinSize below) so no corner of the rotated square can ever
+// show the page behind it - Leaflet itself still thinks its container is
+// whatever size it last measured, though, so it needs telling to
+// re-measure both when spinSize itself changes (a resize/orientation
+// change while already in Compass mode) AND when compassActive toggles
+// even if spinSize doesn't (is-spinning adding/removing is what actually
+// changes Leaflet's rendered container size on that edge) - same as
+// InvalidateSizeOnMount above just keyed on these instead of mount.
+function SpinSizeEffect({ spinSize, compassActive }) {
+  const map = useMap()
+  useEffect(() => {
+    map.invalidateSize()
+  }, [map, spinSize, compassActive])
   return null
 }
 
@@ -401,7 +437,7 @@ const CLOSE_IN_TILT_ZOOM = 19
 // close-in state tilts — mid-zoom gestures at any other level stay flat, so
 // scrolling/pinching through the rest of the range doesn't wobble the whole
 // map. Deliberately NOT forced on just because a run is being tracked
-// (isNavigating, see NavigationCameraEffect below) - combined with that
+// (isFollowing, see NavigationCameraEffect below) - combined with Compass
 // mode's own heading-rotation scale, the two together over-tilted/over-
 // zoomed the view into a flattened, sideways-looking "landscape" camera
 // angle instead of a readable nav view. Nav mode stays flat/rotating; the
@@ -429,43 +465,47 @@ function ZoomTiltEffect({ tiltRef }) {
 // Google Maps "start riding" nav mode - while actively tracking a run, the
 // camera keeps the player centered automatically instead of requiring a
 // manual pan/zoom, at a close enough zoom to actually read as navigation.
+// isFollowing covers both the Follow and Compass location-button states
+// (GamePage.jsx's mapMode) - they only differ in whether the map also
+// rotates (see mapRotation below), not in whether it auto-centers.
 // playerLocation gets a new object reference on every GPS fix (see
 // GamePage.jsx), so this re-centers on each real position update.
 // programmaticMoveRef is set right before the setView call below so
 // UserPanDetector (a sibling under the same map) can tell this move apart
 // from a real pinch/drag and not mistake it for one.
 function NavigationCameraEffect({
-  isNavigating,
+  isFollowing,
   playerLocation,
   programmaticMoveRef,
 }) {
   const map = useMap()
   useEffect(() => {
-    if (!isNavigating || !playerLocation) return
+    if (!isFollowing || !playerLocation) return
     programmaticMoveRef.current = true
     map.setView(
       [playerLocation.lat, playerLocation.lng],
       Math.max(map.getZoom(), 18),
       { animate: true, duration: 0.8 }
     )
-  }, [map, isNavigating, playerLocation, programmaticMoveRef])
+  }, [map, isFollowing, playerLocation, programmaticMoveRef])
   return null
 }
 
-// Suspends nav-follow the moment the player actually pinches/drags the map
-// themselves (Google Maps' "free look" while navigating) - active only
-// while isNavigating, so it's a no-op the rest of the time. dragstart only
-// ever fires for a real pointer/touch drag (setView's own pan doesn't go
+// Drops straight to the location button's Free state the moment the player
+// actually pinches/drags (or, in Compass mode, rotates) the map themselves
+// (Google Maps' "free look" while navigating) - active only while
+// isFollowing, so it's a no-op the rest of the time. dragstart only ever
+// fires for a real pointer/touch drag (setView's own pan doesn't go
 // through Leaflet's Draggable), but setView's zoom change DOES fire
 // zoomstart, so that one needs programmaticMoveRef to tell a real pinch
 // apart from the camera's own re-center.
-function UserPanDetector({ isNavigating, programmaticMoveRef, onUserPan }) {
+function UserPanDetector({ isFollowing, programmaticMoveRef, onUserPan }) {
   useMapEvents({
     dragstart() {
-      if (isNavigating) onUserPan?.()
+      if (isFollowing) onUserPan?.()
     },
     zoomstart() {
-      if (isNavigating && !programmaticMoveRef.current) onUserPan?.()
+      if (isFollowing && !programmaticMoveRef.current) onUserPan?.()
     },
     moveend() {
       programmaticMoveRef.current = false
@@ -652,11 +692,11 @@ function ZoomRangeLimiter() {
 // Warms the globe up as the player zooms out toward it, keeps its camera in
 // step with Leaflet's, and reveals it once Leaflet is zoomed all the way out.
 // Never during a tracked run - NavigationCameraEffect owns the camera then.
-function GlobeHandoff({ isNavigating, onGlobeCamera, onRevealGlobe }) {
+function GlobeHandoff({ isFollowing, onGlobeCamera, onRevealGlobe }) {
   const map = useMapEvents({
     moveend() {
       const zoom = map.getZoom()
-      if (isNavigating || zoom > GLOBE_WARM_ZOOM) {
+      if (isFollowing || zoom > GLOBE_WARM_ZOOM) {
         onGlobeCamera(null)
         return
       }
@@ -974,9 +1014,12 @@ export default function TerritoryMap({
   trailColor,
   mapStyleUrl,
   ambience,
-  blazeSprite,
+  animatedMarkerHero,
   playerMoving,
-  isNavigating,
+  isFollowing,
+  mapRotation = 0,
+  compassActive = false,
+  isTracking = false,
   onUserPan,
   isLoopRun = true,
   drawActive = false,
@@ -994,6 +1037,27 @@ export default function TerritoryMap({
   // run - a PvP race or club-war run has no "loop" to close, so drawing a
   // line from the last point back to the first there was just visual noise.
   const showPreview = isLoopRun && livePath.length >= 3
+  const rootRef = useRef(null)
+  // Compass mode blows the rotating layer up to a square this big (see
+  // .territory-map-heading.is-spinning) so it still fully covers the
+  // screen at any rotation angle - the diagonal of the visible box is the
+  // minimum side length a square centered on it can have and still
+  // guarantee that (any smaller and some rotation angle exposes a corner).
+  // Measured off the actual box instead of window.innerWidth/Height since
+  // this map doesn't always fill the whole viewport. Kept up to date even
+  // while not spinning so it's correct the instant Compass mode turns on,
+  // not one resize-cycle late.
+  const [spinSize, setSpinSize] = useState(0)
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setSpinSize(Math.ceil(Math.hypot(width, height)))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const tiltRef = useRef(null)
   // Shared between NavigationCameraEffect and UserPanDetector so the
   // latter can ignore the former's own programmatic re-center.
@@ -1027,37 +1091,41 @@ export default function TerritoryMap({
   // Anything that moves the Leaflet camera itself (a tracked run, flying to
   // a highlighted territory) needs the globe out of the way to be seen.
   useEffect(() => {
-    if (isNavigating || highlightOwnerId || highlightParcelId) {
+    if (isFollowing || highlightOwnerId || highlightParcelId) {
       setGlobeVisible(false)
     }
-  }, [isNavigating, highlightOwnerId, highlightParcelId])
-  // Blaze's pose only changes on idle/running or a new quadrant, so the icon
-  // (and its CSS animation) isn't rebuilt on every small heading update.
-  const blazePose = blazeSprite
+  }, [isFollowing, highlightOwnerId, highlightParcelId])
+  // The hero's pose only changes on idle/running or a new quadrant, so the
+  // icon (and its CSS animation) isn't rebuilt on every small heading
+  // update. playerHeading is always his real travel direction (course over
+  // ground); mapRotation (0 unless Compass mode) is how far the map itself
+  // has been spun away from north-up, so subtracting it gives where that
+  // travel direction actually points on screen right now - in Follow
+  // (mapRotation 0) that's just playerHeading itself, same as the map's
+  // always been.
+  const heroPose = animatedMarkerHero
     ? !playerMoving
       ? 'idle'
-      : isNavigating
-        ? 'up'
-        : blazePoseForHeading(playerHeading)
+      : heroPoseForHeading(playerHeading - mapRotation)
     : null
   const playerMarkerIcon = useMemo(
     () =>
-      blazePose
-        ? buildBlazeMarkerIcon(blazePose)
+      heroPose
+        ? buildAnimatedMarkerIcon(animatedMarkerHero, heroPose)
         : buildPlayerMarkerIcon(
             avatarSrc || defaultAvatarImage,
             defaultAvatarImage
           ),
-    [blazePose, avatarSrc]
+    [animatedMarkerHero, heroPose, avatarSrc]
   )
 
   // Warm the cache so switching idle -> running never shows a blank frame.
   useEffect(() => {
-    if (!blazeSprite) return
-    Object.values(BLAZE_SHEETS).forEach(({ src }) => {
+    if (!animatedMarkerHero) return
+    Object.values(HERO_MAP_SHEETS[animatedMarkerHero]).forEach(({ src }) => {
       new Image().src = src
     })
-  }, [blazeSprite])
+  }, [animatedMarkerHero])
 
   const [activeTapEffects, setActiveTapEffects] = useState([])
   const nextTapEffectIdRef = useRef(0)
@@ -1076,22 +1144,26 @@ export default function TerritoryMap({
 
   return (
     <div
+      ref={rootRef}
       className={`territory-map${globeVisible ? ' is-globe' : ''}`}
       style={
         ambience?.filter ? { '--ambience-filter': ambience.filter } : undefined
       }
     >
       <div
-        className="territory-map-heading"
+        className={`territory-map-heading${compassActive ? ' is-spinning' : ''}`}
         style={{
-          transform: isNavigating
-            ? `rotate(${-(playerHeading || 0)}deg) scale(1.5)`
-            : 'none',
-          // Blaze counter-rotates by this so he stays upright on screen
-          // while the whole map is rotated in nav view.
-          '--map-counter-rotation': isNavigating
-            ? `${playerHeading || 0}deg`
-            : '0deg',
+          '--spin-size': `${spinSize}px`,
+          // Only Compass mode ever sets a non-zero mapRotation - Free and
+          // Follow stay north-up. A standalone `rotate` (not `transform`)
+          // so it composes independently of anything else that might ever
+          // animate this element via transform. is-spinning (above) is what
+          // actually keeps every corner covered while this is non-zero -
+          // see the ResizeObserver computing spinSize and that class's CSS.
+          rotate: mapRotation ? `${-mapRotation}deg` : '0deg',
+          // The player marker counter-rotates by this so it stays upright
+          // on screen while the whole map is rotated in Compass mode.
+          '--map-counter-rotation': mapRotation ? `${mapRotation}deg` : '0deg',
         }}
       >
         <div className="territory-map-tilt" ref={tiltRef}>
@@ -1100,6 +1172,7 @@ export default function TerritoryMap({
             zoom={17}
             scrollWheelZoom
             zoomControl={false}
+            attributionControl={false}
             renderer={territoryRenderer}
           >
             <PokemonStyleBaseLayer
@@ -1107,6 +1180,7 @@ export default function TerritoryMap({
               onReady={onMapReady}
               glMapRef={baseGlMapRef}
             />
+            <SpinSizeEffect spinSize={spinSize} compassActive={compassActive} />
 
             {mergedTerritories.map((t) => {
               const isMine =
@@ -1240,18 +1314,18 @@ export default function TerritoryMap({
             <InvalidateSizeOnMount />
             <ZoomRangeLimiter />
             <GlobeHandoff
-              isNavigating={isNavigating}
+              isFollowing={isFollowing}
               onGlobeCamera={setGlobeCamera}
               onRevealGlobe={() => setGlobeVisible(true)}
             />
             <ZoomTiltEffect tiltRef={tiltRef} />
             <NavigationCameraEffect
-              isNavigating={isNavigating}
+              isFollowing={isFollowing}
               playerLocation={playerLocation}
               programmaticMoveRef={programmaticMoveRef}
             />
             <UserPanDetector
-              isNavigating={isNavigating}
+              isFollowing={isFollowing}
               programmaticMoveRef={programmaticMoveRef}
               onUserPan={onUserPan}
             />
@@ -1286,8 +1360,46 @@ export default function TerritoryMap({
         </div>
       )}
       <div className="territory-map-vignette" aria-hidden="true" />
-      {mapInstance && (
+      {/* Hidden mid-run - GamePage's own Free/Follow/Compass location button
+          sits in this exact spot then and fully replaces it. */}
+      {mapInstance && !isTracking && (
         <LocateButton map={mapInstance} onLocated={() => exitGlobe()} />
+      )}
+      {/* Leaflet's own attribution control lives inside .territory-map-heading
+          (the layer that spins in Compass mode - see attributionControl=
+          {false} above), so it would otherwise spin right along with the
+          map. Required attribution text, reproduced as a plain static
+          element outside that rotated subtree instead - a straight copy of
+          what Leaflet renders there by default. Hidden while the globe is
+          up since TerritoryGlobe carries its own (compact) one. */}
+      {!globeVisible && (
+        <div className="territory-map-attribution">
+          <a
+            href="https://leafletjs.com"
+            title="A JavaScript library for interactive maps"
+          >
+            Leaflet
+          </a>
+          {' | '}
+          <a href="https://openfreemap.org" target="_blank" rel="noreferrer">
+            OpenFreeMap
+          </a>{' '}
+          <a
+            href="https://www.openmaptiles.org/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            © OpenMapTiles
+          </a>{' '}
+          Data from{' '}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noreferrer"
+          >
+            OpenStreetMap
+          </a>
+        </div>
       )}
     </div>
   )

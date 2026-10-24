@@ -5,11 +5,16 @@ export function isBlazeHero(name) {
   return typeof name === 'string' && name.trim().toLowerCase() === 'blaze'
 }
 
+export function isCometHero(name) {
+  return typeof name === 'string' && name.trim().toLowerCase() === 'comet'
+}
+
 // The backend seeds a generic "Default Hero" store item that every account
 // owns and has equipped from signup. TEMP: until the backend gives everyone
-// Blaze instead, the frontend treats that placeholder as "no hero picked",
-// which falls through to Blaze, and hides it from the Heroes tab.
-export const DEFAULT_HERO_NAME = 'Blaze'
+// Comet instead, the frontend treats that placeholder as "no hero picked",
+// which falls through to Comet (the default hero for now), and hides it
+// from the Heroes tab.
+export const DEFAULT_HERO_NAME = 'Comet'
 export function isPlaceholderHero(name) {
   return (
     typeof name === 'string' && name.trim().toLowerCase() === 'default hero'

@@ -12,18 +12,40 @@
   perspective-origin: center center;
 }
 
-/* Google Maps "start riding" nav mode - rotates the whole map (tiles +
-   territory overlays together, since they're both children of this one
-   element) so the player's direction of travel always points up, instead
-   of a fixed north-up view. The scale(1.5) in the inline transform (see
-   TerritoryMap.jsx) is what keeps a rotated rectangle covering every
-   corner of the screen instead of showing empty edges as it spins. Plain
-   `none` (no rotation) outside of navigation. */
+/* Google Maps' Compass mode - rotates the whole map (tiles + territory
+   overlays together, since they're both children of this one element, and
+   Leaflet itself has no native bearing) so the direction the phone is
+   facing always points up, instead of a fixed north-up view. Plain `none`
+   (0deg) the rest of the time - Free/Follow stay north-up. A short, linear
+   transition (not the default's long ease) so it tracks useDeviceHeading's
+   already-smoothed, already-thresholded updates responsively instead of
+   stacking a second, slower easing curve on top of the first and turning
+   a real heading change into a sluggish catch-up. */
 .territory-map-heading {
   position: absolute;
   inset: 0;
   transform-origin: center center;
-  transition: transform 0.4s ease;
+  transition: rotate 0.15s linear;
+}
+
+/* Compass mode only (see TerritoryMap.jsx's compassActive/spinSize) - a
+   plain `inset: 0` square can't rotate without exposing its own corners
+   past the screen's edges, so this blows it up to a square at least as
+   wide as the visible box's diagonal (any smaller and some rotation angle
+   would show a gap) and centers it, with .territory-map's own
+   `overflow: hidden` doing the clipping. Leaflet renders into this whole
+   enlarged square, which also means it's already fetched/drawn the tiles
+   around the visible edges before they ever turn into view - no separate
+   prefetch step needed. Reverts to the cheap plain `inset: 0` the instant
+   Compass mode turns off. */
+.territory-map-heading.is-spinning {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: var(--spin-size, 100%);
+  height: var(--spin-size, 100%);
+  margin-top: calc(var(--spin-size, 0px) / -2);
+  margin-left: calc(var(--spin-size, 0px) / -2);
 }
 
 /* Flat/top-down until the player is zoomed in close (.is-close-in, toggled
@@ -81,9 +103,31 @@
   transform: translateZ(0);
 }
 
-.territory-map .leaflet-control-attribution {
+/* Leaflet's own attribution control is disabled (see TerritoryMap.jsx's
+   attributionControl={false}) since it lives inside the layer that spins
+   in Compass mode - this is a plain static replacement outside that
+   subtree instead, so it never rotates. Same corner/sizing Leaflet's own
+   default control would use. */
+.territory-map-attribution {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 400;
+  padding: 0 5px;
   background: rgba(255, 255, 255, 0.75);
+  color: #333;
   font-size: 10px;
+  line-height: 1.4;
+}
+
+.territory-map-attribution a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.territory-map-attribution a:hover,
+.territory-map-attribution a:focus {
+  text-decoration: underline;
 }
 
 /* Darkens toward the edges of the screen so the limited view radius reads
@@ -361,6 +405,17 @@
   height: 40px;
 }
 
+/* Counter-rotates the plain avatar marker so it stays upright on screen
+   while the whole map is rotated in Compass mode - safe to rotate the icon
+   element itself here (unlike Blaze's, see .territory-map-blaze-body
+   below) since its iconAnchor is already its own exact center, so there's
+   no off-center pivot to swing around. Excludes Blaze's icon, which
+   already counter-rotates its own inner -body wrapper instead - rotating
+   both would double it up. */
+.territory-map-player-icon:not(.territory-map-blaze-icon) {
+  rotate: var(--map-counter-rotation, 0deg);
+}
+
 .territory-map-player-avatar {
   position: absolute;
   inset: 0;
@@ -393,10 +448,12 @@
   animation-delay: 1s;
 }
 
-/* Blaze's full-body map sprite (see buildBlazeMarkerIcon). 48x64 frames in
-   a 4-frame strip, stepped by background-position. The icon's anchor is at
-   his feet, so the ground pulse is centered there and squashed flat to
-   read as a ring on the ground rather than a halo. */
+/* Blaze's (or Comet's - see buildAnimatedMarkerIcon/HERO_MAP_SHEETS) full-
+   body map sprite. 48x64 frames in a 4-frame strip, stepped by
+   background-position. The icon's anchor is at his feet, so the ground
+   pulse is centered there and squashed flat to read as a ring on the
+   ground rather than a halo. Class names stayed Blaze-named since he was
+   first; nothing below is actually Blaze-specific. */
 .territory-map-blaze-icon {
   width: 48px;
   height: 64px;

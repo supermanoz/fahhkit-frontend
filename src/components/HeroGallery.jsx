@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   IconCheck,
   IconChevronLeft,
@@ -10,11 +11,25 @@ import HeroFigure from './HeroFigure'
 import { getHeroSprite } from '../utils/heroSprites'
 import './HeroGallery.css'
 
-// Hero roster for the Shop: a sideways-scrolling (swipe / arrow buttons)
-// strip of heroes standing free - no card frame - each on a soft glow in
-// their tier colour, name and perk count underneath, and a fat action bar
-// (price / Equip / Equipped / locked). Tapping one opens HeroDetailModal
-// via onSelect.
+// A swipe distance/velocity past either of these commits to the next/prev
+// hero - same thresholds ShareRunCarousel.jsx uses for its drag-to-advance
+// carousel.
+const DRAG_DISTANCE_THRESHOLD = 60
+const DRAG_VELOCITY_THRESHOLD = 500
+// Anything under this counts as a tap (opens the hero), not a swipe.
+const DRAG_CLICK_THRESHOLD = 10
+
+// One hero at a time (the Shop has the room for exactly one full-size
+// figure, not a shelf of them) with a flip-box transition between them:
+// arrows, dot jumps or a swipe all land the same way - the current card
+// rotates away like the far face of a box and the next one rotates in
+// from the opposite face.
+const flipVariants = {
+  enter: (dir) => ({ rotateY: dir >= 0 ? 90 : -90, opacity: 0 }),
+  center: { rotateY: 0, opacity: 1 },
+  exit: (dir) => ({ rotateY: dir >= 0 ? -90 : 90, opacity: 0 }),
+}
+
 export default function HeroGallery({
   heroes,
   ownedItems,
@@ -22,15 +37,42 @@ export default function HeroGallery({
   loading,
   onSelect,
 }) {
-  const [activeId, setActiveId] = useState(null)
-  const trackRef = useRef(null)
+  const [index, setIndex] = useState(0)
+  const [direction, setDirection] = useState(0)
+  const [hovered, setHovered] = useState(false)
+  const draggedRef = useRef(false)
 
-  function scrollByCards(dir) {
-    const track = trackRef.current
-    if (!track) return
-    const card = track.querySelector('.hero-card')
-    const step = card ? card.getBoundingClientRect().width + 12 : 160
-    track.scrollBy({ left: dir * step * 2, behavior: 'smooth' })
+  // Keep a valid index if the roster shrinks (or loads in) under us.
+  useEffect(() => {
+    setIndex((i) => Math.max(0, Math.min(heroes.length - 1, i)))
+  }, [heroes.length])
+
+  function goTo(nextIndex) {
+    const clamped = Math.max(0, Math.min(heroes.length - 1, nextIndex))
+    if (clamped === index) return
+    setDirection(clamped > index ? 1 : -1)
+    setIndex(clamped)
+    setHovered(false)
+  }
+
+  function handleDragEnd(_, info) {
+    if (
+      Math.abs(info.offset.x) > DRAG_CLICK_THRESHOLD ||
+      Math.abs(info.velocity.x) > DRAG_VELOCITY_THRESHOLD
+    ) {
+      draggedRef.current = true
+    }
+    if (
+      info.offset.x < -DRAG_DISTANCE_THRESHOLD ||
+      info.velocity.x < -DRAG_VELOCITY_THRESHOLD
+    ) {
+      goTo(index + 1)
+    } else if (
+      info.offset.x > DRAG_DISTANCE_THRESHOLD ||
+      info.velocity.x > DRAG_VELOCITY_THRESHOLD
+    ) {
+      goTo(index - 1)
+    }
   }
 
   if (loading && heroes.length === 0) {
@@ -44,55 +86,87 @@ export default function HeroGallery({
     )
   }
 
+  const hero = heroes[index]
+  const equipped = hero.id === activeHeroId
+  const owned = ownedItems.some((o) => o.storeItem.heroId === hero.id)
+  const comingSoon = !equipped && !owned && hero.skins?.length === 0
+  const animated = Boolean(getHeroSprite(hero.name))
+  const prices = (hero.skins || [])
+    .map((sk) => sk.priceFahhcoin || 0)
+    .filter((n) => n > 0)
+  const fromPrice = prices.length ? Math.min(...prices) : 0
+  // 'soon' (no skin released yet) stays its own tier for the grayscale
+  // look, and 'limited' (event/reward heroes, e.g. Blaze) keeps its art in
+  // colour - both just read "Limited" to the player (see hero-card-foot
+  // below), since "coming soon" over-promised a release date.
+  const tier = equipped
+    ? 'equipped'
+    : owned
+      ? 'owned'
+      : comingSoon
+        ? 'soon'
+        : hero.limited
+          ? 'limited'
+          : 'locked'
+
   return (
     <div className="hero-roster">
-      <button
-        type="button"
-        className="hero-roster-arrow is-prev"
-        onClick={() => scrollByCards(-1)}
-        aria-label="Previous heroes"
-      >
-        <IconChevronLeft />
-      </button>
-      <div className="hero-roster-track" ref={trackRef}>
-        {heroes.map((hero) => {
-          // activeHeroId covers the default (Blaze) too, which the player
-          // doesn't own a skin for.
-          const equipped = hero.id === activeHeroId
-          const owned = ownedItems.some((o) => o.storeItem.heroId === hero.id)
-          const comingSoon = !equipped && !owned && hero.skins?.length === 0
-          const animated = Boolean(getHeroSprite(hero.name))
-          const active = activeId === hero.id
-          const prices = (hero.skins || [])
-            .map((sk) => sk.priceFahhcoin || 0)
-            .filter((n) => n > 0)
-          const fromPrice = prices.length ? Math.min(...prices) : 0
-          // Limited = not purchasable right now (event/reward heroes).
-          const tier = equipped
-            ? 'equipped'
-            : owned
-              ? 'owned'
-              : comingSoon
-                ? 'soon'
-                : hero.limited
-                  ? 'limited'
-                  : 'locked'
-          return (
-            <button
+      <div className="hero-roster-row">
+        <button
+          type="button"
+          className="hero-roster-arrow is-prev"
+          onClick={() => goTo(index - 1)}
+          disabled={index === 0}
+          aria-label="Previous hero"
+        >
+          <IconChevronLeft />
+        </button>
+
+        <div className="hero-roster-stage">
+          <AnimatePresence mode="popLayout" custom={direction} initial={false}>
+            <motion.div
               key={hero.id}
-              type="button"
+              custom={direction}
+              variants={flipVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.42, ease: [0.4, 0, 0.2, 1] }}
+              style={{ transformPerspective: 900 }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.15}
+              onDragStart={() => {
+                draggedRef.current = false
+              }}
+              onDragEnd={handleDragEnd}
+              role="button"
+              tabIndex={0}
+              aria-label={`${hero.name} - view details`}
               className={`hero-card tier-${tier} ${animated ? 'is-animated' : ''}`}
-              onClick={() => onSelect(hero)}
-              onPointerEnter={() => setActiveId(hero.id)}
-              onPointerLeave={() => setActiveId(null)}
-              onFocus={() => setActiveId(hero.id)}
-              onBlur={() => setActiveId(null)}
+              onClick={() => {
+                if (draggedRef.current) {
+                  draggedRef.current = false
+                  return
+                }
+                onSelect(hero)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelect(hero)
+                }
+              }}
+              onPointerEnter={() => setHovered(true)}
+              onPointerLeave={() => setHovered(false)}
+              onFocus={() => setHovered(true)}
+              onBlur={() => setHovered(false)}
             >
               <span className="hero-card-stage">
                 <HeroFigure
                   hero={hero}
-                  pose={active ? 'hiphop' : 'idle'}
-                  height={150}
+                  pose={hovered ? 'hiphop' : 'idle'}
+                  height={240}
                 />
               </span>
 
@@ -101,7 +175,7 @@ export default function HeroGallery({
               {tier === 'soon' || tier === 'limited' ? (
                 <span className="hero-card-foot is-locked">
                   <IconLock />
-                  <span>{tier === 'limited' ? 'Limited' : 'Coming soon'}</span>
+                  <span>Limited</span>
                 </span>
               ) : (
                 <span className={`hero-card-foot is-${tier}`}>
@@ -126,18 +200,34 @@ export default function HeroGallery({
                   )}
                 </span>
               )}
-            </button>
-          )
-        })}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <button
+          type="button"
+          className="hero-roster-arrow is-next"
+          onClick={() => goTo(index + 1)}
+          disabled={index === heroes.length - 1}
+          aria-label="Next hero"
+        >
+          <IconChevronRight />
+        </button>
       </div>
-      <button
-        type="button"
-        className="hero-roster-arrow is-next"
-        onClick={() => scrollByCards(1)}
-        aria-label="More heroes"
-      >
-        <IconChevronRight />
-      </button>
+
+      {heroes.length > 1 && (
+        <div className="hero-roster-dots">
+          {heroes.map((h, i) => (
+            <button
+              key={h.id}
+              type="button"
+              className={`hero-roster-dot ${i === index ? 'active' : ''}`}
+              aria-label={`Show ${h.name}`}
+              onClick={() => goTo(i)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

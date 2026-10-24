@@ -4,6 +4,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconClose,
+  IconCompassNeedle,
   IconCrosshairs,
   IconEnvelope,
   IconFlag,
@@ -28,6 +29,10 @@ import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
+import {
+  requestCompassPermission,
+  useDeviceHeading,
+} from '../hooks/useDeviceHeading'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
 import { mySide, usePvp } from '../hooks/usePvp'
@@ -100,7 +105,7 @@ import {
   playMenuSound,
   playMilestoneChime,
 } from '../utils/gameSound'
-import { isBlazeHero, isPlaceholderHero } from '../utils/hero'
+import { isBlazeHero, isCometHero, isPlaceholderHero } from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
 import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
@@ -366,15 +371,51 @@ export default function GamePage() {
     }, 5000)
     return () => clearInterval(interval)
   }, [tracker.status])
-  // "Running View" (Google Maps nav-mode - auto-follow, rotate to heading,
-  // see TerritoryMap's isNavigating) only kicks in for a guided run (PvP
-  // race, Club War, or following a saved route - see isNavigating below) -
-  // a manual pinch/drag suspends the auto-follow (Google Maps' own "free
-  // look" behavior) until the locate button taps it back on - see
-  // handleUserPan/handleRecenter and the locate FAB below.
-  const [navSuspended, setNavSuspended] = useState(false)
-  const handleUserPan = useCallback(() => setNavSuspended(true), [])
-  const handleRecenter = useCallback(() => setNavSuspended(false), [])
+  // Google Maps' own "Running View" location controls - two separate
+  // buttons instead of one cycling through all 3 states (a Compass tap
+  // used to need two taps from Free - Free -> Follow -> Compass - see
+  // toggleCompass below for the direct shortcut this replaced that with):
+  // the plain locate FAB toggles 'free' (map doesn't follow) <-> 'follow'
+  // (centers on the player, north stays up), and a separate compass FAB
+  // jumps straight to 'compass' (centers AND rotates so the direction the
+  // phone is facing is always "up" - see useDeviceHeading below) from
+  // either of those, or back to 'follow' if already in it. Defaults to
+  // 'follow' the instant any run starts tracking (Conquer, PvP, Club War
+  // or a guided route alike - see the tracker.status effect below) and
+  // back to 'free' once it stops; a manual pinch/drag/rotate drops
+  // straight to 'free' too (Google Maps' own "free look" behavior) - see
+  // handleUserPan and the locate FABs below.
+  const [mapMode, setMapMode] = useState('free')
+  const handleUserPan = useCallback(() => setMapMode('free'), [])
+  const { heading: deviceHeading, unavailable: compassUnavailable } =
+    useDeviceHeading(mapMode === 'compass')
+  useEffect(() => {
+    setMapMode(tracker.status === 'tracking' ? 'follow' : 'free')
+  }, [tracker.status])
+  // No compass hardware, or the permission prompt was denied - Compass mode
+  // can't do anything useful, so fall back to Follow rather than getting
+  // stuck on a map that's rotated to nothing.
+  useEffect(() => {
+    if (compassUnavailable) setMapMode('follow')
+  }, [compassUnavailable])
+  function toggleFollow() {
+    setMapMode((current) => (current === 'follow' ? 'free' : 'follow'))
+  }
+  // iOS only answers DeviceOrientationEvent.requestPermission from inside
+  // the tap's own call stack (see useDeviceHeading), so this asks before
+  // ever flipping into 'compass' - from Free or Follow it stays put until
+  // permission resolves, rather than flashing into Compass and straight
+  // back out.
+  async function toggleCompass() {
+    if (mapMode === 'compass') {
+      setMapMode('follow')
+      return
+    }
+    const granted = await requestCompassPermission()
+    if (granted) setMapMode('compass')
+  }
+  const mapRotation =
+    mapMode === 'compass' && deviceHeading != null ? deviceHeading : 0
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
@@ -450,13 +491,11 @@ export default function GamePage() {
   // handleRunViewedRoute) - swaps the route's info/share toast for the
   // cartoon turn-by-turn HUD (RouteTurnIndicator) until the run ends.
   const [followingRoute, setFollowingRoute] = useState(false)
-  // A plain territory draw stays on a flat, non-rotating map - no Google
-  // Maps-style nav view. PvP races, Club War runs, and a guided "Run This
-  // Route" replay keep it, since direction actually matters there.
-  const isGuidedRun =
-    followingRoute || Boolean(tracker.challengeId) || Boolean(tracker.clubWarId)
-  const isNavigating =
-    tracker.status === 'tracking' && !navSuspended && isGuidedRun
+  // Whether the map camera is auto-centering on the player right now (the
+  // Follow or Compass location-button state) - every run type gets this
+  // the moment it starts tracking (see the mapMode effect above), same as
+  // Google Maps' own "start riding" nav view.
+  const isFollowing = tracker.status === 'tracking' && mapMode !== 'free'
   // Drawing a new route: raw taps + the OSRM-snapped geometry for each
   // segment between them (kept separate per segment so Undo can pop
   // exactly one tap's worth of geometry instead of guessing where in a
@@ -525,16 +564,15 @@ export default function GamePage() {
     if (!radialOpen) setRadialMode('main')
   }, [radialOpen])
   const [tabPickerOpen, setTabPickerOpen] = useState(false)
-  const [leaderboardModeOpen, setLeaderboardModeOpen] = useState(false)
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   const [viewingProfile, setViewingProfile] = useState(null)
   const [storeChoice, setStoreChoice] = useState(null)
-  // TEMP: Blaze for everyone for now - the Avatar picker is hidden from the
-  // Shop (Heroes tab replaces it), so an old saved pick would be stuck with
-  // no way to change it. Restore `loadAvatarId() || AVATARS[0].id` when
-  // the picker comes back.
-  const [avatarId, setAvatarId] = useState(() => getAvatarById('blaze').id)
+  // TEMP: Comet for everyone for now (the default hero) - the Avatar picker
+  // is hidden from the Shop (Heroes tab replaces it), so an old saved pick
+  // would be stuck with no way to change it. Restore
+  // `loadAvatarId() || AVATARS[0].id` when the picker comes back.
+  const [avatarId, setAvatarId] = useState(() => getAvatarById('comet').id)
   const [avatarChoice, setAvatarChoice] = useState(null)
   const [mapStyleId, setMapStyleId] = useState(
     () => loadMapStyleId() || MAP_STYLES[0].id
@@ -561,6 +599,18 @@ export default function GamePage() {
     }
   })
   const musicRef = useRef(null)
+  // Browsers refuse audio.play() with sound until the page has had a real
+  // user gesture, and the loading sequence (logo/bar, then the automatic
+  // "Zeroing in on your turf" globe dive - see GameIntroGlobe) has no
+  // button anywhere in it - so left alone, music stays silent until
+  // whatever the player happens to tap first once the live map appears,
+  // well after that dive already played out. Gating the dive behind a
+  // one-time "Tap to begin" on the splash (see the loading overlay below)
+  // gives this a guaranteed gesture to start the music on, right before
+  // the dive plays rather than sometime after it. The hint/gesture only
+  // activates once gameReady - while "Preparing your run…" is still
+  // loading there's nothing to tap yet.
+  const [audioGateTapped, setAudioGateTapped] = useState(false)
 
   // Real-world sky for the map (replaces the old manual dark/light
   // toggle) - weather + sunrise/sunset for the player's actual location,
@@ -603,12 +653,12 @@ export default function GamePage() {
   // tracker.status actually flips to 'idle').
   const autoFinishedRaceIdRef = useRef(null)
 
-  // "3 2 1 GO" pre-run countdown (PvP races and guided route runs) - null
-  // when idle, else a number counting down or the literal 'GO' flash right
-  // before the actual tracker.start() call fires (held in pendingStartRef,
-  // since the start function needed differs per run type). Plain territory
-  // draws (handleStartRun) skip the countdown entirely - just the shared
-  // pre-run reset, then straight into tracker.start().
+  // "3 2 1 GO" pre-run countdown (plain territory draws, PvP races and
+  // guided route runs alike) - null when idle, else a number counting down
+  // or the literal 'GO' flash right before the actual tracker.start() call
+  // fires (held in pendingStartRef, since the start function needed
+  // differs per run type). Club War runs (handleStartWarRun) still skip
+  // it - a war entry has its own battle-start framing already.
   const [startCountdown, setStartCountdown] = useState(null)
   const pendingStartRef = useRef(null)
 
@@ -616,7 +666,7 @@ export default function GamePage() {
     setGpsErrorDismissed(false)
     setStatsOnly(true)
     setConfirmAction(null)
-    setNavSuspended(false)
+    setMapMode('follow')
   }
 
   function beginCountdownThenStart(startFn) {
@@ -1066,9 +1116,10 @@ export default function GamePage() {
     return () => clearTimeout(timeout)
   }, [territoryEntryBanner])
 
-  // Player marker's heading cone (Google Maps nav-view style), and - while
-  // actively navigating a tracked run - the whole map's rotation (see
-  // TerritoryMap's isNavigating). Real GPS/WiFi fixes jitter by meters even
+  // Player marker's heading cone (Google Maps nav-view style), and - in
+  // Compass mode - how far off the real travel direction the map's own
+  // rotation (device heading, see mapRotation) has turned it. Real GPS/WiFi
+  // fixes jitter by meters even
   // standing still (MAX_ACCEPTABLE_ACCURACY_METERS admits up to 20m-
   // accuracy points, and network/WiFi positioning can report a
   // meaningfully different "best guess" position on consecutive polls with
@@ -1313,8 +1364,8 @@ export default function GamePage() {
   }
 
   // ownedItems drives which avatar shows (equippedHero takes priority over
-  // the free Blaze sprite/local avatar pick - see avatarSrc/
-  // showBlazeHeroSprite below), not just the Shop tab's own equip/buy UI.
+  // the free Comet sprite/local avatar pick - see avatarSrc/
+  // animatedMarkerHero below), not just the Shop tab's own equip/buy UI.
   // It used to only load lazily the first time the player opened Shop,
   // which meant the map/Me avatar could visibly change mid-session - Blaze's
   // sprite showing at first (ownedItems still empty, so no equippedHero to
@@ -1837,11 +1888,10 @@ export default function GamePage() {
     if (tab === 'race') pvp.refreshChallenges()
   }
 
-  // Plain territory draw - no countdown, no nav-mode direction dressing.
-  // Tap it and you're drawing.
+  // Plain territory draw - same "3 2 1 GO" pre-run countdown as PvP races
+  // and guided route runs (see beginCountdownThenStart).
   function handleStartRun() {
-    resetForRunStart()
-    tracker.start(null)
+    beginCountdownThenStart(() => tracker.start(null))
   }
 
   // "Run This Route" on the viewingRoute toast - same plain loop run as
@@ -2161,7 +2211,8 @@ export default function GamePage() {
   // profile picture, not stand in for one) — equipping one takes priority
   // over the local placeholder picker below since it's a real, owned item.
   // TEMP: the backend's placeholder "Default Hero" doesn't count - see
-  // isPlaceholderHero - so new players land on Blaze.
+  // isPlaceholderHero - so new players land on Comet (the default hero
+  // for now).
   // Declared up here (not next to currentAvatar) because activeHeroId reads
   // it — using it any earlier is a TDZ crash that blanks the whole page.
   const equippedHero = ownedItems.find(
@@ -2171,10 +2222,10 @@ export default function GamePage() {
       !isPlaceholderHero(o.storeItem.name)
   )
   // The hero the player is actually playing as: an equipped Store Hero,
-  // else Blaze (the default).
+  // else Comet (the default for now).
   const activeHeroId = equippedHero
     ? equippedHero.storeItem.heroId
-    : heroes.find((h) => isBlazeHero(h.name))?.id
+    : heroes.find((h) => isCometHero(h.name))?.id
   const selectedHero = selectedHeroId
     ? heroes.find((h) => h.id === selectedHeroId) || null
     : null
@@ -2296,12 +2347,23 @@ export default function GamePage() {
     currentAvatar?.src ||
     resolveFileUrl(user?.profilePictureUrl) ||
     defaultAvatarImage
-  // Blaze is the one hero with an animated run-cycle sprite (HeroSprite)
-  // instead of a flat image, whether it's the real equipped Store Hero or
-  // just the free local avatars.js pick.
-  const showBlazeHeroSprite = isBlazeHero(
-    equippedHero ? equippedHero.storeItem.name : currentAvatar?.name
-  )
+  const activeHeroName = equippedHero
+    ? equippedHero.storeItem.name
+    : currentAvatar?.name
+  // Blaze and Comet both have a full animated run-cycle sprite on the map
+  // marker (TerritoryMap.jsx's HERO_MAP_SHEETS) instead of the flat avatar
+  // photo - any other hero has no sheet built, so their marker stays the
+  // flat image (see buildPlayerMarkerIcon there).
+  const animatedMarkerHero = isBlazeHero(activeHeroName)
+    ? 'blaze'
+    : isCometHero(activeHeroName)
+      ? 'comet'
+      : null
+  // Blaze and Comet are also the heroes with an animated turntable
+  // (HeroSprite) instead of a flat image on the Me tab, whether it's the
+  // real equipped Store Hero or just the free local avatars.js pick - any
+  // other hero still falls back to Blaze's turntable (see HeroSprite.jsx).
+  const showHeroTurntable = animatedMarkerHero != null
   const equippedProfileBackground = ownedItems.find(
     (o) => o.equipped && o.storeItem.category === 'PROFILE_BACKGROUND'
   )
@@ -2410,9 +2472,12 @@ export default function GamePage() {
           trailColor={equippedTrailColor}
           mapStyleUrl={currentMapStyle?.styleUrl}
           ambience={skyLoaded ? mapAmbience : null}
-          blazeSprite={showBlazeHeroSprite}
+          animatedMarkerHero={animatedMarkerHero}
           playerMoving={playerMoving}
-          isNavigating={isNavigating}
+          isFollowing={isFollowing}
+          mapRotation={mapRotation}
+          compassActive={mapMode === 'compass'}
+          isTracking={tracker.status === 'tracking'}
           onUserPan={handleUserPan}
           isLoopRun={!tracker.challengeId && !tracker.clubWarId}
           drawActive={routeDraftMode}
@@ -2436,8 +2501,13 @@ export default function GamePage() {
             initial={false}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.7, ease: 'easeInOut' }}
+            onClick={() => {
+              if (!gameReady || audioGateTapped) return
+              setAudioGateTapped(true)
+              musicRef.current?.play().catch(() => {})
+            }}
           >
-            {gameReady && introPlaying ? (
+            {gameReady && audioGateTapped && introPlaying ? (
               <GameIntroGlobe
                 center={center}
                 styleUrl={currentMapStyle?.styleUrl}
@@ -2464,6 +2534,11 @@ export default function GamePage() {
                       style={{ width: `${loadPct}%` }}
                     />
                   </div>
+                  {gameReady && !audioGateTapped && (
+                    <p className="game-loading-text game-loading-tap-hint">
+                      Tap anywhere to begin
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -2799,18 +2874,39 @@ export default function GamePage() {
         </div>
       )}
 
-      {/* Google Maps' own "recenter" FAB - only shows once a manual pinch/
-          drag has suspended nav-follow (see handleUserPan), sitting where
-          the menu FAB would be since that's hidden while tracking anyway. */}
-      {tracker.status === 'tracking' && navSuspended && (
-        <button
-          type="button"
-          className="game-locate-btn"
-          aria-label="Recenter on your run"
-          onClick={handleRecenter}
-        >
-          <IconCrosshairs />
-        </button>
+      {/* Google Maps' own run-mode location controls, shown as soon as the
+          run starts tracking - the plain locate FAB toggles Free/Follow
+          (see toggleFollow), sitting where the menu FAB would be since
+          that's hidden while tracking anyway. A separate Compass FAB above
+          it jumps straight into Compass mode in one tap (see
+          toggleCompass) instead of needing two taps through Follow first -
+          lit up gold while active since the map physically rotating is
+          worth a visual cue. */}
+      {tracker.status === 'tracking' && (
+        <>
+          <button
+            type="button"
+            className={`game-compass-btn${mapMode === 'compass' ? ' is-active' : ''}`}
+            aria-label={
+              mapMode === 'compass'
+                ? 'Switch to follow mode'
+                : 'Switch to compass mode'
+            }
+            onClick={toggleCompass}
+          >
+            <IconCompassNeedle />
+          </button>
+          <button
+            type="button"
+            className="game-locate-btn"
+            aria-label={
+              mapMode === 'follow' ? 'Switch to free look' : 'Follow your run'
+            }
+            onClick={toggleFollow}
+          >
+            <IconCrosshairs />
+          </button>
+        </>
       )}
 
       <div
@@ -3458,51 +3554,22 @@ export default function GamePage() {
               <div className="game-menu-panel game-cards">
                 <section className="game-card game-card-dark">
                   <div className="game-leaderboard-mode">
-                    {leaderboardModeOpen && (
-                      <div
-                        className="game-leaderboard-mode-scrim"
-                        onClick={() => setLeaderboardModeOpen(false)}
-                      />
-                    )}
                     <button
                       type="button"
-                      className={`game-leaderboard-mode-toggle ${leaderboardModeOpen ? 'is-open' : ''}`}
-                      aria-expanded={leaderboardModeOpen}
-                      onClick={() => setLeaderboardModeOpen((open) => !open)}
+                      className={`game-leaderboard-mode-box ${leaderboardMode === 'individual' ? 'active' : ''}`}
+                      onClick={() => switchLeaderboardMode('individual')}
                     >
-                      {leaderboardMode === 'individual'
-                        ? 'Top Players'
-                        : 'Top Clubs'}
-                      <IconChevronDown />
+                      <IconTrophy />
+                      Top Players
                     </button>
-                    {leaderboardModeOpen && (
-                      <ul className="game-leaderboard-mode-list">
-                        <li>
-                          <button
-                            type="button"
-                            className={`game-leaderboard-mode-option ${leaderboardMode === 'individual' ? 'active' : ''}`}
-                            onClick={() => {
-                              switchLeaderboardMode('individual')
-                              setLeaderboardModeOpen(false)
-                            }}
-                          >
-                            Top Players
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            type="button"
-                            className={`game-leaderboard-mode-option ${leaderboardMode === 'club' ? 'active' : ''}`}
-                            onClick={() => {
-                              switchLeaderboardMode('club')
-                              setLeaderboardModeOpen(false)
-                            }}
-                          >
-                            Top Clubs
-                          </button>
-                        </li>
-                      </ul>
-                    )}
+                    <button
+                      type="button"
+                      className={`game-leaderboard-mode-box ${leaderboardMode === 'club' ? 'active' : ''}`}
+                      onClick={() => switchLeaderboardMode('club')}
+                    >
+                      <IconUsers />
+                      Top Clubs
+                    </button>
                   </div>
 
                   {leaderboardMode === 'individual' ? (
@@ -3679,8 +3746,8 @@ export default function GamePage() {
                 }
               >
                 <div className="game-menu-hero">
-                  {showBlazeHeroSprite ? (
-                    <HeroSprite size={260} />
+                  {showHeroTurntable ? (
+                    <HeroSprite size={260} hero={activeHeroName} />
                   ) : (
                     <img
                       className="game-menu-hero-img"

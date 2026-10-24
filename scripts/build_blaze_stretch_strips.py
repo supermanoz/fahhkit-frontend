@@ -15,7 +15,7 @@ Two kinds of output per SET:
     (this script prints each strip's resulting cell size for that).
   - map_out: re-cropped to the map marker's native 128x170 cell
     (contain-fit, bottom-aligned, matching TerritoryMap.jsx's
-    BLAZE_SHEETS) - always exactly 128x170 regardless of source
+    HERO_MAP_SHEETS) - always exactly 128x170 regardless of source
     proportions, so nothing downstream needs updating for these.
 
 A set's folders are sampled TARGET_FRAMES each (evenly) and concatenated in
@@ -23,8 +23,8 @@ list order, so a multi-folder set (e.g. waving -> neck stretch) plays back
 to back, looping. All frames in a set share one crop box (the union of
 every sampled frame's bbox, padded) so Blaze doesn't jump in scale/position
 switching folders within it. Frame counts are chosen to match exactly what
-the frontend currently declares (BLAZE_SHEETS / heroSprites.js poses) so no
-frontend code changes are needed for a straight asset refresh.
+the frontend currently declares (HERO_MAP_SHEETS / heroSprites.js poses) so
+no frontend code changes are needed for a straight asset refresh.
 
 Usage: `python3 build_blaze_stretch_strips.py [set_name ...]` - with no
 args, builds every set. Not run automatically; rerun by hand (with
@@ -40,8 +40,7 @@ import sys
 from PIL import Image
 
 SRC_ROOT = (
-    "/home/jozan/Documents/Characters/Blaze animation png sequence (1)/"
-    "Blaze animation png sequence"
+    "/home/jozan/Documents/Characters/BLAZE/Blaze animation png sequence"
 )
 OUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

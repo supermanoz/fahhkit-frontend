@@ -1,35 +1,49 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
-import blazeIdleStretchSheet from '../assets/images/blaze-profile-hello-neck-stretch.png'
+import blazeHelloNeckSheet from '../assets/images/blaze-profile-hello-neck-stretch.png'
+import cometHelloNeckSheet from '../assets/images/comet-profile-hello-neck-stretch.png'
 import './HeroSprite.css'
 
 // Heroes are normally a single static image (StoreItemCategoryConstant.HERO
-// assetUrl, or a free local avatars.js pick) - Blaze is the one exception,
-// standing in for a "3D model" turntable on the Me tab/profile panel with
-// a looping idle instead: a wave, then a neck stretch, back to back.
-// This is the Me dashboard's own pick - the Shop hero card/Hero Detail
-// Modal idle (src/utils/heroSprites.js) and the map marker
+// assetUrl, or a free local avatars.js pick) - Blaze and Comet are the
+// exception, standing in for a "3D model" turntable on the Me tab/profile
+// panel with a looping idle instead: a wave, then a neck stretch, back to
+// back. This is the Me dashboard's own pick - the Shop hero card/Hero
+// Detail Modal idle (src/utils/heroSprites.js) and the map marker
 // (TerritoryMap.jsx) use a different pose (arm stretch).
 // 48 hand-picked frames (24 waving + 24 neck stretch, evenly sampled from
-// the "Blaze animation png sequence" drop, cropped to a shared bounding box
-// so Blaze doesn't jump in scale/position across the strip) laid out in one
-// row - see scripts/build_blaze_stretch_strips.py (the "hello_neck" set).
+// each hero's source animation drop, cropped to a shared bounding box so
+// the hero doesn't jump in scale/position across the strip) laid out in
+// one row - see scripts/build_blaze_stretch_strips.py /
+// build_comet_stretch_strips.py (the "hello_neck" set). TEMP: any hero
+// without an entry here still borrows Blaze's strip, same as
+// heroSprites.js's own per-hero fallback.
 const FRAMES_PER_POSE = 24
-// Raw source frame counts were 36 (waving) and 77 (neck stretch) - 24
-// sampled frames from each at one flat interval played the quick wave as a
-// slow, stuttery crawl. Waving is paced close to its real speed; neck
-// stretch is a genuinely slower motion at its real speed, which just reads
-// as sluggish looping on a dashboard, so it's sped up past real-time
-// instead for better game feel.
+// Raw source frame counts were 36-41 (waving) and 77 (neck stretch) across
+// both heroes - 24 sampled frames from each at one flat interval played
+// the quick wave as a slow, stuttery crawl. Waving is paced close to its
+// real speed; neck stretch is a genuinely slower motion at its real speed,
+// which just reads as sluggish looping on a dashboard, so it's sped up
+// past real-time instead for better game feel.
 const POSE_FRAME_MS = [64, 85]
 const FRAME_COUNT = FRAMES_PER_POSE * POSE_FRAME_MS.length
-// Each frame cell is 197x320 (see build_blaze_stretch_strips.py) - not
-// square like the old 5x5 run-cycle sheet, so `size` sets the height and
-// the width follows this ratio instead of forcing a square box that would
-// squash him.
-const CELL_ASPECT = 197 / 320
+// Each hero's frame cell is a fixed 320px height, but its width follows
+// that hero's own source aspect ratio (see each build script's printed
+// cell size) - not square like the old 5x5 run-cycle sheet, so `size`
+// sets the height and the width follows this ratio instead of forcing a
+// square box that would squash the hero.
+const HERO_SHEETS = {
+  blaze: { src: blazeHelloNeckSheet, cellAspect: 197 / 320 },
+  comet: { src: cometHelloNeckSheet, cellAspect: 195 / 320 },
+}
 
-export default function HeroSprite({ size = 96 }) {
+function sheetForHero(name) {
+  if (typeof name !== 'string') return HERO_SHEETS.blaze
+  return HERO_SHEETS[name.trim().toLowerCase()] || HERO_SHEETS.blaze
+}
+
+export default function HeroSprite({ size = 96, hero }) {
+  const { src: sheetSrc, cellAspect: CELL_ASPECT } = sheetForHero(hero)
   const [frame, setFrame] = useState(0)
   const frameRef = useRef(0)
   const lastTickRef = useRef(0)
@@ -81,7 +95,7 @@ export default function HeroSprite({ size = 96 }) {
       style={{
         width,
         height: size,
-        backgroundImage: `url(${blazeIdleStretchSheet})`,
+        backgroundImage: `url(${sheetSrc})`,
         backgroundPosition: `${(frame / (FRAME_COUNT - 1)) * 100}% 0%`,
       }}
       aria-hidden="true"

@@ -285,6 +285,20 @@ export function IconCrosshairs(props) {
   )
 }
 
+// A compass needle, Google Maps' own "compass mode" glyph - two triangles
+// pinched at a shared center pivot, the top one tinted so it always reads
+// as "this half points where you're told is north" even before it's
+// rotated to match a real heading.
+export function IconCompassNeedle(props) {
+  return (
+    <GameIcon {...props}>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M12 4.5 15 12 12 10.5 9 12z" {...SOLID} />
+      <path d="M12 19.5 9 12l3 1.5 3-1.5z" {...TINT} />
+    </GameIcon>
+  )
+}
+
 export function IconRunning(props) {
   return (
     <GameIcon {...props}>

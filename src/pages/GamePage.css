@@ -192,6 +192,27 @@
   text-align: center;
 }
 
+/* One-time prompt on the splash's first frame - tapping it is the real
+   user gesture the music needs to be allowed to play at all (see
+   audioGateTapped in GamePage.jsx), so it has to read as something to
+   tap rather than just more loading copy. */
+.game-loading-tap-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--game-gold-light);
+  animation: game-loading-tap-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes game-loading-tap-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* Signed-out gate reuses the loading poster - the sign-in copy + buttons sit
    where the status line and progress bar normally go. */
 .game-loading-footer--gate {
@@ -1235,13 +1256,12 @@
   height: 60px;
 }
 
-/* Recenter FAB, shown only once a manual pinch/drag has suspended
-   nav-follow mid-run (see GamePage.jsx's navSuspended) - same chunky
-   cel-shaded badge recipe as .game-menu-btn below, just in the game's
-   blue (matching the route/trail lines it's recentering back onto) so it
-   doesn't read as "another menu button". Bottom-right, the conventional
-   spot for a map app's own recenter control (not the bottom-center FAB
-   spot, which is reserved for the main menu button). */
+/* Run-mode location FAB (Free <-> Follow, toggling on tap - see
+   GamePage.jsx's toggleFollow). Same neutral stone recipe as
+   TerritoryMap.jsx's own general-purpose locate button, which this one
+   stands in for while tracking. Bottom-right, the conventional spot for a
+   map app's own locate control (not the bottom-center FAB spot, reserved
+   for the main menu button). */
 .game-locate-btn {
   position: absolute;
   right: 16px;
@@ -1253,17 +1273,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    circle at 32% 28%,
-    #8fc4ff,
-    #4d9bff 55%,
-    #2a6fcf 100%
-  );
-  color: #000;
+  background: var(--game-stone, #9a9d93);
+  color: #fff;
   border: 4px solid #000;
   box-shadow:
-    inset 0 3px 3px rgba(255, 255, 255, 0.6),
-    inset 0 -9px 0 #2a6fcf,
+    inset 0 -9px 0 var(--game-stone-dark, #6e7166),
     0 5px 0 #000;
   font-size: 22px;
   cursor: pointer;
@@ -1275,8 +1289,57 @@
 .game-locate-btn:active {
   transform: translateY(4px);
   box-shadow:
-    inset 0 3px 3px rgba(255, 255, 255, 0.6),
-    inset 0 -9px 0 #2a6fcf,
+    inset 0 -9px 0 var(--game-stone-dark, #6e7166),
+    0 1px 0 #000;
+}
+
+/* Compass FAB - a direct shortcut into Compass mode (see GamePage.jsx's
+   toggleCompass) instead of needing two taps through Follow first.
+   Floats just above the plain locate FAB; lights up with a gold ring
+   while active since the map physically rotating is worth a glanceable
+   cue the other FAB doesn't need. */
+.game-compass-btn {
+  position: absolute;
+  right: 20px;
+  bottom: calc(var(--sheet-h, 90px) + 84px);
+  z-index: 700;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-stone, #9a9d93);
+  color: #fff;
+  border: 3px solid #000;
+  box-shadow:
+    inset 0 -7px 0 var(--game-stone-dark, #6e7166),
+    0 4px 0 #000;
+  font-size: 18px;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.game-compass-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 -7px 0 var(--game-stone-dark, #6e7166),
+    0 1px 0 #000;
+}
+
+.game-compass-btn.is-active {
+  box-shadow:
+    0 0 0 3px var(--game-gold, #e0a537),
+    inset 0 -7px 0 var(--game-stone-dark, #6e7166),
+    0 4px 0 #000;
+}
+
+.game-compass-btn.is-active:active {
+  box-shadow:
+    0 0 0 3px var(--game-gold, #e0a537),
+    inset 0 -7px 0 var(--game-stone-dark, #6e7166),
     0 1px 0 #000;
 }
 
@@ -1897,32 +1960,30 @@
   cursor: pointer;
 }
 
-/* Solo/Club chooser for the Leaderboard tab - a compact dropdown (same
-   chevron-flip + tap-outside-to-close convention as the main
-   .game-menu-picker, just without its medals/badges - this only ever
-   has two plain text options). */
+/* Solo/Club chooser for the Leaderboard tab - two square picks side by
+   side, same chunky glossy-squircle recipe as .game-shop-tabs, just with
+   a label under the icon since "Top Players"/"Top Clubs" don't read from
+   an icon alone the way the shop's category glyphs do. */
 .game-leaderboard-mode {
-  position: relative;
-  z-index: 3;
+  display: flex;
+  gap: 12px;
   margin-bottom: 14px;
 }
 
-.game-leaderboard-mode-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-}
-
-.game-leaderboard-mode-toggle {
+.game-leaderboard-mode-box {
   position: relative;
-  z-index: 2;
-  width: 100%;
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 3px solid var(--game-ink);
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: 18px;
+  border-width: 3px;
+  border-style: solid;
+  border-color: var(--game-ink);
+  overflow: hidden;
   background: linear-gradient(
     180deg,
     var(--game-wood-light) 0%,
@@ -1934,52 +1995,37 @@
     0 3px 0 var(--game-ink);
   color: #fff;
   font-weight: 900;
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
+  transition: transform 0.08s ease;
 }
 
-.game-leaderboard-mode-toggle svg {
-  transition: transform 0.2s ease;
-}
-
-.game-leaderboard-mode-toggle.is-open svg {
-  transform: rotate(180deg);
-}
-
-.game-leaderboard-mode-list {
+.game-leaderboard-mode-box::before {
+  content: '';
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 2;
-  margin: 0;
-  padding: 8px;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-radius: 14px;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(180deg, #5a3e24, #3a2816);
-  box-shadow:
-    0 6px 0 var(--game-ink),
-    0 14px 28px rgba(0, 0, 0, 0.5);
+  inset: 3px 3px auto 3px;
+  height: 46%;
+  border-radius: 14px 14px 50% 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0)
+  );
+  pointer-events: none;
 }
 
-.game-leaderboard-mode-option {
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: 2px solid var(--game-ink);
-  background: linear-gradient(180deg, #7a5634, #5e4027);
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
+.game-leaderboard-mode-box svg {
+  position: relative;
+  z-index: 1;
+  font-size: 22px;
+  filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.35));
 }
 
-.game-leaderboard-mode-option.active {
+.game-leaderboard-mode-box:active {
+  transform: translateY(2px);
+}
+
+.game-leaderboard-mode-box.active {
   background: linear-gradient(
     180deg,
     var(--game-gold-light),

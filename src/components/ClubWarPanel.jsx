@@ -65,6 +65,14 @@ function errorText(err, fallback) {
   return err instanceof ApiError ? err.message : fallback
 }
 
+// Mirrors ClubWarErrorCode.ALREADY_HAS_ACTIVE_WAR_PROCESS server-side. Hit
+// when the client's view of the club's war state is stale (e.g. a
+// co-leader queued moments earlier) - rather than surface the raw error
+// on the now-wrong squad-picker screen, refresh() so the already-built
+// queued/war screen takes over instead.
+const ALREADY_AT_WAR_MESSAGE =
+  'Your club already has a queued, in-preparation, or in-battle war!'
+
 function formatCountdown(until, now) {
   const ms = new Date(until).getTime() - now
   if (Number.isNaN(ms)) return ''
@@ -107,6 +115,12 @@ export default function ClubWarPanel({
   const [busy, setBusy] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [now, setNow] = useState(() => Date.now())
+  // Set when the server rejects a queue attempt as a duplicate (see
+  // ALREADY_AT_WAR_MESSAGE below) but a refresh still can't find that war
+  // or queue entry to show instead - a stuck/orphaned state the leader
+  // can't act past, so it gets its own screen rather than silently
+  // dumping them back on the (still-queueable-looking) squad picker.
+  const [warConflict, setWarConflict] = useState(false)
 
   // Squad picker (leader, before queueing).
   const eligibleSizes = CLUB_WAR_SQUAD_SIZES.filter((n) => n <= roster.length)
@@ -140,8 +154,10 @@ export default function ClubWarPanel({
       setQueueEntry(queued)
       setWar(shownWar)
       setWarRoster(shownWar ? (await getClubWarRoster(shownWar.id)) || [] : [])
+      return { war: shownWar, queueEntry: queued }
     } catch (err) {
       setLoadError(errorText(err, 'Could not load club wars.'))
+      return { war: null, queueEntry: null }
     } finally {
       setLoading(false)
     }
@@ -180,11 +196,17 @@ export default function ClubWarPanel({
   async function runAction(key, action, fallback) {
     setBusy(key)
     setActionError(null)
+    setWarConflict(false)
     try {
       await action()
       await refresh()
       return true
     } catch (err) {
+      if (err instanceof ApiError && err.message === ALREADY_AT_WAR_MESSAGE) {
+        const found = await refresh()
+        setWarConflict(!found.war && !found.queueEntry)
+        return false
+      }
       setActionError(errorText(err, fallback))
       return false
     } finally {
@@ -645,6 +667,39 @@ export default function ClubWarPanel({
               {actionError}
             </p>
           )}
+        </section>
+        {rules}
+      </div>
+    )
+  }
+
+  // --- Server says a war is already queued/active, but neither endpoint
+  // shows us which one (a stuck queue entry, most likely) - don't leave
+  // the leader back on the squad picker looking like nothing happened. ---
+  if (warConflict) {
+    return (
+      <div className="game-cards">
+        <section className="game-card game-card-dark club-war-banner">
+          <ClubBadge name={club.name} size={84} />
+          <h3 className="game-card-title">War Already Underway</h3>
+          <p className="game-row-meta club-war-sub">
+            The server says {club.name} already has a war queued, in prep, or in
+            battle - it just isn&apos;t showing up here yet. Try refreshing in a
+            moment; if it still won&apos;t show, contact support.
+          </p>
+          <button
+            type="button"
+            className="game-btn game-btn-wood"
+            onClick={async () => {
+              setBusy('recheck')
+              const found = await refresh()
+              setWarConflict(!found.war && !found.queueEntry)
+              setBusy(null)
+            }}
+            disabled={busy === 'recheck'}
+          >
+            {busy === 'recheck' ? 'Checking…' : 'Refresh'}
+          </button>
         </section>
         {rules}
       </div>
