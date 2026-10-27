@@ -10,7 +10,15 @@ import {
   readMail,
 } from '../api/mail'
 
-const MAIL_PAGE_SIZE = 30
+// Inbox: page-NUMBERED now (see MailPanel's .game-route-pager, the same
+// control the Me tab's My Territories/My Routes lists use - reused rather
+// than rebuilt), not infinite scroll - 15 per page, replacing the list on
+// each page change rather than accumulating it. Backend already supports
+// real paged requests (findMyMail's pageNumber/noOfRecords), so this just
+// asks for the page it needs instead of paginating a big in-memory list.
+const MAIL_PAGE_SIZE = 15
+// Broadcasts (News tab) keep their original infinite-scroll behavior -
+// only the personal inbox was asked to paginate.
 const BROADCAST_PAGE_SIZE = 20
 
 // Inbox state lives here (not inside MailPanel) so the game's menu tab can
@@ -23,28 +31,33 @@ export function useMailbox() {
   const [error, setError] = useState(null)
   const [busyId, setBusyId] = useState(null)
   const [actionError, setActionError] = useState(null)
-  // Scroll-triggered pagination for each list (see MailPanel's sentinel
-  // elements) - the page counters are refs since only the derived
-  // hasMore/loadingMore flags need to drive a render.
-  const mailPageRef = useRef(1)
+  // Mail's unread badge (see GamePage.jsx's mailbox.unreadCount) is derived
+  // from whatever's currently in `mail` - with real paging that's only ever
+  // ONE page's worth (15) rather than everything scrolled past so far, so a
+  // player with more than 15 unread messages will see an undercount until
+  // they actually visit the later pages. Same trade-off a numbered-page
+  // inbox makes everywhere; flagged here since the old infinite-scroll
+  // version happened to self-correct as you scrolled, which this no longer
+  // does.
+  const [mailPage, setMailPage] = useState(1)
+  const [mailTotalPages, setMailTotalPages] = useState(1)
+  const [loadingMail, setLoadingMail] = useState(false)
   const broadcastPageRef = useRef(1)
-  const [mailHasMore, setMailHasMore] = useState(false)
   const [broadcastHasMore, setBroadcastHasMore] = useState(false)
-  const [loadingMoreMail, setLoadingMoreMail] = useState(false)
   const [loadingMoreBroadcasts, setLoadingMoreBroadcasts] = useState(false)
 
   const refresh = useCallback(async () => {
     setError(null)
     try {
-      const [mailPage, broadcastPage] = await Promise.all([
+      const [mailPage1, broadcastPage] = await Promise.all([
         findMyMail(1, MAIL_PAGE_SIZE),
         findBroadcastMail(1, BROADCAST_PAGE_SIZE),
       ])
-      setMail(mailPage?.content || [])
+      setMail(mailPage1?.content || [])
       setBroadcasts(broadcastPage?.content || [])
-      mailPageRef.current = 1
+      setMailPage(1)
+      setMailTotalPages(mailPage1?.totalPages || 1)
       broadcastPageRef.current = 1
-      setMailHasMore(1 < (mailPage?.totalPages || 1))
       setBroadcastHasMore(1 < (broadcastPage?.totalPages || 1))
     } catch (err) {
       setError(
@@ -55,31 +68,24 @@ export function useMailbox() {
     }
   }, [])
 
-  // Appends the next page instead of replacing the list - a live-pushed item
-  // (receiveMail/receiveBroadcast prepend) can land in between, so incoming
-  // ids already in the list are dropped rather than duplicated.
-  const loadMoreMail = useCallback(async () => {
-    if (loadingMoreMail || !mailHasMore) return
-    setLoadingMoreMail(true)
+  // Fetches and SWAPS IN a specific inbox page (not append) - the pager
+  // control calls this directly with the page number it wants.
+  const goToMailPage = useCallback(async (page) => {
+    setLoadingMail(true)
+    setError(null)
     try {
-      const nextPage = mailPageRef.current + 1
-      const page = await findMyMail(nextPage, MAIL_PAGE_SIZE)
-      const incoming = page?.content || []
-      if (incoming.length > 0) {
-        mailPageRef.current = nextPage
-        setMail((prev) => {
-          const seen = new Set(prev.map((m) => m.id))
-          return [...prev, ...incoming.filter((m) => !seen.has(m.id))]
-        })
-      }
-      setMailHasMore(nextPage < (page?.totalPages || nextPage))
-    } catch {
-      // Leave the list as-is - the sentinel stays in view, so scrolling
-      // (or the next refresh) just tries again.
+      const result = await findMyMail(page, MAIL_PAGE_SIZE)
+      setMail(result?.content || [])
+      setMailPage(page)
+      setMailTotalPages(result?.totalPages || 1)
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Could not load that page.'
+      )
     } finally {
-      setLoadingMoreMail(false)
+      setLoadingMail(false)
     }
-  }, [loadingMoreMail, mailHasMore])
+  }, [])
 
   const loadMoreBroadcasts = useCallback(async () => {
     if (loadingMoreBroadcasts || !broadcastHasMore) return
@@ -106,9 +112,19 @@ export function useMailbox() {
   const replace = (updated) =>
     setMail((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
 
-  const receiveMail = useCallback((incoming) => {
-    setMail((prev) => [incoming, ...prev.filter((m) => m.id !== incoming.id)])
-  }, [])
+  // Only splices a live-pushed item into the list while page 1 is showing -
+  // on any other page, the current slice doesn't actually include "the
+  // newest N" any more, so prepending here would misplace it among items
+  // that don't belong next to it. It'll show correctly once the player
+  // pages back to 1 (unreadCount undercounts it until then - see the note
+  // above mailPage).
+  const receiveMail = useCallback(
+    (incoming) => {
+      if (mailPage !== 1) return
+      setMail((prev) => [incoming, ...prev.filter((m) => m.id !== incoming.id)])
+    },
+    [mailPage]
+  )
 
   const receiveBroadcast = useCallback((incoming) => {
     setBroadcasts((prev) => [
@@ -203,9 +219,10 @@ export function useMailbox() {
     decline,
     remove,
     openBroadcast,
-    mailHasMore,
-    loadingMoreMail,
-    loadMoreMail,
+    mailPage,
+    mailTotalPages,
+    loadingMail,
+    goToMailPage,
     broadcastHasMore,
     loadingMoreBroadcasts,
     loadMoreBroadcasts,

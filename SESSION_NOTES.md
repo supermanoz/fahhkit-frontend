@@ -355,3 +355,126 @@ Frontend for backend commits `ea0f213`…`d528e87` on `feature/territory-game`:
   exactly 128x170 via contain-fit, unaffected): idle's `frameWidth` 200→151, hiphop's 230→233 (both
   `src/utils/heroSprites.js`), and HeroSprite.jsx's `CELL_ASPECT` 203/320→197/320. Re-run the script
   and check its printed `cell=` line before trusting these if the source art changes again.
+
+## Emotes: new buyable poses, and a perf pass on all of them (2026-10-26)
+
+- Added a central emote registry (`src/utils/emotes.js`) + `EmoteGlyph.jsx` - the only place any
+  screen turns an EMOTE StoreItem into a picture (StoreItem.assetUrl is never populated for EMOTE
+  rows). "Classic" (the one free emote every hero already has, migration V1_64) now renders the
+  hero's **idle** pose; "Hip Hop" is a new standalone buyable emote using the hiphop/"signature
+  dance" strip; Breathing/Checking Shoes/Jumping Jack/Shoulder Rub/Squat/Victory are newly-built
+  dedicated emote art (Comet has no Breathing/Checking Shoes folder, one fewer than Blaze). None of
+  these are purchasable yet - no backend EMOTE row exists for them beyond "Classic". New admin tool
+  **`EmoteAdminPanel.jsx`** (`/admin/game-mechanics` → "Emotes") creates them via the backend's
+  existing `POST /v1/store/admin/items` (same pattern `HeroAdminPanel.jsx` already used for Heroes).
+- **Blaze's "idle" source changed**: the asset drop's own `breathing` folder was renamed to `idle`
+  (same 235 frames) to give Blaze a dedicated idle source like Comet already had, instead of reusing
+  `Arm stretching`. This is a shared asset - it now also changes the look of the Shop hero card's
+  default pose, the Hero Detail Modal, the map marker's idle animation, and the Me-tab turntable, not
+  just the new "Classic" emote. `Arm stretching` is unused now.
+- **Performance fix - the actual root causes of "the emote lags in Me/Emotes"**, found by measuring
+  (not guessing) asset weight and render behavior, in order of impact:
+  1. The idle/hiphop/emote sprite strips were lossless PNG built at a flat 320px cell height
+     regardless of where they're ever shown on screen (EmoteGlyph's biggest caller is the 140px buy
+     popup) - 1-2.8MB files decoding to 5-12MB raw RGBA bitmaps each. Fixed: emote-only art
+     (`EMOTE_CELL_H` in both `build_*_stretch_strips.py`) now builds at 190px instead of 320, and
+     every profile-sized strip (idle/hiphop/emotes) saves as WebP instead of PNG
+     (`WEBP_QUALITY = 82`). ~19.5MB of emote/profile PNGs across both heroes is now ~2.7MB of WebP -
+     most individual files went from 1.1-2.8MB to 110-270KB. `blaze/comet-profile-hello-neck-stretch.png`
+     (another ~5MB) turned out to be completely dead - nothing imports them since HeroSprite.jsx
+     switched to the shared idle pose - deleted outright.
+  2. The Shop's Emotes grid played every tile's animation continuously and simultaneously, whether
+     or not it was the one being looked at - `EmoteGlyph` now starts paused (a real static first
+     frame, not a mid-animation freeze) and only plays when `active` (the buy/showcase popup, the
+     one deliberately-selected instance) or while hovered/focused inside the grid
+     (`EmoteGlyph.css`). On mobile (no hover), this means the grid itself stays static and only the
+     opened popup animates - matches "only the selected/visible one" either way.
+  3. GamePage's standing GPS watch (`liveLocation`, independent of whether a run is being tracked)
+     re-renders the whole page every few seconds regardless of which tab is open. `emoteItems`/
+     `skinItems`/`shadeItems`/`trailItems`/`galleryHeroes` were plain inline `.filter()` calls (a new
+     array identity every render) and `handleEquip` was a plain function (a new identity every
+     render) - both defeated any attempt to skip re-rendering the Shop grid on an unrelated tick.
+     Now memoized (`useMemo`/`useCallback`), and `EmoteShelf`/`HeroItemShelf` are wrapped in
+     `React.memo`, so an unrelated GPS-driven re-render of GamePage no longer cascades into
+     re-rendering every emote tile.
+  - Not changed: `HeroSprite.jsx`'s own 150ms rAF-driven re-render (that's the Me-tab turntable's
+    actual animation mechanism, not waste) and the map marker's run-cycle sheets (map_out, a
+    different consumer than Me/Emotes, already reasonably sized before this pass).
+
+## Fortnite-style Emotes, leaderboard polish, and Run/Defend This Territory (2026-10-27)
+
+- **Emotes screen, Fortnite-locker redesign**: `EmoteSelectScreen.jsx` (+ `.css`) replaces the plain
+  grid once a hero's emotes are open (`HeroItemShelf.jsx`'s new `renderGrid` override - only when the
+  hero itself is owned; `SkinShelf.jsx` is untouched, it never passes this prop). Yellow "SELECT
+  EMOTE" header tab, a left detail card (rarity | EMOTE, name, description, big thumbnail) + the tile
+  grid below it, a big pedestal preview on the right (stacks above the grid on mobile). Tapping/
+  arrow-navigating a tile only SELECTS it (updates the card/preview instantly); tapping the pedestal
+  or the detail card's own button is what opens the full-screen showcase (item 2 below) - kept as two
+  separate steps so keyboard/grid browsing never accidentally pops a purchase screen.
+  - **Rarity and description are both invented client-side** (`utils/emoteRarity.js`) - neither
+    exists on the backend's StoreItem (no rarity or description column). Rarity is a price-banded
+    tier (free=Common, <200=Rare, <500=Epic, else=Legendary) purely for the border color/label;
+    description is a hand-written flavor line per known emote name, generic fallback otherwise.
+    Purchase/equip logic never reads either - still 100% priceFahhcoin-driven.
+  - **"NEW" badge** (`utils/seenEmotes.js`) is a per-browser localStorage set too - StoreItemResponse
+    has no createdAt. First visit after an emote's added marks it new; next visit it isn't.
+- **Showcase screen** (`EmoteShowcase.jsx` + `.css`): full-screen pedestal view with name/rarity up
+  top, a Preview button (remounts EmoteGlyph via key to replay the already-infinite-looping
+  animation from frame 1), Equip/Unequip or Buy/Get-Fahhcoin, and the close/Esc/backdrop-click
+  GamePage already had on `storeChoice`. This REPLACES the old shared buy-confirm card for EMOTE
+  specifically - GamePage.jsx's `storeChoice` modal now branches EMOTE into `<EmoteShowcase>` and
+  everything else (SKIN/TERRITORY_SHADE/TRAIL_COLOR) into the original small card, which also lost
+  its now-dead "already owned" branch (those categories only ever reach it unowned - an owned tile
+  equips directly on tap, see SkinShelf.jsx/ColorShelf.jsx).
+- **Leaderboard**: mostly already matched the "CoC-chunky, rank medals, highlighted row, podium"
+  brief from earlier work this branch - added what was actually missing: a real loading state
+  (`LeaderboardSkeleton` in `LeaderboardPodium.jsx` - without it, the empty-state text showed
+  briefly on every first load since the array is empty before the request lands), `role="tab"`/
+  `aria-selected` on both segmented controls, and a 44px tap-target floor on the Global/District
+  and Global/Country scope toggle specifically (`.game-menu-subtabs-scope .game-menu-subtab` - this
+  class has no other consumer, so it didn't touch any other screen's subtabs).
+- **Territory click → run points + "Run/Defend This Territory"**: `handleParcelClick`/
+  `handleViewMyParcel` (GamePage.jsx) now also capture the owner's equipped-Hero avatar, a run
+  score, and the full boundary polygon onto `highlightedEntry`, and the popup grew an avatar (with
+  its own broken-image fallback to colored initials - `TerritoryAvatar`, unlike most other
+  broken-asset spots in this app which just vanish, since a popup that's otherwise just "X's
+  territory" reads as broken with a blank gap where a face should be), a run-score stat, and the
+  run/defend button.
+  - **Owner avatar and run score were already in the API response, just dropped on the way to the
+    map** - `TerritoryParcelResponse.ownerEquippedItems` (every equipped item, not just shade/emoji)
+    and `.currentScore` both existed server-side; `toDisplayParcel` (`utils/territoryGame.js`) just
+    never kept them. Now it does (`ownerAvatarUrl`, `currentScore`).
+  - **"Total run points" is NOT a real total** - `TerritoryParcel.currentScore` is a per-parcel
+    score (what the conflict-resolution engine compares a challenger's score against), not a
+    player-wide figure anywhere on the backend. The popup sums `currentScore` across whichever
+    parcels make up the tapped (merged) shape and labels it "run score" rather than overclaiming a
+    lifetime total. An actual all-parcels total for arbitrary players would need a new backend
+    field - e.g. `TerritoryProfileResponse.totalRunScore` (Double = SUM(currentScore) over every
+    ACTIVE TerritoryParcel WHERE owner_id = :userId), the same home `totalAreaSqMeters` already
+    lives in, exposed through the existing `/v1/territory/profile`/`/v1/territory/profile/{userId}`
+    endpoints (no new endpoint needed, just a new field + query).
+  - **Route generation** (`generateTerritoryLoopRoute`, `utils/territoryGame.js`): rotates the
+    territory's own boundary ring to start at whichever point is nearest the player right now,
+    keeps the ring's existing winding direction (no separate "pick a direction" heuristic), and
+    closes the loop - then feeds straight into the exact same `viewingRoute`/`followingRoute`/
+    `getRouteGuidance` machinery a saved "Run This Route" already uses (`handleRunViewedRoute`) -
+    nothing about running a generated loop is handled differently from a saved one.
+  - Warns (with a "Continue anyway" / Cancel step, not a blocking dialog) on a loop over 10km or
+    under 40m, and surfaces "Start point is Xm away" inline when it's a meaningful walk to the start
+    - the guide's own off-route steering already points the runner there once the run begins, so
+      this is informational, not a separate "navigate there first" mode.
+  - `routeNav.js`'s shared `OFF_ROUTE_METERS` tightened 60m→30m (the spec's own number) - this is
+    shared by every guided run, not territory-only, since parameterizing it per route source would
+    have meant duplicating the guidance function instead of reusing it.
+  - `RouteTurnIndicator.jsx` gained an optional `totalDistanceMeters` prop and now shows "X% done"
+    alongside the existing distance-remaining text, for every guided run (not territory-specific).
+  - A new `routeAnchorPoint` prop on `TerritoryMap.jsx` shows a single 🏁 start/finish pin for
+    whichever route is being previewed or run - one pin, not two, since every route in this game is
+    a closed loop (a territory claim requires one), so start and finish are the same point.
+  - **Verified live against the running dev server** (an already-open, already-authenticated tab -
+    see below) that tapping a real territory shows the correct name/area/run-score and the
+    distance-to-start hint, with real backend data (not a mock). Button text/warnings/keyboard nav
+    on the Emotes screen, actually starting and running a generated loop, and the explicit mobile-
+    width check were **not** verified interactively - a full top-level page reload mid-session
+    logged the tab out (session wasn't cookie-persisted across a fresh load) and no credentials
+    exist to sign back in. `npm run lint`/`npm run build` both pass clean throughout.

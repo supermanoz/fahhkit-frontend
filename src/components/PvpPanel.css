@@ -277,6 +277,108 @@
   height: 14px;
 }
 
+/* --- Home: stat row (Record/Win rate/Races run - see PvpPanel.jsx, no
+   rank/league exists server-side so this shows the real thing instead)
+   and the section cards below it (Active races/Recent matches/Stakes &
+   rewards) - same carved-wood card language as the rest of the game's
+   HUD/Me tab (.game-card), scoped to pvp- so this file stays self
+   contained. --- */
+.pvp-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pvp-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(180deg, #6a4f37 0%, #4a3727 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.15),
+    0 3px 0 var(--game-ink);
+}
+
+.pvp-stat-value {
+  font-size: 19px;
+  color: #fff;
+  -webkit-text-stroke: 1.2px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--game-ink);
+}
+
+.pvp-stat-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--game-gold-light);
+}
+
+.pvp-section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-radius: 16px;
+  border: 3px solid var(--game-ink);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+}
+
+.pvp-section-card > .pvp-section-label {
+  margin: 0;
+}
+
+.pvp-section-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pvp-section-head-row .pvp-history-link {
+  align-self: auto;
+  padding: 0;
+}
+
+.pvp-rewards-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pvp-rewards-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pvp-rewards-mode {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pvp-rewards-terms {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  color: rgba(246, 236, 217, 0.75);
+  text-align: right;
+}
+
 /* --- Big tappable choice rows (distance / opponent) --- */
 .pvp-choice-list {
   display: flex;

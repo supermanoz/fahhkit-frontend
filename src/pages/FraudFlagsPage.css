@@ -1,0 +1,331 @@
+.fraud-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.fraud-wrap {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fraud-status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.fraud-status-tab {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border, #ddd);
+  background: transparent;
+  color: var(--text, inherit);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fraud-status-tab.active {
+  background: var(--primary, #e8590c);
+  border-color: var(--primary, #e8590c);
+  color: #fff;
+}
+
+.fraud-flag-list {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fraud-flag-card {
+  border: 1.5px solid var(--border, #e4e4e4);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+}
+
+.fraud-flag-main {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.fraud-flag-avatar {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary, #e8590c);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.fraud-flag-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fraud-flag-name {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.fraud-flag-reason {
+  font-size: 13px;
+  color: var(--text, inherit);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fraud-flag-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fraud-status-pill {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--border, #eee);
+  color: var(--muted);
+}
+
+.fraud-status-pill.status-pending {
+  background: #fff3cd;
+  color: #8a6400;
+}
+
+.fraud-status-pill.status-confirmed {
+  background: var(--error-bg, #fdecea);
+  color: var(--error, #c0392b);
+}
+
+.fraud-status-pill.status-dismissed {
+  background: #e6f6ea;
+  color: #1e7a3c;
+}
+
+.fraud-flag-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+
+.fraud-flag-actions .btn {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.fraud-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.fraud-pager-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.fraud-back-link {
+  all: unset;
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary, #e8590c);
+  cursor: pointer;
+}
+
+.fraud-ban-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.fraud-ban-btn {
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--error, #c0392b);
+  background: transparent;
+  color: var(--error, #c0392b);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.fraud-ban-btn.is-confirming {
+  background: var(--error, #c0392b);
+  color: #fff;
+}
+
+.fraud-ban-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fraud-ban-done {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--error, #c0392b);
+}
+
+.fraud-ban-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--error, #c0392b);
+  text-align: right;
+  max-width: 220px;
+}
+
+.fraud-run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fraud-run-row {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border, #e4e4e4);
+  background: var(--surface, #fff);
+  cursor: pointer;
+}
+
+.fraud-run-row.is-flagged {
+  border-color: var(--error, #c0392b);
+}
+
+.fraud-run-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fraud-run-mode {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.fraud-run-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fraud-run-flagged-pill {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--error-bg, #fdecea);
+  color: var(--error, #c0392b);
+}
+
+.fraud-run-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fraud-run-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.fraud-run-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border, #e4e4e4);
+  background: var(--surface, #fff);
+}
+
+.fraud-run-stat-value {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.fraud-run-stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fraud-run-flags {
+  border: 1.5px solid var(--border, #e4e4e4);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.fraud-run-flags-title {
+  margin: 0 0 8px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.fraud-run-flags ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .fraud-run-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .moderators-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fraud-ban-box {
+    align-items: flex-start;
+    width: 100%;
+  }
+}

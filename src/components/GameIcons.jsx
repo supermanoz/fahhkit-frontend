@@ -42,6 +42,17 @@ export function IconTrophy(props) {
   )
 }
 
+// #1 podium spot on the leaderboard (see LeaderboardPodium.jsx).
+export function IconCrown(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M3 18L5 9L9 12L12 6L15 12L19 9L21 18Z" {...TINT} />
+      <path d="M3 18L5 9L9 12L12 6L15 12L19 9L21 18Z" />
+      <path d="M4.5 20.5h15" />
+    </GameIcon>
+  )
+}
+
 export function IconUser(props) {
   return (
     <GameIcon {...props}>
@@ -364,6 +375,41 @@ export function IconMap(props) {
         {...TINT}
       />
       <path d="M9 4v13.5M15 6.5V20" />
+    </GameIcon>
+  )
+}
+
+export function IconEmote(props) {
+  return (
+    <GameIcon {...props}>
+      <circle cx="12" cy="12" r="9.5" {...TINT} />
+      <circle cx="12" cy="12" r="9.5" />
+      <circle cx="9" cy="10" r="1" {...SOLID} />
+      <circle cx="15" cy="10" r="1" {...SOLID} />
+      <path d="M8 14.5c1 1.3 2.4 2 4 2s3-.7 4-2" />
+    </GameIcon>
+  )
+}
+
+// A t-shirt - skins are a hero's outfit, so a garment reads more clearly
+// than anything hero-shaped (which would be confused with the Heroes tab
+// right next to it).
+export function IconSkin(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M9 4 5 6l2.5 3v10h9V9L19 6l-4-2a3.5 3.5 0 0 1-6 0z" {...TINT} />
+      <path d="M9 4 5 6l2.5 3v10h9V9L19 6l-4-2a3.5 3.5 0 0 1-6 0z" />
+    </GameIcon>
+  )
+}
+
+export function IconInfo(props) {
+  return (
+    <GameIcon {...props}>
+      <circle cx="12" cy="12" r="9.5" {...TINT} />
+      <circle cx="12" cy="12" r="9.5" />
+      <circle cx="12" cy="8" r="1.1" {...SOLID} />
+      <path d="M12 11.5v5.5" />
     </GameIcon>
   )
 }

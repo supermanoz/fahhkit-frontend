@@ -105,8 +105,71 @@ export function toDisplayParcel(parcel, currentUserId) {
       ? PLAYER_COLOR
       : equippedShade || colorForOwner(parcel.ownerId),
     emojiUrl: equippedEmojiUrl || null,
+    // The owner's actual uploaded profile picture (not a cosmetic) - for
+    // the "whose ground is this" popup's avatar (see GamePage.jsx's
+    // handleParcelClick/TerritoryAvatar). TerritoryParcelResponse doesn't
+    // send this field yet (as of this writing it only sends
+    // ownerEquippedItems, cosmetics, not the photo) - this reads
+    // `ownerProfilePictureUrl` defensively so it picks the field up the
+    // moment the backend adds it (parcel.getOwner().getProfilePictureUrl()
+    // is already loaded server-side in toParcelResponse, just unset on the
+    // response), and falls back to null (TerritoryAvatar's own
+    // colored-initial fallback) until then.
+    ownerProfilePictureUrl: parcel.ownerProfilePictureUrl || null,
     points: exteriorRing.map(([lng, lat]) => ({ lat, lng })),
     area: parcel.areaSqMeters || 0,
+    // TerritoryParcel.currentScore - a per-PARCEL run score (what the
+    // conflict-resolution engine compares a challenger's score against),
+    // not a player-wide total. Summed across a merged territory's
+    // sourceIds, this is the real figure handleParcelClick shows as that
+    // loop's "run score" - there's no backend field for a player's
+    // all-time total across every parcel they own anywhere (see that same
+    // comment for exactly what one would need to add that).
+    currentScore: parcel.currentScore || 0,
+  }
+}
+
+// Builds a guide route that walks a claimed territory's own boundary as a
+// closed loop, starting from whichever boundary point sits nearest the
+// runner right now, in whichever direction the polygon ring already winds
+// (no separate "pick a sensible direction" heuristic needed - the ring
+// order from toDisplayParcel is already a single consistent direction
+// around the shape). Returned `points` always close the loop (first point
+// repeated at the end) so it feeds straight into the exact same
+// viewingRoute/followingRoute/getRouteGuidance machinery a saved route or
+// PvP course already uses (see GamePage.jsx's handleRunViewedRoute) -
+// nothing about running a generated loop is handled differently from
+// running a saved one once this hands back a point list.
+export function generateTerritoryLoopRoute(points, playerLocation) {
+  if (!points || points.length < 3) return null
+  // GeoJSON-derived rings already repeat their first point at the end
+  // (see toDisplayParcel) - rotating needs the "open" ring instead.
+  const first = points[0]
+  const last = points[points.length - 1]
+  const open =
+    points.length > 1 && first.lat === last.lat && first.lng === last.lng
+      ? points.slice(0, -1)
+      : points
+
+  let startIndex = 0
+  if (playerLocation) {
+    let best = Infinity
+    open.forEach((p, i) => {
+      const d = haversineDistance(p, playerLocation)
+      if (d < best) {
+        best = d
+        startIndex = i
+      }
+    })
+  }
+
+  const rotated = [...open.slice(startIndex), ...open.slice(0, startIndex)]
+  return {
+    points: [...rotated, rotated[0]],
+    distanceMeters: loopPerimeterMeters(rotated),
+    startDistanceMeters: playerLocation
+      ? haversineDistance(rotated[0], playerLocation)
+      : null,
   }
 }
 
@@ -249,6 +312,19 @@ export function formatArea(sqMeters) {
   const km = sqMeters / 1_000_000
   const decimals = km < 0.01 ? 4 : km < 1 ? 3 : 2
   return `${km.toFixed(decimals)} km²`
+}
+
+// A separate, compact formatter for the territory popup's big stat blocks
+// (GamePage.jsx's highlightedEntry card) - NOT a replacement for formatArea
+// above, which several other screens already rely on for its own
+// always-km² behavior. This one switches to whole m² below 1 hectare
+// instead of a tiny "0.0012 km²" that doesn't read as a big bold number,
+// and otherwise keeps km² to 1-2 decimals.
+export function formatAreaStat(sqMeters) {
+  if (!sqMeters) return '0 m²'
+  if (sqMeters < 10000) return `${Math.round(sqMeters).toLocaleString()} m²`
+  const km = sqMeters / 1_000_000
+  return `${km.toFixed(km < 10 ? 2 : 1)} km²`
 }
 
 // Mirrors the backend's level curve (TerritoryXpServiceImpl.levelForXp /

@@ -423,6 +423,16 @@
   margin: 0;
 }
 
+.club-war-result-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.club-war-result-actions .game-btn {
+  flex: 1;
+}
+
 /* Gentle pulse on the shield while matchmaking. */
 .club-war-searching {
   animation: club-war-pulse 1.4s ease-in-out infinite;
@@ -502,6 +512,25 @@
   font-size: 15px;
 }
 
+/* Small padlock badge on a not-yet-owned hero's card, top-right corner -
+   same "locked" meaning as EmoteShelf's hero picker, distinct from the
+   diagonal "LOCKED" ribbon below (that one marks the war pick you've
+   committed to, a different sense of the word). */
+.club-war-heroes .club-war-hero-lock {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--game-ink);
+  color: var(--game-cream);
+  font-size: 12px;
+}
+
 /* Diagonal "LOCKED" ribbon across the selected card's corner - the
    classic mobile-game "equipped" badge, replacing the plain inline tag. */
 .club-war-heroes .game-menu-avatar-card.is-selected::after {
@@ -529,6 +558,153 @@
   flex-shrink: 0;
   font-weight: 900;
   color: var(--game-gold-light);
+}
+
+/* --- War History (ClubWarHistory.jsx) --- */
+.club-war-history-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px;
+}
+
+.club-war-history-head .game-card-title {
+  margin: 0;
+}
+
+.club-war-history-back {
+  all: unset;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.club-war-history-back:hover,
+.club-war-history-back:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.club-war-history-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.club-war-history-row {
+  gap: 12px;
+}
+
+/* Two small badges (our club, then opponent) standing in for the single
+   ClubBadge the row used to carry - "our club vs opponent club, names and
+   badges" per the brief, not opponent-only. */
+.club-war-history-badges {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.club-war-history-badge-mine {
+  margin-right: -10px;
+  z-index: 1;
+  filter: drop-shadow(-2px 0 0 #46362a);
+}
+
+.club-war-history-result {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--game-stone-dark);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.club-war-history-result.is-won {
+  background: var(--game-green);
+}
+
+.club-war-history-result.is-lost {
+  background: var(--game-red);
+}
+
+.club-war-history-participants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.club-war-history-participant {
+  gap: 10px;
+}
+
+/* Hero portrait (or IconHelmet placeholder when no hero was picked - a
+   silhouette reads as "no hero" on its own, no "No hero" text needed next
+   to it per the brief). */
+.club-war-history-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--game-ink);
+  color: rgba(246, 236, 217, 0.6);
+}
+
+.club-war-history-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Members who didn't run sink to the bottom of the sorted list and read
+   as inactive, not just "last" - per the brief. */
+.club-war-history-participant.is-no-run {
+  opacity: 0.5;
+}
+
+.club-war-history-participant.is-no-run .club-war-history-avatar {
+  filter: grayscale(1);
+}
+
+/* Top contributor on a squad - a small gold chip next to their name, not
+   a separate column, so it reads at a glance without pushing the row's
+   layout around. */
+.club-war-mvp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  padding: 1px 7px 1px 4px;
+  border-radius: 999px;
+  border: 1.5px solid var(--game-ink);
+  background: linear-gradient(180deg, var(--game-gold-light), var(--game-gold));
+  color: var(--game-ink);
+  font-size: 9.5px;
+  font-weight: 900;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.club-war-mvp-badge svg {
+  width: 10px;
+  height: 10px;
 }
 
 /* Ran/missed/pending badge on a war-roster row, standing in for the

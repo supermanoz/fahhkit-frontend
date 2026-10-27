@@ -1,9 +1,9 @@
-import blazeIdleStretchSheet from '../assets/images/blaze-profile-idle-stretch.png'
-import blazeHipHopSheet from '../assets/images/blaze-profile-hiphop.png'
+import blazeIdleStretchSheet from '../assets/images/blaze-profile-idle-stretch.webp'
+import blazeHipHopSheet from '../assets/images/blaze-profile-hiphop.webp'
 import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
 import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
-import cometIdleStretchSheet from '../assets/images/comet-profile-idle-stretch.png'
-import cometHipHopSheet from '../assets/images/comet-profile-hiphop.png'
+import cometIdleStretchSheet from '../assets/images/comet-profile-idle-stretch.webp'
+import cometHipHopSheet from '../assets/images/comet-profile-hiphop.webp'
 
 // Heroes with animated strips (see scripts/build_blaze_stretch_strips.py).
 // Each pose is its own horizontal strip of `frames` cells,
@@ -16,13 +16,15 @@ import cometHipHopSheet from '../assets/images/comet-profile-hiphop.png'
 const HERO_SPRITES = {
   blaze: {
     poses: {
-      // 48 frames (arm-stretch, straight-on render) - see
-      // scripts/build_blaze_stretch_strips.py (the "idle" set). Same strip
-      // HeroSprite.jsx plays on the Me tab/profile panel.
+      // 48 frames (calm standing loop, straight-on render) - see
+      // scripts/build_blaze_stretch_strips.py (the "idle" set, sourced from
+      // the drop's own "idle" folder as of its latest asset refresh, not
+      // "Arm stretching" any more). Same strip HeroSprite.jsx plays on the
+      // Me tab/profile panel, and utils/emotes.js's "Classic" emote.
       idle: {
         src: blazeIdleStretchSheet,
         frames: 48,
-        frameWidth: 151,
+        frameWidth: 163,
         frameHeight: 320,
       },
       // Shop hero card hover pose (HeroGallery.jsx) - also pickable on the
@@ -53,6 +55,8 @@ const HERO_SPRITES = {
   // been built for him yet, so he falls back to Blaze's for those.
   comet: {
     poses: {
+      // Also backs utils/emotes.js's "Classic" emote - see Blaze's idle
+      // entry above.
       idle: {
         src: cometIdleStretchSheet,
         frames: 48,
@@ -75,4 +79,16 @@ const HERO_SPRITES = {
 export function getHeroSprite(name) {
   if (typeof name !== 'string') return HERO_SPRITES.blaze
   return HERO_SPRITES[name.trim().toLowerCase()] || HERO_SPRITES.blaze
+}
+
+// True only for a hero with a REAL entry above - unlike getHeroSprite,
+// never coerced to the Blaze fallback. Lets a caller tell "this hero
+// genuinely has dedicated pose art" apart from "this hero is silently
+// borrowing Blaze's" (see EmoteShelf.jsx's own renderHeroCardArt, which
+// used to show every hero without an entry here as Blaze - this is what
+// lets it fall back to that hero's own portrait instead).
+export function hasHeroSprite(name) {
+  return (
+    typeof name === 'string' && Boolean(HERO_SPRITES[name.trim().toLowerCase()])
+  )
 }

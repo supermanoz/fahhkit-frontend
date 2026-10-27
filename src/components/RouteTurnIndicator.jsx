@@ -23,8 +23,30 @@ const CUE_COPY = {
   arrived: "You're back! Nice loop 🎉",
 }
 
-export default function RouteTurnIndicator({ guidance, onFinish }) {
+export default function RouteTurnIndicator({
+  guidance,
+  onFinish,
+  // The route's own full length (viewingRoute.distanceMeters) - optional,
+  // only used to show a "% of the route covered" figure alongside the
+  // existing distance-remaining text. Omit it and the percentage just
+  // doesn't render (every caller before this one already worked fine
+  // without it).
+  totalDistanceMeters,
+}) {
   if (!guidance) return null
+
+  const percentComplete =
+    totalDistanceMeters > 0 && guidance.distanceRemaining != null
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              100 * (1 - guidance.distanceRemaining / totalDistanceMeters)
+            )
+          )
+        )
+      : null
 
   if (guidance.arrived) {
     return (
@@ -71,7 +93,9 @@ export default function RouteTurnIndicator({ guidance, onFinish }) {
         <span>
           {offRoute
             ? `Head back to the route to keep going (${formatDistance(distanceRemaining)} left).`
-            : `${formatDistance(distanceToTarget)} · ${formatDistance(distanceRemaining)} to go`}
+            : `${formatDistance(distanceToTarget)} · ${formatDistance(distanceRemaining)} to go${
+                percentComplete != null ? ` · ${percentComplete}% done` : ''
+              }`}
         </span>
       </div>
     </div>

@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useState } from 'react'
+import { IconCrown } from './GameIcons'
 import './LeaderboardPodium.css'
 
 // Top-3 podium (2 · 1 · 3, winner raised with light rays) above a ranked
@@ -68,6 +69,9 @@ function PodiumSpot({ entry, place }) {
       disabled={!entry.onClick}
     >
       <span className="lb-podium-frame">
+        {place === 1 && (
+          <IconCrown className="lb-podium-crown" aria-hidden="true" />
+        )}
         {place === 1 &&
           RAYS.map((angle, i) => (
             <span
@@ -95,6 +99,41 @@ function PodiumSpot({ entry, place }) {
       <span className="lb-podium-name">{entry.name}</span>
       <span className="lb-podium-area">{entry.area}</span>
     </button>
+  )
+}
+
+// Shown in place of the podium/list while a request is in flight - without
+// a distinct loading state, the panel briefly showed its "no one here yet"
+// empty message on every first load (the array is empty before the
+// request even lands), reading as "there's nothing here" rather than
+// "still loading." Shaped like the real podium+rows so the layout doesn't
+// jump once data arrives.
+export function LeaderboardSkeleton() {
+  return (
+    <div className="lb lb-skeleton" aria-hidden="true">
+      <div className="lb-podium">
+        <div className="lb-podium-spot place-2">
+          <span className="lb-skeleton-block lb-skeleton-podium" />
+        </div>
+        <div className="lb-podium-spot place-1">
+          <span className="lb-skeleton-block lb-skeleton-podium" />
+        </div>
+        <div className="lb-podium-spot place-3">
+          <span className="lb-skeleton-block lb-skeleton-podium" />
+        </div>
+      </div>
+      <ul className="lb-list">
+        {[0, 1, 2].map((i) => (
+          <li key={i}>
+            <span className="lb-row lb-skeleton-row">
+              <span className="lb-skeleton-block lb-skeleton-chip" />
+              <span className="lb-skeleton-block lb-skeleton-avatar" />
+              <span className="lb-skeleton-block lb-skeleton-name" />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

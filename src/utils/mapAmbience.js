@@ -201,5 +201,14 @@ export function pickWeatherHype(ambience) {
   const options = WEATHER_HYPE[key] || WEATHER_HYPE.partly
   const [emoji, title, line] =
     options[Math.floor(Math.random() * options.length)]
-  return { emoji, title, line }
+  // `key`/`temp` ride along so the banner (GamePage.jsx's weatherHype) can
+  // pick a matching color (see its own .game-weather-hype.key-* CSS) and
+  // show a temperature pill, without re-deriving the same freezing/
+  // scorching/phase logic a second time on the render side - and, unlike
+  // the old `sky-${mapAmbience.sky}` className it used to drive color off
+  // of, this is always exactly the bucket that chose the emoji/title/line
+  // (mapAmbience.sky alone misses the freezing/scorching/night-phase
+  // overrides applied above, e.g. a clear night read as "clear" colored
+  // even though the title/line already said "Night run").
+  return { emoji, title, line, key, temp }
 }

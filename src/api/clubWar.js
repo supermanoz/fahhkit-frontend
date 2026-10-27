@@ -65,3 +65,17 @@ export function getClubWarRoster(warId) {
 export function lockInClubWarHero(warId, storeItemId) {
   return postJson(`/v1/club-war/${warId}/lock-hero`, { storeItemId })
 }
+
+// Past (COMPLETED) wars the caller's club fought, most recent first - a
+// Page (.content/.totalPages), 1-indexed. myParticipants/opponentParticipants
+// are null on this list call (see getClubWarHistoryDetail for those).
+export function getClubWarHistory(pageNumber = 1, noOfRecords = 10) {
+  return postJson('/v1/club-war/history', { pageNumber, noOfRecords })
+}
+
+// Same shape as one item of getClubWarHistory, but with
+// myParticipants/opponentParticipants populated - each squad member's run
+// outcome and contributed score for that specific war.
+export function getClubWarHistoryDetail(warId) {
+  return getJson(`/v1/club-war/history/${warId}`)
+}

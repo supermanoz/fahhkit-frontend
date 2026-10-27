@@ -10,6 +10,7 @@ import {
 } from './GameIcons'
 import ClubTrophyIcon from './ClubTrophyIcon'
 import ClubBadge from './ClubBadge'
+import ClubWarHistory from './ClubWarHistory'
 import HeroFigure from './HeroFigure'
 import { getHeroSprite } from '../utils/heroSprites'
 import { ApiError, resolveFileUrl } from '../api/client'
@@ -27,7 +28,7 @@ import {
   lockInClubWarHero,
   queueClubWar,
 } from '../api/clubWar'
-import { isPlaceholderHero } from '../utils/hero'
+import { isPlaceholderHero, resolveHeroAsset } from '../utils/hero'
 import './GameCards.css'
 import './ClubPanel.css'
 import { playerNameOf } from '../utils/playerName'
@@ -121,6 +122,7 @@ export default function ClubWarPanel({
   // can't act past, so it gets its own screen rather than silently
   // dumping them back on the (still-queueable-looking) squad picker.
   const [warConflict, setWarConflict] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   // Squad picker (leader, before queueing).
   const eligibleSizes = CLUB_WAR_SQUAD_SIZES.filter((n) => n <= roster.length)
@@ -251,17 +253,24 @@ export default function ClubWarPanel({
   if (loadError) {
     return <p className="game-menu-empty">{loadError}</p>
   }
+  if (historyOpen) {
+    return (
+      <ClubWarHistory
+        userId={userId}
+        storeCatalog={storeCatalog}
+        ownedItems={ownedItems}
+        onClose={() => setHistoryOpen(false)}
+        onViewProfile={onViewProfile}
+      />
+    )
+  }
 
   const heroName = (storeItemId) =>
-    storeCatalog.find((item) => item.id === storeItemId)?.name ||
-    ownedItems.find((o) => o.storeItem.id === storeItemId)?.storeItem.name ||
-    'Hero'
+    resolveHeroAsset(storeItemId, storeCatalog, ownedItems).name || 'Hero'
 
   const heroAssetUrl = (storeItemId) => {
-    const item =
-      storeCatalog.find((i) => i.id === storeItemId) ||
-      ownedItems.find((o) => o.storeItem.id === storeItemId)?.storeItem
-    return item?.assetUrl ? resolveFileUrl(item.assetUrl) : null
+    const { assetUrl } = resolveHeroAsset(storeItemId, storeCatalog, ownedItems)
+    return assetUrl ? resolveFileUrl(assetUrl) : null
   }
 
   const rules = (
@@ -296,6 +305,13 @@ export default function ClubWarPanel({
           {CLUB_WAR_REWARDS.winCoins} Fahhcoin for everyone who ran.
         </li>
       </ul>
+      <button
+        type="button"
+        className="game-btn game-btn-wood"
+        onClick={() => setHistoryOpen(true)}
+      >
+        View War History
+      </button>
     </section>
   )
 
@@ -320,9 +336,12 @@ export default function ClubWarPanel({
     const won = completed && war.winnerClubId === club.id
     const lost = completed && war.winnerClubId && !won
 
-    const ownedHeroes = ownedItems.filter(
-      (o) =>
-        o.storeItem.category === 'HERO' && !isPlaceholderHero(o.storeItem.name)
+    // Every real hero in the shop, not just owned ones (see render below) -
+    // this used to filter ownedItems straight to HERO rows, which meant an
+    // account that only owns one hero only ever saw that one hero here
+    // instead of the full roster with the rest shown locked.
+    const allHeroItems = storeCatalog.filter(
+      (i) => i.category === 'HERO' && !isPlaceholderHero(i.name)
     )
     const equippedHero = ownedItems.find(
       (o) => o.equipped && o.storeItem.category === 'HERO'
@@ -468,17 +487,26 @@ export default function ClubWarPanel({
               : ''}
           </p>
           {completed && (
-            <button
-              type="button"
-              className="game-btn game-btn-wood"
-              onClick={() => {
-                saveLastWarId(club.id, null)
-                setWar(null)
-                setWarRoster([])
-              }}
-            >
-              Back to War Room
-            </button>
+            <div className="club-war-result-actions">
+              <button
+                type="button"
+                className="game-btn game-btn-wood"
+                onClick={() => {
+                  saveLastWarId(club.id, null)
+                  setWar(null)
+                  setWarRoster([])
+                }}
+              >
+                Back to War Room
+              </button>
+              <button
+                type="button"
+                className="game-btn game-btn-wood"
+                onClick={() => setHistoryOpen(true)}
+              >
+                War History
+              </button>
+            </div>
           )}
         </section>
 
@@ -500,25 +528,31 @@ export default function ClubWarPanel({
                     ? `${heroName(me.lockedHeroStoreItemId)} is locked in. You can switch until the battle starts.`
                     : "Pick the hero you'll run with - you'll need it equipped for your war run."}
                 </p>
-                {ownedHeroes.length === 0 ? (
-                  <p className="club-blurb">
-                    You don&apos;t own a hero yet - grab one from the Shop.
-                  </p>
+                {allHeroItems.length === 0 ? (
+                  <p className="club-blurb">No heroes in the shop yet.</p>
                 ) : (
                   <div className="club-war-heroes">
-                    {ownedHeroes.map((o) => {
-                      const locked = o.storeItem.id === me.lockedHeroStoreItemId
-                      const animated = Boolean(getHeroSprite(o.storeItem.name))
+                    {allHeroItems.map((item) => {
+                      const owned = ownedItems.some(
+                        (o) => o.storeItem.id === item.id
+                      )
+                      const lockedIn = item.id === me.lockedHeroStoreItemId
+                      const animated = Boolean(getHeroSprite(item.name))
                       return (
                         <button
-                          key={o.storeItem.id}
+                          key={item.id}
                           type="button"
-                          className={`game-menu-avatar-card ${locked ? 'is-selected' : ''} ${animated ? 'is-animated' : ''}`}
-                          disabled={locked || busy === 'lock'}
+                          className={`game-menu-avatar-card ${lockedIn ? 'is-selected' : ''} ${!owned ? 'is-locked' : ''} ${animated ? 'is-animated' : ''}`}
+                          disabled={!owned || lockedIn || busy === 'lock'}
+                          title={
+                            owned
+                              ? undefined
+                              : `Own ${item.name} first - grab it from the Shop`
+                          }
                           onClick={() =>
                             runAction(
                               'lock',
-                              () => lockInClubWarHero(war.id, o.storeItem.id),
+                              () => lockInClubWarHero(war.id, item.id),
                               'Could not lock in that hero.'
                             )
                           }
@@ -526,15 +560,15 @@ export default function ClubWarPanel({
                           {animated ? (
                             <span className="club-war-hero-figure">
                               <HeroFigure
-                                hero={{ name: o.storeItem.name }}
+                                hero={{ name: item.name }}
                                 pose="idle"
                                 height={88}
                               />
                             </span>
                           ) : (
-                            o.storeItem.assetUrl && (
+                            item.assetUrl && (
                               <img
-                                src={resolveFileUrl(o.storeItem.assetUrl)}
+                                src={resolveFileUrl(item.assetUrl)}
                                 alt=""
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none'
@@ -542,8 +576,16 @@ export default function ClubWarPanel({
                               />
                             )
                           )}
+                          {!owned && (
+                            <span
+                              className="club-war-hero-lock"
+                              aria-hidden="true"
+                            >
+                              <IconLock />
+                            </span>
+                          )}
                           <span className="game-menu-avatar-name">
-                            {o.storeItem.name}
+                            {item.name}
                           </span>
                         </button>
                       )

@@ -49,7 +49,13 @@ export default function HeroDetailModal({
   const abilities = (hero.abilities || [])
     .map((a) => ({ id: a.id, ...heroAbilityParts(a) }))
     .filter((a) => a.label)
-  const skins = hero.skins || []
+  // The backend's "skins" field is really every active store item tied to
+  // this hero (findByHeroAndActiveTrue has no category filter of its own),
+  // so it mixes in the hero-unlock item itself and his emotes along with
+  // real skins - filtered down to just SKIN here so this section doesn't
+  // show either as a "skin" card. Emotes have their own Shop tab (see
+  // EmoteShelf.jsx) instead of a second picker in here.
+  const skins = (hero.skins || []).filter((item) => item.category === 'SKIN')
 
   return (
     <motion.div

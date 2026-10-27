@@ -51,36 +51,40 @@ OUT_DIR = os.path.join(
 
 PAD = 12
 PROFILE_CELL_H = 320  # HeroSprite.jsx / HeroFigure.jsx cell height
+# Emote-only sets never render above 140px on screen (EmoteGlyph's largest
+# caller is the buy/showcase popup) - building them at the full profile
+# height was pure waste (a decoded ~320px-tall x thousands-of-px-wide RGBA
+# strip for art that's always shown shrunk to a sixth of that), one of the
+# root causes of the Me/Emotes-section lag this was built to fix. ~1.4x the
+# largest on-screen size covers a retina display without the 320px strips'
+# bloat.
+EMOTE_CELL_H = 190
+WEBP_QUALITY = 82  # profile_out only - visually lossless at this size, 2-3x smaller than PNG for this gradient/alpha-heavy art
 MAP_CELL = (128, 170)  # matches blaze-map-run-*.png's native cell
 
 SETS = {
-    # Map marker idle (TerritoryMap.jsx BLAZE_SHEETS.idle, 48 frames) and
-    # the Shop hero card / Hero Detail Modal idle pose (heroSprites.js,
-    # also 48 frames) - a single stretch animation sampled across its full
-    # length instead of two animations spliced together.
+    # Map marker idle (TerritoryMap.jsx BLAZE_SHEETS.idle, 48 frames), the
+    # Shop hero card / Hero Detail Modal idle pose (heroSprites.js, also 48
+    # frames), AND (per the "idle = default emote" request) the "Classic"
+    # emote's art (utils/emotes.js's EMOTE_NAME_TO_POSE) - one calm loop
+    # covering all three now. The drop's own "breathing" folder was renamed
+    # to "idle" for this (same 235 frames, same "front vew" typo) - this
+    # used to point at "Arm stretching" instead, which is now unused.
     "idle": {
-        "folders": ["Arm stretching/front view"],
+        "folders": ["idle/front vew"],
         "target_frames": 48,
-        "profile_out": "blaze-profile-idle-stretch.png",
+        "profile_out": "blaze-profile-idle-stretch.webp",
         "map_out": "blaze-map-idle-stretch.png",
     },
-    # Me tab/profile panel only (HeroSprite.jsx) - a wave, then a neck
-    # stretch, back to back (48 frames: 24 + 24 - see HeroSprite.jsx's
-    # FRAMES_PER_POSE).
-    "hello_neck": {
-        "folders": ["waving/front view", "neck stretch/front view"],
-        "target_frames": 24,
-        "profile_out": "blaze-profile-hello-neck-stretch.png",
-        "map_out": None,
-    },
     # Shop hero card hover pose (heroSprites.js's "hiphop" pose, 24 frames)
-    # - also selectable as a pose tab on the Hero Detail Modal. No "Hip
-    # Hop" folder in this drop, so break dance stands in - same energetic
-    # dance-move spirit.
+    # - also selectable as a pose tab on the Hero Detail Modal, and (as of
+    # this registry update) its own standalone buyable "Hip Hop" emote
+    # (utils/emotes.js). No "Hip Hop" folder in this drop, so break dance
+    # stands in - same energetic dance-move spirit.
     "hip_hop": {
         "folders": ["break dance/ front view"],
         "target_frames": 24,
-        "profile_out": "blaze-profile-hiphop.png",
+        "profile_out": "blaze-profile-hiphop.webp",
         "map_out": None,
     },
     # Map marker run cycles (TerritoryMap.jsx BLAZE_SHEETS) - this drop's
@@ -109,11 +113,57 @@ SETS = {
     "run_up": {
         # "top back" is this drop's "facing away from camera" angle for
         # every animation (paired with "front view" throughout), so it
-        # doubles as the back-view run here too.
+        # doubles as the back-view run here too. This is now the ONLY run
+        # sheet the map marker uses (see TerritoryMap.jsx) - the marker
+        # rotates to face travel direction via a CSS transform instead of
+        # switching between separate per-direction sheets.
         "folders": ["Blaze running png sequence/running top back"],
         "target_frames": 15,
         "profile_out": None,
         "map_out": "blaze-map-run-up.png",
+    },
+    # EmoteShelf art - EMOTE_CELL_H/webp, not the full profile_out cut (see
+    # EMOTE_CELL_H's own comment). Each needs a real EMOTE StoreItem row
+    # (name must match, case-insensitive - see src/utils/emotes.js) before
+    # it's purchasable; the admin "Create Emote" tool
+    # (src/components/EmoteAdminPanel.jsx) makes those rows.
+    "emote_victory": {
+        "folders": ["victory/front view"],
+        "target_frames": 24,
+        "profile_out": "blaze-emote-victory.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    # Note: the old "breathing" folder this used to pull from was renamed
+    # to "idle" (see the idle set above) - it's now Classic's art, not a
+    # separate buyable emote, so there's no emote_breathing set any more.
+    "emote_checking_shoes": {
+        "folders": ["checking shoes/ front view"],
+        "target_frames": 24,
+        "profile_out": "blaze-emote-checking-shoes.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    "emote_jumping_jack": {
+        "folders": ["jumping jack/front view"],
+        "target_frames": 24,
+        "profile_out": "blaze-emote-jumping-jack.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    "emote_shoulder_rub": {
+        "folders": ["shoulder rubbing/front view"],
+        "target_frames": 24,
+        "profile_out": "blaze-emote-shoulder-rub.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    "emote_squat": {
+        "folders": [" squat/font view"],
+        "target_frames": 24,
+        "profile_out": "blaze-emote-squat.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
     },
 }
 
@@ -144,20 +194,28 @@ def linspace_indices(n, count):
     return [round(i * (n - 1) / (count - 1)) for i in range(count)]
 
 
-def build_profile_strip(frame_paths, crop_box, out_name):
+def build_profile_strip(frame_paths, crop_box, out_name, cell_h=PROFILE_CELL_H):
     x0, y0, x1, y1 = crop_box
     crop_w, crop_h = x1 - x0, y1 - y0
-    scale = PROFILE_CELL_H / crop_h
-    cell_w, cell_h = round(crop_w * scale), PROFILE_CELL_H
+    scale = cell_h / crop_h
+    cell_w, out_h = round(crop_w * scale), cell_h
 
-    strip = Image.new("RGBA", (cell_w * len(frame_paths), cell_h), (0, 0, 0, 0))
+    strip = Image.new("RGBA", (cell_w * len(frame_paths), out_h), (0, 0, 0, 0))
     for i, path in enumerate(frame_paths):
         im = Image.open(path).convert("RGBA").crop(crop_box)
-        resized = im.resize((cell_w, cell_h), Image.LANCZOS)
+        resized = im.resize((cell_w, out_h), Image.LANCZOS)
         strip.paste(resized, (i * cell_w, 0), resized)
 
     out_path = os.path.join(OUT_DIR, out_name)
-    strip.save(out_path, optimize=True)
+    # WebP (lossy, alpha-capable) instead of lossless PNG - 2-3x smaller for
+    # this gradient/photographic-shaded art with no visible quality loss at
+    # the size these ever render on screen. See EMOTE_CELL_H's comment for
+    # why this mattered enough to fix (decoded-bitmap cost, not just the
+    # file-size number).
+    if out_name.endswith(".webp"):
+        strip.save(out_path, "WEBP", quality=WEBP_QUALITY, method=6)
+    else:
+        strip.save(out_path, optimize=True)
     print(
         "saved",
         out_path,
@@ -165,7 +223,9 @@ def build_profile_strip(frame_paths, crop_box, out_name):
         "frames=",
         len(frame_paths),
         "cell=",
-        (cell_w, cell_h),
+        (cell_w, out_h),
+        "bytes=",
+        os.path.getsize(out_path),
     )
 
 
@@ -231,7 +291,12 @@ def build_set(name, spec):
 
     os.makedirs(OUT_DIR, exist_ok=True)
     if spec.get("profile_out"):
-        build_profile_strip(frame_paths, crop_box, spec["profile_out"])
+        build_profile_strip(
+            frame_paths,
+            crop_box,
+            spec["profile_out"],
+            spec.get("profile_cell_h", PROFILE_CELL_H),
+        )
     if spec.get("map_out"):
         build_map_strip(frame_paths, crop_box, spec["map_out"])
 

@@ -5,6 +5,7 @@ import { FaChevronDown, FaSearch } from 'react-icons/fa'
 import { ApiError, isAdmin } from '../api/client'
 import { publishBroadcast } from '../api/mail'
 import {
+  findRolloutRequestSummary,
   findTerritoryCities,
   setCityRolloutEnabled,
 } from '../api/territoryRollout'
@@ -13,6 +14,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import HeroAdminPanel from '../components/HeroAdminPanel'
+import EmoteAdminPanel from '../components/EmoteAdminPanel'
 import MailToolsPanel from '../components/MailToolsPanel'
 import './GameMechanicsPage.css'
 
@@ -61,6 +63,7 @@ export default function GameMechanicsPage() {
   const [newsBanner, setNewsBanner] = useState(null)
   const [newsOpen, setNewsOpen] = useState(true)
   const [heroesOpen, setHeroesOpen] = useState(false)
+  const [emotesOpen, setEmotesOpen] = useState(false)
   const [mailToolsOpen, setMailToolsOpen] = useState(false)
 
   const [cities, setCities] = useState([])
@@ -73,6 +76,41 @@ export default function GameMechanicsPage() {
   const debouncedCitySearch = useDebouncedValue(citySearch)
   const [cityPage, setCityPage] = useState(1)
   const [cityTotalPages, setCityTotalPages] = useState(1)
+
+  // "Where do we roll out next" - areas sorted by unique player request
+  // count (see findRolloutRequestSummary's own note in api/
+  // territoryRollout.js: the backend endpoint this calls doesn't exist
+  // yet, only the request-flow spec does, so this section stays in its
+  // error state - "Could not load rollout requests." - until that ships;
+  // it's wired up and ready rather than left for later.
+  const [requestSummary, setRequestSummary] = useState([])
+  const [requestSummaryLoading, setRequestSummaryLoading] = useState(true)
+  const [requestSummaryError, setRequestSummaryError] = useState(null)
+  const [requestsOpen, setRequestsOpen] = useState(false)
+  const [requestPage, setRequestPage] = useState(1)
+  const [requestTotalPages, setRequestTotalPages] = useState(1)
+
+  useEffect(() => {
+    if (userLoading || !isAdmin(user)) {
+      setRequestSummaryLoading(false)
+      return
+    }
+    setRequestSummaryLoading(true)
+    setRequestSummaryError(null)
+    findRolloutRequestSummary(requestPage, CITY_PAGE_SIZE)
+      .then((page) => {
+        setRequestSummary(page?.content || [])
+        setRequestTotalPages(Math.max(1, page?.totalPages || 1))
+      })
+      .catch((err) =>
+        setRequestSummaryError(
+          err instanceof ApiError
+            ? err.message
+            : 'Could not load rollout requests.'
+        )
+      )
+      .finally(() => setRequestSummaryLoading(false))
+  }, [userLoading, user, requestPage])
 
   // Every imported city, not just the enabled ones - findTerritoryCities
   // hits the server's paginated, name-searchable browse endpoint (see
@@ -316,12 +354,86 @@ export default function GameMechanicsPage() {
         </Section>
 
         <Section
+          title="Rollout Requests"
+          hint="Areas players have asked for territory capture in, most requested first - helps decide where to enable next."
+          open={requestsOpen}
+          onToggle={() => setRequestsOpen((o) => !o)}
+        >
+          {requestSummaryError && (
+            <div className="banner error">{requestSummaryError}</div>
+          )}
+          {requestSummaryLoading ? (
+            <p className="game-mechanics-muted">Loading…</p>
+          ) : requestSummary.length === 0 && !requestSummaryError ? (
+            <p className="game-mechanics-muted">No rollout requests yet.</p>
+          ) : (
+            <ul className="game-mechanics-city-list">
+              {requestSummary.map((area) => (
+                <li key={area.cityId}>
+                  <span className="game-mechanics-city-name">
+                    {area.cityName}
+                    <span className="game-mechanics-city-country">
+                      {area.countryName}
+                    </span>
+                  </span>
+                  <span className="game-mechanics-city-status">
+                    {area.requestCount}{' '}
+                    {area.requestCount === 1 ? 'request' : 'requests'}
+                  </span>
+                  {area.rolledOut && (
+                    <span className="game-mechanics-city-status is-enabled">
+                      Rolled out
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {requestTotalPages > 1 && (
+            <div className="game-mechanics-pagination">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setRequestPage((p) => Math.max(1, p - 1))}
+                disabled={requestPage <= 1 || requestSummaryLoading}
+              >
+                Prev
+              </button>
+              <span className="game-mechanics-pagination-info">
+                Page {requestPage} of {requestTotalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() =>
+                  setRequestPage((p) => Math.min(requestTotalPages, p + 1))
+                }
+                disabled={
+                  requestPage >= requestTotalPages || requestSummaryLoading
+                }
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </Section>
+
+        <Section
           title="Heroes"
           hint="Create and edit the hero codex - name, tagline, backstory, portrait and score abilities."
           open={heroesOpen}
           onToggle={() => setHeroesOpen((o) => !o)}
         >
           <HeroAdminPanel />
+        </Section>
+
+        <Section
+          title="Emotes"
+          hint="Create purchasable emote items for a hero - draws on the local art already built for Blaze/Comet."
+          open={emotesOpen}
+          onToggle={() => setEmotesOpen((o) => !o)}
+        >
+          <EmoteAdminPanel />
         </Section>
 
         <Section

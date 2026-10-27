@@ -7,45 +7,12 @@
   /* Only used while .territory-map-tilt carries .is-close-in below — a real
      vanishing point is what makes that tilt read as "3D" rather than a flat
      squish, without needing to keep it (or correct click math for it) once
-     the map settles back to its normal top-down view. */
+     the map settles back to its normal top-down view. The map itself never
+     rotates - north is always up - so there's no bearing-rotation overscan
+     to account for here either. */
   perspective: 1100px;
   perspective-origin: center center;
-}
-
-/* Google Maps' Compass mode - rotates the whole map (tiles + territory
-   overlays together, since they're both children of this one element, and
-   Leaflet itself has no native bearing) so the direction the phone is
-   facing always points up, instead of a fixed north-up view. Plain `none`
-   (0deg) the rest of the time - Free/Follow stay north-up. A short, linear
-   transition (not the default's long ease) so it tracks useDeviceHeading's
-   already-smoothed, already-thresholded updates responsively instead of
-   stacking a second, slower easing curve on top of the first and turning
-   a real heading change into a sluggish catch-up. */
-.territory-map-heading {
-  position: absolute;
-  inset: 0;
-  transform-origin: center center;
-  transition: rotate 0.15s linear;
-}
-
-/* Compass mode only (see TerritoryMap.jsx's compassActive/spinSize) - a
-   plain `inset: 0` square can't rotate without exposing its own corners
-   past the screen's edges, so this blows it up to a square at least as
-   wide as the visible box's diagonal (any smaller and some rotation angle
-   would show a gap) and centers it, with .territory-map's own
-   `overflow: hidden` doing the clipping. Leaflet renders into this whole
-   enlarged square, which also means it's already fetched/drawn the tiles
-   around the visible edges before they ever turn into view - no separate
-   prefetch step needed. Reverts to the cheap plain `inset: 0` the instant
-   Compass mode turns off. */
-.territory-map-heading.is-spinning {
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  width: var(--spin-size, 100%);
-  height: var(--spin-size, 100%);
-  margin-top: calc(var(--spin-size, 0px) / -2);
-  margin-left: calc(var(--spin-size, 0px) / -2);
+  transition: perspective 0.45s ease;
 }
 
 /* Flat/top-down until the player is zoomed in close (.is-close-in, toggled
@@ -53,14 +20,16 @@
    point it settles into a standing tilt so building-3d extrusions in the
    basemap read as real buildings. Mid-zoom gestures at any other level stay
    flat — no tilt flourish while scrolling/pinching through the rest of the
-   range. Also forced on for the whole duration of a tracked run, Google
-   Maps nav-view style (see ZoomTiltEffect's isNavigating). */
+   range. This is the ONLY camera transform the map ever applies - it never
+   rotates to follow heading (a past rotating "chase camera" run view was
+   removed; the player's character now rotates on its own instead - see
+   .territory-map-blaze-body's --hero-heading below). */
 .territory-map-tilt {
   position: absolute;
   inset: 0;
   transform: none;
   transform-origin: center center;
-  transition: transform 0.3s ease;
+  transition: transform 0.45s ease;
 }
 
 .territory-map-tilt.is-close-in {
@@ -104,10 +73,10 @@
 }
 
 /* Leaflet's own attribution control is disabled (see TerritoryMap.jsx's
-   attributionControl={false}) since it lives inside the layer that spins
-   in Compass mode - this is a plain static replacement outside that
-   subtree instead, so it never rotates. Same corner/sizing Leaflet's own
-   default control would use. */
+   attributionControl={false}) since it lives inside the layer that rotates
+   while chasing - this is a plain static replacement outside that subtree
+   instead, so it never rotates. Same corner/sizing Leaflet's own default
+   control would use. */
 .territory-map-attribution {
   position: absolute;
   right: 0;
@@ -405,15 +374,16 @@
   height: 40px;
 }
 
-/* Counter-rotates the plain avatar marker so it stays upright on screen
-   while the whole map is rotated in Compass mode - safe to rotate the icon
-   element itself here (unlike Blaze's, see .territory-map-blaze-body
-   below) since its iconAnchor is already its own exact center, so there's
-   no off-center pivot to swing around. Excludes Blaze's icon, which
-   already counter-rotates its own inner -body wrapper instead - rotating
-   both would double it up. */
-.territory-map-player-icon:not(.territory-map-blaze-icon) {
-  rotate: var(--map-counter-rotation, 0deg);
+/* Start/finish pin for the route currently being previewed or run - see
+   TerritoryMap.jsx's buildRouteAnchorIcon. */
+.territory-map-route-anchor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
 }
 
 .territory-map-player-avatar {
@@ -449,8 +419,7 @@
 }
 
 /* Blaze's (or Comet's - see buildAnimatedMarkerIcon/HERO_MAP_SHEETS) full-
-   body map sprite. 48x64 frames in a 4-frame strip, stepped by
-   background-position. The icon's anchor is at his feet, so the ground
+   body map sprite, 48x64. The icon's anchor is at his feet, so the ground
    pulse is centered there and squashed flat to read as a ring on the
    ground rather than a halo. Class names stayed Blaze-named since he was
    first; nothing below is actually Blaze-specific. */
@@ -459,13 +428,20 @@
   height: 64px;
 }
 
-/* Rotated on this inner wrapper, not the icon itself - Leaflet positions
-   the icon element with its own transform, so rotating that would swing
-   the marker around the map pane instead of around his feet. */
+/* Rotates to face the direction of travel - set imperatively, straight onto
+   this marker's DOM element as a CSS custom property, by
+   useSmoothMarkerHeading in TerritoryMap.jsx (GPS-course-only, never the
+   device compass - see playerHeading in GamePage.jsx). That hook already
+   eases every step itself via requestAnimationFrame (see ROTATION_EASE_MS
+   there), so no CSS transition here - stacking a second easing curve on
+   top of an already-eased per-frame value would just add lag, not
+   smoothness. On this inner wrapper, not the icon itself - Leaflet
+   positions the icon element with its own transform, so rotating that
+   would swing the marker around the map pane instead of around his feet. */
 .territory-map-blaze-body {
   position: absolute;
   inset: 0;
-  rotate: var(--map-counter-rotation, 0deg);
+  rotate: var(--hero-heading, 0deg);
   transform-origin: 24px 58px;
 }
 
@@ -483,28 +459,14 @@
   position: absolute;
   inset: 0;
   background-repeat: no-repeat;
-  background-size: 192px 64px;
   filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.45));
-  animation: blaze-frames 0.5s steps(4) infinite;
 }
 
-.territory-map-blaze.is-idle {
-  animation-duration: 1.4s;
-}
-
-@keyframes blaze-frames {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: -192px 0;
-  }
-}
-
-/* Blaze's "up" (back-view) sheet is a 15-frame cycle played at 24fps (see
-   BLAZE_SHEETS and scripts/build_blaze_stretch_strips.py) - a finer strip
-   than the other three directions' 4-frame sheets, so it needs its own
-   frame count and background-size rather than reusing blaze-frames above. */
+/* The back-view run sheet is a 15-frame cycle played at 24fps (see
+   HERO_MAP_SHEETS and scripts/build_blaze_stretch_strips.py /
+   build_comet_stretch_strips.py) - this is now the marker's ONLY run
+   sheet (it rotates to face travel direction instead of switching between
+   separate per-direction sheets - see .territory-map-blaze-body above). */
 .territory-map-blaze[data-frames='15'] {
   background-size: 720px 64px;
   animation: blaze-frames-15 0.625s steps(15) infinite;

@@ -730,6 +730,21 @@ export default function PvpPanel({
   }
 
   // --- Home ---
+  // Real record, computed from actual match history - every PVP_MODES
+  // backend has no rank/league/rating system at all, so rather than fake
+  // one, this card shows the one thing that IS real: how the player has
+  // actually done. A race only counts once it's genuinely been played out
+  // (resolutionType set) - a declined/cancelled/expired challenge was
+  // never run, so it's not a result either way.
+  const played = challenges.filter((c) => c.resolutionType)
+  const wins = played.filter((c) => c.winnerId === userId).length
+  const losses = played.filter(
+    (c) => c.winnerId && c.winnerId !== userId
+  ).length
+  const draws = played.length - wins - losses
+  const winRate =
+    played.length > 0 ? Math.round((wins / played.length) * 100) : null
+
   return (
     <div className="pvp-flow">
       <div className="pvp-hero">
@@ -745,63 +760,134 @@ export default function PvpPanel({
           className="game-btn game-btn-green game-btn-lg pvp-hero-btn"
           onClick={() => setScreen('distance')}
         >
-          Find a Race
+          <IconSwords /> Battle
         </button>
       </div>
 
-      <p className="pvp-section-label">Your races</p>
-      {!challengesLoaded ? (
-        <p className="game-menu-empty">Loading races…</p>
-      ) : active.length === 0 ? (
-        <p className="game-menu-empty">No races on right now.</p>
-      ) : (
-        <ul className="pvp-runner-list">
-          {active.map((c) => {
-            const side = mySide(c, userId)
-            const needsMe =
-              (c.status === 'PENDING' && !side.confirmed) ||
-              (c.status === 'IN_PROGRESS' && !side.myRunId)
-            return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  className={`pvp-runner ${needsMe ? 'needs-me' : ''}`}
-                  onClick={() => openRace(c.id)}
-                >
-                  <span className="pvp-runner-info">
-                    <span className="pvp-runner-name">
-                      vs {side.opponentName || 'a rival'}
+      <div className="pvp-stat-row">
+        <div className="pvp-stat-card">
+          <span className="pvp-stat-value">
+            {wins}-{losses}
+            {draws > 0 ? `-${draws}` : ''}
+          </span>
+          <span className="pvp-stat-label">Record</span>
+        </div>
+        <div className="pvp-stat-card">
+          <span className="pvp-stat-value">
+            {winRate != null ? `${winRate}%` : '—'}
+          </span>
+          <span className="pvp-stat-label">Win rate</span>
+        </div>
+        <div className="pvp-stat-card">
+          <span className="pvp-stat-value">{played.length}</span>
+          <span className="pvp-stat-label">Races run</span>
+        </div>
+      </div>
+
+      <section className="pvp-section-card">
+        <p className="pvp-section-label">Active races</p>
+        {!challengesLoaded ? (
+          <p className="game-menu-empty">Loading races…</p>
+        ) : active.length === 0 ? (
+          <p className="game-menu-empty">No races on right now.</p>
+        ) : (
+          <ul className="pvp-runner-list">
+            {active.map((c) => {
+              const side = mySide(c, userId)
+              const needsMe =
+                (c.status === 'PENDING' && !side.confirmed) ||
+                (c.status === 'IN_PROGRESS' && !side.myRunId)
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className={`pvp-runner ${needsMe ? 'needs-me' : ''}`}
+                    onClick={() => openRace(c.id)}
+                  >
+                    <span className="pvp-runner-info">
+                      <span className="pvp-runner-name">
+                        vs {side.opponentName || 'a rival'}
+                      </span>
+                      <span className="pvp-runner-meta">
+                        {modeLabel(c)} · pot {c.stakeAmount * 2} <Coin /> ·{' '}
+                        {timeLeft(c.expiresAt)}
+                      </span>
                     </span>
-                    <span className="pvp-runner-meta">
-                      {modeLabel(c)} · pot {c.stakeAmount * 2} <Coin /> ·{' '}
-                      {timeLeft(c.expiresAt)}
+                    <span className={`pvp-race-status status-${c.status}`}>
+                      {c.status === 'PENDING'
+                        ? needsMe
+                          ? 'Your call'
+                          : 'Pending'
+                        : needsMe
+                          ? 'Run!'
+                          : 'Live'}
                     </span>
-                  </span>
-                  <span className={`pvp-race-status status-${c.status}`}>
-                    {c.status === 'PENDING'
-                      ? needsMe
-                        ? 'Your call'
-                        : 'Pending'
-                      : needsMe
-                        ? 'Run!'
-                        : 'Live'}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       {past.length > 0 && (
-        <button
-          type="button"
-          className="pvp-history-link"
-          onClick={() => setScreen('history')}
-        >
-          Race history ({past.length}) <IconChevronRight />
-        </button>
+        <section className="pvp-section-card">
+          <div className="pvp-section-head-row">
+            <p className="pvp-section-label">Recent matches</p>
+            <button
+              type="button"
+              className="pvp-history-link"
+              onClick={() => setScreen('history')}
+            >
+              View all ({past.length}) <IconChevronRight />
+            </button>
+          </div>
+          <ul className="pvp-runner-list">
+            {past.slice(0, 3).map((c) => {
+              const side = mySide(c, userId)
+              const won = c.winnerId && c.winnerId === userId
+              const lost = c.winnerId && c.winnerId !== userId
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className="pvp-runner"
+                    onClick={() => openRace(c.id)}
+                  >
+                    <span className="pvp-runner-info">
+                      <span className="pvp-runner-name">
+                        vs {side.opponentName || 'a rival'}
+                      </span>
+                      <span
+                        className={`pvp-runner-meta ${won ? 'pvp-won' : lost ? 'pvp-lost' : ''}`}
+                      >
+                        {modeLabel(c)} · {resultLine(c, userId)}
+                      </span>
+                    </span>
+                    <IconChevronRight />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
+
+      <section className="pvp-section-card pvp-rewards-card">
+        <p className="pvp-section-label">Stakes &amp; rewards</p>
+        <ul className="pvp-rewards-list">
+          {PVP_MODES.map((m) => (
+            <li key={m.id}>
+              <span className="pvp-rewards-mode">{m.label}</span>
+              <span className="pvp-rewards-terms">
+                {m.queueStake} <Coin /> stake · winner takes {m.queueStake * 2}{' '}
+                <Coin />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       {errorLine}
     </div>
   )

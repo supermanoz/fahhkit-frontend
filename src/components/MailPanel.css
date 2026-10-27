@@ -1,34 +1,174 @@
-/* In-game inbox - rows reuse .game-menu-list styling; these just add the
-   expandable body, type icon and unread dot. */
-.mail-list li.mail-item {
+/* --- Header: clear title + Mark all read, pinned above the tabs/list -
+   the menu sheet itself is the real scroll container (see
+   MailPanel.jsx's useLoadMoreSentinel comment), so sticky positioning
+   still pins this against that outer scroll. An opaque background (not
+   the card's own translucent one) so scrolled-under rows don't show
+   through it. --- */
+.mail-panel-card {
+  position: relative;
+}
+
+/* Header + tabs pinned together as one sticky block - sticky lives on
+   this shared wrapper (not on the header and tabs separately, which would
+   need a hard-coded top offset per element to stack without overlapping). */
+.mail-panel-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -4px -4px 12px;
+  padding: 4px 4px 0;
+  background: var(--game-panel, #2c2014);
+}
+
+.mail-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.mail-panel-title {
+  margin: 0;
+  font-size: 17px;
+  color: var(--game-gold);
+}
+
+.mail-mark-all-btn {
+  all: unset;
+  box-sizing: border-box;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(246, 236, 217, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
+
+.mail-mark-all-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* --- Inbox/News segmented tabs - a fill + underline active state and an
+   unread-count badge, instead of the old inline "(3)" text. Its own
+   classes (not the shared .game-menu-subtab other screens use) so this
+   doesn't touch the Leaderboard's/Club's own tab rows. --- */
+.mail-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 -4px;
+  padding: 0 4px 10px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.mail-tab {
+  all: unset;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px 10px 0 0;
+  font-weight: 800;
+  font-size: 13px;
+  color: rgba(246, 236, 217, 0.6);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -12px;
+}
+
+.mail-tab.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-bottom-color: var(--game-gold);
+}
+
+.mail-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--game-ink);
+  background: var(--game-gold);
+  border: 1.5px solid var(--game-ink);
+}
+
+/* --- Date groups (Today / Yesterday / Earlier) --- */
+.mail-date-group + .mail-date-group {
+  margin-top: 14px;
+}
+
+.mail-date-group-label {
+  margin: 0 0 6px 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(246, 236, 217, 0.5);
+}
+
+/* In-game inbox rows - no longer riding on the shared .game-menu-list
+   look (that stayed a flat one-weight row no matter read/unread state) -
+   its own layout: icon, title+source column, date+chevron on the right. */
+.mail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
   flex-direction: column;
-  align-items: stretch;
   gap: 8px;
 }
 
-/* Invisible trigger row watched by MailPanel's IntersectionObserver - only
-   rendered while there's another page to fetch, so it never shows as a
-   dead-end empty row once the list is exhausted. */
-.mail-list-sentinel {
-  text-align: center;
-  color: rgba(246, 236, 217, 0.6);
-  font-size: 12px;
-  padding: 8px 0;
+.mail-item {
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  transition: background 0.12s ease;
 }
 
 .mail-item.is-unread {
   border-color: rgba(255, 177, 92, 0.55);
-  background: rgba(255, 122, 41, 0.1);
+  background: rgba(255, 122, 41, 0.14);
+}
+
+/* Read rows dim - deliberately lower-contrast than unread so the two
+   states are tellable apart at a glance, not just by the title weight. */
+.mail-item.is-read {
+  background: rgba(255, 255, 255, 0.04);
+  opacity: 0.68;
 }
 
 .mail-item-row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
   gap: 12px;
+  width: 100%;
+  /* 56px minimum tap/row height, per the brief. */
+  min-height: 56px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.mail-item-row:active {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .mail-item-icon {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -36,7 +176,7 @@
   border: 2px solid var(--game-ink);
   background: var(--game-stone);
   color: var(--game-ink);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .mail-item-icon.type-CLUB_INVITE {
@@ -51,17 +191,91 @@
   background: var(--game-wood);
 }
 
+.mail-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.mail-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mail-item-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 14px;
+}
+
+/* Unread titles are bold; read ones step down to a regular weight - the
+   shared list style this used to borrow from (.game-menu-list-area) was
+   always 800 regardless of read state. */
+.mail-item.is-unread .mail-item-title {
+  font-weight: 800;
+}
+
+.mail-item.is-read .mail-item-title {
+  font-weight: 500;
+}
+
+.mail-item-source {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(246, 236, 217, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-item-side {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mail-item-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(246, 236, 217, 0.55);
+  white-space: nowrap;
+}
+
+.mail-item-chevron {
+  font-size: 12px;
+  color: rgba(246, 236, 217, 0.4);
+}
+
 .mail-item-dot {
   flex-shrink: 0;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--game-red);
   box-shadow: 0 0 6px rgba(255, 90, 77, 0.8);
 }
 
+/* Invisible trigger row watched by MailPanel's IntersectionObserver - only
+   rendered while there's another page to fetch, so it never shows as a
+   dead-end empty row once the list is exhausted. */
+.mail-list-sentinel {
+  text-align: center;
+  color: rgba(246, 236, 217, 0.6);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
 .mail-item-body {
-  padding-left: 46px;
+  padding: 0 12px 10px 58px;
   font-size: 13px;
   color: rgba(246, 236, 217, 0.85);
   white-space: pre-line;

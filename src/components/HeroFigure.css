@@ -1,23 +1,6 @@
-.hero-figure-sprite {
-  display: block;
-  background-repeat: no-repeat;
-  background-size: var(--hero-strip-width) 100%;
-  filter: drop-shadow(0 6px 4px rgba(0, 0, 0, 0.5));
-  animation: hero-figure-frames 1.4s steps(var(--hero-frames)) infinite;
-}
-
-.hero-figure-sprite.is-moving {
-  animation-duration: 0.5s;
-}
-
-@keyframes hero-figure-frames {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: calc(-1 * var(--hero-strip-width)) 0;
-  }
-}
+/* The sprite-strip animation itself lives in AnimatedSprite.css now (see
+   AnimatedSprite.jsx) - shared with EmoteGlyph.jsx so neither duplicates
+   the frame math. */
 
 .hero-figure-portrait {
   width: 100%;
@@ -30,10 +13,4 @@
   font-weight: 900;
   color: var(--game-cream);
   text-shadow: 0 3px 0 var(--game-ink);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-figure-sprite {
-    animation: none;
-  }
 }

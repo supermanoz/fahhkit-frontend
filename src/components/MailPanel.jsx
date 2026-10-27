@@ -1,7 +1,8 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import {
+  IconChevronRight,
   IconEnvelope,
   IconEnvelopeOpen,
   IconGift,
@@ -27,6 +28,41 @@ function formatMailDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+// "2d ago" style, for the inbox row's own right-aligned date (News/
+// broadcasts keep the absolute formatMailDate above - not asked to change).
+function formatRelativeMailDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (diffMin < 1) return 'Just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 7) return `${diffDay}d ago`
+  return formatMailDate(value)
+}
+
+// Today / Yesterday / Earlier, by local calendar day - not a rolling 24h
+// window, so a message from 11pm yesterday reads as "Yesterday" even if
+// it's only been a couple hours.
+function mailDateGroup(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Earlier'
+  const now = new Date()
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  )
+  const startOfYesterday = new Date(startOfToday)
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+  if (date >= startOfToday) return 'Today'
+  if (date >= startOfYesterday) return 'Yesterday'
+  return 'Earlier'
 }
 
 function isResolved(item) {
@@ -75,9 +111,10 @@ export default function MailPanel({ mailbox, onClaimed }) {
     decline,
     remove,
     openBroadcast,
-    mailHasMore,
-    loadingMoreMail,
-    loadMoreMail,
+    mailPage,
+    mailTotalPages,
+    loadingMail,
+    goToMailPage,
     broadcastHasMore,
     loadingMoreBroadcasts,
     loadMoreBroadcasts,
@@ -86,7 +123,17 @@ export default function MailPanel({ mailbox, onClaimed }) {
   const unreadInbox = mail.filter((m) => m.status === 'UNREAD').length
   const unreadNews = broadcasts.filter((b) => !b.readAt).length
 
-  const mailSentinelRef = useLoadMoreSentinel(mailHasMore, loadMoreMail)
+  // Today/Yesterday/Earlier sections for the inbox list - only ever
+  // grouping the current (server-paged) page, same scope "Mark all read"
+  // below already operates within.
+  const mailGroups = useMemo(() => {
+    const buckets = { Today: [], Yesterday: [], Earlier: [] }
+    for (const item of mail) buckets[mailDateGroup(item.createdDate)].push(item)
+    return ['Today', 'Yesterday', 'Earlier']
+      .filter((label) => buckets[label].length > 0)
+      .map((label) => ({ label, items: buckets[label] }))
+  }, [mail])
+
   const newsSentinelRef = useLoadMoreSentinel(
     broadcastHasMore,
     loadMoreBroadcasts
@@ -109,24 +156,64 @@ export default function MailPanel({ mailbox, onClaimed }) {
     if (updated) onClaimed?.(updated)
   }
 
+  // Only a per-item read endpoint exists server-side (see api/mail.js) -
+  // no bulk "mark all read" call to make instead, so this is exactly what
+  // tapping into every unread row one at a time would do, just fired
+  // together. Scoped to the current page, same as the rest of this file's
+  // pagination already is.
+  function handleMarkAllRead() {
+    mail.filter((m) => m.status === 'UNREAD').forEach((item) => open(item))
+  }
+
   return (
     <div className="mail-panel game-cards">
-      <section className="game-card game-card-dark">
-        <div className="game-menu-subtabs">
-          <button
-            type="button"
-            className={`game-menu-subtab ${view === 'inbox' ? 'active' : ''}`}
-            onClick={() => setView('inbox')}
-          >
-            Inbox{unreadInbox > 0 ? ` (${unreadInbox})` : ''}
-          </button>
-          <button
-            type="button"
-            className={`game-menu-subtab ${view === 'news' ? 'active' : ''}`}
-            onClick={() => setView('news')}
-          >
-            News{unreadNews > 0 ? ` (${unreadNews})` : ''}
-          </button>
+      <section className="game-card game-card-dark mail-panel-card">
+        {/* One sticky block (not the header/tabs pinned separately at two
+            guessed top offsets) - the menu sheet this lives in is the
+            actual scroll container (see useLoadMoreSentinel's own comment
+            on why - no list here owns its own scrollbar), and sticky still
+            pins against that outer scroll as long as nothing in between
+            clips overflow. */}
+        <div className="mail-panel-sticky-head">
+          <div className="mail-panel-header">
+            <h3 className="mail-panel-title">Mail</h3>
+            {view === 'inbox' && unreadInbox > 0 && (
+              <button
+                type="button"
+                className="mail-mark-all-btn"
+                onClick={handleMarkAllRead}
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div className="mail-tabs" role="tablist" aria-label="Mail">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'inbox'}
+              className={`mail-tab ${view === 'inbox' ? 'active' : ''}`}
+              onClick={() => setView('inbox')}
+            >
+              Inbox
+              {unreadInbox > 0 && (
+                <span className="mail-tab-badge">{unreadInbox}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'news'}
+              className={`mail-tab ${view === 'news' ? 'active' : ''}`}
+              onClick={() => setView('news')}
+            >
+              News
+              {unreadNews > 0 && (
+                <span className="mail-tab-badge">{unreadNews}</span>
+              )}
+            </button>
+          </div>
         </div>
 
         {error ? (
@@ -139,101 +226,150 @@ export default function MailPanel({ mailbox, onClaimed }) {
               Inbox zero. Suspiciously peaceful out here. 🕊️
             </p>
           ) : (
-            <ul className="game-menu-list mail-list">
-              {mail.map((item) => {
-                const Icon =
-                  item.status === 'UNREAD'
-                    ? TYPE_ICON[item.type] || IconEnvelope
-                    : item.type === 'NOTICE'
-                      ? IconEnvelopeOpen
-                      : TYPE_ICON[item.type] || IconEnvelope
-                const expanded = openId === item.id
-                const busy = busyId === item.id
-                const claimable = item.type !== 'NOTICE' && !isResolved(item)
-                return (
-                  <li
-                    key={item.id}
-                    className={`mail-item ${item.status === 'UNREAD' ? 'is-unread' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className="game-menu-list-row mail-item-row"
-                      onClick={() => toggle(item)}
-                      aria-expanded={expanded}
-                    >
-                      <span className={`mail-item-icon type-${item.type}`}>
-                        <Icon />
-                      </span>
-                      <span className="game-store-item-info">
-                        <span className="game-menu-list-area">
-                          {toClubRoleWords(item.title)}
-                        </span>
-                        <span className="game-menu-list-meta">
-                          {playerName(null, item.senderName) || 'Run Conquest'}{' '}
-                          · {formatMailDate(item.createdDate)}
-                          {STATUS_LABEL[item.status]
-                            ? ` · ${STATUS_LABEL[item.status]}`
-                            : ''}
-                        </span>
-                      </span>
-                      {item.status === 'UNREAD' && (
-                        <span className="mail-item-dot" aria-label="Unread" />
-                      )}
-                    </button>
+            <>
+              {mailGroups.map((group) => (
+                <div key={group.label} className="mail-date-group">
+                  <p className="mail-date-group-label">{group.label}</p>
+                  <ul className="mail-list">
+                    {group.items.map((item) => {
+                      const Icon =
+                        item.status === 'UNREAD'
+                          ? TYPE_ICON[item.type] || IconEnvelope
+                          : item.type === 'NOTICE'
+                            ? IconEnvelopeOpen
+                            : TYPE_ICON[item.type] || IconEnvelope
+                      const expanded = openId === item.id
+                      const busy = busyId === item.id
+                      const claimable =
+                        item.type !== 'NOTICE' && !isResolved(item)
+                      return (
+                        <li
+                          key={item.id}
+                          className={`mail-item ${item.status === 'UNREAD' ? 'is-unread' : 'is-read'}`}
+                        >
+                          <button
+                            type="button"
+                            className="mail-item-row"
+                            onClick={() => toggle(item)}
+                            aria-expanded={expanded}
+                          >
+                            <span
+                              className={`mail-item-icon type-${item.type}`}
+                            >
+                              <Icon />
+                            </span>
+                            <span className="mail-item-main">
+                              <span className="mail-item-title-row">
+                                {item.status === 'UNREAD' && (
+                                  <span
+                                    className="mail-item-dot"
+                                    aria-label="Unread"
+                                  />
+                                )}
+                                <span className="mail-item-title">
+                                  {toClubRoleWords(item.title)}
+                                </span>
+                              </span>
+                              <span className="mail-item-source">
+                                {playerName(null, item.senderName) ||
+                                  'Run Conquest'}
+                                {STATUS_LABEL[item.status]
+                                  ? ` · ${STATUS_LABEL[item.status]}`
+                                  : ''}
+                              </span>
+                            </span>
+                            <span className="mail-item-side">
+                              <span className="mail-item-date">
+                                {formatRelativeMailDate(item.createdDate)}
+                              </span>
+                              <IconChevronRight
+                                className="mail-item-chevron"
+                                aria-hidden="true"
+                              />
+                            </span>
+                          </button>
 
-                    {expanded && (
-                      <div className="mail-item-body">
-                        {item.body && <p>{toClubRoleWords(item.body)}</p>}
-                        <div className="mail-item-actions">
-                          {claimable && (
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              onClick={() => handleClaim(item)}
-                              disabled={busy}
-                            >
-                              {busy
-                                ? 'Working…'
-                                : item.type === 'CLUB_INVITE'
-                                  ? 'Join Club'
-                                  : 'Claim Gift'}
-                            </button>
+                          {expanded && (
+                            <div className="mail-item-body">
+                              {item.body && <p>{toClubRoleWords(item.body)}</p>}
+                              <div className="mail-item-actions">
+                                {claimable && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => handleClaim(item)}
+                                    disabled={busy}
+                                  >
+                                    {busy
+                                      ? 'Working…'
+                                      : item.type === 'CLUB_INVITE'
+                                        ? 'Join Club'
+                                        : 'Claim Gift'}
+                                  </button>
+                                )}
+                                {claimable && item.type === 'CLUB_INVITE' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={() => decline(item)}
+                                    disabled={busy}
+                                  >
+                                    Decline
+                                  </button>
+                                )}
+                                {/* The backend only lets read/resolved mail be
+                                  deleted - an unclaimed gift has to be dealt with
+                                  first. */}
+                                {!claimable && item.status !== 'UNREAD' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={() => remove(item)}
+                                    disabled={busy}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           )}
-                          {claimable && item.type === 'CLUB_INVITE' && (
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              onClick={() => decline(item)}
-                              disabled={busy}
-                            >
-                              Decline
-                            </button>
-                          )}
-                          {/* The backend only lets read/resolved mail be
-                            deleted - an unclaimed gift has to be dealt with
-                            first. */}
-                          {!claimable && item.status !== 'UNREAD' && (
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              onClick={() => remove(item)}
-                              disabled={busy}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
-              {mailHasMore && (
-                <li ref={mailSentinelRef} className="mail-list-sentinel">
-                  {loadingMoreMail ? 'Loading more…' : ''}
-                </li>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+              {/* Same pager control the Me tab uses for My Territories/My
+                  Routes (.game-route-pager) - reused here rather than
+                  rebuilt, per the brief. 15 mail per page, server-paged
+                  (see findMyMail in src/api/mail.js) - each tap replaces
+                  the list with that exact page instead of accumulating. */}
+              {mailTotalPages > 1 && (
+                <div className="game-route-pager">
+                  <button
+                    type="button"
+                    className="game-btn game-btn-wood game-btn-sm"
+                    aria-label="Previous page"
+                    disabled={mailPage <= 1 || loadingMail}
+                    onClick={() => goToMailPage(mailPage - 1)}
+                  >
+                    ◀
+                  </button>
+                  <span className="game-route-pager-label">
+                    Page {mailPage} of {mailTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="game-btn game-btn-wood game-btn-sm"
+                    aria-label="Next page"
+                    disabled={mailPage >= mailTotalPages || loadingMail}
+                    onClick={() => goToMailPage(mailPage + 1)}
+                  >
+                    ▶
+                  </button>
+                </div>
               )}
-            </ul>
+            </>
           )
         ) : broadcasts.length === 0 ? (
           <p className="game-menu-empty">No announcements right now.</p>

@@ -9,6 +9,24 @@ export function isCometHero(name) {
   return typeof name === 'string' && name.trim().toLowerCase() === 'comet'
 }
 
+// A StoreItem id for a HERO-category item (e.g. Club War's
+// lockedHeroStoreItemId/heroStoreItemId) might be in the full shop catalog
+// or only in what this player owns (an unlocked limited hero that's since
+// been pulled from the catalog, say) - checks both, same lookup
+// ClubWarPanel.jsx's roster and ClubWarHistory.jsx's past-war breakdown
+// both need. Returns { name, assetUrl } - assetUrl is null (not a broken
+// image) if nothing matches or the item has no art.
+export function resolveHeroAsset(storeItemId, storeCatalog, ownedItems) {
+  if (!storeItemId) return { name: null, assetUrl: null }
+  const item =
+    storeCatalog?.find((i) => i.id === storeItemId) ||
+    ownedItems?.find((o) => o.storeItem.id === storeItemId)?.storeItem
+  return {
+    name: item?.name || null,
+    assetUrl: item?.assetUrl || null,
+  }
+}
+
 // The backend seeds a generic "Default Hero" store item that every account
 // owns and has equipped from signup. TEMP: until the backend gives everyone
 // Comet instead, the frontend treats that placeholder as "no hero picked",

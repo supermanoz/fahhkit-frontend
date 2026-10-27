@@ -7,8 +7,12 @@ import { bearingBetween } from './territoryGame'
 // the run itself (the route is already just a flat list of {lat,lng}).
 
 // Past this far off the line, there's no useful "next point" to steer
-// toward - the cartoon arrow would just be pointing at noise.
-const OFF_ROUTE_METERS = 60
+// toward - the cartoon arrow would just be pointing at noise. Shared by
+// every guided run (saved routes, PvP courses, and "Run this territory"'s
+// generated boundary loop) - the territory-run spec called for roughly
+// 30m specifically, tightened down from 60m here rather than branching a
+// second off-route threshold just for one guide-route source.
+const OFF_ROUTE_METERS = 30
 // How far ahead along the route to aim the arrow, so it reflects the
 // upcoming bend rather than the exact (noisy) nearest point.
 const LOOKAHEAD_METERS = 18

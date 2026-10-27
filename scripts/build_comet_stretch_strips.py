@@ -53,6 +53,12 @@ OUT_DIR = os.path.join(
 
 PAD = 12
 PROFILE_CELL_H = 320  # HeroFigure.jsx / HeroSprite.jsx cell height
+# Emote-only sets never render above 140px on screen (EmoteGlyph's largest
+# caller is the buy/showcase popup) - see build_blaze_stretch_strips.py's
+# own EMOTE_CELL_H comment for why this matters (decoded-bitmap cost, not
+# just the file-size number - this was a root cause of Me/Emotes lag).
+EMOTE_CELL_H = 190
+WEBP_QUALITY = 82  # profile_out only
 MAP_CELL = (128, 170)  # matches blaze-map-run-*.png's native cell
 
 SETS = {
@@ -65,23 +71,16 @@ SETS = {
     "idle": {
         "folders": ["idle/front view"],
         "target_frames": 48,
-        "profile_out": "comet-profile-idle-stretch.png",
+        "profile_out": "comet-profile-idle-stretch.webp",
         "map_out": "comet-map-idle-stretch.png",
     },
     # Shop hero card hover pose (HeroGallery.jsx) - also pickable on the
-    # Hero Detail Modal's pose tabs. 24 frames.
+    # Hero Detail Modal's pose tabs, and (as of this registry update) its
+    # own standalone buyable "Hip Hop" emote (utils/emotes.js). 24 frames.
     "hip_hop": {
         "folders": ["Hip Hop/Front view"],
         "target_frames": 24,
-        "profile_out": "comet-profile-hiphop.png",
-        "map_out": None,
-    },
-    # Me tab/profile panel only (HeroSprite.jsx) - matches Blaze's
-    # "hello_neck" set exactly (see build_blaze_stretch_strips.py).
-    "hello_neck": {
-        "folders": ["waving hand/front view", "neck stretching/front view"],
-        "target_frames": 24,
-        "profile_out": "comet-profile-hello-neck-stretch.png",
+        "profile_out": "comet-profile-hiphop.webp",
         "map_out": None,
     },
     # Map marker run cycles (TerritoryMap.jsx COMET_SHEETS) - frame counts
@@ -106,10 +105,48 @@ SETS = {
         "map_out": "comet-map-run-right.png",
     },
     "run_up": {
+        # This is now the ONLY run sheet the map marker uses (see
+        # TerritoryMap.jsx) - the marker rotates to face travel direction
+        # via a CSS transform instead of switching between separate
+        # per-direction sheets.
         "folders": ["Running/Top back"],
         "target_frames": 15,
         "profile_out": None,
         "map_out": "comet-map-run-up.png",
+    },
+    # EmoteShelf art, same "profile-sized" cut as idle/hip_hop. Each needs a
+    # real EMOTE StoreItem row (name must match, case-insensitive - see
+    # src/utils/emotes.js) before it's purchasable; the admin "Create
+    # Emote" tool (src/components/EmoteAdminPanel.jsx) makes those rows.
+    # Comet's drop has no "breathing"/"checking shoes" folders (unlike
+    # Blaze's), so he gets one fewer emote than Blaze.
+    "emote_victory": {
+        "folders": ["victory/front view"],
+        "target_frames": 24,
+        "profile_out": "comet-emote-victory.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    "emote_jumping_jack": {
+        "folders": ["jumping jack/front view"],
+        "target_frames": 24,
+        "profile_out": "comet-emote-jumping-jack.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    "emote_shoulder_rub": {
+        "folders": ["shoulder rubbing/front view"],
+        "target_frames": 24,
+        "profile_out": "comet-emote-shoulder-rub.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
+    },
+    "emote_squat": {
+        "folders": ["Squasd/Front view"],
+        "target_frames": 24,
+        "profile_out": "comet-emote-squat.webp",
+        "profile_cell_h": EMOTE_CELL_H,
+        "map_out": None,
     },
 }
 
@@ -140,20 +177,23 @@ def linspace_indices(n, count):
     return [round(i * (n - 1) / (count - 1)) for i in range(count)]
 
 
-def build_profile_strip(frame_paths, crop_box, out_name):
+def build_profile_strip(frame_paths, crop_box, out_name, cell_h=PROFILE_CELL_H):
     x0, y0, x1, y1 = crop_box
     crop_w, crop_h = x1 - x0, y1 - y0
-    scale = PROFILE_CELL_H / crop_h
-    cell_w, cell_h = round(crop_w * scale), PROFILE_CELL_H
+    scale = cell_h / crop_h
+    cell_w, out_h = round(crop_w * scale), cell_h
 
-    strip = Image.new("RGBA", (cell_w * len(frame_paths), cell_h), (0, 0, 0, 0))
+    strip = Image.new("RGBA", (cell_w * len(frame_paths), out_h), (0, 0, 0, 0))
     for i, path in enumerate(frame_paths):
         im = Image.open(path).convert("RGBA").crop(crop_box)
-        resized = im.resize((cell_w, cell_h), Image.LANCZOS)
+        resized = im.resize((cell_w, out_h), Image.LANCZOS)
         strip.paste(resized, (i * cell_w, 0), resized)
 
     out_path = os.path.join(OUT_DIR, out_name)
-    strip.save(out_path, optimize=True)
+    if out_name.endswith(".webp"):
+        strip.save(out_path, "WEBP", quality=WEBP_QUALITY, method=6)
+    else:
+        strip.save(out_path, optimize=True)
     print(
         "saved",
         out_path,
@@ -161,7 +201,9 @@ def build_profile_strip(frame_paths, crop_box, out_name):
         "frames=",
         len(frame_paths),
         "cell=",
-        (cell_w, cell_h),
+        (cell_w, out_h),
+        "bytes=",
+        os.path.getsize(out_path),
     )
 
 
@@ -226,7 +268,12 @@ def build_set(name, spec):
 
     os.makedirs(OUT_DIR, exist_ok=True)
     if spec.get("profile_out"):
-        build_profile_strip(frame_paths, crop_box, spec["profile_out"])
+        build_profile_strip(
+            frame_paths,
+            crop_box,
+            spec["profile_out"],
+            spec.get("profile_cell_h", PROFILE_CELL_H),
+        )
     if spec.get("map_out"):
         build_map_strip(frame_paths, crop_box, spec["map_out"])
 

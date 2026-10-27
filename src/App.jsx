@@ -28,6 +28,7 @@ import EventReportPage from './pages/EventReportPage'
 import DashboardPage from './pages/DashboardPage'
 import GamePage from './pages/GamePage'
 import GameMechanicsPage from './pages/GameMechanicsPage'
+import FraudFlagsPage from './pages/FraudFlagsPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
 
 export default function App() {
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/game" element={<GamePage />} />
         <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
+        <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />
         <Route path="/payment-status" element={<PaymentStatusPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

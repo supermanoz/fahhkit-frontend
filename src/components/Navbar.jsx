@@ -102,6 +102,11 @@ export default function Navbar() {
               Game Mechanics
             </Link>
           )}
+          {canManageEvents(user) && (
+            <Link to="/admin/fraud-flags" onClick={close}>
+              Fraud Flags
+            </Link>
+          )}
           <Link to="/contact" onClick={close}>
             Contact
           </Link>

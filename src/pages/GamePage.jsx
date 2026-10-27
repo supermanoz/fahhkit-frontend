@@ -4,16 +4,19 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconClose,
-  IconCompassNeedle,
   IconCrosshairs,
+  IconEmote,
   IconEnvelope,
   IconFlag,
+  IconFlagCheckered,
   IconHelmet,
+  IconLock,
   IconMap,
   IconMenuOrb,
   IconPlay,
   IconRunning,
   IconSettings,
+  IconSkin,
   IconStore,
   IconSwords,
   IconTrophy,
@@ -29,10 +32,6 @@ import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
-import {
-  requestCompassPermission,
-  useDeviceHeading,
-} from '../hooks/useDeviceHeading'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
 import { mySide, usePvp } from '../hooks/usePvp'
@@ -50,6 +49,8 @@ import {
   getTopIndividualsLocal,
 } from '../api/territory'
 import { findClubs, getMyClub, inviteToClub } from '../api/club'
+import { requestRollout } from '../api/territoryRollout'
+import { warnMissingEmoteAssets } from '../utils/emotes'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
@@ -74,8 +75,11 @@ import {
   LOOP_MIN_AREA_SQ_METERS,
   LOOP_MIN_POINTS,
   VIEW_RADIUS_METERS,
+  PLAYER_COLOR,
   bearingBetween,
   formatArea,
+  formatAreaStat,
+  generateTerritoryLoopRoute,
   loopPerimeterMeters,
   mergeTouchingParcels,
   pointInPolygon,
@@ -115,16 +119,23 @@ import HeroGallery from '../components/HeroGallery'
 import ShadeFlag from '../components/ShadeFlag'
 import TrailPreview from '../components/TrailPreview'
 import ColorShelf from '../components/ColorShelf'
+import EmoteShelf from '../components/EmoteShelf'
+import EmoteShowcase from '../components/EmoteShowcase'
+import SkinShelf from '../components/SkinShelf'
+import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
 import RunRewardAnimation from '../components/RunRewardAnimation'
+import RunScoreCard from '../components/RunScoreCard'
 import ClubBadge from '../components/ClubBadge'
 import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
 import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
-import LeaderboardPodium from '../components/LeaderboardPodium'
+import LeaderboardPodium, {
+  LeaderboardSkeleton,
+} from '../components/LeaderboardPodium'
 import RouteTurnIndicator from '../components/RouteTurnIndicator'
 import { getRouteGuidance } from '../utils/routeNav'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
@@ -151,6 +162,53 @@ function formatMeters(meters) {
   if (meters < 1000) return `${Math.round(meters)} m`
   return `${(meters / 1000).toFixed(2)} km`
 }
+
+/* eslint-disable react/prop-types -- no prop-types dependency in this project */
+// Territory popup's owner avatar (see handleParcelClick) - unlike other
+// broken-asset spots in this codebase that just vanish on error (e.g.
+// HeroItemShelf's portrait), this one falls back to a colored initial
+// instead, since a popup that's otherwise just "[name]'s territory" with a
+// blank gap where a face should be reads as broken, not as "no avatar set."
+// `key={src}` on every call site remounts this (resetting `broken`) the
+// moment a different owner's territory is tapped, instead of carrying a
+// stale broken-flag over from whichever entry was open before.
+// `ringColor` is the territory's own display color (gold for the player's
+// own ground, their hashed/shade color otherwise - see toDisplayParcel) so
+// the avatar visually ties back to the ground it's standing on. Explicit
+// width/height (not just CSS) avoid a layout shift while the image loads,
+// and loading="lazy" defers the fetch until the popup is actually open
+// (it's never pre-rendered off-screen, but costs nothing to declare).
+function TerritoryAvatar({ src, name, ringColor, size = 60 }) {
+  const [broken, setBroken] = useState(false)
+  const style = {
+    width: size,
+    height: size,
+    '--avatar-ring-color': ringColor || 'var(--game-gold)',
+  }
+  if (!src || broken) {
+    return (
+      <span
+        className="game-highlight-toast-avatar is-placeholder"
+        style={style}
+      >
+        {(name || '?')[0]}
+      </span>
+    )
+  }
+  return (
+    <img
+      className="game-highlight-toast-avatar"
+      style={style}
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      loading="lazy"
+      onError={() => setBroken(true)}
+    />
+  )
+}
+/* eslint-enable react/prop-types */
 
 // Pokémon GO-style menu: tapping the FAB (which turns into a close X) lays
 // these out above it, each labelled - five big buttons in an X (two up top,
@@ -267,7 +325,26 @@ const RUN_REJECTION_COPY = {
 }
 
 function describeRunRejection(outcome) {
-  if (!outcome || outcome.outcome === 'SUCCESS') return null
+  if (
+    !outcome ||
+    outcome.outcome === 'SUCCESS' ||
+    outcome.outcome === 'SUCCESS_NO_CAPTURE'
+  ) {
+    return null
+  }
+  // No loop was ever attempted here - same as a Club War/Boss Fight run,
+  // scored on pace + base effort alone - but unlike that case, the player
+  // can ask for it (see handleRequestRollout below). Surfaced via its own
+  // flag rather than RUN_REJECTION_COPY since the result toast needs to
+  // render a live Request Rollout button here, not just static copy.
+  if (outcome.outcome === 'TERRITORY_NOT_ROLLED_OUT') {
+    return {
+      title: 'Not live here yet 🚧',
+      message:
+        "Territory capture isn't rolled out in your area yet, so this run scored on pace and effort alone, same as a Club War. PvP and Club Wars work everywhere - and you can ask for your area below.",
+      isRolloutRejection: true,
+    }
+  }
   const key =
     outcome.outcome === 'CHEAT_DETECTED'
       ? 'CHEAT_DETECTED'
@@ -283,6 +360,8 @@ function describeRunRejection(outcome) {
 // Shop sub-sections (tab row under the wallet).
 const SHOP_SECTIONS = [
   { id: 'heroes', label: 'Heroes', Icon: IconHelmet },
+  { id: 'skins', label: 'Skins', Icon: IconSkin },
+  { id: 'emotes', label: 'Emotes', Icon: IconEmote },
   { id: 'territory', label: 'Territory', Icon: IconFlag },
   { id: 'trail', label: 'Trail', Icon: IconRunning },
   { id: 'map', label: 'Map', Icon: IconMap },
@@ -371,51 +450,22 @@ export default function GamePage() {
     }, 5000)
     return () => clearInterval(interval)
   }, [tracker.status])
-  // Google Maps' own "Running View" location controls - two separate
-  // buttons instead of one cycling through all 3 states (a Compass tap
-  // used to need two taps from Free - Free -> Follow -> Compass - see
-  // toggleCompass below for the direct shortcut this replaced that with):
-  // the plain locate FAB toggles 'free' (map doesn't follow) <-> 'follow'
-  // (centers on the player, north stays up), and a separate compass FAB
-  // jumps straight to 'compass' (centers AND rotates so the direction the
-  // phone is facing is always "up" - see useDeviceHeading below) from
-  // either of those, or back to 'follow' if already in it. Defaults to
-  // 'follow' the instant any run starts tracking (Conquer, PvP, Club War
-  // or a guided route alike - see the tracker.status effect below) and
-  // back to 'free' once it stops; a manual pinch/drag/rotate drops
-  // straight to 'free' too (Google Maps' own "free look" behavior) - see
-  // handleUserPan and the locate FABs below.
+  // Google Maps' own run-mode location control - the locate FAB toggles
+  // 'free' (map doesn't follow) <-> 'follow' (centers on the player, north
+  // always stays up - the map never rotates or tilts; see TerritoryMap.jsx).
+  // Defaults to 'follow' the instant any run starts tracking (Conquer, PvP,
+  // Club War or a guided route alike - see the tracker.status effect below)
+  // and back to 'free' once it stops; a manual pinch/drag drops straight to
+  // 'free' too (Google Maps' own "free look" behavior) - see handleUserPan
+  // and the locate FAB below.
   const [mapMode, setMapMode] = useState('free')
   const handleUserPan = useCallback(() => setMapMode('free'), [])
-  const { heading: deviceHeading, unavailable: compassUnavailable } =
-    useDeviceHeading(mapMode === 'compass')
   useEffect(() => {
     setMapMode(tracker.status === 'tracking' ? 'follow' : 'free')
   }, [tracker.status])
-  // No compass hardware, or the permission prompt was denied - Compass mode
-  // can't do anything useful, so fall back to Follow rather than getting
-  // stuck on a map that's rotated to nothing.
-  useEffect(() => {
-    if (compassUnavailable) setMapMode('follow')
-  }, [compassUnavailable])
   function toggleFollow() {
     setMapMode((current) => (current === 'follow' ? 'free' : 'follow'))
   }
-  // iOS only answers DeviceOrientationEvent.requestPermission from inside
-  // the tap's own call stack (see useDeviceHeading), so this asks before
-  // ever flipping into 'compass' - from Free or Follow it stays put until
-  // permission resolves, rather than flashing into Compass and straight
-  // back out.
-  async function toggleCompass() {
-    if (mapMode === 'compass') {
-      setMapMode('follow')
-      return
-    }
-    const granted = await requestCompassPermission()
-    if (granted) setMapMode('compass')
-  }
-  const mapRotation =
-    mapMode === 'compass' && deviceHeading != null ? deviceHeading : 0
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
@@ -492,7 +542,7 @@ export default function GamePage() {
   // cartoon turn-by-turn HUD (RouteTurnIndicator) until the run ends.
   const [followingRoute, setFollowingRoute] = useState(false)
   // Whether the map camera is auto-centering on the player right now (the
-  // Follow or Compass location-button state) - every run type gets this
+  // Follow or Chase location-button state) - every run type gets this
   // the moment it starts tracking (see the mapMode effect above), same as
   // Google Maps' own "start riding" nav view.
   const isFollowing = tracker.status === 'tracking' && mapMode !== 'free'
@@ -529,6 +579,11 @@ export default function GamePage() {
   const [clubScope, setClubScope] = useState('global')
   const [clubLeaderboard, setClubLeaderboard] = useState([])
   const [leaderboardError, setLeaderboardError] = useState(null)
+  // True while a leaderboard request is in flight - without this, the
+  // panel briefly showed its "No territory claimed yet"/"No club..." empty
+  // state on every first load (leaderboard.length is 0 before the request
+  // even lands), reading as "there's nothing here" instead of "loading."
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   // Set when a club leaderboard row is tapped - the Club tab jumps straight
   // to that club's info instead of wherever it was left.
   const [openClubId, setOpenClubId] = useState(null)
@@ -566,6 +621,11 @@ export default function GamePage() {
   const [tabPickerOpen, setTabPickerOpen] = useState(false)
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
+  // Size/distance warning shown inline on the territory popup before
+  // actually starting a generated "Run/Defend this territory" loop (see
+  // handleRunTerritory) - null the rest of the time. A string, not a
+  // boolean: the message itself names which threshold tripped.
+  const [territoryRunWarning, setTerritoryRunWarning] = useState(null)
   const [viewingProfile, setViewingProfile] = useState(null)
   const [storeChoice, setStoreChoice] = useState(null)
   // TEMP: Comet for everyone for now (the default hero) - the Avatar picker
@@ -587,6 +647,13 @@ export default function GamePage() {
   // id/avgPace the backend hands back.
   const [completedRun, setCompletedRun] = useState(null)
   const [downloadingMap, setDownloadingMap] = useState(false)
+  // The score breakdown the backend already pushes over the socket for
+  // every scored run (RunScoreBreakdownResponse, see onRunProcessed below)
+  // - previously only read to pick a rejection message, never to show the
+  // actual numbers (see RunScoreCard.jsx). null for a cheat-flagged run
+  // (never scored at all) or a PvP race (scored entirely separately, no
+  // push at all for that mode - see TerritoryProcessingServiceImpl).
+  const [runScoreBreakdown, setRunScoreBreakdown] = useState(null)
 
   // Background music mute, remembered across sessions like the avatar
   // choice — nobody wants the game to start blaring music again after they
@@ -642,6 +709,18 @@ export default function GamePage() {
   // TrackRunPanel's Stop Run and PvpPanel's Forfeit, just inline in the
   // button row instead of a separate state var per button.
   const [confirmAction, setConfirmAction] = useState(null)
+  // Esc closes the end-run confirm modal the same as tapping the backdrop
+  // or "Keep Running" - only for 'end'/'cancel' (the pendingRun 'discard'
+  // and route-drawing confirms stay inline-in-sheet, not a modal, so Esc
+  // has nothing to do there).
+  useEffect(() => {
+    if (confirmAction !== 'end' && confirmAction !== 'cancel') return
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') setConfirmAction(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [confirmAction])
   // Shows the "loop not closed" popup once right after a run ends open -
   // dismissible so it doesn't nag while the athlete decides whether to
   // submit anyway or go back out and close it. Reset to false every time
@@ -754,6 +833,61 @@ export default function GamePage() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [isAuthed])
 
+  // Territory-capture rollout request (see api/territoryRollout.js) - the
+  // backend has NO passive "is my area rolled out" check, only this
+  // mutating request call, so there's no reliable way to lock the Conquer
+  // button or show an arrival notice in advance - see its own file-level
+  // comment for why this is never called from a background
+  // location-watching effect. Two triggers instead:
+  //   1. Reactive: a plain territory run actually comes back
+  //      TERRITORY_NOT_ROLLED_OUT (see RUN_REJECTION_COPY/
+  //      describeRunRejection above) - the result toast gets its own
+  //      "Request Rollout" button right there.
+  //   2. A standing "Request Territory Capture For My Area" row in
+  //      Settings, always available regardless of known status - tapping
+  //      it either requests (area isn't rolled out yet) or comes back
+  //      ALREADY_ROLLED_OUT (area already works - told as good news, not
+  //      an error).
+  // Same busy/error/done state machine serves both triggers.
+  const [rolloutRequestBusy, setRolloutRequestBusy] = useState(false)
+  const [rolloutRequestError, setRolloutRequestError] = useState(null)
+  const [rolloutRequestResult, setRolloutRequestResult] = useState(null)
+
+  // Matched by message text, not an error code - ApiError only carries the
+  // backend's already-humanized description (see TerritoryRolloutErrorCode.
+  // ALREADY_ROLLED_OUT), same pattern ClubWarPanel.jsx's own
+  // ALREADY_AT_WAR_MESSAGE already uses for telling one specific business
+  // error apart from a generic one.
+  const ALREADY_ROLLED_OUT_MESSAGE =
+    'The game is already rolled out in your city.'
+
+  async function handleRequestRollout() {
+    const loc = liveLocation || center
+    if (!loc) return
+    setRolloutRequestBusy(true)
+    setRolloutRequestError(null)
+    setRolloutRequestResult(null)
+    try {
+      const result = await requestRollout(loc.lat, loc.lng)
+      setRolloutRequestResult({ ...result, alreadyRolledOut: false })
+    } catch (err) {
+      if (
+        err instanceof ApiError &&
+        err.message === ALREADY_ROLLED_OUT_MESSAGE
+      ) {
+        setRolloutRequestResult({ alreadyRolledOut: true })
+      } else {
+        setRolloutRequestError(
+          err instanceof ApiError
+            ? err.message
+            : 'Could not send that request - try again in a bit.'
+        )
+      }
+    } finally {
+      setRolloutRequestBusy(false)
+    }
+  }
+
   const playerLocation =
     tracker.status === 'tracking' && tracker.path.length > 0
       ? tracker.path[tracker.path.length - 1]
@@ -833,7 +967,12 @@ export default function GamePage() {
   useGameSocket(isAuthed ? user?.id : null, {
     onRunProcessed: (outcome) => {
       runOutcomesRef.current[outcome.runId] = outcome
-      if (outcome.runId === watchedRunIdRef.current) showRunOutcome(outcome)
+      if (outcome.runId !== watchedRunIdRef.current) return
+      // Captured for every outcome, not just a rejection - a successful
+      // (or Club War/Boss Fight) run's score numbers live on this same
+      // payload, just previously never read (see RunScoreCard.jsx).
+      setRunScoreBreakdown(outcome)
+      showRunOutcome(outcome)
     },
     onMail: mailbox.receiveMail,
     onBroadcastMail: mailbox.receiveBroadcast,
@@ -1083,7 +1222,9 @@ export default function GamePage() {
   }, [gameReady, introPlaying])
   useEffect(() => {
     if (!weatherHype) return
-    const hide = setTimeout(() => setWeatherHype(null), 6000)
+    // Matches .game-weather-toast-progress's own 5s CSS animation exactly -
+    // change one, change the other.
+    const hide = setTimeout(() => setWeatherHype(null), 5000)
     return () => clearTimeout(hide)
   }, [weatherHype])
 
@@ -1116,24 +1257,27 @@ export default function GamePage() {
     return () => clearTimeout(timeout)
   }, [territoryEntryBanner])
 
-  // Player marker's heading cone (Google Maps nav-view style), and - in
-  // Compass mode - how far off the real travel direction the map's own
-  // rotation (device heading, see mapRotation) has turned it. Real GPS/WiFi
-  // fixes jitter by meters even
-  // standing still (MAX_ACCEPTABLE_ACCURACY_METERS admits up to 20m-
-  // accuracy points, and network/WiFi positioning can report a
-  // meaningfully different "best guess" position on consecutive polls with
-  // zero real movement), so naively recomputing a heading from any nearby
-  // fix's position DELTA alone - even a fairly large one - spun the whole
-  // map on pure positioning noise instead of real movement. The fix a real
-  // nav SDK uses: never re-orient the camera off position deltas alone,
-  // corroborate with the fix's own reported SPEED (an independently
-  // measured quantity, not inferred from consecutive positions) before
-  // trusting any heading change at all - preferring the GPS chip's own
-  // reported course (coords.heading, see useRunTracker.js) when speed
-  // clears the floor, else only a recomputed bearing once the movement
-  // also clearly exceeds both fixes' combined accuracy margin. Easing into
-  // any new heading (smoothAngle) instead of snapping straight to it.
+  // The player character's facing direction (see animatedMarkerHero's
+  // rotating marker in TerritoryMap.jsx) - GPS movement ONLY, never the
+  // device compass. Real GPS/WiFi fixes jitter by meters even standing
+  // still (MAX_ACCEPTABLE_ACCURACY_METERS admits up to 20m-accuracy points,
+  // and network/WiFi positioning can report a meaningfully different "best
+  // guess" position on consecutive polls with zero real movement), so
+  // naively recomputing a heading from any nearby fix's position DELTA
+  // alone - even a fairly large one - would spin the character on pure
+  // positioning noise instead of real movement. The fix a real nav SDK
+  // uses: never re-orient off position deltas alone, corroborate with the
+  // fix's own reported SPEED (an independently measured quantity, not
+  // inferred from consecutive positions) before trusting any heading
+  // change at all - preferring the GPS chip's own reported course
+  // (coords.heading, see useRunTracker.js - still a GPS-derived value, not
+  // a magnetometer/compass reading) when speed clears the floor, else only
+  // a recomputed bearing between the last accepted point and the new one
+  // once the movement also clearly exceeds both fixes' combined accuracy
+  // margin (MIN_BEARING_MOVEMENT_METERS - the "minimum movement threshold"
+  // tunable). Easing into any new heading (smoothAngle) instead of
+  // snapping straight to it - the marker itself eases this further still
+  // (see TerritoryMap.jsx's ROTATION_EASE_MS/useSmoothMarkerHeading).
   const MIN_BEARING_MOVEMENT_METERS = 8
   const MIN_TRUSTED_SPEED_MPS = 0.5
   const lastBearingFixRef = useRef(null)
@@ -1460,6 +1604,7 @@ export default function GamePage() {
 
   async function loadLeaderboard(scope = individualScope) {
     setLeaderboardError(null)
+    setLeaderboardLoading(true)
     try {
       if (scope === 'city') {
         const list = await getTopIndividualsLocal(20)
@@ -1476,11 +1621,14 @@ export default function GamePage() {
             ? "Could not load your city's leaderboard."
             : 'Could not load the leaderboard.'
       )
+    } finally {
+      setLeaderboardLoading(false)
     }
   }
 
   async function loadClubLeaderboard(scope = clubScope) {
     setLeaderboardError(null)
+    setLeaderboardLoading(true)
     try {
       if (scope === 'national') {
         const list = await getTopClubsNational(20)
@@ -1497,6 +1645,8 @@ export default function GamePage() {
             ? "Could not load your country's club leaderboard."
             : 'Could not load the club leaderboard.'
       )
+    } finally {
+      setLeaderboardLoading(false)
     }
   }
 
@@ -1882,6 +2032,8 @@ export default function GamePage() {
     if (tab === 'shop' && storeCatalog.length === 0) loadStore()
     // Club Wars' hero lock-in needs owned heroes + the catalog for names.
     if (tab === 'club' && storeCatalog.length === 0) loadStore()
+    // Me tab's Medals grid needs the MEDAL catalog + owned items too.
+    if (tab === 'me' && storeCatalog.length === 0) loadStore()
     if (tab === 'me' && myRuns.length === 0) loadMyRuns()
     if (tab === 'me' && !myRoutesLoaded) loadMyRoutes()
     if (tab === 'mail') mailbox.refresh()
@@ -1939,11 +2091,20 @@ export default function GamePage() {
   // The territory info box closes itself after a few seconds (the Close
   // button still works). Each new tap sets a fresh object, restarting the
   // timer, and closing it also clears the map highlight, same as Close.
+  // Suppressed while a run-this-territory size/distance warning is up -
+  // that's an active decision (Continue anyway / Cancel), not something
+  // that should get yanked away mid-read. Longer when a Run/Defend button
+  // is actually showing (a real decision to make, not just a glance) than
+  // the plain read-only case.
   useEffect(() => {
-    if (!highlightedEntry) return
-    const autoClose = setTimeout(() => setHighlightedEntry(null), 4000)
+    if (!highlightedEntry || territoryRunWarning) return
+    const canRun = (highlightedEntry.points?.length || 0) >= 3
+    const autoClose = setTimeout(
+      () => setHighlightedEntry(null),
+      canRun ? 8000 : 4000
+    )
     return () => clearTimeout(autoClose)
-  }, [highlightedEntry])
+  }, [highlightedEntry, territoryRunWarning])
 
   // Tapping a claimed parcel directly on the map is a stronger signal than
   // tapping a leaderboard row (the player already has it in view), so this
@@ -1958,11 +2119,102 @@ export default function GamePage() {
     // is this" popup is suppressed, since it has nothing to do with
     // drawing and would just get in the way.
     if (routeDraftMode) return
+    const isMine = Boolean(user?.id) && parcel.ownerId === user.id
+    // Avatar: the owner's own real uploaded profile picture, never a
+    // cosmetic (equipped Hero skin, map marker art, etc.) - for the
+    // player's own tapped territory, `user.profilePictureUrl` is already
+    // right here; for anyone else, see toDisplayParcel's own comment on
+    // ownerProfilePictureUrl - it's null until the backend sends it, and
+    // TerritoryAvatar falls back to a colored initial either way.
+    const ownerRaw = nearbyParcels.find((p) => p.ownerId === parcel.ownerId)
+    // Run score: TerritoryParcel.currentScore, summed across exactly the
+    // parcels that make up this tapped (merged) shape - see
+    // toDisplayParcel's own comment on why this isn't a player-wide total.
+    const runScore = (parcel.sourceIds || [])
+      .map((id) => nearbyParcels.find((p) => p.id === id))
+      .filter(Boolean)
+      .reduce((sum, p) => sum + (p.currentScore || 0), 0)
+    setTerritoryRunWarning(null)
     setHighlightedEntry({
       userId: parcel.ownerId,
       fullName: parcel.ownerName,
       areaSqMeters: parcel.area,
+      avatarSrc: isMine
+        ? resolveFileUrl(user?.profilePictureUrl) || null
+        : resolveFileUrl(ownerRaw?.ownerProfilePictureUrl) || null,
+      // The territory's own display color (gold for mine, hashed/shade for
+      // anyone else - see toDisplayParcel) - the avatar's ring color.
+      color: parcel.color,
+      runScore,
+      // The full boundary ring, for "Run/Defend this territory" to walk as
+      // a guide loop (see handleRunTerritory) - never submitted itself,
+      // only ever a guide the same way a saved route is.
+      points: parcel.points,
     })
+  }
+
+  // A loop longer than this is a long run to commit to by accident - the
+  // spec's own "over 10 km" example.
+  const TERRITORY_RUN_WARN_MAX_METERS = 10000
+  // A loop this short isn't really worth a turn-by-turn guide (likely a
+  // sliver/edge case parcel) - warn rather than silently guide something
+  // this trivial.
+  const TERRITORY_RUN_WARN_MIN_METERS = 40
+  // Past this far from the generated loop's own start point, flag it in
+  // the confirm toast (not a separate "navigate there first" mode - the
+  // guide's own off-route steering, see routeNav.js, already points the
+  // runner at the nearest point on the loop the moment the run begins,
+  // starting point included).
+  const TERRITORY_RUN_FAR_START_METERS = 150
+
+  // Builds the boundary-loop guide route for `entry` (a highlightedEntry -
+  // see handleParcelClick) and starts running it through the exact same
+  // viewingRoute/followingRoute flow a saved "Run This Route" already uses
+  // (see handleRunViewedRoute) - nothing here duplicates that guidance
+  // logic, it only ever produces the point list that feeds it. `force`
+  // skips the size warning below, used by the warning toast's own
+  // "Continue anyway" button.
+  function handleRunTerritory(entry, { force = false } = {}) {
+    if (!entry?.points || entry.points.length < 3) return
+    if (tracker.status !== 'idle' || pendingRun) return
+    if (!playerLocation) {
+      setTerritoryRunWarning(
+        'Enable location to generate a route for this territory.'
+      )
+      return
+    }
+    const route = generateTerritoryLoopRoute(entry.points, playerLocation)
+    if (!route) return
+    if (!force) {
+      if (route.distanceMeters > TERRITORY_RUN_WARN_MAX_METERS) {
+        setTerritoryRunWarning(
+          `This loop is ${formatMeters(route.distanceMeters)} around — that's a long run. Continue anyway?`
+        )
+        return
+      }
+      if (route.distanceMeters < TERRITORY_RUN_WARN_MIN_METERS) {
+        setTerritoryRunWarning(
+          `This loop is only ${formatMeters(route.distanceMeters)} around — barely worth guiding. Continue anyway?`
+        )
+        return
+      }
+    }
+    setTerritoryRunWarning(null)
+    setHighlightedEntry(null)
+    setViewingRoute({
+      id: null,
+      name: isMyEntry(entry)
+        ? 'Defend Your Territory'
+        : `${playerNameOf(entry)}'s Territory`,
+      points: route.points,
+      distanceMeters: route.distanceMeters,
+      // Never a saved route - no visibility/ownerId, so the "Share with
+      // Club"/"Make Private" controls (gated on ownerId === user?.id, see
+      // the viewingRoute toast below) never show for a generated one.
+      visibility: null,
+      ownerId: null,
+    })
+    handleRunViewedRoute()
   }
 
   // Tapping one of your own parcels in the "Me" tab list — same direct
@@ -1970,10 +2222,23 @@ export default function GamePage() {
   // since picking a specific row is already an explicit choice), just
   // sourced from the paginated my-parcels list instead of the map.
   function handleViewMyParcel(territory) {
+    setTerritoryRunWarning(null)
     setHighlightedEntry({
       userId: user?.id,
       fullName: user?.fullName,
       areaSqMeters: territory.area,
+      // The player's own real uploaded profile picture, not a cosmetic -
+      // see handleParcelClick's own comment on this.
+      avatarSrc: resolveFileUrl(user?.profilePictureUrl) || null,
+      // Always PLAYER_COLOR here (never territory.color - myTerritories'
+      // own merge drops it, see mergeTouchingParcels) since this handler
+      // only ever runs for the logged-in player's own territory.
+      color: PLAYER_COLOR,
+      // myTerritories' own currentScore (see its useMemo) - the real
+      // total for this whole merged cluster, not the nearby-parcels
+      // approximation handleParcelClick falls back to for other owners.
+      runScore: territory.currentScore,
+      points: territory.points,
       // A merged territory's own id is synthetic (see mergeTouchingParcels)
       // - sourceIds[0] is a real parcel id the map can actually fly to and
       // match against, and since TerritoryMap highlights the whole merged
@@ -1998,27 +2263,42 @@ export default function GamePage() {
   // phase (still checking / done / timed out) has to say.
   function renderCompletedRunStats() {
     if (!completedRun) return null
+    // Keyed on runId so RunScoreCard remounts fresh per run (its own
+    // "new best" check runs once per mount - see RunScoreCard.jsx) instead
+    // of reusing a stale instance across two different runs' results.
+    const scoreMode = completedRun.isWar
+      ? 'club_war'
+      : completedRun.isRace
+        ? 'pvp'
+        : 'territory'
     return (
-      <div className="game-controls-stats game-claim-toast-stats">
-        <span className="game-stat">
-          <span className="game-stat-value">
-            {formatDistance(completedRun.distance)}
+      <>
+        <div className="game-controls-stats game-claim-toast-stats">
+          <span className="game-stat">
+            <span className="game-stat-value">
+              {formatDistance(completedRun.distance)}
+            </span>
+            <span className="game-stat-label">Distance</span>
           </span>
-          <span className="game-stat-label">Distance</span>
-        </span>
-        <span className="game-stat">
-          <span className="game-stat-value">
-            {formatPace(completedRun.avgPace)}
+          <span className="game-stat">
+            <span className="game-stat-value">
+              {formatPace(completedRun.avgPace)}
+            </span>
+            <span className="game-stat-label">Pace</span>
           </span>
-          <span className="game-stat-label">Pace</span>
-        </span>
-        <span className="game-stat">
-          <span className="game-stat-value">
-            {formatDuration(completedRun.duration)}
+          <span className="game-stat">
+            <span className="game-stat-value">
+              {formatDuration(completedRun.duration)}
+            </span>
+            <span className="game-stat-label">Time</span>
           </span>
-          <span className="game-stat-label">Time</span>
-        </span>
-      </div>
+        </div>
+        <RunScoreCard
+          key={completedRun.id}
+          breakdown={runScoreBreakdown}
+          mode={scoreMode}
+        />
+      </>
     )
   }
 
@@ -2058,6 +2338,7 @@ export default function GamePage() {
     }
     setSaving(true)
     setSaveError(null)
+    setRunScoreBreakdown(null)
     const submittedAt = new Date()
     runXpBeforeRef.current = profile
       ? { level: profile.level, xp: profile.xp }
@@ -2076,6 +2357,12 @@ export default function GamePage() {
       if (pendingRun.challengeId) pvp.refreshChallenges()
       const isRace = Boolean(pendingRun.challengeId)
       const isWar = Boolean(pendingRun.clubWarId)
+      // Watched from here, not just inside pollForTerritoryResult below -
+      // a Club War/Boss Fight run also gets a score push (just never a
+      // territory-event poll), so this needs to be set for every mode, not
+      // only the territory-capture one.
+      watchedRunIdRef.current = created.id
+      settledRunIdRef.current = null
       setCompletedRun({
         id: created.id,
         isRace,
@@ -2094,6 +2381,13 @@ export default function GamePage() {
       // that was never going to happen.
       if (isRace || isWar) {
         setRunResult({ phase: 'submitted' })
+        // Club War/Boss Fight runs DO get a score push (pace + base effort
+        // only, no territory - see TerritoryProcessingServiceImpl); a PvP
+        // race never does (scored entirely separately), so this just finds
+        // nothing and runScoreBreakdown stays null for that mode, same as
+        // ever - RunScoreCard already renders nothing in that case.
+        const early = runOutcomesRef.current[created.id]
+        if (early) setRunScoreBreakdown(early)
         // A race/war run's XP is awarded by the same async processing a
         // conquer run's territory check waits on, but there's no
         // poll/socket signal for these modes to know when it's landed - a
@@ -2124,7 +2418,10 @@ export default function GamePage() {
     settledRunIdRef.current = null
     setRunResult({ phase: 'processing' })
     const early = runOutcomesRef.current[runId]
-    if (early && showRunOutcome(early)) return
+    if (early) {
+      setRunScoreBreakdown(early)
+      if (showRunOutcome(early)) return
+    }
     for (let attempt = 0; attempt < RESULT_POLL_ATTEMPTS; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, RESULT_POLL_DELAY_MS))
       // The socket already told us it's a no-territory run - stop polling.
@@ -2180,7 +2477,24 @@ export default function GamePage() {
     setPurchaseError(null)
   }
 
-  async function handleEquip(item, isEquipped) {
+  // Esc closes the buy/showcase popup, same as clicking the X or outside it.
+  useEffect(() => {
+    if (!storeChoice) return
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') closeStoreChoice()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [storeChoice])
+
+  // useCallback (empty deps - every function this touches, including
+  // loadStore/loadHeroes, only closes over stable setState setters and
+  // imported API calls, never per-render state, so there's nothing to go
+  // stale) so EmoteShelf/SkinShelf/ColorShelf below can actually be
+  // React.memo'd - passing a plain function here would hand them a new
+  // prop identity every render and defeat that memo regardless of how
+  // stable their other props are.
+  const handleEquip = useCallback(async (item, isEquipped) => {
     setStoreActionError(null)
     try {
       if (isEquipped) {
@@ -2194,18 +2508,56 @@ export default function GamePage() {
         err instanceof ApiError ? err.message : 'Could not update that item.'
       )
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const galleryHeroes = heroes.filter((h) => !isPlaceholderHero(h.name))
+  // Memoized (not just filtered inline) because GamePage re-renders every
+  // few seconds from the standing GPS watch above (liveLocation) whether
+  // or not the Shop is even open - without this, every one of those ticks
+  // handed EmoteShelf/SkinShelf/ColorShelf a brand-new array, which not
+  // only re-ran this filter for nothing but also defeated any attempt to
+  // skip their own re-render (see those components' own React.memo), since
+  // a changed array reference looks like changed data even when none of
+  // the items actually did. A real contributor to the Me/Emotes-section
+  // lag this was built to fix, same root cause class as the asset-size one
+  // in utils/emotes.js - unrelated parent state forcing child re-renders.
+  const galleryHeroes = useMemo(
+    () => heroes.filter((h) => !isPlaceholderHero(h.name)),
+    [heroes]
+  )
   // Shop shelves: heroes (and their skins) live in the hero gallery; the
   // two colour categories get their own preview shelves (ColorShelf). The
   // old catch-all Items list is gone - other categories (borders, profile
   // backgrounds, phrases…) aren't sold in the Shop for now. Seeded default
   // colours stay: they're real colours the player owns and can switch back to.
-  const shadeItems = storeCatalog.filter(
-    (i) => i.category === 'TERRITORY_SHADE'
+  const shadeItems = useMemo(
+    () => storeCatalog.filter((i) => i.category === 'TERRITORY_SHADE'),
+    [storeCatalog]
   )
-  const trailItems = storeCatalog.filter((i) => i.category === 'TRAIL_COLOR')
+  const trailItems = useMemo(
+    () => storeCatalog.filter((i) => i.category === 'TRAIL_COLOR'),
+    [storeCatalog]
+  )
+  // Emotes/Skins (see EmoteShelf/SkinShelf) - every item in either category
+  // belongs to a hero (heroId), so they get their own per-hero shelf
+  // instead of folding into the color shops above.
+  const emoteItems = useMemo(
+    () => storeCatalog.filter((i) => i.category === 'EMOTE'),
+    [storeCatalog]
+  )
+  const skinItems = useMemo(
+    () => storeCatalog.filter((i) => i.category === 'SKIN'),
+    [storeCatalog]
+  )
+  // One-time dev-tools check that every real backend EMOTE row has a local
+  // asset mapped for it (see utils/emotes.js) - a silent gap would
+  // otherwise just look like a locked card with no clue why.
+  useEffect(() => {
+    warnMissingEmoteAssets(
+      storeCatalog.filter((i) => i.category === 'EMOTE'),
+      heroes
+    )
+  }, [storeCatalog, heroes])
   // HERO is the one real Store category that's actually an avatar-shaped
   // image (the others are borders/colors/backgrounds meant to layer onto a
   // profile picture, not stand in for one) — equipping one takes priority
@@ -2226,6 +2578,19 @@ export default function GamePage() {
   const activeHeroId = equippedHero
     ? equippedHero.storeItem.heroId
     : heroes.find((h) => isCometHero(h.name))?.id
+  // Equipping a skin (StoreItem category SKIN, same per-hero equip scoping
+  // as emotes) swaps the active hero's art wherever a flat image is shown
+  // - see avatarSrc below. It can't currently change Blaze/Comet's
+  // ANIMATED run-view sprite or Me-tab turntable (those are hardcoded
+  // local sprite sheets keyed by hero name only, with no skin dimension -
+  // see TerritoryMap.jsx's HERO_MAP_SHEETS/src/utils/heroSprites.js), only
+  // the static avatar path - see SkinShelf.jsx's own note on this.
+  const equippedSkin = ownedItems.find(
+    (o) =>
+      o.equipped &&
+      o.storeItem.category === 'SKIN' &&
+      o.storeItem.heroId === activeHeroId
+  )
   const selectedHero = selectedHeroId
     ? heroes.find((h) => h.id === selectedHeroId) || null
     : null
@@ -2343,6 +2708,7 @@ export default function GamePage() {
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
   const avatarSrc =
+    (equippedSkin && resolveFileUrl(equippedSkin.storeItem.assetUrl)) ||
     (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
     currentAvatar?.src ||
     resolveFileUrl(user?.profilePictureUrl) ||
@@ -2475,8 +2841,6 @@ export default function GamePage() {
           animatedMarkerHero={animatedMarkerHero}
           playerMoving={playerMoving}
           isFollowing={isFollowing}
-          mapRotation={mapRotation}
-          compassActive={mapMode === 'compass'}
           isTracking={tracker.status === 'tracking'}
           onUserPan={handleUserPan}
           isLoopRun={!tracker.challengeId && !tracker.clubWarId}
@@ -2488,6 +2852,11 @@ export default function GamePage() {
           onRouteClick={handleViewRoute}
           routeGuidanceLine={routeGuidanceLine}
           routeOffCourse={Boolean(routeGuidance?.offRoute)}
+          // Every route here is a closed loop (territory claims require
+          // one), so start and finish are the same point - shown whenever
+          // a route is being previewed or actually run, not just while
+          // drawing one.
+          routeAnchorPoint={viewingRoute?.points?.[0] || null}
           onParcelClick={handleParcelClick}
           onMapReady={handleMapReady}
         />
@@ -2604,36 +2973,58 @@ export default function GamePage() {
         </button>
       </div>
 
+      {/* Its own class (not .game-weather-hype, which the PvP/war alert
+          banners further below still use as-is) so this redesign - circular
+          emoji badge, temp pill, close button, auto-dismiss progress bar -
+          can't change anything about how those two look or behave. */}
       <AnimatePresence>
         {weatherHype && (
-          <motion.button
-            type="button"
+          <motion.div
             key="weather-hype"
-            className={`game-weather-hype sky-${mapAmbience.sky}`}
-            onClick={() => setWeatherHype(null)}
-            aria-label={`${weatherHype.title}. ${weatherHype.line} Tap to dismiss.`}
-            initial={{ opacity: 0, y: -40, scale: 0.85 }}
+            className={`game-weather-toast key-${weatherHype.key}`}
+            role="status"
+            aria-label={`${weatherHype.title}. ${weatherHype.line}`}
+            initial={{ opacity: 0, y: -28, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -24, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            exit={{ opacity: 0, y: -20, scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
           >
-            <span className="game-weather-hype-emoji" aria-hidden="true">
-              {weatherHype.emoji}
+            <span className="game-weather-toast-emoji-wrap" aria-hidden="true">
+              <span className="game-weather-toast-emoji">
+                {weatherHype.emoji}
+              </span>
             </span>
-            <span className="game-weather-hype-body">
-              <strong className="game-weather-hype-title">
-                {weatherHype.title}
-                {mapAmbience.temperature != null &&
-                  ` · ${mapAmbience.temperature}°`}
-              </strong>
-              <span className="game-weather-hype-line">{weatherHype.line}</span>
+            <span className="game-weather-toast-body">
+              <span className="game-weather-toast-title-row">
+                <strong className="game-weather-toast-title">
+                  {weatherHype.title}
+                </strong>
+                {weatherHype.temp != null && (
+                  <span className="game-weather-toast-temp">
+                    {Math.round(weatherHype.temp)}°
+                  </span>
+                )}
+              </span>
+              <span className="game-weather-toast-line">
+                {weatherHype.line}
+              </span>
             </span>
-          </motion.button>
+            <button
+              type="button"
+              className="game-weather-toast-close"
+              aria-label="Dismiss"
+              onClick={() => setWeatherHype(null)}
+            >
+              <IconClose />
+            </button>
+            <span className="game-weather-toast-progress" aria-hidden="true" />
+          </motion.div>
         )}
       </AnimatePresence>
 
       <RouteTurnIndicator
         guidance={routeGuidance}
+        totalDistanceMeters={viewingRoute?.distanceMeters}
         onFinish={() => tracker.stop()}
       />
 
@@ -2874,39 +3265,22 @@ export default function GamePage() {
         </div>
       )}
 
-      {/* Google Maps' own run-mode location controls, shown as soon as the
-          run starts tracking - the plain locate FAB toggles Free/Follow
-          (see toggleFollow), sitting where the menu FAB would be since
-          that's hidden while tracking anyway. A separate Compass FAB above
-          it jumps straight into Compass mode in one tap (see
-          toggleCompass) instead of needing two taps through Follow first -
-          lit up gold while active since the map physically rotating is
-          worth a visual cue. */}
+      {/* Google Maps' own run-mode location control, shown as soon as the
+          run starts tracking - toggles Free/Follow (see toggleFollow),
+          sitting where the menu FAB would be since that's hidden while
+          tracking anyway. North always stays up either way - the map never
+          rotates (see TerritoryMap.jsx). */}
       {tracker.status === 'tracking' && (
-        <>
-          <button
-            type="button"
-            className={`game-compass-btn${mapMode === 'compass' ? ' is-active' : ''}`}
-            aria-label={
-              mapMode === 'compass'
-                ? 'Switch to follow mode'
-                : 'Switch to compass mode'
-            }
-            onClick={toggleCompass}
-          >
-            <IconCompassNeedle />
-          </button>
-          <button
-            type="button"
-            className="game-locate-btn"
-            aria-label={
-              mapMode === 'follow' ? 'Switch to free look' : 'Follow your run'
-            }
-            onClick={toggleFollow}
-          >
-            <IconCrosshairs />
-          </button>
-        </>
+        <button
+          type="button"
+          className="game-locate-btn"
+          aria-label={
+            mapMode === 'follow' ? 'Switch to free look' : 'Follow your run'
+          }
+          onClick={toggleFollow}
+        >
+          <IconCrosshairs />
+        </button>
       )}
 
       <div
@@ -2919,13 +3293,17 @@ export default function GamePage() {
       >
         {tracker.status === 'tracking' && (
           <>
-            <div className="game-controls-stats">
+            {/* DISTANCE/PACE/TIME is the hero here, not the buttons below it
+                - a 3-column row with dividers, Time biggest (the number
+                most runners actually glance at mid-run). */}
+            <div className="game-controls-stats game-run-stats">
               <span className="game-stat">
                 <span className="game-stat-value">
                   {formatMeters(displayedDistance)}
                 </span>
                 <span className="game-stat-label">Distance</span>
               </span>
+              <span className="game-run-stats-divider" aria-hidden="true" />
               <span className="game-stat">
                 <span className="game-stat-value">
                   {formatPace(
@@ -2940,7 +3318,8 @@ export default function GamePage() {
                 </span>
                 <span className="game-stat-label">Pace</span>
               </span>
-              <span className="game-stat">
+              <span className="game-run-stats-divider" aria-hidden="true" />
+              <span className="game-stat game-stat-hero">
                 <span className="game-stat-value">
                   {formatDuration(tracker.elapsedSeconds)}
                 </span>
@@ -2954,6 +3333,7 @@ export default function GamePage() {
               aria-expanded={!statsOnly}
               onClick={() => setStatsOnly((collapsed) => !collapsed)}
             >
+              <span className="game-controls-handle-grip" aria-hidden="true" />
               <IconChevronDown />
             </button>
             <AnimatePresence initial={false}>
@@ -2966,58 +3346,27 @@ export default function GamePage() {
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.22, ease: 'easeInOut' }}
                 >
-                  {confirmAction === 'end' || confirmAction === 'cancel' ? (
-                    <div className="game-controls-confirm">
-                      <p className="game-controls-confirm-text">
-                        {confirmAction === 'end'
-                          ? 'End this run now?'
-                          : 'Cancel and discard this run? Nothing will be saved.'}
-                      </p>
-                      <div className="game-controls-actions">
-                        <button
-                          type="button"
-                          className="game-btn game-btn-wood"
-                          onClick={() => setConfirmAction(null)}
-                        >
-                          Keep Running
-                        </button>
-                        <button
-                          type="button"
-                          className={`game-btn ${
-                            confirmAction === 'end'
-                              ? 'game-btn-green'
-                              : 'game-btn-red'
-                          }`}
-                          onClick={() => {
-                            setConfirmAction(null)
-                            if (confirmAction === 'end') {
-                              setLoopWarningDismissed(false)
-                              tracker.stop()
-                            } else handleCancelTracking()
-                          }}
-                        >
-                          {confirmAction === 'end' ? 'Yes, End' : 'Yes, Cancel'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="game-controls-actions">
-                      <button
-                        type="button"
-                        className="game-btn game-btn-green game-btn-lg"
-                        onClick={() => setConfirmAction('end')}
-                      >
-                        End
-                      </button>
-                      <button
-                        type="button"
-                        className="game-btn game-btn-wood game-btn-lg"
-                        onClick={() => setConfirmAction('cancel')}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
+                  {/* Discard is deliberately quieter than End (smaller,
+                      muted, no fat drop-shadow) so a thumb reaching for End
+                      doesn't land on it by accident - the actual
+                      "are you sure" step is the modal below, triggered by
+                      either one. */}
+                  <div className="game-controls-actions game-run-actions">
+                    <button
+                      type="button"
+                      className="game-run-btn game-run-btn-end"
+                      onClick={() => setConfirmAction('end')}
+                    >
+                      <IconFlagCheckered /> End
+                    </button>
+                    <button
+                      type="button"
+                      className="game-run-btn game-run-btn-discard"
+                      onClick={() => setConfirmAction('cancel')}
+                    >
+                      <IconClose /> Discard
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3174,6 +3523,74 @@ export default function GamePage() {
         )}
       </div>
 
+      {/* End-run confirmation - a real modal (Esc/backdrop close like any
+          other confirm in this app), unlike the pendingRun/route-drawing
+          confirms above, which stay inline-in-sheet (the already-established
+          pattern elsewhere - see TrackRunPanel/PvpPanel). This one gets the
+          heavier treatment since ending/discarding an in-progress run is a
+          bigger, easier-to-fat-finger decision than those. */}
+      <AnimatePresence>
+        {(confirmAction === 'end' || confirmAction === 'cancel') && (
+          <motion.div
+            className="game-confirm-overlay game-end-run-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setConfirmAction(null)}
+          >
+            <motion.div
+              className="game-confirm-card game-end-run-card"
+              initial={{ opacity: 0, y: 28 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="game-end-run-title">
+                {confirmAction === 'end'
+                  ? 'End this run?'
+                  : 'Discard this run?'}
+              </h3>
+              <p className="game-end-run-summary">
+                {formatMeters(displayedDistance)} ·{' '}
+                {formatDuration(tracker.elapsedSeconds)}
+                {confirmAction === 'end' ? ' will be saved' : ' will be lost'}
+              </p>
+              {confirmAction === 'end' &&
+                tracker.distance < MIN_VALID_RUN_DISTANCE_METERS && (
+                  <p className="game-controls-hint game-controls-hint-error">
+                    This run is very short and may not count.
+                  </p>
+                )}
+              <div className="game-end-run-actions">
+                <button
+                  type="button"
+                  className="game-btn game-btn-wood"
+                  onClick={() => setConfirmAction(null)}
+                >
+                  Keep Running
+                </button>
+                <button
+                  type="button"
+                  className={`game-btn ${
+                    confirmAction === 'end' ? 'game-btn-green' : 'game-btn-red'
+                  }`}
+                  onClick={() => {
+                    setConfirmAction(null)
+                    if (confirmAction === 'end') {
+                      setLoopWarningDismissed(false)
+                      tracker.stop()
+                    } else handleCancelTracking()
+                  }}
+                >
+                  {confirmAction === 'end' ? 'Yes, End' : 'Yes, Discard'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {saveError && (
           <motion.div
@@ -3292,10 +3709,45 @@ export default function GamePage() {
                 <h3>{runResult.title}</h3>
                 {renderCompletedRunStats()}
                 <p>{runResult.message}</p>
+                {runResult.isRolloutRejection && (
+                  <>
+                    {rolloutRequestResult?.alreadyRolledOut && (
+                      <p className="game-settings-row-requested">
+                        Looks like it&apos;s already live here - try your next
+                        run!
+                      </p>
+                    )}
+                    {rolloutRequestResult &&
+                      !rolloutRequestResult.alreadyRolledOut && (
+                        <p className="game-settings-row-requested">
+                          Requested - thanks for letting us know!
+                        </p>
+                      )}
+                    {rolloutRequestError && (
+                      <p className="game-controls-hint game-controls-hint-error">
+                        {rolloutRequestError}
+                      </p>
+                    )}
+                    {!rolloutRequestResult && (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        disabled={rolloutRequestBusy}
+                        onClick={handleRequestRollout}
+                      >
+                        {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
+                      </button>
+                    )}
+                  </>
+                )}
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => setRunResult(null)}
+                  onClick={() => {
+                    setRunResult(null)
+                    setRolloutRequestResult(null)
+                    setRolloutRequestError(null)
+                  }}
                 >
                   Got it
                 </button>
@@ -3372,46 +3824,160 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {highlightedEntry && (
-          <motion.div
-            className="game-highlight-toast glass-card"
-            initial={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
-          >
-            <button
-              type="button"
-              className="game-highlight-toast-close"
-              aria-label="Close"
-              onClick={() => setHighlightedEntry(null)}
-            >
-              <IconClose />
-            </button>
-            <h3>
-              {isMyEntry(highlightedEntry)
-                ? 'Your territory'
-                : `${playerNameOf(highlightedEntry)}'s territory`}
-            </h3>
-            <p>{formatArea(highlightedEntry.areaSqMeters)} held</p>
-            {!highlightHasVisibleParcels && (
-              <p className="game-controls-hint">
-                Nothing of theirs is in view right now — try exploring the map.
-              </p>
-            )}
-            <div className="game-highlight-toast-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  setViewingProfile(highlightedEntry)
-                  setHighlightedEntry(null)
-                }}
+        {highlightedEntry &&
+          (() => {
+            const isMine = isMyEntry(highlightedEntry)
+            // Only computed for display (start distance/eligibility hint) -
+            // handleRunTerritory builds its own copy fresh off the live
+            // playerLocation at the moment the button is actually pressed,
+            // so a stale preview here never feeds the real run.
+            const previewRoute =
+              highlightedEntry.points?.length >= 3 && playerLocation
+                ? generateTerritoryLoopRoute(
+                    highlightedEntry.points,
+                    playerLocation
+                  )
+                : null
+            const canRun =
+              (highlightedEntry.points?.length || 0) >= 3 &&
+              tracker.status === 'idle' &&
+              !pendingRun
+            return (
+              <motion.div
+                className="game-highlight-toast glass-card game-territory-popup"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
               >
-                View Profile
-              </button>
-            </div>
-          </motion.div>
-        )}
+                {/* --- Header: avatar + owner name + close --- */}
+                <div className="game-highlight-toast-header">
+                  <TerritoryAvatar
+                    key={highlightedEntry.avatarSrc || highlightedEntry.userId}
+                    src={highlightedEntry.avatarSrc}
+                    name={playerNameOf(highlightedEntry)}
+                    ringColor={highlightedEntry.color}
+                    size={60}
+                  />
+                  <div className="game-highlight-toast-owner">
+                    <p className="game-highlight-toast-owner-label">
+                      Territory owner
+                    </p>
+                    <h3>{isMine ? 'You' : playerNameOf(highlightedEntry)}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="game-highlight-toast-close"
+                    aria-label="Close"
+                    onClick={() => {
+                      setHighlightedEntry(null)
+                      setTerritoryRunWarning(null)
+                    }}
+                  >
+                    <IconClose />
+                  </button>
+                </div>
+
+                {/* --- Stats row: the two numbers that actually matter --- */}
+                <div className="game-territory-stats">
+                  <div className="game-territory-stat">
+                    <span className="game-territory-stat-value">
+                      {formatAreaStat(highlightedEntry.areaSqMeters)}
+                    </span>
+                    <span className="game-territory-stat-label">Held</span>
+                  </div>
+                  <div className="game-territory-stat">
+                    <span className="game-territory-stat-value">
+                      <IconTrophy />
+                      {Math.round(
+                        highlightedEntry.runScore || 0
+                      ).toLocaleString()}
+                    </span>
+                    <span className="game-territory-stat-label">Run score</span>
+                  </div>
+                </div>
+
+                {!highlightHasVisibleParcels && (
+                  <p className="game-controls-hint">
+                    Nothing of theirs is in view right now — try exploring the
+                    map.
+                  </p>
+                )}
+                {territoryRunWarning && (
+                  <>
+                    <p className="game-controls-hint game-controls-hint-error">
+                      {territoryRunWarning}
+                    </p>
+                    <div className="game-highlight-toast-actions">
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setTerritoryRunWarning(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() =>
+                          handleRunTerritory(highlightedEntry, { force: true })
+                        }
+                      >
+                        Continue anyway
+                      </button>
+                    </div>
+                  </>
+                )}
+                {!territoryRunWarning && canRun && (
+                  <>
+                    {/* --- Secondary info line: distance to the route's
+                        start point, with the "guide will steer you there"
+                        detail kept as a smaller caption underneath rather
+                        than a hover-only tooltip (this is a touch-first
+                        game, nothing here is hoverable on mobile). --- */}
+                    {previewRoute?.startDistanceMeters >
+                      TERRITORY_RUN_FAR_START_METERS && (
+                      <p className="game-territory-distance">
+                        <IconCrosshairs />
+                        <span>
+                          Start point is{' '}
+                          {formatMeters(previewRoute.startDistanceMeters)} away
+                          <span className="game-territory-distance-caption">
+                            The guide will steer you there first.
+                          </span>
+                        </span>
+                      </p>
+                    )}
+                    <div className="game-highlight-toast-actions">
+                      <button
+                        type="button"
+                        className="game-route-run-btn"
+                        onClick={() => handleRunTerritory(highlightedEntry)}
+                      >
+                        🏃{' '}
+                        {isMine
+                          ? 'Defend This Territory'
+                          : 'Run This Territory'}
+                      </button>
+                    </div>
+                  </>
+                )}
+                {!territoryRunWarning && (
+                  <div className="game-highlight-toast-actions is-secondary">
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        setViewingProfile(highlightedEntry)
+                        setHighlightedEntry(null)
+                      }}
+                    >
+                      View Profile
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )
+          })()}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -3553,29 +4119,55 @@ export default function GamePage() {
             {menuTab === 'leaderboard' && (
               <div className="game-menu-panel game-cards">
                 <section className="game-card game-card-dark">
-                  <div className="game-leaderboard-mode">
+                  <div
+                    className="game-leaderboard-mode"
+                    role="tablist"
+                    aria-label="Leaderboard"
+                  >
+                    {/* Icon-only, per the brief - IconUser/IconUsers reused
+                        exactly as-is from the Me/Club nav tabs and radial
+                        menu buttons (RADIAL_ITEMS above) rather than
+                        inventing a separate icon language just for this
+                        tab row. IconTrophy (this tab's old icon) was
+                        dropped for Players specifically - it already means
+                        "score/rank" elsewhere on this same screen (the
+                        podium medals, the stat chips), so reusing it here
+                        too for "this is the Players section" read as the
+                        wrong concept once the label text was gone. */}
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={leaderboardMode === 'individual'}
+                      aria-label="Top Players"
+                      title="Top Players"
                       className={`game-leaderboard-mode-box ${leaderboardMode === 'individual' ? 'active' : ''}`}
                       onClick={() => switchLeaderboardMode('individual')}
                     >
-                      <IconTrophy />
-                      Top Players
+                      <IconUser />
                     </button>
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={leaderboardMode === 'club'}
+                      aria-label="Top Clubs"
+                      title="Top Clubs"
                       className={`game-leaderboard-mode-box ${leaderboardMode === 'club' ? 'active' : ''}`}
                       onClick={() => switchLeaderboardMode('club')}
                     >
                       <IconUsers />
-                      Top Clubs
                     </button>
                   </div>
 
                   {leaderboardMode === 'individual' ? (
-                    <div className="game-menu-subtabs game-menu-subtabs-scope">
+                    <div
+                      className="game-menu-subtabs game-menu-subtabs-scope"
+                      role="tablist"
+                      aria-label="Scope"
+                    >
                       <button
                         type="button"
+                        role="tab"
+                        aria-selected={individualScope === 'global'}
                         className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
                         onClick={() => switchIndividualScope('global')}
                       >
@@ -3583,6 +4175,8 @@ export default function GamePage() {
                       </button>
                       <button
                         type="button"
+                        role="tab"
+                        aria-selected={individualScope === 'city'}
                         className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
                         onClick={() => switchIndividualScope('city')}
                       >
@@ -3592,9 +4186,15 @@ export default function GamePage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="game-menu-subtabs game-menu-subtabs-scope">
+                    <div
+                      className="game-menu-subtabs game-menu-subtabs-scope"
+                      role="tablist"
+                      aria-label="Scope"
+                    >
                       <button
                         type="button"
+                        role="tab"
+                        aria-selected={clubScope === 'global'}
                         className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
                         onClick={() => switchClubScope('global')}
                       >
@@ -3602,6 +4202,8 @@ export default function GamePage() {
                       </button>
                       <button
                         type="button"
+                        role="tab"
+                        aria-selected={clubScope === 'national'}
                         className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
                         onClick={() => switchClubScope('national')}
                       >
@@ -3629,6 +4231,8 @@ export default function GamePage() {
                   {leaderboardMode === 'individual' ? (
                     leaderboardError ? (
                       <p className="game-menu-empty">{leaderboardError}</p>
+                    ) : leaderboardLoading && leaderboard.length === 0 ? (
+                      <LeaderboardSkeleton />
                     ) : leaderboard.length === 0 ? (
                       <p className="game-menu-empty">
                         {individualScope === 'city'
@@ -3642,7 +4246,15 @@ export default function GamePage() {
                           key: entry.userId,
                           rank: entry.rank,
                           name: isMyEntry(entry) ? 'You' : playerNameOf(entry),
-                          area: formatArea(entry.areaSqMeters),
+                          // Same "icon + stat" treatment as the Club board's
+                          // trophy count below - territory is this board's
+                          // equivalent score.
+                          area: (
+                            <span className="lb-trophy-stat">
+                              <IconFlag />
+                              {formatArea(entry.areaSqMeters)}
+                            </span>
+                          ),
                           // Your own row uses the exact same avatar everywhere
                           // else in the game (hero skin > profile picture >
                           // default), so changing it anywhere picks it up here
@@ -3660,6 +4272,8 @@ export default function GamePage() {
                     )
                   ) : leaderboardError ? (
                     <p className="game-menu-empty">{leaderboardError}</p>
+                  ) : leaderboardLoading && clubLeaderboard.length === 0 ? (
+                    <LeaderboardSkeleton />
                   ) : clubLeaderboard.length === 0 ? (
                     <p className="game-menu-empty">
                       {clubScope === 'national'
@@ -3805,6 +4419,12 @@ export default function GamePage() {
                   )}
                 </div>
                 <div className="game-cards">
+                  <MedalGrid
+                    catalog={storeCatalog}
+                    ownedItems={ownedItems}
+                    seasonMedals={profile?.medals}
+                    loading={storeCatalog.length === 0 && !storeError}
+                  />
                   <section className="game-me-section">
                     <p className="game-menu-section-title">My Territories</p>
                     {myTerritories.length === 0 ? (
@@ -4080,6 +4700,47 @@ export default function GamePage() {
                   </span>
                   <IconChevronRight />
                 </button>
+
+                {/* Standing home for this, always available - there's no
+                    passive "is my area rolled out" check (see
+                    requestRollout's own comment in api/territoryRollout.js),
+                    so this doesn't know in advance whether the player needs
+                    it; tapping it either requests (not rolled out yet) or
+                    comes back ALREADY_ROLLED_OUT (good news, told as such,
+                    not an error). */}
+                <div className="game-settings-row game-settings-row-static">
+                  <span className="game-settings-row-label">
+                    <IconLock />
+                    <span className="game-settings-row-text">
+                      Territory Capture Here
+                      <span className="game-settings-row-sub">
+                        Not live everywhere yet - PvP and Club Wars always are.
+                        Ask for your area below.
+                      </span>
+                    </span>
+                  </span>
+                  {rolloutRequestResult ? (
+                    <span className="game-settings-row-requested">
+                      {rolloutRequestResult.alreadyRolledOut
+                        ? 'Already live here!'
+                        : 'Requested'}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={handleRequestRollout}
+                      disabled={rolloutRequestBusy}
+                    >
+                      {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
+                    </button>
+                  )}
+                </div>
+                {rolloutRequestError && (
+                  <p className="game-controls-hint game-controls-hint-error">
+                    {rolloutRequestError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -4129,6 +4790,27 @@ export default function GamePage() {
                       setStoreActionError(null)
                       setSelectedHeroId(hero.id)
                     }}
+                  />
+                )}
+
+                {shopSection === 'skins' && (
+                  <SkinShelf
+                    skins={skinItems}
+                    heroes={heroes}
+                    ownedItems={ownedItems}
+                    onBuy={setStoreChoice}
+                    onEquip={handleEquip}
+                  />
+                )}
+
+                {shopSection === 'emotes' && (
+                  <EmoteShelf
+                    emotes={emoteItems}
+                    heroes={heroes}
+                    ownedItems={ownedItems}
+                    onBuy={setStoreChoice}
+                    onEquip={handleEquip}
+                    onShowcase={setStoreChoice}
                   />
                 )}
 
@@ -4570,6 +5252,47 @@ export default function GamePage() {
 
       <AnimatePresence>
         {storeChoice &&
+          storeChoice.category === 'EMOTE' &&
+          (() => {
+            const price = storeChoice.priceFahhcoin || 0
+            const balance = profile?.fahhcoinBalance ?? 0
+            const short = price > balance
+            // EMOTE tiles open this same showcase popup whether owned or
+            // not (see HeroItemShelf's onShowcase) - an owned one shows
+            // Equip/Unequip below instead of the buy flow, since there's
+            // nothing left to purchase.
+            const ownedEmote = ownedItems.find(
+              (o) => o.storeItem.id === storeChoice.id
+            )
+            return (
+              <EmoteShowcase
+                item={storeChoice}
+                heroName={heroes.find((h) => h.id === storeChoice.heroId)?.name}
+                owned={ownedEmote}
+                price={price}
+                balance={balance}
+                short={short}
+                purchasing={purchasing}
+                purchaseError={purchaseError}
+                storeActionError={storeActionError}
+                onClose={closeStoreChoice}
+                onBuy={() => handlePurchase(storeChoice)}
+                onEquip={async () => {
+                  await handleEquip(storeChoice, ownedEmote.equipped)
+                  closeStoreChoice()
+                }}
+                onGetCoins={() => {
+                  closeStoreChoice()
+                  openCoinShop()
+                }}
+              />
+            )
+          })()}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {storeChoice &&
+          storeChoice.category !== 'EMOTE' &&
           (() => {
             const price = storeChoice.priceFahhcoin || 0
             const balance = profile?.fahhcoinBalance ?? 0
@@ -4589,6 +5312,14 @@ export default function GamePage() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <button
+                    type="button"
+                    className="game-run-viewer-close"
+                    aria-label="Close"
+                    onClick={closeStoreChoice}
+                  >
+                    <IconClose />
+                  </button>
                   {storeChoice.category === 'TERRITORY_SHADE' && (
                     <ShadeFlag
                       className="game-confirm-shade-preview"
@@ -4601,6 +5332,22 @@ export default function GamePage() {
                       color={storeChoice.colorValue}
                     />
                   )}
+                  {storeChoice.category === 'SKIN' && storeChoice.assetUrl && (
+                    <img
+                      className="game-confirm-emote-preview"
+                      src={resolveFileUrl(storeChoice.assetUrl)}
+                      alt=""
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  )}
+                  {/* SKIN/TERRITORY_SHADE/TRAIL_COLOR only ever reach this
+                      modal unowned - an owned tile equips/unequips directly
+                      on tap (see SkinShelf.jsx/ColorShelf.jsx), without ever
+                      calling onBuy/setStoreChoice - so there's no "already
+                      owned" branch to handle here (EMOTE's own owned-vs-buy
+                      split now lives in EmoteShowcase.jsx). */}
                   <p className="game-buy-title">
                     {price > 0 ? (
                       <>

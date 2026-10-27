@@ -69,3 +69,12 @@ export function attachHeroAbility(heroId, componentType, multiplier) {
     multiplier,
   })
 }
+
+// Admin/moderator only - create a new catalog row for any category (see
+// EmoteAdminPanel.jsx, which uses this for EMOTE). HERO, SKIN and EMOTE all
+// require heroId; every other category rejects one. No update or delete
+// endpoint exists for a plain item the way there is for a hero - a mistake
+// here is permanent, so the admin UI confirms before calling this.
+export function createStoreItem(item) {
+  return postJson('/v1/store/admin/items', item)
+}
