@@ -4,6 +4,13 @@ import { FaExclamation, FaTimes } from 'react-icons/fa'
 import { ApiError } from '../api/client'
 import { createRun } from '../api/runs'
 import { useRunTracker } from '../hooks/useRunTracker'
+import { VehicleState } from '../utils/vehicleDetection'
+import {
+  isAccessibilityModeEnabled,
+  isAntiCheatDebugEnabled,
+  setAccessibilityModeEnabled,
+} from '../utils/antiCheatSettings'
+import VehicleDebugOverlay from './VehicleDebugOverlay'
 import {
   MIN_DISTANCE_FOR_PACE_METERS,
   MIN_VALID_RUN_DISTANCE_METERS,
@@ -33,12 +40,20 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     dismissBackgroundGap,
     pendingRun,
     clearPendingRun,
-    invalidMotion,
-    dismissInvalidMotion,
+    vehicleState,
+    vehicleReason,
+    suspectDismissed,
+    dismissSuspect,
+    disputeVehicle,
+    getDebugInfo,
   } = useRunTracker()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [confirmingStop, setConfirmingStop] = useState(false)
+  const [accessibilityMode, setAccessibilityMode] = useState(
+    isAccessibilityModeEnabled
+  )
+  const [debugEnabled] = useState(isAntiCheatDebugEnabled)
 
   const pace = calculatePaceMinPerKm(distance, elapsedSeconds)
   const tracking = status === 'tracking'
@@ -66,7 +81,7 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, elapsedSeconds, distance])
 
-  async function attemptSave(run) {
+  async function attemptSave(run, { force = false } = {}) {
     // Both minimums are enforced independently - a run has to clear each on
     // its own, not just one or the other.
     if (run.distance < MIN_VALID_RUN_DISTANCE_METERS) {
@@ -83,6 +98,19 @@ export default function TrackRunPanel({ eventId, onSaved }) {
       })
       return
     }
+    // More than 30% of this run looked vehicle-assisted - block the normal
+    // auto-save and let the athlete either discard or explicitly insist (the
+    // backend re-validates the raw points independently either way, so a
+    // false positive here doesn't guarantee credit, it just doesn't get
+    // silently thrown away).
+    if (run.isVehicleInvalid && !force) {
+      setSaveError({
+        title: 'Mostly vehicle, not legs 🚗',
+        message: `About ${Math.round((run.vehicleSuspiciousRatio || 0) * 100)}% of this run looked vehicle-assisted, so it won't score as-is. Discard it, or save anyway if this was a false alarm (it'll still be reviewed).`,
+        offerForceSave: true,
+      })
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
@@ -93,6 +121,13 @@ export default function TrackRunPanel({ eventId, onSaved }) {
         duration: run.duration,
         startedAt: toLocalDateTimeString(run.startedAt),
         endedAt: toLocalDateTimeString(run.endedAt),
+        segmentFlags: run.segments,
+        maxSpeedMps: run.maxSpeedMps,
+        avgSpeedMps: run.avgSpeedMps,
+        stepCount: run.stepCount,
+        vehicleSuspiciousRatio: run.vehicleSuspiciousRatio,
+        clientFlaggedInvalid: run.isVehicleInvalid,
+        vehicleDisputeCount: run.disputes?.length || 0,
       })
       clearPendingRun()
       onSaved(saved)
@@ -167,24 +202,67 @@ export default function TrackRunPanel({ eventId, onSaved }) {
           <div>
             <p className="track-run-error-title">{saveError.title}</p>
             <p className="track-run-error-message">{saveError.message}</p>
+            {saveError.offerForceSave && pendingRun && (
+              <div className="track-run-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleDiscardPending}
+                  disabled={saving}
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => attemptSave(pendingRun, { force: true })}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving...' : 'Save Anyway'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {invalidMotion && (
-        <div className="banner error track-run-gap-banner">
-          <span>
-            {invalidMotion.reason === 'no-gait'
-              ? "That pace looks more scooter than sneakers — you're covering ground fast with no running stride detected. Mind stopping if you're not on foot?"
-              : "That's a faster sustained pace than running allows. Mind stopping if you're not on foot?"}
+      {tracking &&
+        vehicleState === VehicleState.SUSPECT &&
+        !suspectDismissed && (
+          <div className="banner error track-run-gap-banner">
+            <span>
+              Moving fast — are you in a vehicle?{' '}
+              {vehicleReason === 'no-gait'
+                ? "You're covering ground fast with no running stride detected."
+                : vehicleReason === 'pattern'
+                  ? 'That pace has been suspiciously steady for a human stride.'
+                  : "That's a faster sustained pace than running allows."}
+            </span>
+            <button type="button" onClick={dismissSuspect} aria-label="Dismiss">
+              <FaTimes />
+            </button>
+          </div>
+        )}
+
+      {tracking && vehicleState === VehicleState.VEHICLE && (
+        <div className="track-run-error">
+          <span className="track-run-error-badge">
+            <FaExclamation />
           </span>
-          <button
-            type="button"
-            onClick={dismissInvalidMotion}
-            aria-label="Dismiss"
-          >
-            <FaTimes />
-          </button>
+          <div>
+            <p className="track-run-error-title">Vehicle detected 🛵</p>
+            <p className="track-run-error-message">
+              Distance paused — it won&apos;t count until you slow down to a
+              run. Not in a vehicle?
+            </p>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={disputeVehicle}
+            >
+              I&apos;m not in a vehicle
+            </button>
+          </div>
         </div>
       )}
 
@@ -292,16 +370,37 @@ export default function TrackRunPanel({ eventId, onSaved }) {
             </div>
           </>
         ) : (
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            onClick={() => start(eventId)}
-            disabled={saving || !eventId}
-          >
-            Start Run
-          </button>
+          <>
+            <label className="track-run-accessibility-toggle">
+              <input
+                type="checkbox"
+                checked={accessibilityMode}
+                onChange={(e) => {
+                  setAccessibilityModeEnabled(e.target.checked)
+                  setAccessibilityMode(e.target.checked)
+                }}
+              />
+              I use a wheelchair or hand-cycle (raises speed limits, skips
+              stride detection)
+            </label>
+            <button
+              type="button"
+              className="btn btn-primary btn-block"
+              onClick={() => start(eventId)}
+              disabled={saving || !eventId}
+            >
+              Start Run
+            </button>
+          </>
         )}
       </div>
+
+      {debugEnabled && tracking && (
+        <VehicleDebugOverlay
+          getDebugInfo={getDebugInfo}
+          vehicleState={vehicleState}
+        />
+      )}
     </div>
   )
 }

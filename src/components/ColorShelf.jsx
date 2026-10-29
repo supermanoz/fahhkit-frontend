@@ -39,7 +39,7 @@ export default function ColorShelf({
                 key={item.id}
                 type="button"
                 className={`shade-tile ${owned?.equipped ? 'is-equipped' : owned ? 'is-owned' : ''}`}
-                style={{ '--shade': item.colorValue || '#ff7a29' }}
+                style={{ '--shade': item.colorValue || 'var(--sky-500)' }}
                 onClick={() =>
                   owned ? onEquip(item, owned.equipped) : onBuy(item)
                 }

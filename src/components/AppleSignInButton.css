@@ -1,0 +1,31 @@
+/* Matches .google-signin-button's footprint (LoginPage.css) so the two
+   buttons stack/sit side by side without a visible size mismatch, since
+   Apple's button is ours to draw (see AppleSignInButton.jsx) while Google's
+   is rendered by Google's own script. */
+.apple-signin-button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 22px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.apple-signin-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.apple-signin-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}

@@ -1,0 +1,1 @@
+NOTE: resize_window did not change the actual rendered viewport in this sandboxed browser (confirmed: screenshot stayed 1568x757 after requesting 390x844). These are captured at the sandbox's fixed window size, not true 390px/1440px device widths.

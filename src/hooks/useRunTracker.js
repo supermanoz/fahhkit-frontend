@@ -2,11 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   MAX_ACCEPTABLE_ACCURACY_METERS,
   clearActiveRun,
-  haversineDistance,
   loadActiveRun,
   saveActiveRun,
 } from '../utils/run'
+import { VEHICLE_RUN_INVALID_RATIO } from '../constants/antiCheat'
+import {
+  createVehicleDetector,
+  VehicleState,
+  SegmentKind,
+  compressSegments,
+} from '../utils/vehicleDetection'
+import { isAccessibilityModeEnabled } from '../utils/antiCheatSettings'
 import { useWakeLock } from './useWakeLock'
+import { watchPosition, clearWatch } from '../utils/geo'
 
 // Below this, a brief tab switch or notification check isn't worth warning about.
 const BACKGROUND_GAP_THRESHOLD_MS = 10000
@@ -20,24 +28,17 @@ const BACKGROUND_GAP_THRESHOLD_MS = 10000
 // a real run never needs sub-2.5s point density anyway.
 const MIN_POINT_INTERVAL_MS = 2500
 
-// --- Live "is this actually a run" sanity check (gyroscope + pace) ---
-// Entirely client-side - the backend only validates speed asynchronously
-// after a run is already saved (see TerritoryAntiCheatValidator server-side),
-// so there's nothing to call out to here. This is a warning, not a kill
-// switch: phone-sensor heuristics alone can't be 100% certain (bridges,
-// downhill stretches, a bumpy road), so it never auto-stops or discards data.
-const SPEED_VIOLATION_WINDOW_MS = 12000 // rolling window used to average out single-fix GPS noise
-const SPEED_VIOLATION_SUSTAIN_MS = 8000 // how long the violation must hold before it's shown
-// ~25.2 km/h sustained, corroborated by zero detected footstrike cadence - well
-// beyond even elite distance-running pace, but still reachable on a bike/scooter.
-const SPEED_WARN_MPS = 7
-// No motion sensor to corroborate with, so speed alone needs to look faster
-// still before it's worth a warning (~30.6 km/h sustained).
-const SPEED_ONLY_FALLBACK_MPS = 8.5
-const BRISK_RUN_MPS = 3 // below this, "no cadence detected" could just be walking/standing
-const GAIT_CHECK_WINDOW_MS = 8000 // trailing window used to look for footstrike peaks
-const STEP_MIN_INTERVAL_MS = 250 // debounce between counted steps (caps ~4Hz)
-const STEP_ACCEL_DEVIATION_MPS2 = 3 // deviation from the rolling gravity baseline that counts as a footstrike
+// --- Vehicle detection (anti-cheat) ---
+// The actual speed/cadence/pattern state machine lives in
+// utils/vehicleDetection.js (framework-free, unit-tested there with
+// simulated traces) - this hook only ever feeds it accepted GPS fixes and
+// raw devicemotion samples, and translates its output into distance
+// accounting + UI state. Thresholds live in constants/antiCheat.js.
+//
+// This is a real-time, client-side safeguard only - the backend
+// independently re-validates the full raw trace after submission
+// (TerritoryAntiCheatValidator / TerritoryProcessingServiceImpl) and never
+// trusts anything reported here.
 
 // status: idle | tracking | permission-denied | unsupported | error
 export function useRunTracker() {
@@ -53,10 +54,13 @@ export function useRunTracker() {
   // because there was no connection) — kept in localStorage until it succeeds, so
   // it survives closing the app rather than being lost.
   const [pendingRun, setPendingRun] = useState(null)
-  // Sustained implausible pace (optionally corroborated by missing footstrike
-  // cadence) — see the SPEED_VIOLATION_* constants above. Null when nothing's
-  // currently flagged.
-  const [invalidMotion, setInvalidMotion] = useState(null)
+  // RUNNING | SUSPECT | VEHICLE - see utils/vehicleDetection.js. Drives the
+  // banners in TrackRunPanel.jsx/GamePage.jsx.
+  const [vehicleState, setVehicleState] = useState(VehicleState.RUNNING)
+  const [vehicleReason, setVehicleReason] = useState(null)
+  // Hides the current SUSPECT banner without changing detection state (a
+  // "keep going" dismiss) - resets the moment the state changes again.
+  const [suspectDismissed, setSuspectDismissed] = useState(false)
 
   const pointsRef = useRef([])
   const distanceRef = useRef(0)
@@ -64,13 +68,22 @@ export function useRunTracker() {
   const timerRef = useRef(null)
   const startedAtRef = useRef(null)
   const eventIdRef = useRef(null)
-  const speedSamplesRef = useRef([])
-  const stepTimestampsRef = useRef([])
-  const motionBaselineRef = useRef(9.81)
+  const detectorRef = useRef(null)
+  // Flat per-fix segment log, compressed into runs at stop() - see
+  // compressSegments in utils/vehicleDetection.js. Sent to the backend with
+  // the run (per-segment flags) alongside the aggregate fields below.
+  const segmentsRef = useRef([])
+  const vehicleExcludedMetersRef = useRef(0)
+  const traceMetersRef = useRef(0) // every non-jump segment, for avg speed
+  const traceSecondsRef = useRef(0)
+  const maxSpeedMpsRef = useRef(0)
+  const totalStepsRef = useRef(0)
+  // "I'm not in a vehicle" taps - sent with the run for moderator review,
+  // never trusted client-side to mean the flagged segments weren't real.
+  const disputesRef = useRef([])
   const motionAvailableRef = useRef(false)
   const motionAttachedRef = useRef(false)
-  const lastStepAtRef = useRef(0)
-  const violationStartedAtRef = useRef(null)
+  const vehicleStateRef = useRef(VehicleState.RUNNING)
   // PvP race this run counts for (see api/pvp.js) - persisted with the run
   // like eventId so a reload mid-race still submits it against the race.
   const challengeIdRef = useRef(null)
@@ -80,6 +93,11 @@ export function useRunTracker() {
   const fixCountRef = useRef(0)
   const lastAccuracyRef = useRef(null)
   const hiddenAtRef = useRef(null)
+  // watchPosition's id now arrives asynchronously (the native Geolocation
+  // plugin has to await an OS permission check first) - this flags that
+  // clearTimers() already ran before the id came back, so it's cleared
+  // immediately on arrival instead of left dangling.
+  const watchCancelledRef = useRef(false)
   const statusRef = useRef(status)
   statusRef.current = status
   const wakeLock = useWakeLock()
@@ -116,32 +134,44 @@ export function useRunTracker() {
     []
   )
 
-  // Rough step/cadence detector off the accelerometer - a running gait has a
-  // clear rhythmic footstrike (~1.5-4Hz) that a smooth vehicle ride doesn't.
-  // Not trying to be a precise pedometer, just "is *any* cadence present".
+  const applyVehicleState = useCallback((nextState, reason) => {
+    if (nextState !== vehicleStateRef.current) {
+      vehicleStateRef.current = nextState
+      setVehicleState(nextState)
+      setSuspectDismissed(false)
+    }
+    setVehicleReason(reason ?? null)
+  }, [])
+
+  const dismissSuspect = useCallback(() => setSuspectDismissed(true), [])
+
+  // "I'm not in a vehicle" - logs a dispute (sent with the run for moderator
+  // review, never trusted blindly) and resumes tracking immediately. If the
+  // athlete really is in a vehicle, sustained evidence trips the detector
+  // again shortly - this doesn't disable detection going forward.
+  const disputeVehicle = useCallback(() => {
+    disputesRef.current.push({
+      at: new Date().toISOString(),
+      stateAtDispute: vehicleStateRef.current,
+    })
+    detectorRef.current?.dispute()
+    applyVehicleState(VehicleState.RUNNING, null)
+  }, [applyVehicleState])
+
+  // Rough step/cadence detector off the accelerometer, forwarded into the
+  // vehicle-detection state machine - see handleMotionSample in
+  // utils/vehicleDetection.js for the actual peak-detection math.
   const handleDeviceMotion = useCallback((event) => {
     const acc = event.accelerationIncludingGravity || event.acceleration
     if (!acc || acc.x == null) return
     const magnitude = Math.sqrt(
       (acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2
     )
-    // Slow-moving baseline (not a fixed 9.81) so a tilted phone still reads
-    // deviations relative to its own resting magnitude.
-    motionBaselineRef.current += (magnitude - motionBaselineRef.current) * 0.05
-    const deviation = Math.abs(magnitude - motionBaselineRef.current)
-    const now = Date.now()
-    if (
-      deviation > STEP_ACCEL_DEVIATION_MPS2 &&
-      now - lastStepAtRef.current > STEP_MIN_INTERVAL_MS
-    ) {
-      lastStepAtRef.current = now
-      stepTimestampsRef.current = [
-        ...stepTimestampsRef.current.filter(
-          (t) => t > now - GAIT_CHECK_WINDOW_MS
-        ),
-        now,
-      ]
-    }
+    const isStep = detectorRef.current?.handleMotionSample(
+      magnitude,
+      Date.now()
+    )
+    if (isStep) totalStepsRef.current += 1
   }, [])
 
   const detachMotionSensing = useCallback(() => {
@@ -163,6 +193,7 @@ export function useRunTracker() {
       typeof DeviceMotionEvent === 'undefined'
     ) {
       motionAvailableRef.current = false
+      detectorRef.current?.setMotionAvailable(false)
       return
     }
     const attach = () => {
@@ -174,61 +205,24 @@ export function useRunTracker() {
       DeviceMotionEvent.requestPermission()
         .then((result) => {
           motionAvailableRef.current = result === 'granted'
+          detectorRef.current?.setMotionAvailable(motionAvailableRef.current)
           if (motionAvailableRef.current) attach()
         })
         .catch(() => {
           motionAvailableRef.current = false
+          detectorRef.current?.setMotionAvailable(false)
         })
       return
     }
     motionAvailableRef.current = true
+    detectorRef.current?.setMotionAvailable(true)
     attach()
   }, [handleDeviceMotion])
 
-  // Checked after every accepted GPS point - samples is a rolling window of
-  // {t, speedMps, distance, dt} built in the watchPosition callback below.
-  const evaluateMotionPlausibility = useCallback((now) => {
-    const samples = speedSamplesRef.current
-    if (samples.length === 0) return
-    const windowDistance = samples.reduce((sum, s) => sum + s.distance, 0)
-    const windowTime = samples.reduce((sum, s) => sum + s.dt, 0)
-    if (windowTime <= 0) return
-    const avgSpeed = windowDistance / windowTime
-
-    const hasGaitData = motionAvailableRef.current
-    const recentSteps = stepTimestampsRef.current.filter(
-      (t) => t > now - GAIT_CHECK_WINDOW_MS
-    )
-    const noGait =
-      hasGaitData && avgSpeed > BRISK_RUN_MPS && recentSteps.length === 0
-    const speedTooHigh = hasGaitData
-      ? avgSpeed > SPEED_WARN_MPS
-      : avgSpeed > SPEED_ONLY_FALLBACK_MPS
-    const violating = speedTooHigh || noGait
-
-    if (!violating) {
-      violationStartedAtRef.current = null
-      return
-    }
-    if (violationStartedAtRef.current == null) {
-      violationStartedAtRef.current = now
-      return
-    }
-    if (now - violationStartedAtRef.current >= SPEED_VIOLATION_SUSTAIN_MS) {
-      setInvalidMotion(
-        (current) => current || { reason: noGait ? 'no-gait' : 'speed' }
-      )
-    }
-  }, [])
-
-  const dismissInvalidMotion = useCallback(() => {
-    setInvalidMotion(null)
-    violationStartedAtRef.current = null
-  }, [])
-
   const clearTimers = useCallback(() => {
+    watchCancelledRef.current = true
     if (watchIdRef.current != null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
+      clearWatch(watchIdRef.current)
       watchIdRef.current = null
     }
     if (timerRef.current != null) {
@@ -247,6 +241,7 @@ export function useRunTracker() {
     setStatus('tracking')
     wakeLock.request()
     armMotionSensing()
+    watchCancelledRef.current = false
 
     timerRef.current = setInterval(() => {
       setElapsedSeconds(
@@ -254,7 +249,7 @@ export function useRunTracker() {
       )
     }, 1000)
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
+    watchPosition(
       (position) => {
         const { latitude, longitude, altitude, accuracy, speed, heading } =
           position.coords
@@ -289,20 +284,48 @@ export function useRunTracker() {
 
         pointsRef.current = [...pointsRef.current, point]
         setPath(pointsRef.current)
-        if (previous) {
-          const segmentDistance = haversineDistance(previous, point)
-          distanceRef.current += segmentDistance
-          setDistance(distanceRef.current)
 
-          const dtSeconds = (point.timestamp - previous.timestamp) / 1000
-          if (dtSeconds > 0) {
-            const cutoff = point.timestamp - SPEED_VIOLATION_WINDOW_MS
-            speedSamplesRef.current = [
-              ...speedSamplesRef.current.filter((s) => s.t > cutoff),
-              { t: point.timestamp, distance: segmentDistance, dt: dtSeconds },
-            ]
-            evaluateMotionPlausibility(point.timestamp)
+        if (previous && detectorRef.current) {
+          const result = detectorRef.current.addGpsPoint({
+            lat: point.lat,
+            lng: point.lng,
+            timestamp: point.timestamp,
+            accuracy: point.accuracy,
+            speedMps: point.speed,
+          })
+          const segment = result.segment
+          if (segment) {
+            segmentsRef.current.push({
+              fromTimestamp: previous.timestamp,
+              toTimestamp: point.timestamp,
+              distanceMeters: segment.distanceMeters,
+              kind: segment.kind,
+              excluded: segment.excluded,
+            })
+            if (segment.kind !== SegmentKind.JUMP) {
+              traceMetersRef.current += segment.distanceMeters
+              traceSecondsRef.current +=
+                (point.timestamp - previous.timestamp) / 1000
+              if (segment.speedMps != null) {
+                maxSpeedMpsRef.current = Math.max(
+                  maxSpeedMpsRef.current,
+                  segment.speedMps
+                )
+              }
+            }
+            if (segment.excluded) {
+              if (segment.kind === SegmentKind.VEHICLE) {
+                vehicleExcludedMetersRef.current += segment.distanceMeters
+              }
+              // Jump segments are discarded entirely - not real movement
+              // either direction, same philosophy as the backend's own
+              // filterTeleportingPoints.
+            } else {
+              distanceRef.current += segment.distanceMeters
+              setDistance(distanceRef.current)
+            }
           }
+          applyVehicleState(result.state, result.reason)
         }
 
         saveActiveRun({
@@ -322,11 +345,20 @@ export function useRunTracker() {
         )
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-    )
-  }, [clearTimers, wakeLock, armMotionSensing, evaluateMotionPlausibility])
+    ).then((id) => {
+      if (watchCancelledRef.current) {
+        clearWatch(id)
+        return
+      }
+      watchIdRef.current = id
+    })
+  }, [clearTimers, wakeLock, armMotionSensing, applyVehicleState])
 
   // Resumes a run that was already in progress when this component mounted —
   // covers a page refresh or the tracker being reopened after SPA navigation.
+  // Note: the vehicle-detection state machine itself is NOT persisted across
+  // a refresh (only points/distance are) - a resumed run's anti-cheat
+  // tracking restarts clean from RUNNING.
   useEffect(() => {
     const saved = loadActiveRun()
     if (!saved || !('geolocation' in navigator)) return
@@ -351,6 +383,14 @@ export function useRunTracker() {
         endedAt: savedEndedAt,
         fixCount: saved.fixCount ?? saved.points.length,
         lastAccuracy: saved.lastAccuracy ?? null,
+        segments: saved.segments ?? [],
+        vehicleExcludedMeters: saved.vehicleExcludedMeters ?? 0,
+        vehicleSuspiciousRatio: saved.vehicleSuspiciousRatio ?? 0,
+        isVehicleInvalid: saved.isVehicleInvalid ?? false,
+        maxSpeedMps: saved.maxSpeedMps ?? null,
+        avgSpeedMps: saved.avgSpeedMps ?? null,
+        stepCount: saved.stepCount ?? 0,
+        disputes: saved.disputes ?? [],
       })
       return
     }
@@ -361,6 +401,17 @@ export function useRunTracker() {
     eventIdRef.current = saved.eventId ?? null
     challengeIdRef.current = saved.challengeId ?? null
     clubWarIdRef.current = saved.clubWarId ?? null
+    detectorRef.current = createVehicleDetector({
+      hasMotionSensing: true,
+      accessibilityMode: isAccessibilityModeEnabled(),
+    })
+    segmentsRef.current = []
+    vehicleExcludedMetersRef.current = 0
+    traceMetersRef.current = 0
+    traceSecondsRef.current = 0
+    maxSpeedMpsRef.current = 0
+    totalStepsRef.current = 0
+    disputesRef.current = []
     setPath(pointsRef.current)
     setDistance(distanceRef.current)
     setElapsedSeconds(
@@ -392,16 +443,23 @@ export function useRunTracker() {
       distanceRef.current = 0
       fixCountRef.current = 0
       lastAccuracyRef.current = null
-      speedSamplesRef.current = []
-      stepTimestampsRef.current = []
-      motionBaselineRef.current = 9.81
-      violationStartedAtRef.current = null
+      segmentsRef.current = []
+      vehicleExcludedMetersRef.current = 0
+      traceMetersRef.current = 0
+      traceSecondsRef.current = 0
+      maxSpeedMpsRef.current = 0
+      totalStepsRef.current = 0
+      disputesRef.current = []
+      detectorRef.current = createVehicleDetector({
+        hasMotionSensing: true,
+        accessibilityMode: isAccessibilityModeEnabled(),
+      })
       setPath([])
       setDistance(0)
       setElapsedSeconds(0)
       setBackgroundGapSeconds(null)
       setPendingRun(null)
-      setInvalidMotion(null)
+      applyVehicleState(VehicleState.RUNNING, null)
       startedAtRef.current = new Date()
       eventIdRef.current = eventId ?? null
       challengeIdRef.current = challengeId
@@ -417,7 +475,7 @@ export function useRunTracker() {
       })
       beginWatch()
     },
-    [beginWatch]
+    [beginWatch, applyVehicleState]
   )
 
   const stop = useCallback(() => {
@@ -425,11 +483,14 @@ export function useRunTracker() {
     wakeLock.release()
     setStatus('idle')
     setBackgroundGapSeconds(null)
-    setInvalidMotion(null)
-    violationStartedAtRef.current = null
 
     const endedAt = new Date()
     const startedAt = startedAtRef.current ?? endedAt
+    const segments = compressSegments(segmentsRef.current)
+    const vehicleExcludedMeters = vehicleExcludedMetersRef.current
+    const consideredMeters = distance + vehicleExcludedMeters
+    const vehicleSuspiciousRatio =
+      consideredMeters > 0 ? vehicleExcludedMeters / consideredMeters : 0
     const result = {
       eventId: eventIdRef.current,
       challengeId: challengeIdRef.current,
@@ -441,7 +502,21 @@ export function useRunTracker() {
       endedAt,
       fixCount: fixCountRef.current,
       lastAccuracy: lastAccuracyRef.current,
+      // Anti-cheat telemetry sent with the run (see api/runs.js createRun) -
+      // the backend re-validates independently and never trusts this alone.
+      segments,
+      vehicleExcludedMeters,
+      vehicleSuspiciousRatio,
+      isVehicleInvalid: vehicleSuspiciousRatio > VEHICLE_RUN_INVALID_RATIO,
+      maxSpeedMps: maxSpeedMpsRef.current || null,
+      avgSpeedMps:
+        traceSecondsRef.current > 0
+          ? traceMetersRef.current / traceSecondsRef.current
+          : null,
+      stepCount: totalStepsRef.current,
+      disputes: disputesRef.current,
     }
+    applyVehicleState(VehicleState.RUNNING, null)
 
     if (result.points.length === 0) {
       // Nothing worth retrying — clear rather than leaving an empty pending record behind.
@@ -460,12 +535,20 @@ export function useRunTracker() {
         duration: result.duration,
         fixCount: result.fixCount,
         lastAccuracy: result.lastAccuracy,
+        segments: result.segments,
+        vehicleExcludedMeters: result.vehicleExcludedMeters,
+        vehicleSuspiciousRatio: result.vehicleSuspiciousRatio,
+        isVehicleInvalid: result.isVehicleInvalid,
+        maxSpeedMps: result.maxSpeedMps,
+        avgSpeedMps: result.avgSpeedMps,
+        stepCount: result.stepCount,
+        disputes: result.disputes,
       })
       setPendingRun(result)
     }
 
     return result
-  }, [clearTimers, wakeLock, distance])
+  }, [clearTimers, wakeLock, distance, applyVehicleState])
 
   const clearPendingRun = useCallback(() => {
     clearActiveRun()
@@ -489,7 +572,11 @@ export function useRunTracker() {
     dismissBackgroundGap,
     pendingRun,
     clearPendingRun,
-    invalidMotion,
-    dismissInvalidMotion,
+    vehicleState,
+    vehicleReason,
+    suspectDismissed,
+    dismissSuspect,
+    disputeVehicle,
+    getDebugInfo: () => detectorRef.current?.getDebugInfo() ?? null,
   }
 }

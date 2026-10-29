@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { postJson, setToken, clearToken, ApiError } from '../api/client'
+import { useAuthFlow, authErrorMessage } from '../hooks/useAuthFlow'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PasswordField from '../components/PasswordField'
 import './UpdatePasswordPage.css'
 
 export default function UpdatePasswordPage() {
+  const auth = useAuthFlow()
   const location = useLocation()
   const navigate = useNavigate()
   const routeParams = useParams()
@@ -57,16 +58,11 @@ export default function UpdatePasswordPage() {
 
     setSubmitting(true)
     try {
-      const auth = await postJson('/v1/authenticate', {
+      await auth.completePasswordSetup({
         mobileNumber: form.mobileNumber,
-        password: form.oldPassword,
-      })
-      setToken(auth.tokenId)
-      await postJson('/v1/user/change-password', {
         oldPassword: form.oldPassword,
         newPassword: form.newPassword,
       })
-      clearToken()
       navigate('/login', {
         state: {
           message:
@@ -74,12 +70,13 @@ export default function UpdatePasswordPage() {
         },
       })
     } catch (err) {
-      clearToken()
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : 'Could not update password. Please try again.'
-      setBanner({ kind: 'error', message })
+      setBanner({
+        kind: 'error',
+        message: authErrorMessage(
+          err,
+          'Could not update password. Please try again.'
+        ),
+      })
     } finally {
       setSubmitting(false)
     }

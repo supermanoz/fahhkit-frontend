@@ -106,7 +106,7 @@
   height: 34px;
   border-radius: 50%;
   background: var(--gradient-brand);
-  color: #fff;
+  color: var(--text);
   font-size: 13px;
   box-shadow: var(--shadow-glow);
 }
@@ -130,4 +130,31 @@
   text-align: center;
   color: var(--muted);
   font-size: 13px;
+}
+
+.track-run-error .track-run-confirm-actions {
+  margin-top: 12px;
+}
+
+.track-run-error .btn-outline {
+  margin-top: 10px;
+}
+
+.track-run-accessibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+
+.track-run-accessibility-toggle input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
 }

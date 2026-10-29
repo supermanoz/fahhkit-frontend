@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { syncStatusBarStyle } from '../utils/nativeShell'
 
 const STORAGE_KEY = 'fahhkit-theme'
 const ThemeContext = createContext(null)
@@ -18,6 +19,7 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem(STORAGE_KEY, theme)
+    syncStatusBarStyle(theme)
   }, [theme])
 
   function toggleTheme() {

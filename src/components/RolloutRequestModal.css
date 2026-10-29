@@ -1,0 +1,41 @@
+.rollout-modal-body {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: 1.35;
+}
+
+.rollout-modal-count {
+  color: var(--text-muted);
+}
+
+.rollout-modal-error {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: rgba(239, 59, 79, 0.18);
+  border: var(--border-sm) solid var(--red-500);
+  color: var(--red-300);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+.rollout-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rollout-modal-success {
+  padding: var(--space-4) 0;
+  text-align: center;
+  cursor: pointer;
+}
+
+.rollout-modal-success-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--text-md);
+  line-height: 1.5;
+}

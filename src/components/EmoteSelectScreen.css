@@ -1,5 +1,5 @@
 /* Fortnite-locker-style redesign of the per-hero emote grid - lives inside
-   .game-page's "Passion One" display-font + --game-* palette, so it reads
+   .game-page's "Fredoka" display-font + --game-* palette, so it reads
    as part of the same game instead of a bolted-on different style. */
 .emote-select {
   display: flex;

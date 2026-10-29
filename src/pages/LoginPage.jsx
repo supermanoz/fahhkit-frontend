@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { postJson, getJson, setToken, setUser, ApiError } from '../api/client'
+import { useAuthFlow, authErrorMessage } from '../hooks/useAuthFlow'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PasswordField from '../components/PasswordField'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import AppleSignInButton from '../components/AppleSignInButton'
 import './LoginPage.css'
 import { playerNameOf } from '../utils/playerName'
 
 const INITIAL_FORM = { mobileNumber: '', password: '' }
 
 export default function LoginPage() {
+  const auth = useAuthFlow()
   const [form, setForm] = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
   const location = useLocation()
@@ -33,7 +35,7 @@ export default function LoginPage() {
 
     setSubmitting(true)
     try {
-      const data = await postJson('/v1/authenticate', form)
+      const data = await auth.signIn(form.mobileNumber, form.password)
       if (data.firstLogin && data.userType === 'MODERATOR') {
         navigate('/update-password', {
           state: {
@@ -43,24 +45,21 @@ export default function LoginPage() {
         })
         return
       }
-      await finishSignIn(data)
+      await completeSignIn(data)
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : 'Sign in failed. Please try again.'
-      setBanner({ kind: 'error', message })
+      setBanner({
+        kind: 'error',
+        message: authErrorMessage(err, 'Sign in failed. Please try again.'),
+      })
     } finally {
       setSubmitting(false)
     }
   }
 
-  // Shared tail of password and Google sign-in: store the token, load the
-  // user, and head back to wherever sent them here.
-  async function finishSignIn(data) {
-    setToken(data.tokenId)
-    const user = await getJson('/v1/user/find/logged-in')
-    setUser(user)
+  // Shared tail of password, Google and Apple sign-in: store the token, load
+  // the user, and head back to wherever sent them here.
+  async function completeSignIn(data) {
+    const user = await auth.finishSignIn(data)
     // Pages that gate on sign-in pass `state.from` so the user lands back
     // where they were. Only same-origin paths - never a `//host` redirect.
     const from = location.state?.from
@@ -79,15 +78,34 @@ export default function LoginPage() {
     setBanner(null)
     setSubmitting(true)
     try {
-      const data = await postJson('/v1/auth/google', { idToken })
-      await finishSignIn(data)
+      const data = await auth.signInWithGoogle(idToken)
+      await completeSignIn(data)
     } catch (err) {
       setBanner({
         kind: 'error',
-        message:
-          err instanceof ApiError
-            ? err.message
-            : 'Google sign-in failed. Please try again.',
+        message: authErrorMessage(
+          err,
+          'Google sign-in failed. Please try again.'
+        ),
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleAppleCredential(identityToken, fullName) {
+    setBanner(null)
+    setSubmitting(true)
+    try {
+      const data = await auth.signInWithApple(identityToken, fullName)
+      await completeSignIn(data)
+    } catch (err) {
+      setBanner({
+        kind: 'error',
+        message: authErrorMessage(
+          err,
+          'Apple sign-in failed. Please try again.'
+        ),
       })
     } finally {
       setSubmitting(false)
@@ -154,12 +172,13 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <GoogleSignInButtonBlock
-            onCredential={handleGoogleCredential}
-            onError={() =>
+          <OAuthButtonsBlock
+            onGoogleCredential={handleGoogleCredential}
+            onAppleCredential={handleAppleCredential}
+            onError={(provider) =>
               setBanner({
                 kind: 'error',
-                message: 'Google sign-in was cancelled or failed.',
+                message: `${provider} sign-in was cancelled or failed.`,
               })
             }
           />
@@ -174,15 +193,31 @@ export default function LoginPage() {
   )
 }
 
-// "or" divider + button, only when Google sign-in is configured.
-function GoogleSignInButtonBlock(props) {
-  if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) return null
+// "or" divider + button(s), only when at least one OAuth provider is
+// configured (each button already degrades to rendering nothing on its own
+// when its client id env var is unset).
+/* eslint-disable-next-line react/prop-types -- no prop-types dependency in this project */
+function OAuthButtonsBlock({ onGoogleCredential, onAppleCredential, onError }) {
+  const hasGoogle = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
+  const hasApple = Boolean(import.meta.env.VITE_APPLE_CLIENT_ID)
+  if (!hasGoogle && !hasApple) return null
   return (
     <div className="login-oauth">
       <div className="login-divider">
         <span>or</span>
       </div>
-      <GoogleSignInButton {...props} />
+      {hasGoogle && (
+        <GoogleSignInButton
+          onCredential={onGoogleCredential}
+          onError={() => onError('Google')}
+        />
+      )}
+      {hasApple && (
+        <AppleSignInButton
+          onCredential={onAppleCredential}
+          onError={() => onError('Apple')}
+        />
+      )}
     </div>
   )
 }

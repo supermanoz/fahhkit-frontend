@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { postJson, ApiError } from '../api/client'
+import { useAuthFlow, authErrorMessage } from '../hooks/useAuthFlow'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './ForgotPasswordPage.css'
@@ -8,6 +8,7 @@ import './ForgotPasswordPage.css'
 const INITIAL_FORM = { mobileNumber: '' }
 
 export default function ForgotPasswordPage() {
+  const auth = useAuthFlow()
   const [form, setForm] = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [banner, setBanner] = useState(null)
@@ -25,17 +26,16 @@ export default function ForgotPasswordPage() {
 
     setSubmitting(true)
     try {
-      await postJson('/v1/user/forgot-password', {
-        ...form,
-        passwordRequestType: 'EMAIL',
-      })
+      await auth.forgotPassword(form.mobileNumber)
       setSent(true)
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : 'Something went wrong. Please try again.'
-      setBanner({ kind: 'error', message })
+      setBanner({
+        kind: 'error',
+        message: authErrorMessage(
+          err,
+          'Something went wrong. Please try again.'
+        ),
+      })
     } finally {
       setSubmitting(false)
     }

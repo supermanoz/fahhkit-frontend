@@ -107,16 +107,28 @@
 
 html {
   scroll-behavior: smooth;
+  height: 100%;
+  /* iOS Safari still bounces the whole page on overscroll even with this
+     set on body alone; it has to be on html too to stop the map/run-view
+     rubber-banding when a drag or swipe gesture overshoots the content. */
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
+  min-height: 100%;
+  min-height: 100dvh;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  /* Chrome's pull-to-refresh and the pinch-zoom gesture both fight with map
+     dragging/rotation on /game; pan-y still allows normal page scrolling
+     on non-map pages. */
+  touch-action: pan-y;
   transition:
     background-color 0.3s ease,
     color 0.3s ease;

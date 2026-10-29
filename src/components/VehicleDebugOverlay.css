@@ -1,0 +1,54 @@
+.vehicle-debug-overlay {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  z-index: 9999;
+  padding: 10px 14px;
+  background: rgba(10, 10, 16, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.vehicle-debug-state {
+  margin: 0 0 6px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.vehicle-debug-running .vehicle-debug-state {
+  color: var(--green-300);
+}
+
+.vehicle-debug-suspect .vehicle-debug-state {
+  color: var(--gold-300);
+}
+
+.vehicle-debug-vehicle .vehicle-debug-state {
+  color: var(--red-300);
+}
+
+.vehicle-debug-overlay dl {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 2px 14px;
+  margin: 0;
+}
+
+.vehicle-debug-overlay dt {
+  opacity: 0.6;
+}
+
+.vehicle-debug-overlay dt::after {
+  content: ':';
+}
+
+.vehicle-debug-overlay dd {
+  margin: 0;
+  display: inline;
+}

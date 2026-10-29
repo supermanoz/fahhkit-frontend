@@ -5,6 +5,9 @@ import 'aos/dist/aos.css'
 import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
+import { initNativeShell } from './utils/nativeShell.js'
+
+initNativeShell()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

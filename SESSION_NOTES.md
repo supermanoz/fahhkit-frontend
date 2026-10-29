@@ -6,7 +6,7 @@ Update this as work continues rather than starting a new file each time. Git his
 messages have the precise diffs — this is the "why" and "what's still open" that doesn't show up
 in a `git log`.
 
-Last updated: 2026-09-21, branch `RUN_CONQUER`, latest commit `f69c7be`.
+Last updated: 2026-10-28, branch `RUN_CONQUER`, latest commit `91ceadc`.
 
 ## Club system
 
@@ -478,3 +478,133 @@ Frontend for backend commits `ea0f213`…`d528e87` on `feature/territory-game`:
     width check were **not** verified interactively - a full top-level page reload mid-session
     logged the tab out (session wasn't cookie-persisted across a fresh load) and no credentials
     exist to sign back in. `npm run lint`/`npm run build` both pass clean throughout.
+
+## Vehicle detection (anti-cheat) for runs (2026-10-28)
+
+Adds a client-side, real-time vehicle/bike detector to `useRunTracker` so distance/territory
+credit pauses the moment a run looks vehicle-assisted, instead of only catching it after the fact
+server-side. **This is additive, not a replacement** for the backend's own after-the-fact
+re-validation (`TerritoryAntiCheatValidator`, `TerritoryProcessingServiceImpl` in the backend repo
+`~/Documents/FahhKit`) - that already independently recomputes from the raw submitted points and
+rejects territory processing (`CHEAT_DETECTED`) on `avgSustainedSpeed > 12.0 m/s` or
+`>30%` of segments violating, regardless of anything the client reports. The two numbers were
+picked to agree on purpose (`VEHICLE_SPEED_MS = 12`, `VEHICLE_RUN_INVALID_RATIO = 0.3` in
+`src/constants/antiCheat.js` match `TerritoryAntiCheatProperties.maxSustainedSpeedMetersPerSecond`/
+`.maxSustainedSpeedViolationRatio`).
+
+- **`src/constants/antiCheat.js`** — every threshold, named (`VEHICLE_SPEED_MS`, `SUSPECT_SPEED_MS`,
+  `MIN_CADENCE_HZ`, `WINDOW_SECONDS`, `ACCURACY_LIMIT_METERS`, `RESUME_SECONDS`, etc.) plus the
+  accessibility-mode multiplier and two localStorage keys.
+- **`src/utils/vehicleDetection.js`** — the actual state machine (`RUNNING → SUSPECT → VEHICLE`,
+  hysteresis both ways), zero React/DOM imports on purpose (same philosophy as the backend's own
+  `TerritoryAntiCheatValidator` - directly unit-testable with hand-built traces, no mocking a hook
+  or the DOM). Combines rolling-window speed (blends `coords.speed` with computed distance/time
+  speed), accelerometer-peak step/cadence detection (moved out of `useRunTracker`'s old inline
+  version), and two pattern checks (suspiciously constant speed, GPS-jump/teleport rejection).
+  Tunnels/signal drops (`GAP_SECONDS` gap) are discarded from evidence without resetting whatever
+  state was already building. `compressSegments()` merges the per-fix flag log into runs before
+  it's sent with the run, so a long run doesn't balloon the payload.
+  - `src/utils/vehicleDetection.test.js` — Vitest (newly added as a devDependency + `npm test`/
+    `npm run test:watch` scripts, and `vitest.config.js` - there was no test runner in this
+    frontend before this) unit tests with simulated traces: walking/running/sprinting (never
+    flag, including a brief sprint spike that shouldn't sustain into SUSPECT), cycling/car-in-
+    traffic/car-on-highway (all caught), a single GPS jump and a tunnel-length dropout (both
+    discarded, not penalized), resume-after-VEHICLE, dispute(), and accessibility mode (tolerates
+    higher hand-cycle speed with zero cadence, still catches genuinely vehicle-level speed).
+- **`src/utils/antiCheatSettings.js`** — localStorage/URL glue kept separate from the pure detector
+  module: `isAccessibilityModeEnabled`/`setAccessibilityModeEnabled` (TEMP, local-device-only -
+  there's no backend field for this preference yet, see the backend spec below for the hook a real
+  per-user preference would plug into) and `isAntiCheatDebugEnabled` (`?debug=anticheat` URL param,
+  remembered in localStorage so a real-phone field test only needs the URL once; `?debug=off`
+  clears it).
+- **`src/hooks/useRunTracker.js`** — the old one-shot `invalidMotion` (warn-only, never paused
+  anything) is gone, replaced by `vehicleState`/`vehicleReason`/`suspectDismissed`/`dismissSuspect`/
+  `disputeVehicle`/`getDebugInfo`. Every accepted GPS fix is fed to the detector; a segment the
+  detector returns as `excluded` (VEHICLE state, or a GPS jump) is left out of `distanceRef`
+  entirely rather than just flagged after the fact. `stop()`'s result gains `segments` (compressed
+  flag log), `vehicleExcludedMeters`, `vehicleSuspiciousRatio`, `isVehicleInvalid` (ratio over 30%),
+  `maxSpeedMps`, `avgSpeedMps`, `stepCount`, `disputes` - all persisted into the existing
+  `saveActiveRun()` localStorage record too, so a "Retry Save" after reopening the app still carries
+  them. **Known limitation**: the detector's own state machine is NOT persisted across a page
+  refresh mid-run (only points/distance already were) - a resumed run's anti-cheat tracking restarts
+  clean from RUNNING. Accepted as a reasonable gap given how rarely a mid-run refresh happens and
+  that the backend's own after-the-fact check still applies regardless.
+- **`src/components/TrackRunPanel.jsx`** / **`src/pages/GamePage.jsx`** (both consume the same hook,
+  no duplicated detection logic) — SUSPECT renders a dismissible, non-blocking banner ("Moving fast
+  — are you in a vehicle?"); VEHICLE renders a blocking-looking but auto-recovering banner ("Vehicle
+  detected — distance paused...") with an "I'm not in a vehicle" dispute button (logs the dispute,
+  resumes immediately, but doesn't erase already-flagged segments - sustained evidence re-trips it
+  if it keeps coming). A run with `isVehicleInvalid` (>30% vehicle-excluded distance) blocks the
+  normal auto-submit with a friendly "Mostly vehicle, not legs 🚗" message and Discard/"Save Anyway"
+  buttons (mirrors the existing too-short/too-fast warm-up pattern) rather than silently submitting
+  or silently discarding - forcing it through still goes to the backend, which decides for real.
+  GamePage's existing `CHEAT_DETECTED` → "Whoa there, speedster 🛵" rejection copy
+  (`RUN_REJECTION_COPY`) already covers the backend's own after-the-fact rejection path, so nothing
+  new was needed there. Both components also gained a "Wheelchair / Hand-Cycle Mode" settings toggle
+  (raises speed ceilings, skips stride detection entirely - GamePage's lives in the existing
+  Settings tab next to Visibility/Sound) and, behind the debug flag, `VehicleDebugOverlay` (live
+  speed/avg-speed/cadence/state, bottom-left, polled every 500ms).
+- **`src/api/runs.js`** `createRun()` — no signature change, just documents the new optional fields
+  callers may include on the same POST payload (see backend spec below).
+
+### Not implemented client-side (called out explicitly, not silently skipped)
+
+- **Road-snapping check** ("positions snapped onto a road at a sustained speed faster than running
+  pace") - would need a routing/map-matching API call per point, too expensive to do live client-
+  side with what's available here. The existing speed+cadence+pattern signals cover the same cheat
+  vector in practice (a car on a road is still just "fast, no cadence, often constant speed").
+- A numeric countdown on the VEHICLE banner for when auto-resume will re-check - it resumes
+  silently once `RESUME_SECONDS` of valid running+cadence holds, no visible timer.
+
+### Backend spec (NOT implemented — backend is the sibling repo `~/Documents/FahhKit`, never edited
+
+or compiled from this session; this is the exact handoff)
+
+The security boundary already exists and needs no change: `TerritoryProcessingServiceImpl.java`
+(~line 83) already calls `TerritoryAntiCheatValidator.isSustainedSpeedPlausible(...)` with
+`TerritoryAntiCheatProperties.maxSustainedSpeedMetersPerSecond = 12.0` and
+`.maxSustainedSpeedViolationRatio = 0.3`, independently recomputed from the raw submitted points,
+and already rejects with `RunProcessingOutcomeConstant.CHEAT_DETECTED` + an automatic `FraudFlag`
+(`FraudFlagSourceConstant.AUTO_RUN_CHEAT`) on violation. **Never make that check trust the new
+client fields below instead of its own recomputation** - they're for moderator audit/context only.
+
+What's actually missing is persisting the client's own telemetry so `FraudFlagsPage`'s moderator
+review queue can see "what the runner's phone reported" alongside the server's own verdict,
+especially dispute history (a player repeatedly tapping "I'm not in a vehicle" is itself a signal
+worth a moderator seeing):
+
+1. `RunCreateRequest.java` (`controller/request/`) — add, all optional (`@NotNull` omitted, a run
+   with no client could still predate this):
+   ```java
+   private List<RunSegmentFlagRequest> segmentFlags; // see below
+   private Double maxSpeedMps;
+   private Double avgSpeedMps;
+   private Integer stepCount;
+   private Double vehicleSuspiciousRatio;
+   private Boolean clientFlaggedInvalid;
+   private Integer vehicleDisputeCount;
+   ```
+2. New `RunSegmentFlagRequest.java` (same package), one per compressed segment
+   (`src/utils/vehicleDetection.js`'s `compressSegments()` output):
+   ```java
+   private Long fromTimestamp;
+   private Long toTimestamp;
+   private Double distanceMeters;
+   private String kind; // "running" | "suspect" | "vehicle" | "gap" | "jump"
+   private Boolean excluded;
+   ```
+3. Persist these onto the `Run` entity (or a new `RunClientTelemetry` child table if keeping `Run`
+   lean matters more here) and surface them in `ModeratorRunController`'s run-detail response
+   (`getModeratorRunDetail`, already consumed by `FraudFlagsPage.jsx`'s run-detail drill-down) -
+   e.g. a "Client reported: 18% vehicle-excluded, 2 disputes" line next to the existing peak-speed
+   stat there.
+4. Optional, not required for correctness: if `vehicleDisputeCount` is high across a player's
+   history, that's a reasonable input to `FraudFlagService`'s existing manual-flag/review weighting
+   - left as a suggestion, not a spec, since that's a moderation-policy call.
+5. **Accessibility mode hook**: there's no backend field for a per-user accessibility preference
+   today (`src/utils/antiCheatSettings.js`'s toggle is a local-device-only localStorage flag, TEMP).
+   If this becomes a real per-user setting, it'd most naturally live as a new boolean on whatever
+   entity holds athlete profile preferences, read by `RunController`/`TerritoryProcessingServiceImpl`
+   to loosen the server-side thresholds the same way the client raises its own - but doing so changes
+   the _server's_ trust boundary (a malicious client could otherwise just always claim accessibility
+   mode), so this needs real per-user state, not a request field.

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AOS from 'aos'
 import LandingPage from './pages/LandingPage'
@@ -27,6 +27,12 @@ import EventRegistrantsPage from './pages/EventRegistrantsPage'
 import EventReportPage from './pages/EventReportPage'
 import DashboardPage from './pages/DashboardPage'
 import GamePage from './pages/GamePage'
+// Dev-only (see the import.meta.env.DEV guard below) - Vite statically
+// replaces that check at build time, so this dynamic import is stripped
+// from the production bundle entirely, not just unlinked.
+const GameStyleGuidePage = import.meta.env.DEV
+  ? lazy(() => import('./pages/GameStyleGuidePage'))
+  : null
 import GameMechanicsPage from './pages/GameMechanicsPage'
 import FraudFlagsPage from './pages/FraudFlagsPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
@@ -80,6 +86,16 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/game" element={<GamePage />} />
         <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
+        {import.meta.env.DEV && (
+          <Route
+            path="/game/style-guide"
+            element={
+              <Suspense fallback={null}>
+                <GameStyleGuidePage />
+              </Suspense>
+            }
+          />
+        )}
         <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />
         <Route path="/payment-status" element={<PaymentStatusPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

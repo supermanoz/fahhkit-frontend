@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { IconCrosshairs } from './GameIcons'
+import { getCurrentPosition } from '../utils/geo'
 import {
   MapContainer,
   Polygon,
@@ -459,7 +460,7 @@ function TerritoryPolygon({
           ? '#FFFFFF'
           : isMine
             ? playerColor || PLAYER_COLOR
-            : '#2B2140',
+            : '#1E2A5A', // matches tokens.css --surface-700 (literal hex: Leaflet paint option, not CSS)
         weight: isHighlighted ? 4 : isMine ? 4 : 3,
         fillColor: isMine ? playerColor || PLAYER_COLOR : t.color,
         fillOpacity: isHighlighted ? 0.65 : isMine ? 0.5 : 0.35,
@@ -923,7 +924,7 @@ function territoryDotsGeoJSON(territories, currentUserId, playerColor) {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [lng, lat] },
         properties: {
-          color: isMine ? playerColor || PLAYER_COLOR : t.color || '#2B2140',
+          color: isMine ? playerColor || PLAYER_COLOR : t.color || '#1E2A5A', // --surface-700
           mine: isMine,
         },
       }
@@ -1154,7 +1155,7 @@ function LocateButton({ map, onLocated }) {
       setError('Location is not supported on this device.')
       return
     }
-    navigator.geolocation.getCurrentPosition(
+    getCurrentPosition(
       (position) => {
         setError(null)
         onLocated?.()
@@ -1380,7 +1381,10 @@ export default function TerritoryMap({
           {livePath.length > 0 && (
             <Polyline
               positions={toLatLngs(livePath)}
-              pathOptions={{ color: trailColor || '#E63946', weight: 4 }}
+              pathOptions={{
+                color: trailColor || '#EF3B4F' /* --red-500 */,
+                weight: 4,
+              }}
             />
           )}
 
@@ -1388,10 +1392,10 @@ export default function TerritoryMap({
             <Polygon
               positions={toLatLngs(livePath)}
               pathOptions={{
-                color: '#FFC94D',
+                color: '#FFC531' /* --gold-500 */,
                 weight: 2,
                 dashArray: '6 8',
-                fillColor: '#FFC94D',
+                fillColor: '#FFC531' /* --gold-500 */,
                 fillOpacity: 0.15,
               }}
             />
@@ -1424,7 +1428,7 @@ export default function TerritoryMap({
                   key={route.id}
                   positions={toLatLngs(route.points)}
                   pathOptions={{
-                    color: '#4d9bff',
+                    color: '#2FA8FF' /* --sky-500 */,
                     weight: 3,
                     opacity: 0.6,
                     dashArray: '10 8',
@@ -1446,14 +1450,18 @@ export default function TerritoryMap({
           {drawPoints && drawPoints.length > 0 && (
             <Polyline
               positions={toLatLngs(drawPoints)}
-              pathOptions={{ color: '#4d9bff', weight: 5, dashArray: '10 8' }}
+              pathOptions={{
+                color: '#2FA8FF' /* --sky-500 */,
+                weight: 5,
+                dashArray: '10 8',
+              }}
             />
           )}
           {viewRoutePoints && viewRoutePoints.length > 0 && (
             <Polyline
               positions={toLatLngs(viewRoutePoints)}
               pathOptions={{
-                color: '#4d9bff',
+                color: '#2FA8FF' /* --sky-500 */,
                 weight: 5,
                 dashArray: '10 8',
               }}
@@ -1473,7 +1481,9 @@ export default function TerritoryMap({
             <Polyline
               positions={toLatLngs(routeGuidanceLine)}
               pathOptions={{
-                color: routeOffCourse ? '#ff5a4d' : '#4d9bff',
+                color: routeOffCourse
+                  ? '#EF3B4F' /* --red-500 */
+                  : '#2FA8FF' /* --sky-500 */,
                 weight: 6,
                 opacity: 0.95,
               }}

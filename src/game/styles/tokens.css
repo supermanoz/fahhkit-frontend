@@ -1,0 +1,132 @@
+/* Design tokens for the /game re-skin - "Frost & Amethyst": deep
+   night-indigo surfaces, sky blue as the brand/primary colour, white frost
+   cards for readable content, violet for premium/rare, green only for
+   go/success, red only for danger, gold ONLY for coins/trophies/rank-1.
+   Scoped on .game-root so the rest of the site is unaffected. .game-root is
+   added alongside the existing .game-page class on GamePage's root element.
+   THIS FILE REPLACES the earlier "warm wooden war-table" token set and the
+   original --game-* custom properties in GamePage.css - no hex colour
+   should exist anywhere in /game outside this file once migration is
+   complete. Check with:
+     grep -rEo "#[0-9a-fA-F]{3,8}" src/game src/pages/GamePage.css src/components/*.css
+   and confirm every hit is inside this file. */
+.game-root {
+  /* Ink (outlines, text strokes) */
+  --ink: #0a0f2c;
+
+  /* Surfaces (dark, premium) */
+  --bg-900: #0b1026;
+  --bg-800: #141b3d;
+  --surface-700: #1e2a5a;
+  --surface-600: #2a3a78;
+  --line: #3b4f9a;
+
+  /* Frost / white (light cards, readable content) */
+  --frost-50: #f7faff;
+  --frost-100: #eaf2ff;
+  --frost-200: #d3e3ff;
+  --frost-ink: #1a2550;
+
+  /* Sky blue - brand + primary action */
+  --sky-300: #7fd6ff;
+  --sky-500: #2fa8ff;
+  --sky-700: #1673d6;
+  --sky-900: #0b4a99;
+
+  /* Violet - premium, epic/legendary, active tab highlight */
+  --violet-300: #b79bff;
+  --violet-500: #7c4dff;
+  --violet-700: #5229cc;
+  --violet-900: #331a85;
+
+  /* Green - success only */
+  --green-300: #6ef0a6;
+  --green-500: #22c55e;
+  --green-700: #15803d;
+
+  /* Red - danger only */
+  --red-300: #ff8a96;
+  --red-500: #ef3b4f;
+  --red-700: #b3192d;
+
+  /* Gold - ONLY coins, trophies, rank-1 */
+  --gold-300: #ffe07a;
+  --gold-500: #ffc531;
+  --gold-700: #c98a00;
+
+  /* Text */
+  --text: #ffffff;
+  --text-muted: #b6c2e8;
+  --text-on-frost: var(--frost-ink);
+  --text-link: var(--sky-300);
+
+  /* Rarity */
+  --rarity-common: #a9b6d6;
+  --rarity-rare: #2fa8ff;
+  --rarity-epic: #7c4dff;
+  --rarity-legendary: #ffc531;
+
+  /* Team / territory colours - 8 saturated, CVD-leaning-safe hues that read
+     clean against the sky/violet UI (no muddy browns). Best-effort: not run
+     through an actual CVD simulator tool, re-check before ship. */
+  --team-coral: #ff6b6b;
+  --team-tangerine: #ff9f43;
+  --team-lime: #a3e635;
+  --team-emerald: #2dd4a7;
+  --team-cyan: #22d3ee;
+  --team-indigo: #6366f1;
+  --team-magenta: #e263c9;
+  --team-slate: #94a3c4;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* Border */
+  --border-sm: 2px;
+  --border-md: 3px;
+  --border-lg: 4px;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Type scale */
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 44px;
+  --text-4xl: 64px;
+
+  /* Z-index */
+  --z-map: 0;
+  --z-hud: 10;
+  --z-panel: 20;
+  --z-modal: 30;
+  --z-toast: 40;
+  --z-tooltip: 50;
+
+  /* Motion */
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-med: 220ms;
+  --dur-slow: 400ms;
+
+  /* Shared button recipe: 3-stop gradient (300 -> 500 at 55% -> 700), 3px
+     ink border, radius 14, top highlight + bottom shade + hard drop,
+     pressed = translateY(3px). */
+  --press-drop: 0 4px 0 var(--ink);
+  --press-drop-active: 0 1px 0 var(--ink);
+  --inner-highlight: inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  --inner-shade: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}

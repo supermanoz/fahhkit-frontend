@@ -336,6 +336,15 @@ export function IconLock(props) {
   )
 }
 
+export function IconLogout(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" {...TINT} />
+      <path d="M15 16l4-4-4-4M19 12H9" />
+    </GameIcon>
+  )
+}
+
 export function IconSearch(props) {
   return (
     <GameIcon {...props}>

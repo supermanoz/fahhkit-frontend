@@ -34,22 +34,27 @@ export function boundsForRadius(center, radiusMeters) {
   ]
 }
 
-// Gold ties the player's ground to the same "gold = you" language as the
-// HUD coin/avatar/menu button (see style.md). Keep in sync with the
-// pulse/glow colors in TerritoryMap.css.
-export const PLAYER_COLOR = '#E0A537'
+// Sky matches the new Frost & Amethyst palette's brand/primary colour (see
+// tokens.css --sky-500) - gold is reserved for coins/trophies/rank-1 only
+// now, not player identity. Keep in sync with the pulse/glow colors in
+// TerritoryMap.css. This is a literal hex, not a CSS var(), because it
+// feeds Leaflet/MapLibre paint options (non-CSS rendering), not DOM styles.
+export const PLAYER_COLOR = '#2FA8FF'
 
-// Other players get a deterministic color from this earthy, Clash-of-Clans
-// style palette (hashed from their userId) so the same person reads as the
-// same color across the map/leaderboard without the server needing to
-// assign or store one.
+// Other players get a deterministic color from this 8-colour,
+// colour-blind-leaning-safe palette (hashed from their userId, see
+// tokens.css --team-*) so the same person reads as the same color across
+// the map/leaderboard without the server needing to assign or store one.
+// Matches tokens.css exactly - update both together if this ever changes.
 const OTHER_OWNER_COLORS = [
-  '#4E7A3A',
-  '#B5651D',
-  '#5C7A8A',
-  '#8B5A9E',
-  '#C4553D',
-  '#3D7A6E',
+  '#FF6B6B', // --team-coral
+  '#FF9F43', // --team-tangerine
+  '#A3E635', // --team-lime
+  '#2DD4A7', // --team-emerald
+  '#22D3EE', // --team-cyan
+  '#6366F1', // --team-indigo
+  '#E263C9', // --team-magenta
+  '#94A3C4', // --team-slate
 ]
 
 function hashString(str) {

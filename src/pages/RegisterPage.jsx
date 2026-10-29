@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { postForm, ApiError } from '../api/client'
+import { useAuthFlow, authErrorMessage } from '../hooks/useAuthFlow'
 import { COUNTRIES_SORTED } from '../constants/countries'
 import {
   EMAIL_PATTERN,
@@ -33,6 +33,7 @@ const INITIAL_FORM = {
 }
 
 export default function RegisterPage() {
+  const auth = useAuthFlow()
   const [form, setForm] = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [banner, setBanner] = useState(null) // { kind: "success" | "error", message }
@@ -64,25 +65,22 @@ export default function RegisterPage() {
     )
     if (!e.target.reportValidity()) return
 
-    const formData = new FormData()
-    Object.entries(form).forEach(([key, value]) => {
-      if (value.trim() !== '') formData.append(key, value)
-    })
-
     setSubmitting(true)
     try {
-      const data = await postForm('/v1/athlete/signup', formData)
+      const data = await auth.signUpAthlete(form)
       setRegisteredEmail(data?.email || form.email)
       setForm(INITIAL_FORM)
       setConfirmEmail('')
       setAgreedToTerms(false)
       e.target.reset()
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : 'Registration failed. Please try again.'
-      setBanner({ kind: 'error', message })
+      setBanner({
+        kind: 'error',
+        message: authErrorMessage(
+          err,
+          'Registration failed. Please try again.'
+        ),
+      })
     } finally {
       setSubmitting(false)
     }
