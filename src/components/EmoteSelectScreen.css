@@ -80,7 +80,7 @@
   border-radius: 12px;
   overflow: hidden;
   border: 2.5px solid var(--game-ink);
-  background: rgba(10, 18, 36, 0.55);
+  background: rgb(10, 14, 22);
 }
 
 .emote-select-detail-top {
@@ -88,11 +88,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: linear-gradient(
-    180deg,
-    rgba(77, 155, 255, 0.35),
-    rgba(77, 155, 255, 0.12)
-  );
+  background: linear-gradient(180deg, rgb(33, 59, 93), rgb(18, 26, 36));
 }
 
 .emote-select-detail-thumb {
@@ -103,7 +99,7 @@
   width: 48px;
   height: 48px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgb(6, 5, 4);
   border: 2px solid var(--game-ink);
 }
 
@@ -167,11 +163,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: linear-gradient(
-    180deg,
-    rgba(10, 24, 46, 0.95) 0%,
-    rgba(6, 14, 28, 0.95) 100%
-  );
+  background: linear-gradient(180deg, rgb(10, 23, 44) 0%, rgb(6, 14, 27) 100%);
   border: 2px solid var(--rarity-color, var(--game-ink));
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
   cursor: pointer;
@@ -290,9 +282,9 @@
   cursor: pointer;
   background: radial-gradient(
     circle at 50% 28%,
-    rgba(120, 170, 255, 0.55),
-    rgba(30, 60, 120, 0.85) 70%,
-    rgba(14, 28, 56, 0.95) 100%
+    rgb(70, 97, 143),
+    rgb(27, 52, 103) 70%,
+    rgb(14, 27, 53) 100%
   );
 }
 

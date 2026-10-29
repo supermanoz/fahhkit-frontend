@@ -13,7 +13,7 @@
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  background: rgba(239, 59, 79, 0.18);
+  background: rgb(59, 33, 64);
   border: var(--border-sm) solid var(--red-500);
   color: var(--red-300);
   font-family: var(--font-body);

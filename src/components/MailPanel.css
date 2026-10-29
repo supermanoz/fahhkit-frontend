@@ -42,13 +42,13 @@
   font-size: 11px;
   font-weight: 800;
   color: rgba(246, 236, 217, 0.85);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(88, 71, 55);
   border: 1.5px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
 }
 
 .mail-mark-all-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgb(99, 83, 68);
 }
 
 /* --- Inbox/News segmented tabs - a fill + underline active state and an
@@ -84,7 +84,7 @@
 
 .mail-tab.active {
   color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(88, 71, 55);
   border-bottom-color: var(--game-gold);
 }
 
@@ -138,13 +138,13 @@
 
 .mail-item.is-unread {
   border-color: rgba(255, 177, 92, 0.55);
-  background: rgba(255, 122, 41, 0.14);
+  background: rgb(99, 64, 38);
 }
 
 /* Read rows dim - deliberately lower-contrast than unread so the two
    states are tellable apart at a glance, not just by the title weight. */
 .mail-item.is-read {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(81, 63, 47);
   opacity: 0.68;
 }
 
@@ -162,7 +162,7 @@
 }
 
 .mail-item-row:active {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(88, 71, 55);
 }
 
 .mail-item-icon {

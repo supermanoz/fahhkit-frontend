@@ -125,7 +125,7 @@
   text-shadow: none;
 }
 .gb-ghost {
-  background: rgba(10, 15, 44, 0.35);
+  background: rgb(10, 10, 19);
   color: var(--sky-300);
   text-shadow: none;
   box-shadow: var(--inner-shade);

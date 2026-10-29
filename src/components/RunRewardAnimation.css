@@ -98,7 +98,7 @@
   flex: 1;
   height: 26px;
   border-radius: 8px;
-  background: rgba(225, 228, 218, 0.3);
+  background: rgb(119, 107, 92);
   border: 2.5px solid var(--game-ink);
   overflow: hidden;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);

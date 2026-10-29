@@ -7,7 +7,7 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   border: var(--border-sm) solid var(--sky-700);
-  background: rgba(47, 168, 255, 0.12);
+  background: rgb(23, 44, 84);
   color: var(--sky-300);
   font-family: var(--font-body);
   font-weight: 700;

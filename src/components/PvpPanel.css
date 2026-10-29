@@ -63,7 +63,7 @@
   margin-top: 6px;
   height: 6px;
   border-radius: 999px;
-  background: rgba(246, 236, 217, 0.18);
+  background: rgb(52, 49, 44);
   overflow: hidden;
 }
 
@@ -158,7 +158,7 @@
   height: 10px;
   border-radius: 50%;
   border: 2px solid var(--game-ink);
-  background: rgba(255, 255, 255, 0.15);
+  background: rgb(101, 85, 71);
 }
 
 .pvp-step-dot.is-done {
@@ -325,7 +325,7 @@
   padding: 12px 14px 14px;
   border-radius: 16px;
   border: 3px solid var(--game-ink);
-  background: rgba(0, 0, 0, 0.22);
+  background: rgb(8, 6, 5);
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -361,7 +361,7 @@
   gap: 8px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(85, 67, 51);
 }
 
 .pvp-rewards-mode {
@@ -632,18 +632,18 @@
   padding: 12px;
   border-radius: 14px;
   border: 2px solid rgba(0, 0, 0, 0.45);
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(87, 69, 53);
   cursor: pointer;
 }
 
 .pvp-runner:hover,
 .pvp-runner:focus-visible {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgb(98, 81, 66);
 }
 
 .pvp-runner.needs-me {
   border-color: var(--game-gold);
-  background: rgba(255, 122, 41, 0.14);
+  background: rgb(99, 64, 38);
 }
 
 .pvp-runner > svg {
@@ -756,7 +756,7 @@
   padding: 8px 4px;
   border-radius: 12px;
   border: 2px solid rgba(0, 0, 0, 0.45);
-  background: rgba(0, 0, 0, 0.25);
+  background: rgb(56, 41, 28);
 }
 
 .pvp-term-label {
@@ -791,7 +791,7 @@
   right: 12%;
   top: 8px;
   height: 3px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgb(101, 85, 71);
 }
 
 .pvp-timeline li {
@@ -839,7 +839,7 @@
   padding: 12px;
   border-radius: 14px;
   border: 3px solid var(--game-ink);
-  background: rgba(0, 0, 0, 0.3);
+  background: rgb(52, 38, 27);
   font-size: 20px;
   color: #fff;
   text-shadow: 0 2px 0 var(--game-ink);

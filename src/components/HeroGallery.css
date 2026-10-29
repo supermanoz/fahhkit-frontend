@@ -247,7 +247,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgb(108, 107, 106);
   cursor: pointer;
   transition:
     transform 0.15s ease,

@@ -4,7 +4,7 @@
   left: 12px;
   z-index: 9999;
   padding: 10px 14px;
-  background: rgba(10, 10, 16, 0.82);
+  background: rgb(10, 10, 14);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
   color: var(--text);
@@ -12,7 +12,6 @@
   font-size: 11px;
   line-height: 1.4;
   pointer-events: none;
-  backdrop-filter: blur(8px);
 }
 
 .vehicle-debug-state {
