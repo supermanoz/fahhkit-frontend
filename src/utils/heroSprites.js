@@ -4,6 +4,8 @@ import blazeRunDownSheet from '../assets/images/blaze-map-run-down.png'
 import blazeRunRightSheet from '../assets/images/blaze-map-run-right.png'
 import cometIdleStretchSheet from '../assets/images/comet-profile-idle-stretch.webp'
 import cometHipHopSheet from '../assets/images/comet-profile-hiphop.webp'
+import boltIdleStretchSheet from '../assets/images/bolt-profile-idle-stretch.webp'
+import boltHipHopSheet from '../assets/images/bolt-profile-hiphop.webp'
 
 // Heroes with animated strips (see scripts/build_blaze_stretch_strips.py).
 // Each pose is its own horizontal strip of `frames` cells,
@@ -67,6 +69,29 @@ const HERO_SPRITES = {
         src: cometHipHopSheet,
         frames: 24,
         frameWidth: 273,
+        frameHeight: 320,
+      },
+    },
+  },
+  // See scripts/build_bolt_stretch_strips.py (the "Bolt_1/Bolt" drop,
+  // 2026-10-30). No run/charge poses - HeroDetailModal.jsx's MODAL_POSES
+  // only ever offers 'idle'/'hiphop', so those two poses (which Blaze and
+  // Comet both still carry above) are unreachable anywhere in the current
+  // UI; skipped here rather than ship dead weight. Frame counts are lower
+  // than Blaze/Comet's: WebP's 16,383px/side limit, not a style choice -
+  // see the build script's own comment for the full reasoning.
+  bolt: {
+    poses: {
+      idle: {
+        src: boltIdleStretchSheet,
+        frames: 101,
+        frameWidth: 161,
+        frameHeight: 320,
+      },
+      hiphop: {
+        src: boltHipHopSheet,
+        frames: 61,
+        frameWidth: 267,
         frameHeight: 320,
       },
     },
