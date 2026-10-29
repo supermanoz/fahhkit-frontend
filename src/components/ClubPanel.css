@@ -24,7 +24,7 @@
     var(--game-gold) 50%,
     var(--game-gold-dark) 100%
   );
-  color: var(--text);
+  color: #fff;
   font-size: 28px;
 }
 
@@ -66,7 +66,7 @@
   justify-content: center;
   border-radius: 8px;
   border: 2px solid var(--game-ink);
-  color: var(--text);
+  color: #fff;
   font-size: 17px;
 }
 
@@ -110,7 +110,7 @@
 }
 
 .game-club-input.club-input-light {
-  background: var(--text);
+  background: #fff;
   border-color: rgba(61, 43, 26, 0.35);
   color: var(--game-ink);
   font-family:
@@ -171,8 +171,8 @@
   padding: 3px 9px;
   border: 2px solid rgba(0, 0, 0, 0.35);
   border-radius: 8px;
-  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
-  color: var(--bg-900);
+  background: linear-gradient(180deg, #f7d77a, #d9a531);
+  color: #3b2505;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -238,14 +238,14 @@
   border-radius: 50%;
   border: 2px solid var(--game-ink);
   background: var(--game-gold);
-  color: var(--text);
+  color: #fff;
   font-size: 20px;
 }
 
 .club-treasury-value {
   font-size: 20px;
   font-weight: 900;
-  color: var(--text);
+  color: #fff;
 }
 
 .club-donate {
@@ -350,7 +350,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone-dark);
-  color: var(--text);
+  color: #fff;
   font-size: 13px;
   font-weight: 900;
   text-shadow:
@@ -416,7 +416,7 @@
 .club-war-score {
   font-size: 22px;
   font-weight: 900;
-  color: var(--text);
+  color: #fff;
 }
 
 .club-war-sub {
@@ -543,7 +543,7 @@
   transform: rotate(45deg);
   background: var(--game-green);
   border: 1px solid var(--game-ink);
-  color: var(--text);
+  color: #fff;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
@@ -583,7 +583,7 @@
   justify-content: center;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--text);
+  color: #fff;
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -614,7 +614,7 @@
 .club-war-history-badge-mine {
   margin-right: -10px;
   z-index: 1;
-  filter: drop-shadow(-2px 0 0 var(--bg-800));
+  filter: drop-shadow(-2px 0 0 #46362a);
 }
 
 .club-war-history-result {
@@ -623,7 +623,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone-dark);
-  color: var(--text);
+  color: #fff;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -724,12 +724,12 @@
 
 .club-war-run-badge.is-done {
   background: var(--game-green);
-  color: var(--text);
+  color: #fff;
 }
 
 .club-war-run-badge.is-missed {
   background: var(--game-red-dark);
-  color: var(--text);
+  color: #fff;
 }
 
 .club-war-run-badge.is-pending {
@@ -759,7 +759,7 @@
   border-radius: 6px;
   border: 2px solid var(--game-ink);
   background: rgba(255, 255, 255, 0.12);
-  color: var(--text);
+  color: #fff;
   font-size: 14px;
 }
 

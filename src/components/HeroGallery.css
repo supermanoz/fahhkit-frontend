@@ -72,8 +72,8 @@
 /* --- Hero (no card frame): stands on a glow in its tier colour. --- */
 .hero-card {
   all: unset;
-  --tier: var(--violet-500);
-  --tier-light: var(--violet-300);
+  --tier: #8e44d6;
+  --tier-light: #c48bff;
   box-sizing: border-box;
   position: absolute;
   inset: 0;
@@ -94,24 +94,24 @@
 }
 
 .hero-card.tier-equipped {
-  --tier: var(--gold-500);
-  --tier-light: var(--gold-300);
+  --tier: #ffb400;
+  --tier-light: #ffe07a;
 }
 
 .hero-card.tier-owned {
-  --tier: var(--green-500);
-  --tier-light: var(--green-300);
+  --tier: #3cb54a;
+  --tier-light: #9ef0a4;
 }
 
 .hero-card.tier-soon {
-  --tier: var(--line);
-  --tier-light: var(--text-muted);
+  --tier: #6d6f72;
+  --tier-light: #b8babd;
 }
 
 /* Limited (not for sale) heroes: gold-tinged floor, art stays in colour. */
 .hero-card.tier-limited {
-  --tier: var(--gold-700);
-  --tier-light: var(--gold-300);
+  --tier: #d4a017;
+  --tier-light: #ffe58a;
 }
 
 .hero-card-stage {
@@ -165,7 +165,7 @@
   margin-top: 6px;
   text-align: center;
   font-size: 22px;
-  color: var(--text);
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,18 +189,13 @@
   justify-content: center;
   border-radius: 10px;
   border: 3px solid var(--game-ink);
-  color: var(--text);
+  color: #fff;
   font-size: 15px;
   line-height: 1.1;
   text-shadow: 0 1px 0 var(--game-ink);
   -webkit-text-stroke: 0.6px var(--game-ink);
   paint-order: stroke fill;
-  background: linear-gradient(
-    180deg,
-    var(--green-300) 0%,
-    var(--green-500) 45%,
-    var(--green-700) 100%
-  );
+  background: linear-gradient(180deg, #a8f07a 0%, #5cc23a 45%, #3a9a22 100%);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.45),
     inset 0 -4px 0 rgba(0, 0, 0, 0.2);
@@ -214,12 +209,7 @@
 .hero-card-foot.is-equipped {
   flex-direction: row;
   gap: 4px;
-  background: linear-gradient(
-    180deg,
-    var(--gold-300) 0%,
-    var(--gold-500) 50%,
-    var(--gold-700) 100%
-  );
+  background: linear-gradient(180deg, #ffe58a 0%, #ffb400 50%, #d98a00 100%);
 }
 
 .hero-card-foot.is-owned {
@@ -240,7 +230,7 @@
 .hero-card-foot.is-locked {
   flex-direction: row;
   gap: 6px;
-  background: linear-gradient(180deg, var(--line), var(--surface-600));
+  background: linear-gradient(180deg, #8a8c90, #5d5f62);
   font-size: 13px;
   -webkit-text-stroke: 0;
 }

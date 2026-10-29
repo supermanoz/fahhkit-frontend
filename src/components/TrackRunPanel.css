@@ -106,7 +106,7 @@
   height: 34px;
   border-radius: 50%;
   background: var(--gradient-brand);
-  color: var(--text);
+  color: #fff;
   font-size: 13px;
   box-shadow: var(--shadow-glow);
 }

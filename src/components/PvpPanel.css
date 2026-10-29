@@ -142,7 +142,7 @@
   flex: 1;
   min-width: 0;
   font-size: 20px;
-  color: var(--text);
+  color: #fff;
   -webkit-text-stroke: 2px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--game-ink);
@@ -177,7 +177,7 @@
   margin: 0;
   text-align: center;
   font-size: 17px;
-  color: var(--text);
+  color: #fff;
   text-shadow: 0 2px 0 var(--game-ink);
 }
 
@@ -218,7 +218,7 @@
       rgba(255, 90, 77, 0.35),
       transparent 70%
     ),
-    linear-gradient(180deg, var(--surface-700) 0%, var(--bg-800) 100%);
+    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.12),
     0 4px 0 var(--game-ink);
@@ -238,7 +238,7 @@
     var(--game-red) 50%,
     var(--game-red-dark)
   );
-  color: var(--text);
+  color: #fff;
   font-size: 30px;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.4),
@@ -249,7 +249,7 @@
 .pvp-hero-title {
   margin: 4px 0 0;
   font-size: 24px;
-  color: var(--text);
+  color: #fff;
   -webkit-text-stroke: 2px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 3px 0 var(--game-ink);
@@ -297,7 +297,7 @@
   padding: 10px 4px;
   border-radius: 14px;
   border: 3px solid var(--game-ink);
-  background: linear-gradient(180deg, var(--red-700) 0%, var(--bg-800) 100%);
+  background: linear-gradient(180deg, #6a4f37 0%, #4a3727 100%);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.15),
     0 3px 0 var(--game-ink);
@@ -305,7 +305,7 @@
 
 .pvp-stat-value {
   font-size: 19px;
-  color: var(--text);
+  color: #fff;
   -webkit-text-stroke: 1.2px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--game-ink);
@@ -367,7 +367,7 @@
 .pvp-rewards-mode {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text);
+  color: #fff;
 }
 
 .pvp-rewards-terms {
@@ -396,7 +396,7 @@
   padding: 14px 14px 16px;
   border-radius: 16px;
   border: 3px solid var(--game-ink);
-  background: linear-gradient(180deg, var(--red-700) 0%, var(--bg-800) 100%);
+  background: linear-gradient(180deg, #6a4f37 0%, #4a3727 100%);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.15),
     inset 0 -5px 0 rgba(0, 0, 0, 0.25),
@@ -432,36 +432,21 @@
   padding: 8px 6px;
   text-align: center;
   font-size: 22px;
-  color: var(--text);
+  color: #fff;
   border-radius: 12px;
   border: 3px solid var(--game-ink);
   -webkit-text-stroke: 1.5px var(--game-ink);
   paint-order: stroke fill;
-  background: linear-gradient(
-    180deg,
-    var(--sky-300),
-    var(--sky-500) 55%,
-    var(--sky-900)
-  );
+  background: linear-gradient(180deg, #7cc6ff, #2f8ee8 55%, #1a5fb4);
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
 
 .pvp-mode-ONE_KM .pvp-choice-big {
-  background: linear-gradient(
-    180deg,
-    var(--green-300),
-    var(--game-green) 55%,
-    var(--game-green-dark)
-  );
+  background: linear-gradient(180deg, #a8f07a, #4fc85e 55%, #268a3a);
 }
 
 .pvp-mode-FIVE_KM .pvp-choice-big {
-  background: linear-gradient(
-    180deg,
-    var(--game-red-light),
-    var(--game-red) 55%,
-    var(--game-red-dark)
-  );
+  background: linear-gradient(180deg, #ffab9e, #ff5a4d 55%, #c72a20);
 }
 
 .pvp-choice-icon {
@@ -474,7 +459,7 @@
   border-radius: 50%;
   border: 3px solid var(--game-ink);
   font-size: 24px;
-  color: var(--text);
+  color: #fff;
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
 
@@ -507,7 +492,7 @@
 
 .pvp-choice-title {
   font-size: 19px;
-  color: var(--text);
+  color: #fff;
   -webkit-text-stroke: 1.5px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--game-ink);
@@ -540,7 +525,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-gold);
-  color: var(--text);
+  color: #fff;
   -webkit-text-stroke: 1px var(--game-ink);
   paint-order: stroke fill;
 }
@@ -612,7 +597,7 @@
     var(--game-red) 50%,
     var(--game-red-dark)
   );
-  color: var(--text);
+  color: #fff;
   font-size: 22px;
 }
 
@@ -678,7 +663,7 @@
 
 .pvp-runner-name {
   font-size: 17px;
-  color: var(--text);
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -714,7 +699,7 @@
   background:
     linear-gradient(90deg, rgba(47, 142, 232, 0.35), transparent 45%),
     linear-gradient(270deg, rgba(255, 90, 77, 0.35), transparent 45%),
-    linear-gradient(180deg, var(--bg-800), var(--bg-900));
+    linear-gradient(180deg, #4a3727, #2e2118);
   box-shadow: 0 4px 0 var(--game-ink);
 }
 
@@ -727,7 +712,7 @@
   min-width: 0;
   text-align: center;
   font-size: 20px;
-  color: var(--text);
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -751,7 +736,7 @@
     var(--game-gold) 55%,
     var(--game-gold-dark)
   );
-  color: var(--text);
+  color: #fff;
   font-size: 16px;
   -webkit-text-stroke: 1.2px var(--game-ink);
   paint-order: stroke fill;
@@ -786,7 +771,7 @@
   align-items: center;
   gap: 4px;
   font-size: 17px;
-  color: var(--text);
+  color: #fff;
 }
 
 /* Matched → Locked in → Run → Result. */
@@ -825,7 +810,7 @@
   height: 18px;
   border-radius: 50%;
   border: 3px solid var(--game-ink);
-  background: var(--surface-700);
+  background: #5a4633;
 }
 
 .pvp-timeline li.is-done {
@@ -837,7 +822,7 @@
 }
 
 .pvp-timeline li.is-now {
-  color: var(--text);
+  color: #fff;
 }
 
 .pvp-timeline li.is-now .pvp-timeline-dot {
@@ -856,16 +841,16 @@
   border: 3px solid var(--game-ink);
   background: rgba(0, 0, 0, 0.3);
   font-size: 20px;
-  color: var(--text);
+  color: #fff;
   text-shadow: 0 2px 0 var(--game-ink);
 }
 
 .pvp-result.is-won {
-  background: linear-gradient(180deg, var(--green-300), var(--game-green-dark));
+  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
 }
 
 .pvp-result.is-lost {
-  background: linear-gradient(180deg, var(--red-300), var(--game-red-dark));
+  background: linear-gradient(180deg, #ff7a6d, var(--game-red-dark));
 }
 
 .pvp-run-btn svg,
@@ -876,7 +861,7 @@
 
 .pvp-forfeit-btn.is-confirming {
   box-shadow:
-    inset 0 -4px 0 var(--red-700),
+    inset 0 -4px 0 #6e130d,
     0 0 0 3px rgba(255, 90, 77, 0.45);
 }
 
