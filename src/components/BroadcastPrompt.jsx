@@ -4,10 +4,11 @@ import { IconClose, IconMegaphone } from './GameIcons'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
 
 // News/announcement broadcasts, front and center the moment the game opens
-// (see GamePage's broadcastQueue) instead of waiting for the player to find
-// them in the Mail tab - a title-bar dialog in the middle of the screen,
-// same shape as a mobile game's "Events" popup (banner image, title, body,
-// one big action button) rather than a small bottom-anchored toast.
+// (see GamePage's useAnnouncementNotices) instead of waiting for the player
+// to find them in the Mail tab - a title-bar dialog in the middle of the
+// screen, same shape as a mobile game's "Events" popup (banner image, title,
+// body, one big action button) rather than a small bottom-anchored toast.
+// "Got it"/Next, the X, and tapping the backdrop all call onDismiss.
 export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
   return (
     <motion.div
@@ -15,6 +16,7 @@ export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      onClick={onDismiss}
     >
       <motion.div
         className="broadcast-prompt"
@@ -25,6 +27,7 @@ export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="broadcast-prompt-titlebar">
           <IconMegaphone aria-hidden="true" />

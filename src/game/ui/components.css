@@ -1,0 +1,888 @@
+/* Shared component library styles for the /game re-skin (CoC-style
+   whitish/black/green default, 2026-10-30). Every rule in this file (and
+   every other file under src/game/) must use tokens from
+   ../styles/tokens.css - no hex colours here. All motion is
+   transform/opacity only and respects prefers-reduced-motion (see the
+   blanket rule at the bottom of this file). Headings and button labels are
+   white with a 2px ink stroke + a soft dark drop shadow (so they read on
+   any button colour); plain body text/labels are ink-coloured directly -
+   see GameStyleGuidePage's contrast table for the pairs checked. */
+
+/* ---------- GameButton ---------- */
+.gb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-6);
+  border-radius: var(--radius-md);
+  border: var(--border-md) solid var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  color: var(--white);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  user-select: none;
+  box-shadow: var(--inner-highlight), var(--inner-shade), var(--press-drop);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out);
+  overflow: hidden;
+}
+.gb:active:not(:disabled):not(.gb-loading) {
+  transform: translateY(3px);
+  box-shadow:
+    var(--inner-highlight), var(--inner-shade), var(--press-drop-active);
+}
+.gb:focus-visible {
+  outline: 3px solid var(--green-500);
+  outline-offset: 2px;
+}
+.gb:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.4) brightness(0.85);
+  opacity: 0.75;
+}
+
+/* Static state demos for the style guide (real hover/press are the actual
+   pseudo-classes above - these just let the guide show what they look like
+   without requiring the viewer to move a mouse). */
+.gb-demo-hover {
+  filter: brightness(1.08);
+}
+.gb-demo-active {
+  transform: translateY(3px);
+  box-shadow:
+    var(--inner-highlight), var(--inner-shade), var(--press-drop-active);
+}
+
+.g-full-width {
+  width: 100%;
+}
+
+.gb-sm {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--text-md);
+  border-width: var(--border-sm);
+}
+.gb-lg {
+  min-height: 56px;
+  padding: var(--space-3) var(--space-8);
+  font-size: var(--text-xl);
+}
+
+/* Green is the default/primary button colour - .gb-success is the same
+   gradient (the old system split "primary action" from "success" into two
+   colours; this one doesn't need to). .gb-premium has no colour of its own
+   any more either - no 4th accent exists in this palette - so it reuses
+   the same green gradient too, just keeping the class as a hook for future
+   styling. */
+.gb-primary,
+.gb-success,
+.gb-premium {
+  background: linear-gradient(
+    180deg,
+    var(--green-300) 0%,
+    var(--green-500) 55%,
+    var(--green-700) 100%
+  );
+}
+.gb-danger {
+  background: linear-gradient(
+    180deg,
+    var(--red-300) 0%,
+    var(--red-500) 55%,
+    var(--red-700) 100%
+  );
+  /* color/stroke inherited from .gb above - white-on-red needs the same
+     treatment as every other variant, not a separate override. */
+}
+.gb-secondary {
+  background: var(--white);
+  color: var(--ink);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.gb-ghost {
+  background: transparent;
+  color: var(--ink);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  box-shadow: var(--inner-shade);
+}
+.gb-ghost:active:not(:disabled) {
+  box-shadow: var(--inner-shade);
+  transform: translateY(2px);
+}
+
+/* Shine sweep - primary (brand) buttons only, every ~4s, disabled under
+   reduced motion */
+.gb-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  transform: translateX(-120%);
+  animation: gb-shine 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes gb-shine {
+  0%,
+  92% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+.gb-icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.gb-spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid rgba(26, 26, 26, 0.25);
+  border-top-color: var(--ink);
+  animation: gb-spin 0.7s linear infinite;
+}
+.gb-danger .gb-spinner,
+.gb-ghost .gb-spinner {
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: var(--white);
+}
+.gb-ghost .gb-spinner {
+  border: 3px solid rgba(26, 26, 26, 0.2);
+  border-top-color: var(--ink);
+}
+@keyframes gb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.gb-label-hidden {
+  opacity: 0;
+}
+
+/* ---------- Panel / Modal ---------- */
+.g-panel {
+  background: var(--panel);
+  border: var(--border-md) solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 0 0 var(--border-sm) var(--divider),
+    0 6px 0 var(--ink);
+  color: var(--ink);
+  position: relative;
+}
+
+.g-modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 32, 0.72);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+/* Applied together with .g-panel in JSX (plain CSS has no `composes`) */
+.g-modal {
+  width: min(420px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: g-modal-in var(--dur-med) var(--ease-pop);
+}
+@keyframes g-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Header ribbon: green by default - no separate premium colour exists in
+   this palette, .g-modal-ribbon-premium is kept only as a styling hook.
+   White stroked text, same treatment as button labels. */
+.g-modal-ribbon {
+  background: linear-gradient(
+    180deg,
+    var(--green-500) 0%,
+    var(--green-700) 100%
+  );
+  border-bottom: var(--border-md) solid var(--ink);
+  border-radius: calc(var(--radius-lg) - var(--border-md))
+    calc(var(--radius-lg) - var(--border-md)) 0 0;
+  padding: var(--space-3) var(--space-8) var(--space-3) var(--space-4);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--white);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.g-modal-ribbon-premium {
+  background: linear-gradient(
+    180deg,
+    var(--green-500) 0%,
+    var(--green-700) 100%
+  );
+}
+.g-modal-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: var(--border-sm) solid var(--ink);
+  background: linear-gradient(
+    180deg,
+    var(--red-300),
+    var(--red-500) 55%,
+    var(--red-700)
+  );
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.g-modal-close:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+.g-modal-close:focus-visible {
+  outline: 3px solid var(--green-500);
+  outline-offset: 2px;
+}
+.g-modal-body {
+  padding: var(--space-4);
+  font-family: var(--font-body);
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+/* ---------- Tabs ---------- */
+.g-tabs {
+  display: flex;
+  gap: var(--space-2);
+  background: var(--row);
+  border: var(--border-sm) solid var(--ink);
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+}
+.g-tab {
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--tab-inactive);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  position: relative;
+}
+/* Active tab merges into the (light) panel instead of taking a button
+   colour - white background, dark text, same as the rest of the panel. */
+.g-tab[aria-selected='true'] {
+  background: var(--white);
+  color: var(--ink);
+  box-shadow:
+    var(--inner-highlight),
+    0 3px 0 var(--ink);
+}
+.g-tab-premium[aria-selected='true'] {
+  background: var(--white);
+}
+.g-tab:focus-visible {
+  outline: 3px solid var(--green-500);
+  outline-offset: 2px;
+}
+.g-tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+
+/* ---------- CurrencyPill ---------- */
+.g-currency {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--panel);
+  border: var(--border-sm) solid var(--ink);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  min-height: 36px;
+}
+.g-currency-icon {
+  width: 28px;
+  height: 28px;
+  margin-left: -2px;
+  flex-shrink: 0;
+}
+/* Coins/gems are the ONE sanctioned gold use outside rank-1. Gold-300 on
+   the light panel needs the ink outline to stay readable (gold alone is
+   too close to the panel's own lightness). */
+.g-currency-value {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-text);
+}
+.g-currency-value.text-outlined {
+  font-size: var(--text-lg);
+}
+.g-currency-add {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: var(--border-sm) solid var(--ink);
+  background: linear-gradient(
+    180deg,
+    var(--green-300),
+    var(--green-500) 60%,
+    var(--green-700)
+  );
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 900;
+  margin-left: var(--space-1);
+  cursor: pointer;
+}
+
+/* ---------- Badge ---------- */
+.g-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: var(--border-sm) solid var(--ink);
+  font-family: var(--font-body);
+  font-weight: 900;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.g-badge-count {
+  background: var(--red-500);
+  color: var(--white);
+}
+.g-badge-level {
+  background: var(--green-500);
+  color: var(--white);
+}
+.g-badge-new {
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
+  color: var(--ink);
+  animation: g-wobble 2.4s ease-in-out infinite;
+}
+@keyframes g-wobble {
+  0%,
+  85%,
+  100% {
+    transform: rotate(0deg);
+  }
+  88% {
+    transform: rotate(-8deg);
+  }
+  91% {
+    transform: rotate(8deg);
+  }
+  94% {
+    transform: rotate(-4deg);
+  }
+}
+
+/* ---------- ListRow / Card ---------- */
+.g-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: var(--border-sm) solid var(--ink);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  background: none;
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+.g-row-frost {
+  background: var(--white);
+  color: var(--ink);
+}
+.g-row-dark {
+  background: var(--row);
+  color: var(--ink);
+}
+.g-row-selected {
+  box-shadow: inset 4px 0 0 var(--green-500);
+}
+.g-row:active {
+  transform: translateY(1px);
+}
+.g-row:focus-visible {
+  outline: 3px solid var(--green-500);
+  outline-offset: -1px;
+}
+.g-row-chevron {
+  margin-left: auto;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.g-card {
+  border-radius: var(--radius-md);
+  border: var(--border-sm) solid var(--ink);
+  padding: var(--space-3);
+  font-family: var(--font-body);
+}
+.g-card-frost {
+  background: var(--white);
+  color: var(--ink);
+}
+.g-card-dark {
+  background: var(--row);
+  color: var(--ink);
+}
+
+/* ---------- ProgressBar ---------- */
+.g-progress {
+  position: relative;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ink);
+  border: var(--border-sm) solid var(--ink);
+  overflow: hidden;
+}
+.g-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--dur-slow) var(--ease-out);
+  position: relative;
+}
+.g-progress-sky,
+.g-progress-green {
+  background: linear-gradient(180deg, var(--green-300), var(--green-700));
+}
+.g-progress-gold {
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-700));
+}
+.g-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  background: rgba(255, 255, 255, 0.3);
+}
+.g-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-weight: 900;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--white);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- Toast ---------- */
+.g-toast-region {
+  position: fixed;
+  top: max(var(--space-3), env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(380px, calc(100vw - var(--space-4) * 2));
+}
+.g-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--panel);
+  border: var(--border-sm) solid var(--ink);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  font-family: var(--font-body);
+  position: relative;
+  overflow: hidden;
+  animation: g-toast-in var(--dur-med) var(--ease-pop);
+}
+@keyframes g-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.g-toast-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: var(--border-sm) solid var(--ink);
+}
+.g-toast-success .g-toast-icon {
+  background: var(--green-500);
+}
+.g-toast-error .g-toast-icon {
+  background: var(--red-500);
+}
+.g-toast-info .g-toast-icon {
+  background: var(--green-500);
+}
+.g-toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--green-500);
+  animation: g-toast-timer linear forwards;
+}
+@keyframes g-toast-timer {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* ---------- StatBlock ---------- */
+.g-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* Huge outlined numbers - white fill, ink stroke, same label treatment as
+   buttons/headings. Gold is reserved for genuinely currency/trophy stats
+   (pass color="gold" explicitly) - everything else defaults to white. */
+.g-stat-value {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-3xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--white);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.g-stat-value.g-stat-gold {
+  color: var(--gold-500);
+}
+.g-stat-label {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* ---------- Avatar ---------- */
+.g-avatar {
+  position: relative;
+  border-radius: 50%;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.g-avatar-img,
+.g-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: var(--border-sm) solid var(--ink);
+  box-sizing: border-box;
+}
+.g-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--row);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+.g-avatar-ring {
+  box-shadow: 0 0 0 3px var(--ring-color, var(--green-500));
+}
+.g-avatar-level {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+}
+
+/* ---------- RarityTile ---------- */
+.g-rarity-tile {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  border: var(--border-sm) solid var(--ink);
+  background: var(--row);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.g-rarity-common {
+  box-shadow: 0 0 0 2px var(--rarity-common) inset;
+}
+.g-rarity-rare {
+  box-shadow:
+    0 0 0 2px var(--rarity-rare) inset,
+    0 0 12px rgba(58, 123, 213, 0.5);
+}
+.g-rarity-epic {
+  box-shadow:
+    0 0 0 2px var(--rarity-epic) inset,
+    0 0 12px rgba(138, 79, 224, 0.5);
+}
+.g-rarity-legendary {
+  box-shadow:
+    0 0 0 2px var(--rarity-legendary) inset,
+    0 0 14px rgba(255, 197, 49, 0.6);
+}
+.g-rarity-legendary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  transform: translateX(-120%);
+  animation: gb-shine 4s ease-in-out infinite;
+}
+.g-rarity-lock {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 32, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+}
+.g-rarity-equipped {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--green-500);
+  border: var(--border-sm) solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+.g-rarity-new {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+}
+
+/* ---------- Ribbon / Divider / IconButton / Tooltip / Skeleton ---------- */
+.g-ribbon {
+  display: inline-block;
+  background: linear-gradient(
+    180deg,
+    var(--green-300),
+    var(--green-500) 60%,
+    var(--green-700)
+  );
+  border: var(--border-sm) solid var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  font-family: var(--font-body);
+  font-weight: 900;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--white);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.g-ribbon-gold {
+  background: linear-gradient(
+    180deg,
+    var(--gold-300),
+    var(--gold-500) 60%,
+    var(--gold-700)
+  );
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.g-divider {
+  height: var(--border-sm);
+  background: var(--divider);
+  border-radius: 999px;
+  opacity: 1;
+  margin: var(--space-3) 0;
+}
+
+.g-icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: var(--border-sm) solid var(--ink);
+  background: var(--row);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--press-drop);
+}
+.g-icon-btn:active {
+  transform: translateY(3px);
+  box-shadow: var(--press-drop-active);
+}
+.g-icon-btn:focus-visible {
+  outline: 3px solid var(--green-500);
+  outline-offset: 2px;
+}
+
+.g-tooltip {
+  position: absolute;
+  z-index: var(--z-tooltip);
+  background: var(--ink);
+  color: var(--white);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.g-skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--row) 25%,
+    var(--divider) 50%,
+    var(--row) 75%
+  );
+  background-size: 200% 100%;
+  animation: g-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes g-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Juice: press/pop, idle bob ---------- */
+.g-press {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.g-press:active {
+  transform: scale(0.94);
+}
+
+.g-idle-bob {
+  animation: g-idle-bob 3.2s ease-in-out infinite;
+}
+@keyframes g-idle-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.g-bounce {
+  animation: g-bounce var(--dur-med) var(--ease-pop);
+}
+@keyframes g-bounce {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-primary::after,
+  .g-rarity-legendary::after,
+  .g-badge-new,
+  .g-idle-bob,
+  .g-skeleton,
+  .g-bounce,
+  .g-modal,
+  .g-toast {
+    animation: none !important;
+  }
+  .gb,
+  .g-icon-btn,
+  .g-press,
+  .g-progress-fill {
+    transition: none !important;
+  }
+}

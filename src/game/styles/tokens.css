@@ -1,0 +1,139 @@
+/* Design tokens for /game.
+   Original warm wood/gold "war-table" default: wood-tan panels, dark-brown
+   ink for borders+text+outlines, orange-gold as the default button/accent
+   colour, green for success/go, red for close/danger, real gold reserved
+   for coins/trophies/rank-1. The intro globe (untokenized either way -
+   MapLibre's own sky) stays exactly as it is. Scoped on .game-root so the
+   rest of the site is unaffected. No hex colour should exist anywhere in
+   /game outside this file once migration is complete. Check with:
+     grep -rEo "#[0-9a-fA-F]{3,8}" src/game src/pages/GamePage.css src/components/*.css
+   and confirm every hit is inside this file (or the globe exemption, see
+   style.md). */
+.game-root {
+  /* Loading overlay only - everything else in /game reads --ink/--panel/
+     etc below instead. Kept as its own token (not reused for anything
+     else) so the loading screen's look can't drift if this file's other
+     tokens change later. */
+  --bg-900: #0a0806;
+
+  /* Typography - matches GamePage.css's existing Passion One @font-face
+     (loaded there, not pulled in here) so restored components (game-auth,
+     the rollout modal/chip) use the same type the rest of /game already
+     has, instead of introducing a different font family. */
+  --font-display: 'Passion One', 'Trebuchet MS', sans-serif;
+  --font-body: 'Trebuchet MS', sans-serif;
+
+  /* Ink - borders (2-3px), body text, icons */
+  --ink: #3d2b1a;
+
+  /* Panels / menus / modals / cards - fully solid, no alpha (wood tones) */
+  --panel: #e0a355;
+  --row: #a8672c;
+  --divider: #767a6d;
+  --white: #ffffff;
+  --tab-inactive: #aeb3a6;
+
+  /* Green - success/go, not the default button colour here */
+  --green-300: #a8f0af;
+  --green-500: #4fc85e;
+  --green-700: #268a3a;
+  /* Pale green surface for success banners - same reasoning as --red-tint
+     below. */
+  --green-tint: #e3f3d9;
+  --green-text: var(--green-700);
+
+  /* Red - close/danger only */
+  --red-300: #ffab9e;
+  --red-500: #ff5a4d;
+  --red-700: #c72a20;
+  /* Pale red surface for error banners/chips - not part of the original
+     literal colour list, derived to stay in the same red family for a
+     "this is an error" surface that isn't the saturated button/icon red. */
+  --red-tint: #fbe0dc;
+
+  /* Gold - the default/primary button+accent colour here (matches the
+     site's own brand orange, index.css --brand/--brand-amber/--brand-dark -
+     one warm orange identity, not a separate in-game yellow) */
+  --gold-300: #ffb15c;
+  --gold-500: #ff7a29;
+  --gold-700: #c94a08;
+  --gold-text: var(--gold-700);
+
+  /* Text */
+  --text: var(--ink);
+  --text-muted: #6e5a42;
+  --text-on-panel: var(--ink);
+  --text-link: var(--green-700);
+
+  /* Rarity (shop/emote tiles) */
+  --rarity-common: #8a8a84;
+  --rarity-rare: #3a7bd5;
+  --rarity-epic: #8a4fe0;
+  --rarity-legendary: #ffc531;
+
+  /* Team / territory colours - 8 saturated, CVD-leaning-safe hues that
+     read clean against the white/green/black UI (no muddy browns).
+     Best-effort: not run through an actual CVD simulator tool, re-check
+     before ship. Unchanged from the previous palette - these were never
+     wood/gold-themed to begin with. */
+  --team-coral: #ff6b6b;
+  --team-tangerine: #ff9f43;
+  --team-lime: #a3e635;
+  --team-emerald: #2dd4a7;
+  --team-cyan: #22d3ee;
+  --team-indigo: #6366f1;
+  --team-magenta: #e263c9;
+  --team-slate: #94a3c4;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* Border */
+  --border-sm: 2px;
+  --border-md: 3px;
+  --border-lg: 4px;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Type scale */
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 44px;
+  --text-4xl: 64px;
+
+  /* Z-index */
+  --z-map: 0;
+  --z-hud: 10;
+  --z-panel: 20;
+  --z-modal: 30;
+  --z-toast: 40;
+  --z-tooltip: 50;
+
+  /* Motion */
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-med: 220ms;
+  --dur-slow: 400ms;
+
+  /* Shared button recipe: 3-stop gradient (300 -> 500 at 55% -> 700), 3px
+     ink border, radius 14, top highlight + bottom shade + hard drop,
+     pressed = translateY(3px). */
+  --press-drop: 0 4px 0 var(--ink);
+  --press-drop-active: 0 1px 0 var(--ink);
+  --inner-highlight: inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  --inner-shade: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}

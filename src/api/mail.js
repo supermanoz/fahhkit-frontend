@@ -1,4 +1,4 @@
-import { deleteJson, postForm, postJson } from './client'
+import { deleteJson, getJson, postForm, postJson } from './client'
 
 // Player inbox (see MailController in the FahhKit backend). Personal mail is
 // NOTICE (read-only), CLUB_INVITE (claim = join the club, or decline) or
@@ -33,6 +33,23 @@ export function findBroadcastMail(pageNumber = 1, noOfRecords = 20) {
 
 export function readBroadcastMail(id) {
   return postJson(`/v1/mail/broadcast/${id}/read`, {})
+}
+
+// IMPORTANT_NOTICE broadcasts this user hasn't been shown up front yet -
+// the backend already filters to just these (BroadcastMailReadState,
+// per-user), so there's nothing to filter client-side. Call once per
+// authenticated session, after the user is known - see
+// hooks/useAnnouncementNotices.js.
+export function getPendingNotices() {
+  return getJson('/v1/mail/broadcast/notices/pending')
+}
+
+// Records that this user was shown this notice up front, per-user, on the
+// backend - it never shows again for them, on any device, even after
+// logout/login. Also marks it read (same as readBroadcastMail) so it
+// doesn't additionally show as unread in the Mail tab.
+export function markNoticeShown(id) {
+  return postJson(`/v1/mail/broadcast/${id}/notice-shown`, {})
 }
 
 // Admin only - publishes a new broadcast every player sees in their News

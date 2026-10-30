@@ -3301,6 +3301,12 @@
   color: var(--game-green-light, #a8f0af);
 }
 
+/* Log Out - same row recipe, just red-tinted icon/label so it reads as the
+   one destructive action in this list. */
+.game-settings-row-danger .game-settings-row-label {
+  color: var(--game-red-light, #ffab9e);
+}
+
 /* Chunky on/off switch - stone track that turns green, cream knob with an
    ink outline that slides across. */
 .game-switch {

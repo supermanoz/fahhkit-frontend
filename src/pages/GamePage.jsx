@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   IconCheck,
   IconChevronDown,
@@ -11,6 +19,7 @@ import {
   IconFlagCheckered,
   IconHelmet,
   IconLock,
+  IconLogout,
   IconMap,
   IconMenuOrb,
   IconPlay,
@@ -25,13 +34,18 @@ import {
   IconVolumeMute,
   IconVolumeUp,
 } from '../components/GameIcons'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
+import { useAuthFlow } from '../hooks/useAuthFlow'
+// Dynamically imported (not bundled with the rest of the game) - a logged-
+// in player never triggers this import at all, so it doesn't add to the
+// bundle they actually download. See the logged-out branch below.
+const GameAuthGate = lazy(() => import('../components/game-auth/GameAuthGate'))
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
 import { mySide, usePvp } from '../hooks/usePvp'
@@ -49,7 +63,13 @@ import {
   getTopIndividualsLocal,
 } from '../api/territory'
 import { findClubs, getMyClub, inviteToClub } from '../api/club'
-import { requestRollout } from '../api/territoryRollout'
+import {
+  requestRollout,
+  ALREADY_ROLLED_OUT_MESSAGE,
+} from '../api/territoryRollout'
+import { useRolloutStatus } from '../hooks/useRolloutStatus'
+import RolloutRequestModal from '../components/RolloutRequestModal'
+import RolloutRequestedChip from '../components/RolloutRequestedChip'
 import { warnMissingEmoteAssets } from '../utils/emotes'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
@@ -125,6 +145,7 @@ import SkinShelf from '../components/SkinShelf'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
+import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
 import RunRewardAnimation from '../components/RunRewardAnimation'
 import RunScoreCard from '../components/RunScoreCard'
 import ClubBadge from '../components/ClubBadge'
@@ -154,6 +175,7 @@ import {
   fetchSkyConditions,
   pickWeatherHype,
 } from '../utils/mapAmbience'
+import '../game/styles/tokens.css'
 import './GamePage.css'
 import '../components/GameCards.css'
 
@@ -427,7 +449,18 @@ function summarizeRunEvents(events) {
 export default function GamePage() {
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
+  const auth = useAuthFlow()
   const tracker = useRunTracker()
+  // A full reload (not just clearing the token + re-rendering) is
+  // deliberate here - this page holds dozens of pieces of React state tied
+  // to the signed-in player (hero, territory, run tracker, club, etc.) that
+  // have no single "reset to signed-out" path; reloading guarantees none of
+  // it leaks into whatever the next GameAuthGate session does, at the cost
+  // of a logout being the one action in the game that isn't instant.
+  function handleLogout() {
+    auth.signOut()
+    window.location.reload()
+  }
   // The live "Distance" stat during a run - throttled to refresh once every
   // 5s instead of on every render (tracker.elapsedSeconds ticks every
   // second, which would otherwise redraw this on every tick even though
@@ -469,6 +502,12 @@ export default function GamePage() {
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
+  // liveLocation only ever holds a real GPS fix (never the DEFAULT_CENTER
+  // fallback the map itself falls back to) - exactly what the rollout
+  // check needs, since a denied/unavailable location should fail the check
+  // open (nothing shown), not silently check Kathmandu's rollout status.
+  // See hooks/useRolloutStatus.js.
+  const rolloutStatus = useRolloutStatus(liveLocation)
   // Gates the "Preparing your run…" loading screen - true only once the
   // basemap has actually finished loading tiles (see TerritoryMap.jsx's
   // PokemonStyleBaseLayer, which fires this on MapLibre's "idle" event), not
@@ -853,14 +892,6 @@ export default function GamePage() {
   const [rolloutRequestError, setRolloutRequestError] = useState(null)
   const [rolloutRequestResult, setRolloutRequestResult] = useState(null)
 
-  // Matched by message text, not an error code - ApiError only carries the
-  // backend's already-humanized description (see TerritoryRolloutErrorCode.
-  // ALREADY_ROLLED_OUT), same pattern ClubWarPanel.jsx's own
-  // ALREADY_AT_WAR_MESSAGE already uses for telling one specific business
-  // error apart from a generic one.
-  const ALREADY_ROLLED_OUT_MESSAGE =
-    'The game is already rolled out in your city.'
-
   async function handleRequestRollout() {
     const loc = liveLocation || center
     if (!loc) return
@@ -894,43 +925,14 @@ export default function GamePage() {
       : liveLocation || center
 
   const mailbox = useMailbox()
-  // Broadcasts (news/announcements), queued to pop up front and center the
-  // moment the game opens instead of waiting for the player to find them in
-  // the Mail tab - see BroadcastPrompt below. Deliberately NOT gated on
-  // readAt: the point is this reappears every time the game opens, even for
-  // a broadcast the player already saw last session (listActive has no
-  // expiry - everything published stays "active" until a moderator pulls
-  // it), so dismissing one just marks it read for the Mail tab's unread
-  // badge, it never permanently suppresses the popup. introducedIds tracks
-  // which broadcasts this session has already offered, so only the single
-  // newest one shows on open (not the whole backlog) while a broadcast
-  // published later in the same session (a live socket push) still queues
-  // immediately as its own pop-up.
-  const [broadcastQueue, setBroadcastQueue] = useState([])
-  const introducedBroadcastIdsRef = useRef(new Set())
-  const initialBroadcastShownRef = useRef(false)
-  useEffect(() => {
-    if (mailbox.broadcasts.length === 0) return
-    if (!initialBroadcastShownRef.current) {
-      initialBroadcastShownRef.current = true
-      mailbox.broadcasts.forEach((b) =>
-        introducedBroadcastIdsRef.current.add(b.id)
-      )
-      setBroadcastQueue([mailbox.broadcasts[0]])
-      return
-    }
-    const fresh = mailbox.broadcasts.filter(
-      (b) => !introducedBroadcastIdsRef.current.has(b.id)
-    )
-    if (fresh.length === 0) return
-    fresh.forEach((b) => introducedBroadcastIdsRef.current.add(b.id))
-    setBroadcastQueue((prev) => [...prev, ...fresh])
-  }, [mailbox.broadcasts])
-  function dismissBroadcastPrompt() {
-    const current = broadcastQueue[0]
-    if (current) mailbox.openBroadcast(current)
-    setBroadcastQueue((q) => q.slice(1))
-  }
+  // IMPORTANT_NOTICE broadcasts, popped up front and center the moment the
+  // game opens instead of waiting for the player to find them in the Mail
+  // tab - see BroadcastPrompt below. Backed by the server
+  // (BroadcastMailReadState.noticeShownAt, per user), not a client-side
+  // guess: once dismissed, GET /v1/mail/broadcast/notices/pending simply
+  // never returns it again, on any device, even after logout/login. A
+  // genuinely new one still shows once. See hooks/useAnnouncementNotices.js.
+  const announcementNotices = useAnnouncementNotices(isAuthed ? user?.id : null)
   // Whether the player is actually looking at the PvP tab right now - the
   // recurring challenge/discoverable-ping polls only run while this is
   // true (see usePvp); the incoming-challenge pop-up itself still works
@@ -975,7 +977,10 @@ export default function GamePage() {
       showRunOutcome(outcome)
     },
     onMail: mailbox.receiveMail,
-    onBroadcastMail: mailbox.receiveBroadcast,
+    onBroadcastMail: (broadcast) => {
+      mailbox.receiveBroadcast(broadcast)
+      announcementNotices.receive(broadcast)
+    },
     onPvp: (eventName, payload) => {
       pvp.handlePush(eventName, payload)
       // Stakes move on accept, payouts on resolve.
@@ -2780,41 +2785,34 @@ export default function GamePage() {
   // — nothing here works signed out, so the game itself never renders until
   // login is confirmed. userLoading gates this so a page refresh with a still-
   // valid token doesn't flash the gate before useCurrentUser() resolves.
+  // GameAuthGate owns the welcome/sign-in/sign-up/forgot/set-password screens
+  // (see src/components/game-auth/) - once any of them succeeds it calls
+  // replaceUser(user), which updates useCurrentUser's cache and re-renders
+  // this component with isAuthed now true, so the gate just stops rendering
+  // rather than navigating anywhere (the player never leaves /game).
   if (!userLoading && !isAuthed) {
     return (
-      <div className="game-page">
-        <div className="game-loading-overlay">
-          <img
-            src={runConquestLogo}
-            alt="Run Conquest"
-            className="game-loading-logo"
-          />
-          <div className="game-loading-footer game-loading-footer--gate">
-            <p className="game-loading-text">
-              Sign in to play Territory Run — claiming ground, GPS runs, and
-              Fahhcoin are for logged-in athletes only.
-            </p>
-            <div className="game-confirm-actions">
-              <Link to="/" className="btn btn-outline">
-                Back to Home
-              </Link>
-              <Link
-                to="/login"
-                state={{ from: '/game' }}
-                className="btn btn-primary"
-              >
-                Sign In
-              </Link>
+      <div className="game-page game-root">
+        <Suspense
+          fallback={
+            <div className="game-loading-overlay">
+              <img
+                src={runConquestLogo}
+                alt="Run Conquest"
+                className="game-loading-logo"
+              />
             </div>
-          </div>
-        </div>
+          }
+        >
+          <GameAuthGate onAuthenticated={replaceUser} />
+        </Suspense>
       </div>
     )
   }
 
   return (
     <div
-      className="game-page"
+      className="game-page game-root"
       style={{ '--sheet-h': `${controlsHeight}px` }}
       onClickCapture={handleGameClick}
     >
@@ -2940,6 +2938,19 @@ export default function GamePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {gameReady && !introPlaying && rolloutStatus.showModal && (
+        <RolloutRequestModal
+          cityName={rolloutStatus.state.cityName}
+          countryName={rolloutStatus.state.countryName}
+          requestCount={rolloutStatus.state.requestCount}
+          submitting={rolloutStatus.state.submitting}
+          submitError={rolloutStatus.state.submitError}
+          justRequested={rolloutStatus.state.justRequested}
+          onRequest={rolloutStatus.request}
+          onDismiss={rolloutStatus.dismiss}
+        />
+      )}
 
       {profile?.level != null && (
         <button
@@ -3118,12 +3129,12 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {broadcastQueue[0] && (
+        {announcementNotices.current && (
           <BroadcastPrompt
-            key={broadcastQueue[0].id}
-            broadcast={broadcastQueue[0]}
-            hasMore={broadcastQueue.length > 1}
-            onDismiss={dismissBroadcastPrompt}
+            key={announcementNotices.current.id}
+            broadcast={announcementNotices.current}
+            hasMore={announcementNotices.hasMore}
+            onDismiss={announcementNotices.dismiss}
           />
         )}
       </AnimatePresence>
@@ -4701,45 +4712,73 @@ export default function GamePage() {
                   <IconChevronRight />
                 </button>
 
-                {/* Standing home for this, always available - there's no
-                    passive "is my area rolled out" check (see
-                    requestRollout's own comment in api/territoryRollout.js),
-                    so this doesn't know in advance whether the player needs
-                    it; tapping it either requests (not rolled out yet) or
-                    comes back ALREADY_ROLLED_OUT (good news, told as such,
-                    not an error). */}
-                <div className="game-settings-row game-settings-row-static">
+                <button
+                  type="button"
+                  className="game-settings-row game-settings-row-danger"
+                  onClick={handleLogout}
+                >
                   <span className="game-settings-row-label">
-                    <IconLock />
+                    <IconLogout />
                     <span className="game-settings-row-text">
-                      Territory Capture Here
+                      Log Out
                       <span className="game-settings-row-sub">
-                        Not live everywhere yet - PvP and Club Wars always are.
-                        Ask for your area below.
+                        Clears your session and returns to the sign-in screen
                       </span>
                     </span>
                   </span>
-                  {rolloutRequestResult ? (
-                    <span className="game-settings-row-requested">
-                      {rolloutRequestResult.alreadyRolledOut
-                        ? 'Already live here!'
-                        : 'Requested'}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={handleRequestRollout}
-                      disabled={rolloutRequestBusy}
-                    >
-                      {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
-                    </button>
-                  )}
-                </div>
-                {rolloutRequestError && (
-                  <p className="game-controls-hint game-controls-hint-error">
-                    {rolloutRequestError}
-                  </p>
+                </button>
+
+                {/* Once useRolloutStatus.js positively knows the player
+                    already requested their region (see api/
+                    territoryRollout.js's GET .../status), swap the standing
+                    row below for the non-blocking chip instead - there's
+                    nothing left to request. Until then (or while it's still
+                    loading), this always-available row is the fallback: it
+                    doesn't know in advance whether the player needs it, so
+                    tapping it either requests (not rolled out yet) or comes
+                    back ALREADY_ROLLED_OUT (good news, told as such, not an
+                    error). */}
+                {rolloutStatus.showChip ? (
+                  <RolloutRequestedChip
+                    cityName={rolloutStatus.state.cityName}
+                    countryName={rolloutStatus.state.countryName}
+                  />
+                ) : (
+                  <>
+                    <div className="game-settings-row game-settings-row-static">
+                      <span className="game-settings-row-label">
+                        <IconLock />
+                        <span className="game-settings-row-text">
+                          Territory Capture Here
+                          <span className="game-settings-row-sub">
+                            Not live everywhere yet - PvP and Club Wars always
+                            are. Ask for your area below.
+                          </span>
+                        </span>
+                      </span>
+                      {rolloutRequestResult ? (
+                        <span className="game-settings-row-requested">
+                          {rolloutRequestResult.alreadyRolledOut
+                            ? 'Already live here!'
+                            : 'Requested'}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={handleRequestRollout}
+                          disabled={rolloutRequestBusy}
+                        >
+                          {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
+                        </button>
+                      )}
+                    </div>
+                    {rolloutRequestError && (
+                      <p className="game-controls-hint game-controls-hint-error">
+                        {rolloutRequestError}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}

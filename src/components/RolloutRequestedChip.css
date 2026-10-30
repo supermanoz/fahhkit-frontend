@@ -1,0 +1,34 @@
+.rollout-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: var(--border-sm) solid var(--ink);
+  background: var(--row);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+}
+.rollout-chip:focus-visible {
+  outline: 3px solid var(--green-500);
+  outline-offset: 2px;
+}
+
+.rollout-chip-label::before {
+  content: '\2713';
+  margin-right: 6px;
+  color: var(--green-text);
+}
+
+.rollout-chip-detail {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
