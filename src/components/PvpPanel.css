@@ -167,7 +167,7 @@
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .pvp-big-line {
@@ -294,7 +294,7 @@
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .pvp-section-card {
@@ -395,7 +395,7 @@
   flex-shrink: 0;
   width: 18px;
   height: 18px;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .pvp-choice-big {
@@ -477,7 +477,7 @@
   align-items: center;
   gap: 3px;
   font-size: 12px;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .pvp-picked {
@@ -619,7 +619,7 @@
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .pvp-runner-info {
@@ -648,11 +648,11 @@
 }
 
 .pvp-runner-meta.pvp-won {
-  color: var(--green-700);
+  color: var(--green-text);
 }
 
 .pvp-runner-meta.pvp-lost {
-  color: var(--red-700);
+  color: var(--red-text);
 }
 
 /* --- Race screen --- */
@@ -782,7 +782,7 @@
 }
 
 .pvp-timeline li.is-done {
-  color: var(--green-700);
+  color: var(--green-text);
 }
 
 .pvp-timeline li.is-done .pvp-timeline-dot {

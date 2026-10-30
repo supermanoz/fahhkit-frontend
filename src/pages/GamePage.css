@@ -4239,7 +4239,7 @@
   justify-content: center;
   border-radius: 8px;
   background: var(--row);
-  color: var(--gold-700);
+  color: var(--gold-text);
   overflow: hidden;
 }
 
@@ -4756,7 +4756,7 @@
 }
 
 .nickname-card-hint.is-error {
-  color: var(--red-700);
+  color: var(--red-text);
 }
 
 .nickname-card-row {
@@ -4767,7 +4767,7 @@
 
 .nickname-card-at {
   font-size: 20px;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .nickname-card-input {
@@ -4899,7 +4899,7 @@
   border-radius: 10px;
   border: 2px solid var(--game-red-dark);
   background: var(--red-tint);
-  color: var(--red-700);
+  color: var(--red-text);
   font-size: 13px;
   text-align: center;
 }

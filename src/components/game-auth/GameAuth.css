@@ -239,7 +239,7 @@
 .game-auth-banner.error {
   background: var(--red-tint);
   border: 1px solid var(--game-red);
-  color: var(--red-700);
+  color: var(--red-text);
 }
 
 .game-auth-banner.success {

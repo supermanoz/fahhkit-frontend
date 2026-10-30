@@ -96,7 +96,7 @@
   margin: 2px 0 0;
   font-size: 13px;
   font-style: italic;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .hero-modal-heading {
@@ -133,12 +133,12 @@
 }
 
 .hero-modal-stat-label svg {
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .hero-modal-stat-value {
   font-weight: 900;
-  color: var(--green-700);
+  color: var(--green-text);
 }
 
 .hero-modal-stat-bar {

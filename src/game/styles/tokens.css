@@ -54,7 +54,11 @@
   /* Pale green surface for success banners - same reasoning as --red-tint
      below. */
   --green-tint: #e3f3d9;
-  --green-text: var(--green-700);
+  /* Darker than --green-700 specifically for GREEN TEXT on a light panel -
+     --green-700 itself is only 3.5:1 there (fails AA at normal text size,
+     see style.md's contrast table); this clears 4.5:1 even on --row, the
+     lightest surface it appears on. */
+  --green-text: #1f6b2c;
 
   /* Red - close/danger only */
   --red-300: #ffab9e;
@@ -64,6 +68,10 @@
      literal colour list, derived to stay in the same red family for a
      "this is an error" surface that isn't the saturated button/icon red. */
   --red-tint: #fbe0dc;
+  /* Darker than --red-700 specifically for RED TEXT on a light panel - same
+     reasoning as --green-text above (--red-700 is 4.48:1 on --panel, under
+     4.5; this clears it everywhere). */
+  --red-text: #a82218;
 
   /* Gold/orange - the existing ribbon/accent + secondary-primary button
      colour (matches the site's own brand orange, index.css --brand/
@@ -72,7 +80,10 @@
   --gold-300: #ffb15c;
   --gold-500: #ff7a29;
   --gold-700: #c94a08;
-  --gold-text: var(--gold-700);
+  /* Darker than --gold-700 specifically for GOLD TEXT on a light panel -
+     same reasoning as --green-text above (--gold-700 is only 3.79:1 on
+     --panel; this clears 4.5:1 everywhere it's used). */
+  --gold-text: #a83d00;
   /* Pale orange surface for tinted rows/badges (unread mail, "needs you",
      low-funds) - same reasoning as --red-tint. */
   --gold-tint: #ffe8d3;

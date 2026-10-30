@@ -219,5 +219,5 @@
 }
 
 .game-row-meta.is-error {
-  color: var(--red-700);
+  color: var(--red-text);
 }

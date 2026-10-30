@@ -573,7 +573,7 @@
 .club-war-points {
   flex-shrink: 0;
   font-weight: 900;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 /* --- War History (ClubWarHistory.jsx) --- */
@@ -910,7 +910,7 @@
 }
 
 .club-member-rows .game-row.is-me .game-row-name {
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .club-member-rows .game-row-clickable:hover,

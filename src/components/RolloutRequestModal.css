@@ -15,7 +15,7 @@
   border-radius: var(--radius-sm);
   background: var(--red-tint);
   border: var(--border-sm) solid var(--red-500);
-  color: var(--red-700);
+  color: var(--red-text);
   font-family: var(--font-body);
   font-size: var(--text-sm);
 }

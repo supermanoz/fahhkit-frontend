@@ -358,7 +358,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--gold-700);
+  color: var(--gold-text);
   font-size: 20px;
 }
 
@@ -396,7 +396,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--gold-700);
+  color: var(--gold-text);
 }
 
 .news-card-meta svg {
