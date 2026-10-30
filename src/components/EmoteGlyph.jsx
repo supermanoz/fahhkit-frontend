@@ -42,6 +42,15 @@ export default function EmoteGlyph({
     <AnimatedSprite
       {...asset}
       height={size}
+      // 20fps (50ms/frame) - HeroFigure's 125/150ms (6.7-8fps) defaults
+      // were tuned for its own slow stretch-pose strips, not these; left
+      // at that pace, a quick action like Victory or Thumbs Up read as
+      // sluggish slow motion, and a long strip (e.g. Bolt's 141-frame
+      // Shoulder Rub, built from un-trimmed source frames) stretched to
+      // a 20+ second loop. 20fps sits in the ~12-24fps range real motion
+      // capture is usually shot at, so played-back speed roughly matches
+      // the source regardless of how many frames a given strip has.
+      frameMs={50}
       className={`emote-glyph-sprite ${active ? 'is-active' : ''}`}
     />
   )

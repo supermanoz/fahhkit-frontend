@@ -7,7 +7,10 @@ import './AnimatedSprite.css'
 // need, pulled out once here so neither duplicates it. `fast` swaps in
 // the quicker run/charge-cycle pacing (125ms/frame) instead of the
 // default relaxed-stretch pacing (150ms/frame) - same two speeds
-// HeroFigure.jsx always used.
+// HeroFigure.jsx always used. `frameMs`, when given, overrides both and
+// sets the per-frame duration directly - see EmoteGlyph.jsx, which needs
+// its own pacing (matching the source capture's ~12-24fps) rather than
+// HeroFigure's slower stretch-pose timing.
 export default function AnimatedSprite({
   src,
   frames,
@@ -15,10 +18,11 @@ export default function AnimatedSprite({
   frameHeight,
   height,
   fast = false,
+  frameMs: frameMsProp,
   className = '',
 }) {
   const width = Math.round((height * frameWidth) / frameHeight)
-  const frameMs = fast ? 125 : 150
+  const frameMs = frameMsProp ?? (fast ? 125 : 150)
   return (
     <span
       key={src}

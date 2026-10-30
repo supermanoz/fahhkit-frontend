@@ -9,7 +9,12 @@ import { playerName } from '../utils/playerName'
 import { getTerritoryProfileByUserId } from '../api/territory'
 import { resolveFileUrl } from '../api/client'
 import { PARCELS_PER_FLAG, formatArea } from '../utils/territoryGame'
-import { isBlazeHero, isCometHero, isPlaceholderHero } from '../utils/hero'
+import {
+  isBlazeHero,
+  isCometHero,
+  isBoltHero,
+  isPlaceholderHero,
+} from '../utils/hero'
 import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
 import './AthleteTerritoryProfilePanel.css'
 
@@ -95,9 +100,9 @@ export default function AthleteTerritoryProfilePanel({
 
   // Their equipped cosmetics, resolved the same way GamePage does for the
   // player's own: the placeholder "Default Hero" counts as none, and no
-  // hero means Comet (the default for now) - both Blaze and Comet have a
-  // Me-tab turntable (see HeroSprite.jsx); any other hero falls back to
-  // Blaze's.
+  // hero means Comet (the default for now) - Blaze, Comet and Bolt all
+  // have a Me-tab turntable (see HeroSprite.jsx); any other hero falls
+  // back to Blaze's.
   const cosmetics = profile?.equippedCosmetics || []
   const equippedOf = (category) =>
     cosmetics.find((c) => c.storeItem?.category === category)
@@ -108,7 +113,8 @@ export default function AthleteTerritoryProfilePanel({
   const showsTurntable =
     !hero ||
     isBlazeHero(hero.storeItem.name) ||
-    isCometHero(hero.storeItem.name)
+    isCometHero(hero.storeItem.name) ||
+    isBoltHero(hero.storeItem.name)
   const background = equippedOf('PROFILE_BACKGROUND')
   const phrase = equippedOf('PHRASE')
   const parcelCount = profile?.parcelCount ?? 0

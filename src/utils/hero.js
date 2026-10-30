@@ -9,6 +9,10 @@ export function isCometHero(name) {
   return typeof name === 'string' && name.trim().toLowerCase() === 'comet'
 }
 
+export function isBoltHero(name) {
+  return typeof name === 'string' && name.trim().toLowerCase() === 'bolt'
+}
+
 // A StoreItem id for a HERO-category item (e.g. Club War's
 // lockedHeroStoreItemId/heroStoreItemId) might be in the full shop catalog
 // or only in what this player owns (an unlocked limited hero that's since

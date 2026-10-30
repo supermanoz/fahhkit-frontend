@@ -129,7 +129,12 @@ import {
   playMenuSound,
   playMilestoneChime,
 } from '../utils/gameSound'
-import { isBlazeHero, isCometHero, isPlaceholderHero } from '../utils/hero'
+import {
+  isBlazeHero,
+  isCometHero,
+  isBoltHero,
+  isPlaceholderHero,
+} from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
 import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
@@ -2721,15 +2726,17 @@ export default function GamePage() {
   const activeHeroName = equippedHero
     ? equippedHero.storeItem.name
     : currentAvatar?.name
-  // Blaze and Comet both have a full animated run-cycle sprite on the map
-  // marker (TerritoryMap.jsx's HERO_MAP_SHEETS) instead of the flat avatar
-  // photo - any other hero has no sheet built, so their marker stays the
-  // flat image (see buildPlayerMarkerIcon there).
+  // Blaze, Comet and Bolt all have a full animated run-cycle sprite on the
+  // map marker (TerritoryMap.jsx's HERO_MAP_SHEETS) instead of the flat
+  // avatar photo - any other hero has no sheet built, so their marker
+  // stays the flat image (see buildPlayerMarkerIcon there).
   const animatedMarkerHero = isBlazeHero(activeHeroName)
     ? 'blaze'
     : isCometHero(activeHeroName)
       ? 'comet'
-      : null
+      : isBoltHero(activeHeroName)
+        ? 'bolt'
+        : null
   // Blaze and Comet are also the heroes with an animated turntable
   // (HeroSprite) instead of a flat image on the Me tab, whether it's the
   // real equipped Store Hero or just the free local avatars.js pick - any

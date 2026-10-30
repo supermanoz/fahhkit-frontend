@@ -8,6 +8,13 @@ import cometEmoteVictorySheet from '../assets/images/comet-emote-victory.webp'
 import cometEmoteJumpingJackSheet from '../assets/images/comet-emote-jumping-jack.webp'
 import cometEmoteShoulderRubSheet from '../assets/images/comet-emote-shoulder-rub.webp'
 import cometEmoteSquatSheet from '../assets/images/comet-emote-squat.webp'
+import boltEmoteVictorySheet from '../assets/images/bolt-emote-victory.webp'
+import boltEmoteCheckingShoesSheet from '../assets/images/bolt-emote-checking-shoes.webp'
+import boltEmoteJumpingJackSheet from '../assets/images/bolt-emote-jumping-jack.webp'
+import boltEmoteShoulderRubSheet from '../assets/images/bolt-emote-shoulder-rub.webp'
+import boltEmoteSquatSheet from '../assets/images/bolt-emote-squat.webp'
+import boltEmoteThumbsUpSheet from '../assets/images/bolt-emote-thumbs-up.webp'
+import boltEmoteWavingHandSheet from '../assets/images/bolt-emote-waving-hand.webp'
 
 // Central emote registry - the ONLY place in the app that turns an EMOTE
 // StoreItem into a picture. StoreItem.assetUrl is never populated for
@@ -109,6 +116,56 @@ const EXTRA_EMOTE_SPRITES = {
       src: cometEmoteSquatSheet,
       frames: 24,
       frameWidth: 98,
+      frameHeight: 190,
+    },
+  },
+  // See scripts/build_bolt_stretch_strips.py (the "Bolt_1/Bolt" drop) -
+  // Bolt's source has every pose Blaze does (Checking Shoes included) plus
+  // two nobody else has yet: Thumbs Up and Waving Hand. Both need a real
+  // EMOTE StoreItem row before they're purchasable (see this file's own
+  // top comment) - ask an admin to create them via EmoteAdminPanel.jsx
+  // with exactly these names, heroId = Bolt's.
+  bolt: {
+    victory: {
+      src: boltEmoteVictorySheet,
+      frames: 109,
+      frameWidth: 119,
+      frameHeight: 190,
+    },
+    'checking shoes': {
+      src: boltEmoteCheckingShoesSheet,
+      frames: 114,
+      frameWidth: 106,
+      frameHeight: 190,
+    },
+    'jumping jack': {
+      src: boltEmoteJumpingJackSheet,
+      frames: 27,
+      frameWidth: 132,
+      frameHeight: 190,
+    },
+    'shoulder rub': {
+      src: boltEmoteShoulderRubSheet,
+      frames: 141,
+      frameWidth: 99,
+      frameHeight: 190,
+    },
+    squat: {
+      src: boltEmoteSquatSheet,
+      frames: 45,
+      frameWidth: 104,
+      frameHeight: 190,
+    },
+    'thumbs up': {
+      src: boltEmoteThumbsUpSheet,
+      frames: 101,
+      frameWidth: 103,
+      frameHeight: 190,
+    },
+    'waving hand': {
+      src: boltEmoteWavingHandSheet,
+      frames: 36,
+      frameWidth: 107,
       frameHeight: 190,
     },
   },
