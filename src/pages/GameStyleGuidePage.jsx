@@ -32,74 +32,53 @@ import './GameStyleGuidePage.css'
 // the swatch grid and the automated contrast table both work from one
 // source of truth without a CSS-parsing step.
 const TOKEN_GROUPS = [
-  { title: 'Ink', tokens: { '--ink': '#0a0f2c' } },
+  { title: 'Ink', tokens: { '--ink': '#3d2b1a' } },
   {
-    title: 'Surfaces',
+    title: 'Loading overlay',
     tokens: {
-      '--bg-900': '#0b1026',
-      '--bg-800': '#141b3d',
-      '--surface-700': '#1e2a5a',
-      '--surface-600': '#2a3a78',
-      '--line': '#3b4f9a',
+      '--bg-900': '#0a0806',
     },
   },
   {
-    title: 'Frost / white',
+    title: 'Panels / rows (wood)',
     tokens: {
-      '--frost-50': '#f7faff',
-      '--frost-100': '#eaf2ff',
-      '--frost-200': '#d3e3ff',
-      '--frost-ink': '#1a2550',
+      '--panel': '#e0a355',
+      '--row': '#a8672c',
+      '--divider': '#767a6d',
+      '--tab-inactive': '#aeb3a6',
+      '--white': '#ffffff',
     },
   },
   {
-    title: 'Sky (brand + primary)',
+    title: 'Gold (default action/currency)',
     tokens: {
-      '--sky-300': '#7fd6ff',
-      '--sky-500': '#2fa8ff',
-      '--sky-700': '#1673d6',
-      '--sky-900': '#0b4a99',
-    },
-  },
-  {
-    title: 'Violet (premium)',
-    tokens: {
-      '--violet-300': '#b79bff',
-      '--violet-500': '#7c4dff',
-      '--violet-700': '#5229cc',
-      '--violet-900': '#331a85',
+      '--gold-300': '#ffb15c',
+      '--gold-500': '#ff7a29',
+      '--gold-700': '#c94a08',
     },
   },
   {
     title: 'Green (success only)',
     tokens: {
-      '--green-300': '#6ef0a6',
-      '--green-500': '#22c55e',
-      '--green-700': '#15803d',
+      '--green-300': '#a8f0af',
+      '--green-500': '#4fc85e',
+      '--green-700': '#268a3a',
     },
   },
   {
     title: 'Red (danger only)',
     tokens: {
-      '--red-300': '#ff8a96',
-      '--red-500': '#ef3b4f',
-      '--red-700': '#b3192d',
-    },
-  },
-  {
-    title: 'Gold (coins / trophies / rank-1 ONLY)',
-    tokens: {
-      '--gold-300': '#ffe07a',
-      '--gold-500': '#ffc531',
-      '--gold-700': '#c98a00',
+      '--red-300': '#ffab9e',
+      '--red-500': '#ff5a4d',
+      '--red-700': '#c72a20',
     },
   },
   {
     title: 'Rarity',
     tokens: {
-      '--rarity-common': '#a9b6d6',
-      '--rarity-rare': '#2fa8ff',
-      '--rarity-epic': '#7c4dff',
+      '--rarity-common': '#8a8a84',
+      '--rarity-rare': '#3a7bd5',
+      '--rarity-epic': '#8a4fe0',
       '--rarity-legendary': '#ffc531',
     },
   },
@@ -132,104 +111,96 @@ const TYPE_SCALE = [
 // Real usage pairs - not every possible combination, the ones the component
 // library above actually renders. Buttons/tabs/ribbons are sized and
 // weighted (see components.css) specifically so they legitimately qualify
-// for WCAG's "large text" 3:1 threshold (>=18.66px bold) - no stroke/
-// mitigation needed anywhere in this table, every pair passes on raw fill
-// colour alone.
+// for WCAG's "large text" 3:1 threshold (>=18.66px bold) where noted.
 const CONTRAST_PAIRS = [
   {
-    label: 'White body text on bg-900 (page bg)',
+    label: 'Ink body text on panel (wood)',
+    fg: '#3d2b1a',
+    bg: '#e0a355',
+    large: false,
+  },
+  {
+    label: 'Ink body text on row (wood-dark)',
+    fg: '#3d2b1a',
+    bg: '#a8672c',
+    large: false,
+  },
+  {
+    label: 'Text-muted on panel (wood)',
+    fg: '#6e5a42',
+    bg: '#e0a355',
+    large: false,
+  },
+  {
+    label: 'White text on bg-900 (loading overlay)',
     fg: '#ffffff',
-    bg: '#0b1026',
+    bg: '#0a0806',
     large: false,
   },
   {
-    label: 'White body text on bg-800 (panel)',
+    label: 'Cream text on bg-900 (loading overlay)',
+    fg: '#fff6e6',
+    bg: '#0a0806',
+    large: false,
+  },
+  {
+    label: 'White outlined stat value on panel (44px)',
     fg: '#ffffff',
-    bg: '#141b3d',
-    large: false,
-  },
-  {
-    label: 'Muted text on bg-800 (panel)',
-    fg: '#b6c2e8',
-    bg: '#141b3d',
-    large: false,
-  },
-  {
-    label: 'Muted text on bg-900 (page bg)',
-    fg: '#b6c2e8',
-    bg: '#0b1026',
-    large: false,
-  },
-  {
-    label: 'Frost-ink text on frost-100 (card)',
-    fg: '#1a2550',
-    bg: '#f7faff',
-    large: false,
-  },
-  {
-    label: 'Gold-300 outlined stat value on bg-800 (44px)',
-    fg: '#ffe07a',
-    bg: '#141b3d',
+    bg: '#e0a355',
     large: true,
   },
   {
-    label: 'Ink label on gold-500 (currency pill / ribbon)',
-    fg: '#0a0f2c',
-    bg: '#ffc531',
+    label: 'White label on gold-500 (currency pill / ribbon)',
+    fg: '#ffffff',
+    bg: '#ff7a29',
     large: false,
   },
   {
-    label: 'Ink button label on sky-500 (primary, 20px/700)',
-    fg: '#0a0f2c',
-    bg: '#2fa8ff',
+    label: 'White button label on gold-500 (primary, 20px/700)',
+    fg: '#ffffff',
+    bg: '#ff7a29',
     large: true,
   },
   {
-    label: 'Ink button label on green-500 (success, 20px/700)',
-    fg: '#0a0f2c',
-    bg: '#22c55e',
-    large: true,
-  },
-  {
-    label: 'Ink button label on violet-500 (premium, 20px/700)',
-    fg: '#0a0f2c',
-    bg: '#7c4dff',
+    label: 'White button label on green-500 (success, 20px/700)',
+    fg: '#ffffff',
+    bg: '#4fc85e',
     large: true,
   },
   {
     label: 'White button label on red-500 (danger, 20px/700)',
     fg: '#ffffff',
-    bg: '#ef3b4f',
+    bg: '#ff5a4d',
     large: true,
   },
   {
-    label: 'Frost-ink secondary button on frost-100',
-    fg: '#1a2550',
-    bg: '#f7faff',
+    label: 'Ink secondary button on stone (tab-inactive)',
+    fg: '#3d2b1a',
+    bg: '#aeb3a6',
     large: true,
   },
   {
-    label: 'Sky-300 ghost button text on bg-900',
-    fg: '#7fd6ff',
-    bg: '#0b1026',
+    label: 'Gold-300 ghost button text on bg-900',
+    fg: '#ffb15c',
+    bg: '#0a0806',
     large: false,
   },
   {
-    label: 'White active-tab label on sky-700 (gradient anchor)',
+    label: 'White active-tab label on gold-700 (gradient anchor)',
     fg: '#ffffff',
-    bg: '#1673d6',
+    bg: '#c94a08',
     large: false,
   },
   {
-    label: 'White active-tab label on violet-700 (premium anchor)',
+    label: 'White active-tab label on green-700 (gradient anchor)',
     fg: '#ffffff',
-    bg: '#5229cc',
+    bg: '#268a3a',
     large: false,
   },
   {
-    label: 'White modal ribbon text on sky-700 (gradient anchor)',
+    label: 'White modal ribbon text on gold-700 (gradient anchor)',
     fg: '#ffffff',
-    bg: '#1673d6',
+    bg: '#c94a08',
     large: false,
   },
 ]
@@ -386,9 +357,9 @@ export default function GameStyleGuidePage() {
       <div className="game-root sg-page">
         <h1 className="text-outlined">Run Conquest - Style Guide</h1>
         <p className="sg-intro">
-          Dev-only reference for every token and shared component in the /game
-          re-skin (&quot;Frost &amp; Amethyst&quot;). Not linked from
-          navigation. Visible only in development builds.
+          Dev-only reference for every token and shared component in /game
+          (original wood/gold palette). Not linked from navigation. Visible only
+          in development builds.
         </p>
 
         <section>

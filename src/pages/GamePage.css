@@ -1,13 +1,10 @@
-/* CoC-style default palette (2026-10-30): --game-* now aliases the new
-   whitish/black/green tokens (src/game/styles/tokens.css) instead of
-   literal wood/gold hex - same one-place-cascades-everywhere mechanism
-   the last two palette passes used. Two things stay exactly as they are,
-   not touched here: the loading screen (.game-loading-overlay and its
-   descendants, further down this file - still reads var(--bg-900) and a
-   few of the gold and cream variables, frozen to their current literal
-   hex right there, specifically so they don't drift when --game-star
-   changes again) and the intro globe (GameIntroGlobe - untokenized,
-   MapLibre's own globe-projection sky). Fonts are unaffected, colour only.
+/* Restored (2026-10-30) to the original warm wood/gold default: --game-*
+   aliases src/game/styles/tokens.css, now recoloured back to its original
+   wood/stone/gold/green/red values - same one-place-cascades-everywhere
+   mechanism the two later palette passes used, kept as infrastructure even
+   though the colours themselves went back. The intro globe (GameIntroGlobe
+   - untokenized, MapLibre's own globe-projection sky) stays exactly as it
+   is, untouched by any of this. Fonts are unaffected, colour only.
 
    Caution for future edits: do not write a literal asterisk immediately
    followed by a slash inside this comment block (even across a variable
@@ -15,67 +12,51 @@
    early and drops the whole rule below with no build error, exactly what
    happened here once already this session.
 
-   The wood and stone variables were always neutral panel and control
-   surface roles, so they alias straight onto the new panel, row and
-   divider tokens. The gold variable was "primary action and currency" at
-   once under the old system; under this one, green is the default action
-   colour, so it aliases there by default, with a short list of genuine
-   currency, medal and trophy selectors below overriding it back to real
-   gold (same split this file used for the "gold only for coins" rule two
-   palettes ago). The cream variable was "light text readable on a dark
-   panel" - panels are light now, so it aliases to ink (near-black)
-   instead; anywhere that still needs white-on-colour (badges on a green,
-   red or gold surface, headings and button labels with their own stroke)
-   keeps literal white, untouched by this alias. */
+   --game-wood-light, --game-stone-light and --game-cream are literal hex
+   here rather than aliases: --white has to stay pure white for the many
+   genuine white-on-colour uses elsewhere (badges, button labels with their
+   own stroke), so it can't also stand in for the original's tan/pale-grey/
+   cream tones. --game-panel is likewise its own literal dark tone (the
+   solid replacement for the original's translucent dark overlay, per the
+   transparency-removal pass) rather than aliasing --panel, which is now
+   the light wood colour used for actual card/modal surfaces. --game-gold
+   aliases straight to --gold-* by default here (real gold is the primary
+   action/currency colour again), so the "genuine currency stays gold"
+   override this file needed under the two intervening palettes - where
+   gold defaulted to something else - is gone; it would just set --game-
+   gold to the value it already has. */
 .game-page {
   --game-ink: var(--ink);
   --game-wood: var(--panel);
   --game-wood-dark: var(--row);
-  --game-wood-light: var(--white);
+  --game-wood-light: #ffd9a0;
   --game-stone: var(--tab-inactive);
   --game-stone-dark: var(--divider);
-  --game-stone-light: var(--white);
-  --game-gold: var(--green-500);
-  --game-gold-dark: var(--green-700);
-  --game-gold-light: var(--green-300);
+  --game-stone-light: #dfe2d6;
+  --game-gold: var(--gold-500);
+  --game-gold-dark: var(--gold-700);
+  --game-gold-light: var(--gold-300);
   --game-green: var(--green-500);
   --game-green-dark: var(--green-700);
   --game-green-light: var(--green-300);
   --game-red: var(--red-500);
   --game-red-dark: var(--red-700);
   --game-red-light: var(--red-300);
-  --game-cream: var(--ink);
-  --game-panel: var(--panel);
+  --game-cream: #fff6e6;
+  --game-panel: #2c2014;
 
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100dvh;
   overflow: hidden;
-  background: var(--panel);
+  background: #0a0806;
   font-family: var(--font-body);
   font-weight: 600;
 }
 
-/* Genuine currency/medal/trophy context - stays real gold, not the green
-   default above. Same audited selector list as the Frost & Amethyst pass
-   (medal/coin/trophy/tone-gold keywords across every /game CSS file). */
-.game-menu-picker-medal.tone-battle,
-.medal-season-chip,
-.medal-tile.is-earned,
-.medal-tile-preview,
-.club-coin,
-.club-perk-icon.tone-gold,
-.pvp-choice-icon.tone-gold {
-  --game-gold: var(--gold-500);
-  --game-gold-dark: var(--gold-700);
-  --game-gold-light: var(--gold-300);
-}
-
-/* "Equipped"/"owned" state - stays green (success), not whatever --game-
-   gold resolves to by default (which is also green now, so this mostly
-   just documents intent - kept so it still works correctly if --game-gold
-   is ever split from green again). */
+/* "Equipped"/"owned" state - stays green (success), distinct from the real
+   gold --game-gold now defaults to. */
 .shade-tile.is-equipped,
 .emote-tile.is-equipped,
 .emote-hero-pick.is-owned {

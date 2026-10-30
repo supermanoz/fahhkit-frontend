@@ -1,66 +1,68 @@
 /* Design tokens for /game.
-   CoC-style default (2026-10-30): whitish/light-grey panels, black/near-
-   black ink for borders+text+outlines, green as the default button colour,
-   red for close/danger, gold reserved for coins/trophies/rank-1 only.
-   Replaces the earlier "Frost & Amethyst" indigo/sky/violet set as the
-   default everywhere in /game, EXCEPT the loading/splash screen (still
-   --bg-900 below - kept only for that, not a general-purpose token any
-   more) and the globe (untokenized either way - MapLibre's own sky),
-   which stay exactly as they are. Scoped on .game-root so the rest of the
-   site is unaffected. No hex colour should exist anywhere in /game outside
-   this file once migration is complete. Check with:
+   Restored (2026-10-30) to the original warm wood/gold "war-table" default:
+   wood-tan panels, dark-brown ink for borders+text+outlines, orange-gold as
+   the default button/accent colour, green for success/go, red for close/
+   danger, real gold reserved for coins/trophies/rank-1. Replaces BOTH later
+   experiments - "Frost & Amethyst" (indigo/sky/violet) and the CoC-style
+   whitish/black/green pass - as the default everywhere in /game, EXCEPT the
+   intro globe (untokenized either way - MapLibre's own sky), which stays
+   exactly as it is. --bg-900 also goes back to its original literal value
+   so the /game loading overlay (which still reads it, see GamePage.css)
+   matches too. Scoped on .game-root so the rest of the site is unaffected.
+   The token NAMES here are newer infrastructure kept from the two palette
+   passes (lets every /game file share one set of variables instead of each
+   hard-coding hex) - only the VALUES below were reverted. No hex colour
+   should exist anywhere in /game outside this file once migration is
+   complete. Check with:
      grep -rEo "#[0-9a-fA-F]{3,8}" src/game src/pages/GamePage.css src/components/*.css
-   and confirm every hit is inside this file (or the loading-screen /
-   globe exemption, see style.md). */
+   and confirm every hit is inside this file (or the globe exemption, see
+   style.md). */
 .game-root {
-  /* Splash screen only - everything else in /game reads --ink/--panel/
+  /* Loading overlay only - everything else in /game reads --ink/--panel/
      etc below instead. Kept as its own token (not reused for anything
      else) so the loading screen's look can't drift if this file's other
      tokens change later. */
-  --bg-900: #0b1026;
+  --bg-900: #0a0806;
 
   /* Ink - borders (2-3px), body text, icons */
-  --ink: #1a1a1a;
+  --ink: #3d2b1a;
 
-  /* Panels / menus / modals / cards - fully solid, no alpha */
-  --panel: #f4f4f0;
-  --row: #e3e3dd;
-  --divider: #cfcfc8;
+  /* Panels / menus / modals / cards - fully solid, no alpha (wood tones) */
+  --panel: #e0a355;
+  --row: #a8672c;
+  --divider: #767a6d;
   --white: #ffffff;
-  --tab-inactive: #d9d9d3;
+  --tab-inactive: #aeb3a6;
 
-  /* Green - the default/primary button colour */
-  --green-300: #8ee04a;
-  --green-500: #5cb82a;
-  --green-700: #3c8a18;
+  /* Green - success/go, not the default button colour here */
+  --green-300: #a8f0af;
+  --green-500: #4fc85e;
+  --green-700: #268a3a;
   /* Pale green surface for success banners - same reasoning as --red-tint
-     above. */
-  --green-tint: #e6f7d9;
-  /* Darker than --green-700 specifically for green TEXT on --green-tint -
-     --green-700 itself is only 3.86:1 there (fails AA); this clears 4.5:1. */
-  --green-text: #2f6e13;
+     below. */
+  --green-tint: #e3f3d9;
+  --green-text: var(--green-700);
 
   /* Red - close/danger only */
-  --red-300: #ff6b5c;
-  --red-500: #e23b2e;
-  --red-700: #a82a1f;
-  /* Pale red surface for error banners/chips on the light panel - not part
-     of the spec's literal colour list, derived to stay in the same red
-     family for a "this is an error" surface that isn't the saturated
-     button/icon red. */
-  --red-tint: #fbe4e1;
+  --red-300: #ffab9e;
+  --red-500: #ff5a4d;
+  --red-700: #c72a20;
+  /* Pale red surface for error banners/chips - not part of the original
+     literal colour list, derived to stay in the same red family for a
+     "this is an error" surface that isn't the saturated button/icon red. */
+  --red-tint: #fbe0dc;
 
-  /* Gold - ONLY coins, trophies, rank-1 */
-  --gold-300: #ffe07a;
-  --gold-500: #ffc531;
-  --gold-700: #c98a00;
-  /* Darker than --gold-700 specifically for gold TEXT on the light panel -
-     --gold-700 itself is only 2.68:1 there (fails AA); this clears 4.5:1. */
-  --gold-text: #8a5e00;
+  /* Gold - the default/primary button+accent colour here (matches the
+     site's own brand orange, index.css --brand/--brand-amber/--brand-dark -
+     one warm orange identity, not a separate in-game yellow) */
+  --gold-300: #ffb15c;
+  --gold-500: #ff7a29;
+  --gold-700: #c94a08;
+  --gold-text: var(--gold-700);
 
   /* Text */
-  --text: #1a1a1a;
-  --text-muted: #5a5a54;
+  --text: var(--ink);
+  --text-muted: #6e5a42;
   --text-on-panel: var(--ink);
   --text-link: var(--green-700);
 
