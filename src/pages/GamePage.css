@@ -1,49 +1,52 @@
-/* Restored (2026-10-30) to the original warm wood/gold default: --game-*
-   aliases src/game/styles/tokens.css, now recoloured back to its original
-   wood/stone/gold/green/red values - same one-place-cascades-everywhere
-   mechanism the two later palette passes used, kept as infrastructure even
-   though the colours themselves went back. The intro globe (GameIntroGlobe
-   - untokenized, MapLibre's own globe-projection sky) stays exactly as it
-   is, untouched by any of this. Fonts are unaffected, colour only.
+/* Custom in-game display font (Passion One, bold slab) - bundled locally
+   rather than loaded from Google Fonts so the game still reads right
+   offline/on a flaky connection. Scoped to .game-page (see the font-family
+   rule below) so the rest of the site keeps its own type. */
+@font-face {
+  font-family: 'Passion One';
+  src: url('../assets/fonts/PassionOne-Bold.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
 
-   Caution for future edits: do not write a literal asterisk immediately
-   followed by a slash inside this comment block (even across a variable
-   name like "gold star slash cream") - it silently closes the comment
-   early and drops the whole rule below with no build error, exactly what
-   happened here once already this session.
+@font-face {
+  font-family: 'Passion One';
+  src: url('../assets/fonts/PassionOne-Black.ttf') format('truetype');
+  font-weight: 800 900;
+  font-style: normal;
+  font-display: swap;
+}
 
-   --game-wood-light, --game-stone-light and --game-cream are literal hex
-   here rather than aliases: --white has to stay pure white for the many
-   genuine white-on-colour uses elsewhere (badges, button labels with their
-   own stroke), so it can't also stand in for the original's tan/pale-grey/
-   cream tones. --game-panel is likewise its own literal dark tone (the
-   solid replacement for the original's translucent dark overlay, per the
-   transparency-removal pass) rather than aliasing --panel, which is now
-   the light wood colour used for actual card/modal surfaces. --game-gold
-   aliases straight to --gold-* by default here (real gold is the primary
-   action/currency colour again), so the "genuine currency stays gold"
-   override this file needed under the two intervening palettes - where
-   gold defaulted to something else - is gone; it would just set --game-
-   gold to the value it already has. */
+/* Palette + cel-shading recipe documented in /style.md — CSS custom
+   properties here so TerritoryMap's own stylesheet (a DOM descendant of
+   .game-page) can reuse the same tokens without duplicating hex values.
+   Punched up brighter/more saturated than the original muted set (still
+   readable, just less "sun-faded board game" and more "premium mobile
+   game") - see the glossy gradient buttons below for the other half of
+   that same shift. */
 .game-page {
-  --game-ink: var(--ink);
-  --game-wood: var(--panel);
-  --game-wood-dark: var(--row);
+  --game-ink: #3d2b1a;
+  --game-wood: #e0a355;
+  --game-wood-dark: #a8672c;
   --game-wood-light: #ffd9a0;
-  --game-stone: var(--tab-inactive);
-  --game-stone-dark: var(--divider);
+  --game-stone: #aeb3a6;
+  --game-stone-dark: #767a6d;
   --game-stone-light: #dfe2d6;
-  --game-gold: var(--gold-500);
-  --game-gold-dark: var(--gold-700);
-  --game-gold-light: var(--gold-300);
-  --game-green: var(--green-500);
-  --game-green-dark: var(--green-700);
-  --game-green-light: var(--green-300);
-  --game-red: var(--red-500);
-  --game-red-dark: var(--red-700);
-  --game-red-light: var(--red-300);
+  /* Matches the site's own brand orange (index.css --brand/--brand-amber/
+     --brand-dark) instead of a separate in-game yellow/gold - one warm
+     orange identity across the whole product, not two competing ones. */
+  --game-gold: #ff7a29;
+  --game-gold-dark: #c94a08;
+  --game-gold-light: #ffb15c;
+  --game-green: #4fc85e;
+  --game-green-dark: #268a3a;
+  --game-green-light: #a8f0af;
+  --game-red: #ff5a4d;
+  --game-red-dark: #c72a20;
+  --game-red-light: #ffab9e;
   --game-cream: #fff6e6;
-  --game-panel: #2c2014;
+  --game-panel: rgba(44, 32, 20, 0.92);
 
   position: fixed;
   inset: 0;
@@ -51,18 +54,19 @@
   height: 100dvh;
   overflow: hidden;
   background: #0a0806;
-  font-family: var(--font-body);
-  font-weight: 600;
-}
-
-/* "Equipped"/"owned" state - stays green (success), distinct from the real
-   gold --game-gold now defaults to. */
-.shade-tile.is-equipped,
-.emote-tile.is-equipped,
-.emote-hero-pick.is-owned {
-  --game-gold: var(--green-500);
-  --game-gold-dark: var(--green-700);
-  --game-gold-light: var(--green-300);
+  font-family: 'Passion One', 'Trebuchet MS', sans-serif;
+  letter-spacing: 0.08em;
+  /* No default text-shadow here any more - it used to put the same dark
+     ink outline behind every bit of text, buttons included. That's fine
+     for white lettering on a busy wood/stone card (see .game-card-title,
+     .game-btn - they still carry their own explicit outline recipe), but
+     stacked behind text that's ALREADY --game-ink coloured it just blurred
+     the glyph into a dark smudge - the actual cause of the "black text is
+     unreadable" reports. Dark-on-light labels now opt out of Passion One
+     entirely instead (see .game-card-light, .club-role, .game-menu-avatar-
+     name/-tag and friends) - a plain bold UI face reads far better at
+     small sizes than a display/poster font with no outline to prop up its
+     strokes. */
 }
 
 .game-page button,
@@ -96,7 +100,7 @@
       rgba(201, 74, 8, 0.35) 0%,
       rgba(10, 8, 6, 0) 60%
     ),
-    var(--bg-900);
+    #0a0806;
 }
 
 /* Run Conquest logo front and centre while the map loads - moved here
@@ -143,7 +147,12 @@
   position: relative;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #ffb15c, #ff7a29 70%, #c94a08);
+  background: linear-gradient(
+    90deg,
+    var(--game-gold-light),
+    var(--game-gold) 70%,
+    var(--game-gold-dark)
+  );
   box-shadow: 0 0 8px rgba(255, 122, 41, 0.6);
   transition: width 0.15s linear;
   overflow: hidden;
@@ -176,7 +185,7 @@
 
 .game-loading-text {
   margin: 0;
-  color: #fff6e6;
+  color: var(--game-cream);
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.02em;
@@ -190,7 +199,7 @@
 .game-loading-tap-hint {
   font-size: 13px;
   font-weight: 600;
-  color: #ffb15c;
+  color: var(--game-gold-light);
   animation: game-loading-tap-pulse 1.6s ease-in-out infinite;
 }
 
@@ -296,16 +305,12 @@
     25% 7%,
     41% 17%
   );
-  background: linear-gradient(
-    180deg,
-    var(--tab-inactive) 0%,
-    var(--team-slate) 100%
-  );
+  background: linear-gradient(180deg, #b8e2ff 0%, #6bb8f5 100%);
 }
 
 .game-hud-level-num {
   position: relative;
-  color: var(--ink);
+  color: #fff;
   font-weight: 900;
   font-size: 23px;
   line-height: 1;
@@ -332,7 +337,7 @@
   width: 150px;
   height: 24px;
   border-radius: 7px;
-  background: rgb(128, 129, 123);
+  background: rgba(225, 228, 218, 0.55);
   border: 2.5px solid var(--game-ink);
   overflow: hidden;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
@@ -347,7 +352,7 @@
   right: 4px;
   height: 5px;
   border-radius: 999px;
-  background: rgb(108, 107, 106);
+  background: rgba(255, 255, 255, 0.4);
   pointer-events: none;
 }
 
@@ -358,8 +363,8 @@
   /* Blue to match the level badge - light top half, deeper bottom half. */
   background: linear-gradient(
     180deg,
-    var(--divider) 0%,
-    var(--divider) 48%,
+    #9ad4ff 0%,
+    #9ad4ff 48%,
     #2f8ee8 52%,
     #1a5fb4 100%
   );
@@ -378,7 +383,7 @@
   overflow: visible;
   white-space: nowrap;
   padding: 1px 8px 2px;
-  color: var(--white);
+  color: #fff;
   font-size: 13px;
   font-weight: 800;
   line-height: 1.1;
@@ -400,7 +405,7 @@
 .game-menu-close svg,
 .game-run-viewer-close svg,
 .game-hud-icon-flag svg {
-  color: var(--ink);
+  color: #fff;
 }
 
 /* Fortnite/Clash-style "zone" banner - fires the instant the player's dot
@@ -412,8 +417,8 @@
    pickWeatherHype in utils/mapAmbience.js). Same chunky game-badge look as
    the territory entry banner, tinted to the current sky. Tap dismisses. */
 .game-weather-hype {
-  --hype-a: var(--team-tangerine);
-  --hype-b: var(--red-300);
+  --hype-a: #ffb347;
+  --hype-b: #ff7a29;
   --hype-glow: rgba(255, 150, 60, 0.55);
   position: absolute;
   top: 76px;
@@ -432,7 +437,7 @@
     inset 0 2px 2px rgba(255, 255, 255, 0.4),
     0 4px 0 var(--game-ink),
     0 0 22px var(--hype-glow);
-  color: var(--ink);
+  color: #fff;
   font: inherit;
   text-align: left;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -441,21 +446,21 @@
 
 .game-weather-hype.sky-rain,
 .game-weather-hype.sky-storm {
-  --hype-a: var(--rarity-rare);
-  --hype-b: var(--text-muted);
+  --hype-a: #4a7fd4;
+  --hype-b: #274b8f;
   --hype-glow: rgba(74, 127, 212, 0.55);
 }
 
 .game-weather-hype.sky-overcast,
 .game-weather-hype.sky-fog {
-  --hype-a: var(--rarity-common);
-  --hype-b: var(--text-muted);
+  --hype-a: #8a93a3;
+  --hype-b: #5a6273;
   --hype-glow: rgba(120, 130, 150, 0.5);
 }
 
 .game-weather-hype.sky-snow {
-  --hype-a: var(--team-slate);
-  --hype-b: var(--rarity-rare);
+  --hype-a: #7cc4e8;
+  --hype-b: #3f8fc0;
   --hype-glow: rgba(124, 196, 232, 0.6);
 }
 
@@ -492,8 +497,8 @@
    real close button, and a bottom progress bar timed to the auto-dismiss
    below. */
 .game-weather-toast {
-  --toast-a: var(--team-tangerine);
-  --toast-b: var(--gold-700);
+  --toast-a: #e0a355;
+  --toast-b: #a8672c;
   position: absolute;
   top: calc(76px + env(safe-area-inset-top));
   left: 50%;
@@ -510,7 +515,7 @@
   box-shadow:
     inset 0 2px 2px rgba(255, 255, 255, 0.35),
     0 4px 0 var(--game-ink);
-  color: var(--ink);
+  color: #fff;
   overflow: hidden;
 }
 
@@ -520,46 +525,46 @@
    pickWeatherHype's own `key` (see its comment on why that's more
    accurate than the old sky-only className was). */
 .game-weather-toast.key-dawn {
-  --toast-a: var(--team-tangerine);
-  --toast-b: var(--red-500);
+  --toast-a: #ff9d4d;
+  --toast-b: #c94a08;
 }
 
 .game-weather-toast.key-dusk {
-  --toast-a: var(--team-tangerine);
-  --toast-b: var(--red-500);
+  --toast-a: #ffb15c;
+  --toast-b: #c25a12;
 }
 
 .game-weather-toast.key-night {
-  --toast-a: var(--rarity-epic);
-  --toast-b: var(--ink);
+  --toast-a: #6a4fc9;
+  --toast-b: #2b1f57;
 }
 
 .game-weather-toast.key-rain,
 .game-weather-toast.key-storm {
-  --toast-a: var(--team-slate);
-  --toast-b: var(--text-muted);
+  --toast-a: #5aa9ff;
+  --toast-b: #1f4f8f;
 }
 
 .game-weather-toast.key-fog,
 .game-weather-toast.key-overcast {
-  --toast-a: var(--divider);
-  --toast-b: var(--text-muted);
+  --toast-a: #9aa2ad;
+  --toast-b: #4a515c;
 }
 
 .game-weather-toast.key-snow,
 .game-weather-toast.key-freezing {
-  --toast-a: var(--team-slate);
-  --toast-b: var(--rarity-rare);
+  --toast-a: #7fd3ef;
+  --toast-b: #2f6b8f;
 }
 
 .game-weather-toast.key-scorching {
-  --toast-a: var(--red-300);
-  --toast-b: var(--red-700);
+  --toast-a: #ff6a5a;
+  --toast-b: #a81f12;
 }
 
 .game-weather-toast.key-clear {
-  --toast-a: var(--gold-300);
-  --toast-b: var(--gold-700);
+  --toast-a: #ffd668;
+  --toast-b: #c98600;
 }
 
 .game-weather-toast-emoji-wrap {
@@ -570,7 +575,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgb(64, 62, 61);
+  background: rgba(255, 255, 255, 0.22);
   border: 2px solid rgba(255, 255, 255, 0.4);
 }
 
@@ -609,7 +614,7 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
-  background: rgb(8, 6, 4);
+  background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -634,8 +639,8 @@
   padding: 0;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.35);
-  background: rgb(8, 6, 5);
-  color: var(--ink);
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
   font-size: 11px;
   cursor: pointer;
 }
@@ -649,7 +654,7 @@
   bottom: 0;
   height: 3px;
   width: 100%;
-  background: rgb(145, 144, 143);
+  background: rgba(255, 255, 255, 0.55);
   transform-origin: left;
   animation: game-weather-toast-shrink 5s linear forwards;
 }
@@ -687,16 +692,16 @@
   border-radius: 20px;
   background: linear-gradient(
     135deg,
-    var(--game-red-light, var(--red-300)),
-    var(--game-red, var(--red-500)) 60%,
-    var(--game-red-dark, var(--red-700)) 100%
+    var(--game-red-light, #e8654f),
+    var(--game-red, #d13b2c) 60%,
+    var(--game-red-dark, #a52a1e) 100%
   );
   border: 3px solid var(--game-ink);
   box-shadow:
     inset 0 2px 2px rgba(255, 255, 255, 0.4),
     0 4px 0 var(--game-ink),
     0 0 18px rgba(209, 59, 44, 0.55);
-  color: var(--white);
+  color: #fff;
   font-weight: 700;
   font-size: 14px;
   text-align: center;
@@ -803,12 +808,12 @@
 .game-hud-icon-coin {
   background: radial-gradient(
     circle at 50% 50%,
-    var(--gold-300) 0%,
-    var(--gold-500) 52%,
-    var(--gold-700) 58%,
-    var(--gold-500) 70%,
-    var(--gold-500) 86%,
-    var(--gold-700) 100%
+    #ffe95e 0%,
+    #ffd21f 52%,
+    #d99200 58%,
+    #ffcf2a 70%,
+    #ffb800 86%,
+    #c98600 100%
   );
   box-shadow:
     inset 0 -3px 0 rgba(150, 90, 0, 0.55),
@@ -824,7 +829,7 @@
   width: 40%;
   height: 22%;
   border-radius: 50%;
-  background: rgb(157, 156, 155);
+  background: rgba(255, 255, 255, 0.6);
   transform: rotate(-20deg);
 }
 
@@ -838,7 +843,7 @@
   border-radius: 6px;
   padding: 3px 34px 3px 14px;
   /* Same light translucent track as the XP bar, no dark lower half. */
-  background: rgb(128, 129, 123);
+  background: rgba(225, 228, 218, 0.55);
   border: 2.5px solid var(--game-ink);
   box-shadow: none;
 }
@@ -852,7 +857,7 @@
   right: 22px;
   height: 5px;
   border-radius: 999px;
-  background: rgb(108, 107, 106);
+  background: rgba(255, 255, 255, 0.4);
   pointer-events: none;
 }
 
@@ -896,7 +901,7 @@
   padding-right: 20px;
   font-size: 18px;
   font-weight: 800;
-  color: var(--white);
+  color: #fff;
   -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.5);
   paint-order: stroke fill;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -1020,7 +1025,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 8, 6, 0.6);
+  background: rgba(10, 8, 6, 0.45);
   pointer-events: none;
 }
 
@@ -1043,7 +1048,7 @@
 }
 
 .game-controls-hint-error {
-  color: var(--team-tangerine);
+  color: #e8895f;
   font-weight: 600;
 }
 
@@ -1128,7 +1133,7 @@
   width: 2px;
   align-self: stretch;
   margin: 2px 0;
-  background: rgb(45, 42, 38);
+  background: rgba(246, 236, 217, 0.15);
   border-radius: 1px;
 }
 
@@ -1165,7 +1170,7 @@
 
 .game-run-btn-end {
   border: 3px solid var(--game-ink);
-  color: var(--white);
+  color: #fff;
   background: linear-gradient(
     180deg,
     var(--game-green-light) 0%,
@@ -1184,7 +1189,7 @@
 .game-run-btn-discard {
   border: 2px solid rgba(246, 236, 217, 0.35);
   color: rgba(246, 236, 217, 0.8);
-  background: rgb(8, 6, 4);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 /* --- End-run confirmation modal (GamePage.jsx's confirmAction === 'end'/
@@ -1232,7 +1237,7 @@
 .game-page .btn {
   border-radius: 10px;
   font-weight: 900;
-  color: var(--white);
+  color: #fff;
   text-shadow:
     1px 0 0 var(--game-ink),
     -1px 0 0 var(--game-ink),
@@ -1248,7 +1253,7 @@
     var(--game-green) 45%,
     var(--game-green-dark) 100%
   );
-  color: var(--white);
+  color: #fff;
   border: 3px solid var(--game-ink);
   box-shadow:
     inset 0 -4px 0 var(--game-green-dark),
@@ -1280,7 +1285,7 @@
     var(--game-wood) 45%,
     var(--game-wood-dark) 100%
   );
-  color: var(--ink);
+  color: #fff;
   border: 3px solid var(--game-ink);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -1291,7 +1296,7 @@
 
 .game-page .btn-outline:hover {
   border-color: var(--game-ink);
-  color: var(--ink);
+  color: #fff;
 }
 
 .game-page .btn-outline:active {
@@ -1455,7 +1460,7 @@
   padding-bottom: 22px;
   border-width: 4px;
   border-radius: 24px;
-  background: linear-gradient(180deg, var(--text-muted), var(--ink));
+  background: linear-gradient(180deg, #5a3e24, #3a2816);
   box-shadow:
     inset 0 0 0 3px rgba(224, 163, 85, 0.35),
     inset 0 3px 0 rgba(255, 255, 255, 0.12),
@@ -1527,14 +1532,14 @@
   background: var(--game-stone);
   /* The territory's own color as a ring around the face - see
      TerritoryAvatar's `ringColor` prop. */
-  box-shadow: 0 0 0 3px var(--avatar-ring-color);
+  box-shadow: 0 0 0 3px var(--avatar-ring-color, var(--game-gold));
 }
 
 .game-highlight-toast-avatar.is-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink);
+  color: #fff;
   font-weight: 800;
   font-size: 22px;
   background: var(--game-wood);
@@ -1582,7 +1587,7 @@
   gap: 2px;
   padding: 10px 6px;
   border-radius: 14px;
-  background: rgb(6, 5, 4);
+  background: rgba(0, 0, 0, 0.35);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
@@ -1793,12 +1798,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--game-stone);
-  color: var(--ink);
-  border: 4px solid var(--ink);
+  background: var(--game-stone, #9a9d93);
+  color: #fff;
+  border: 4px solid #000;
   box-shadow:
-    inset 0 -9px 0 var(--game-stone-dark),
-    0 5px 0 var(--ink);
+    inset 0 -9px 0 var(--game-stone-dark, #6e7166),
+    0 5px 0 #000;
   font-size: 22px;
   cursor: pointer;
   transition:
@@ -1809,8 +1814,8 @@
 .game-locate-btn:active {
   transform: translateY(4px);
   box-shadow:
-    inset 0 -9px 0 var(--game-stone-dark),
-    0 1px 0 var(--ink);
+    inset 0 -9px 0 var(--game-stone-dark, #6e7166),
+    0 1px 0 #000;
 }
 
 /* "List" badge (per reference) with a bold near-black ring, but shaded
@@ -1830,12 +1835,12 @@
     var(--game-gold) 55%,
     var(--game-gold-dark) 100%
   );
-  color: var(--ink);
-  border: 4px solid var(--ink);
+  color: #000;
+  border: 4px solid #000;
   box-shadow:
     inset 0 3px 3px rgba(255, 255, 255, 0.6),
     inset 0 -9px 0 var(--game-gold-dark),
-    0 5px 0 var(--ink);
+    0 5px 0 #000;
   font-size: 24px;
   cursor: pointer;
   transition:
@@ -1855,7 +1860,7 @@
   box-shadow:
     inset 0 3px 3px rgba(255, 255, 255, 0.6),
     inset 0 -9px 0 var(--game-gold-dark),
-    0 1px 0 var(--ink);
+    0 1px 0 #000;
 }
 
 /* Dims the map while the radial menu is fanned out, and lets a tap
@@ -1865,7 +1870,7 @@
   position: fixed;
   inset: 0;
   z-index: 650;
-  background: rgba(10, 8, 6, 0.6);
+  background: rgba(10, 8, 6, 0.55);
 }
 
 /* Run Conquest logo shown dead-center while the radial menu is fanned out -
@@ -2145,7 +2150,7 @@
   font-size: 20px;
   font-weight: 900;
   letter-spacing: 0.03em;
-  color: var(--white);
+  color: #fff;
   /* Same outlined lettering as the HUD / hero names: black stroke painted
      under a white fill, plus a drop edge. */
   -webkit-text-stroke: 2.5px var(--game-ink);
@@ -2255,7 +2260,7 @@
       rgba(255, 255, 255, 0.025) 0 6px,
       transparent 6px 12px
     ),
-    linear-gradient(180deg, var(--text-muted), var(--ink));
+    linear-gradient(180deg, #5a3e24, #3a2816);
   box-shadow:
     inset 0 0 0 3px rgba(224, 163, 85, 0.35),
     inset 0 3px 0 rgba(255, 255, 255, 0.12),
@@ -2267,7 +2272,7 @@
 .game-menu-picker-option {
   padding: 6px 12px 6px 6px;
   border-radius: 14px;
-  background: linear-gradient(180deg, var(--text-muted), var(--text-muted));
+  background: linear-gradient(180deg, #7a5634, #5e4027);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.18),
     inset 0 -4px 0 rgba(0, 0, 0, 0.25),
@@ -2362,7 +2367,7 @@
   justify-content: center;
   background: var(--game-red);
   border: 2px solid var(--game-ink);
-  color: var(--white);
+  color: #fff;
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
@@ -2380,8 +2385,8 @@
    seen whether or not the player happens to have a menu tab open, not just
    while looking at the map. */
 .game-weather-hype.game-pvp-alert {
-  --hype-a: var(--team-coral);
-  --hype-b: var(--red-700);
+  --hype-a: #ff8a7a;
+  --hype-b: #c72a20;
   --hype-glow: rgba(255, 90, 77, 0.55);
   z-index: 1350;
 }
@@ -2395,8 +2400,8 @@
   padding: 10px;
   border-radius: 14px;
   border: 2px solid var(--game-ink);
-  background: rgb(79, 60, 41);
-  color: var(--white);
+  background: rgba(246, 236, 217, 0.06);
+  color: #fff;
   font-weight: 900;
   font-size: 15px;
   letter-spacing: 0.03em;
@@ -2410,8 +2415,8 @@
 }
 
 .game-menu-tab.active {
-  background: var(--white);
-  color: var(--ink);
+  background: var(--game-gold);
+  color: #fff;
 }
 
 /* Solo/Club toggle inside the Leaderboard tab - same recipe as
@@ -2437,7 +2442,7 @@
   box-shadow:
     inset 0 -3px 0 var(--game-wood-dark),
     0 2px 0 var(--game-ink);
-  color: var(--white);
+  color: #fff;
   font-weight: 900;
   font-size: 13px;
   text-shadow:
@@ -2487,7 +2492,7 @@
   box-shadow:
     inset 0 -4px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
-  color: var(--ink);
+  color: #fff;
   font-weight: 900;
   font-size: 13px;
   cursor: pointer;
@@ -2638,7 +2643,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--white);
+  color: #fff;
   font-size: 13px;
   font-weight: 900;
   text-shadow:
@@ -2646,7 +2651,7 @@
     -1px 0 0 var(--game-ink),
     0 1px 0 var(--game-ink),
     0 -1px 0 var(--game-ink),
-    0 2px 0;
+    0 2px 0 var(--game-ink);
 }
 
 .game-menu-summary {
@@ -2725,7 +2730,7 @@
     inset 0 -3px 0 var(--game-stone-dark),
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     0 2px 0 var(--game-ink);
-  color: var(--white);
+  color: #fff;
   text-shadow:
     1px 0 0 var(--game-ink),
     -1px 0 0 var(--game-ink),
@@ -2768,7 +2773,7 @@
   border-radius: 12px;
   border: 2.5px solid var(--game-ink);
   background: var(--game-green);
-  color: var(--white);
+  color: #fff;
   font-size: 14px;
   font-weight: 800;
   box-shadow: 0 3px 0 var(--game-ink);
@@ -2799,7 +2804,7 @@
   text-align: left;
   font-weight: 900;
   font-size: 17px;
-  color: var(--ink);
+  color: #fff;
   margin: 18px 0 8px;
   text-shadow:
     1.5px 0 0 var(--game-ink),
@@ -2854,13 +2859,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 10px;
-  background: rgb(87, 69, 53);
+  background: rgba(255, 255, 255, 0.07);
   border-radius: 10px;
   border: 2px solid rgba(0, 0, 0, 0.35);
 }
 
 .game-menu-list li:hover {
-  background: rgb(99, 83, 68);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .game-menu-list-row {
@@ -2875,7 +2880,7 @@
 
 .game-menu-list-area {
   font-weight: 800;
-  color: var(--ink);
+  color: #fff;
   font-size: 14px;
 }
 
@@ -2930,7 +2935,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1.5px solid rgba(246, 236, 217, 0.25);
-  background: rgb(8, 6, 4);
+  background: rgba(0, 0, 0, 0.25);
   color: var(--game-cream);
   font-size: 14px;
   margin-bottom: 8px;
@@ -2947,7 +2952,7 @@
   text-align: left;
   font-weight: 900;
   font-size: 18px;
-  color: var(--ink);
+  color: #fff;
   margin: 0;
   text-shadow:
     1.5px 0 0 var(--game-ink),
@@ -2984,7 +2989,7 @@
   align-items: center;
   gap: 4px;
   padding: 10px 6px;
-  background: linear-gradient(180deg, var(--white) 0%, var(--row) 100%);
+  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
   border: 3px solid var(--game-ink);
   border-radius: 12px;
   box-shadow: 0 3px 0 var(--game-ink);
@@ -2998,7 +3003,7 @@
 
 /* Picked tile - gold ring, like a selected Clash card. */
 .game-menu-avatar-card.is-selected {
-  background: linear-gradient(180deg, var(--panel) 0%, var(--gold-300) 100%);
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd98a 100%);
   box-shadow:
     0 0 0 3px var(--game-gold),
     0 3px 0 var(--game-ink);
@@ -3099,7 +3104,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(88, 69, 52);
+  background: rgba(246, 236, 217, 0.08);
 }
 
 .game-store-item-swatch img {
@@ -3207,7 +3212,7 @@
     height: 32px;
     border: 3px solid var(--game-ink);
     background: var(--game-red);
-    color: var(--white);
+    color: #fff;
     font-size: 12px;
     box-shadow:
       inset 0 -4px 0 var(--game-red-dark),
@@ -3241,7 +3246,7 @@
   border-radius: 0;
   background: none;
   box-shadow: none;
-  color: var(--ink);
+  color: #fff;
   font-weight: 900;
   cursor: pointer;
 }
@@ -3293,7 +3298,7 @@
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
-  color: var(--game-green-light);
+  color: var(--game-green-light, #a8f0af);
 }
 
 /* Chunky on/off switch - stone track that turns green, cream knob with an
@@ -3326,7 +3331,7 @@
   border-radius: 50%;
   border: 2px solid var(--game-ink);
   background: var(--game-cream);
-  box-shadow: inset 0 -3px 0 var(--divider);
+  box-shadow: inset 0 -3px 0 #d9c7a4;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -3347,7 +3352,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone);
-  color: var(--ink);
+  color: #fff;
   font-size: 12px;
   text-align: center;
 }
@@ -3452,18 +3457,22 @@
   border: 2px solid rgba(0, 0, 0, 0.6);
   font-size: 13px;
   line-height: 1.3;
-  color: var(--white);
+  color: #fff;
   -webkit-text-stroke: 0.8px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 1px 0 var(--game-ink);
-  background: linear-gradient(180deg, rgb(38, 26, 17), rgb(19, 13, 7));
+  background: linear-gradient(
+    180deg,
+    rgba(40, 28, 18, 0.92),
+    rgba(20, 13, 7, 0.92)
+  );
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
 .shade-tile.is-owned .shade-tile-chip,
 .shade-tile.is-equipped .shade-tile-chip {
   padding-left: 8px;
-  background: linear-gradient(180deg, var(--green-300), var(--game-green-dark));
+  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
 }
 
 .shade-tile-chip svg {
@@ -3482,8 +3491,8 @@
   font-size: 12px;
   text-transform: uppercase;
   line-height: 1.3;
-  color: var(--white);
-  background: linear-gradient(180deg, var(--green-300), var(--game-green-dark));
+  color: #fff;
+  background: linear-gradient(180deg, #7be07f, var(--game-green-dark));
   opacity: 0;
   transition: opacity 0.14s ease;
 }
@@ -3586,7 +3595,7 @@
   margin: 0 auto 10px;
   border: 3px solid var(--game-ink);
   border-radius: 12px;
-  background: rgb(8, 6, 4);
+  background: rgba(0, 0, 0, 0.25);
   animation: emote-preview-bounce 1.1s ease-in-out infinite;
 }
 
@@ -3628,8 +3637,8 @@
   border: 3px solid var(--game-ink);
   background: linear-gradient(
     180deg,
-    var(--game-wood),
-    var(--game-wood-dark, var(--gold-700))
+    var(--game-wood, #e0a355),
+    var(--game-wood-dark, #a8672c)
   );
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.35),
@@ -3668,13 +3677,13 @@
   border-radius: 50%;
   cursor: pointer;
   color: var(--game-ink);
-  background: rgb(108, 107, 106);
+  background: rgba(255, 255, 255, 0.4);
   border: 2px solid var(--game-ink);
 }
 
 .emote-shelf-info-btn:hover,
 .emote-shelf-info-btn:focus-visible {
-  background: rgb(169, 169, 168);
+  background: rgba(255, 255, 255, 0.65);
   outline: none;
 }
 
@@ -3682,9 +3691,9 @@
   margin: -6px 0 0;
   padding: 8px 12px;
   border-radius: 10px;
-  background: var(--game-panel);
+  background: var(--game-panel, rgba(44, 32, 20, 0.92));
   border: 2px solid rgba(255, 255, 255, 0.12);
-  color: var(--game-cream);
+  color: var(--game-cream, #f6ecd9);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -3704,7 +3713,7 @@
   margin: 0;
   font-weight: 800;
   font-size: 12.5px;
-  color: var(--game-cream);
+  color: var(--game-cream, #f6ecd9);
 }
 
 .emote-hero-filter-row {
@@ -3722,7 +3731,7 @@
   font-weight: 800;
   font-size: 11px;
   color: rgba(246, 236, 217, 0.75);
-  background: rgb(7, 6, 4);
+  background: rgba(0, 0, 0, 0.3);
   border: 1.5px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -3769,7 +3778,7 @@
   padding: 14px 8px 12px;
   border-radius: 14px;
   cursor: pointer;
-  background: var(--game-panel);
+  background: var(--game-panel, rgba(44, 32, 20, 0.9));
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.12),
     0 2px 4px rgba(0, 0, 0, 0.6);
@@ -3825,13 +3834,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(7, 6, 4);
+  background: rgba(0, 0, 0, 0.3);
   border: 2.5px solid var(--game-ink);
-  color: var(--game-cream);
+  color: var(--game-cream, #f6ecd9);
   font-weight: 900;
   font-size: 26px;
   /* The coloured ring - gold once owned, a dim ink ring while locked. */
-  box-shadow: 0 0 0 3px var(--emote-hero-ring-color);
+  box-shadow: 0 0 0 3px var(--emote-hero-ring-color, var(--game-stone));
 }
 
 .emote-hero-pick.is-owned .emote-hero-pick-portrait {
@@ -3868,13 +3877,13 @@
 }
 
 .emote-hero-pick-badge.is-lock {
-  background: var(--game-wood);
+  background: var(--game-wood, #e0a355);
   color: var(--game-ink);
 }
 
 .emote-hero-pick-badge.is-check {
   background: var(--game-green);
-  color: var(--white);
+  color: #fff;
 }
 
 .emote-hero-pick-name {
@@ -3884,7 +3893,7 @@
   white-space: nowrap;
   font-weight: 800;
   font-size: 13px;
-  color: var(--ink);
+  color: #fff;
   text-align: center;
   text-shadow: 0 1px 0 var(--game-ink);
 }
@@ -3896,7 +3905,7 @@
   font-size: 10px;
   font-weight: 700;
   color: rgba(246, 236, 217, 0.85);
-  background: rgb(7, 6, 4);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -3932,8 +3941,8 @@
   height: 30px;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--ink);
-  background: var(--game-panel);
+  color: #fff;
+  background: var(--game-panel, rgba(44, 32, 20, 0.9));
   border: 2px solid var(--game-ink);
 }
 
@@ -3954,7 +3963,7 @@
 .emote-shelf-subheader-name {
   font-weight: 800;
   font-size: 14px;
-  color: var(--ink);
+  color: #fff;
   text-shadow: 0 1px 0 var(--game-ink);
 }
 
@@ -3989,7 +3998,7 @@
   padding: 10px 6px 8px;
   border-radius: 10px;
   cursor: pointer;
-  background: var(--game-panel);
+  background: var(--game-panel, rgba(44, 32, 20, 0.9));
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.12),
     0 2px 4px rgba(0, 0, 0, 0.6);
@@ -4050,8 +4059,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgb(7, 6, 4);
-  color: var(--game-cream);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--game-cream, #f6ecd9);
   overflow: hidden;
 }
 
@@ -4068,7 +4077,7 @@
   white-space: nowrap;
   font-weight: 800;
   font-size: 13px;
-  color: var(--ink);
+  color: #fff;
   text-align: center;
   text-shadow: 0 1px 0 var(--game-ink);
 }
@@ -4082,14 +4091,18 @@
   border: 2px solid rgba(0, 0, 0, 0.6);
   font-size: 12px;
   line-height: 1.3;
-  color: var(--ink);
-  background: linear-gradient(180deg, rgb(38, 26, 17), rgb(19, 13, 7));
+  color: #fff;
+  background: linear-gradient(
+    180deg,
+    rgba(40, 28, 18, 0.92),
+    rgba(20, 13, 7, 0.92)
+  );
 }
 
 .emote-tile.is-owned .emote-tile-chip,
 .emote-tile.is-equipped .emote-tile-chip {
   padding-left: 8px;
-  background: linear-gradient(180deg, var(--green-300), var(--game-green-dark));
+  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
 }
 
 .emote-tile-chip svg {
@@ -4148,7 +4161,7 @@
   gap: 4px;
   padding: 10px 6px 8px;
   border-radius: 10px;
-  background: var(--game-panel);
+  background: var(--game-panel, rgba(44, 32, 20, 0.9));
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.12),
     0 2px 4px rgba(0, 0, 0, 0.6);
@@ -4176,7 +4189,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-red);
-  color: var(--white);
+  color: #fff;
   font-size: 9.5px;
   font-weight: 900;
   text-transform: uppercase;
@@ -4203,7 +4216,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgb(7, 6, 4);
+  background: rgba(0, 0, 0, 0.3);
   color: var(--game-gold-light);
   overflow: hidden;
 }
@@ -4235,7 +4248,7 @@
 .medal-tile-name {
   font-weight: 800;
   font-size: 12px;
-  color: var(--ink);
+  color: #fff;
   text-align: center;
   text-shadow: 0 1px 0 var(--game-ink);
 }
@@ -4289,7 +4302,7 @@
 
 .game-shop-wallet-value {
   font-size: 24px;
-  color: var(--white);
+  color: #fff;
   -webkit-text-stroke: 1px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--game-ink);
@@ -4307,12 +4320,12 @@
   vertical-align: middle;
   background: radial-gradient(
     circle at 50% 50%,
-    var(--gold-300) 0%,
-    var(--gold-500) 52%,
-    var(--gold-700) 58%,
-    var(--gold-500) 70%,
-    var(--gold-500) 86%,
-    var(--gold-700) 100%
+    #ffe95e 0%,
+    #ffd21f 52%,
+    #d99200 58%,
+    #ffcf2a 70%,
+    #ffb800 86%,
+    #c98600 100%
   );
   box-shadow:
     inset 0 -2px 0 rgba(150, 90, 0, 0.55),
@@ -4339,7 +4352,7 @@
   align-items: flex-start;
   justify-content: center;
   padding: calc(70px + env(safe-area-inset-top)) 16px 16px;
-  background: rgba(10, 6, 3, 0.6);
+  background: rgba(10, 6, 3, 0.55);
 }
 
 .challenge-prompt {
@@ -4359,7 +4372,7 @@
       rgba(255, 90, 77, 0.35),
       transparent 70%
     ),
-    linear-gradient(180deg, var(--text-muted) 0%, var(--ink) 100%);
+    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
   color: var(--game-cream);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.12),
@@ -4383,7 +4396,7 @@
     var(--game-red) 50%,
     var(--game-red-dark)
   );
-  color: var(--white);
+  color: #fff;
   font-size: 26px;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.4),
@@ -4410,7 +4423,7 @@
   margin: 0;
   font-size: 22px;
   line-height: 1.1;
-  color: var(--white);
+  color: #fff;
   -webkit-text-stroke: 1px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--game-ink);
@@ -4432,7 +4445,7 @@
   padding: 8px 6px;
   border-radius: 12px;
   border: 2px solid rgba(0, 0, 0, 0.5);
-  background: rgb(7, 6, 4);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .challenge-prompt-term-label {
@@ -4447,7 +4460,7 @@
   align-items: center;
   gap: 5px;
   font-size: 20px;
-  color: var(--ink);
+  color: #fff;
 }
 
 .challenge-prompt-term-value .game-coin {
@@ -4516,7 +4529,7 @@
   /* Light parchment body (same recipe as .game-card-light) instead of the
      dark wood most of this game's UI uses - this is the one popup meant to
      read like a mobile game's "Events" dialog, cream card and all. */
-  background: linear-gradient(180deg, var(--white) 0%, var(--row) 100%);
+  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
   color: var(--game-ink);
   overflow: hidden;
   box-shadow:
@@ -4533,13 +4546,9 @@
   justify-content: center;
   gap: 8px;
   padding: 14px 50px;
-  background: linear-gradient(
-    180deg,
-    var(--text-muted) 0%,
-    var(--text-muted) 100%
-  );
+  background: linear-gradient(180deg, #6b645c 0%, #3f3a34 100%);
   border-bottom: 3px solid var(--game-ink);
-  color: var(--ink);
+  color: #fff;
   font-size: 17px;
   font-weight: 900;
   text-transform: uppercase;
@@ -4565,7 +4574,7 @@
     var(--game-red) 60%,
     var(--game-red-dark)
   );
-  color: var(--white);
+  color: #fff;
   cursor: pointer;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.35),
@@ -4714,14 +4723,14 @@
   padding: 12px;
   border-radius: 14px;
   border: 2px dashed rgba(255, 177, 92, 0.6);
-  background: rgb(34, 19, 10);
+  background: rgba(255, 122, 41, 0.1);
   text-align: left;
 }
 
 .nickname-card-title {
   margin: 0;
   font-size: 17px;
-  color: var(--ink);
+  color: #fff;
   text-shadow: 0 2px 0 var(--game-ink);
 }
 
@@ -4789,7 +4798,7 @@
   padding: 0;
   font-size: 20px;
   line-height: 1;
-  color: var(--white);
+  color: #fff;
   -webkit-text-stroke: 2.5px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: none;
@@ -4826,8 +4835,8 @@
 
 /* Club war callouts reuse the PvP pill; the result one goes gold. */
 .game-weather-hype.game-war-alert.is-ended {
-  --hype-a: var(--gold-300);
-  --hype-b: var(--gold-700);
+  --hype-a: #ffe58a;
+  --hype-b: #d98a00;
   --hype-glow: rgba(255, 180, 0, 0.55);
 }
 
@@ -4875,7 +4884,7 @@
   padding: 8px 10px;
   border-radius: 10px;
   border: 2px solid var(--game-red-dark);
-  background: rgb(47, 20, 17);
+  background: rgba(255, 90, 77, 0.15);
   color: var(--game-red-light);
   font-size: 13px;
   text-align: center;

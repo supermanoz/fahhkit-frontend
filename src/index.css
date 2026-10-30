@@ -107,28 +107,16 @@
 
 html {
   scroll-behavior: smooth;
-  height: 100%;
-  /* iOS Safari still bounces the whole page on overscroll even with this
-     set on body alone; it has to be on html too to stop the map/run-view
-     rubber-banding when a drag or swipe gesture overshoots the content. */
-  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
-  min-height: 100%;
-  min-height: 100dvh;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
-  /* Chrome's pull-to-refresh and the pinch-zoom gesture both fight with map
-     dragging/rotation on /game; pan-y still allows normal page scrolling
-     on non-map pages. */
-  touch-action: pan-y;
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
@@ -220,14 +208,10 @@ button {
 }
 
 /* /game keeps its original, simpler glass-card look — it isn't part of the
-   site-wide liquid-glass pass. Fully solid here (no blur, no translucent
-   background/border) so toasts/popups built on this primitive (claim
-   toasts, the territory/route popups) never let the live map show
-   through, regardless of what --glass-bg/--glass-border resolve to for
-   the rest of the site's light/dark themes. */
+   site-wide liquid-glass pass. */
 .game-page .glass-card {
-  background: rgb(23, 20, 17);
-  border-color: var(--game-ink, rgb(23, 20, 17));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   box-shadow: var(--shadow-md);
 }
 
@@ -405,8 +389,7 @@ button {
 }
 
 .game-page .btn-outline {
-  background: rgb(23, 20, 17);
-  border-color: var(--game-ink, rgb(23, 20, 17));
+  background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;

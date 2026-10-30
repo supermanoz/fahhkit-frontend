@@ -8,7 +8,11 @@
   padding: 12px 14px;
   border-radius: 14px;
   border: 2px solid var(--game-ink);
-  background: linear-gradient(180deg, rgb(83, 63, 45), rgb(65, 48, 34));
+  background: linear-gradient(
+    180deg,
+    rgba(90, 70, 51, 0.55),
+    rgba(58, 43, 31, 0.55)
+  );
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1);
   text-align: left;
 }
@@ -31,7 +35,7 @@
 .run-score-total-value {
   font-size: 28px;
   font-weight: 900;
-  color: var(--game-gold-light, var(--gold-300));
+  color: var(--game-gold-light, #ffd27a);
   -webkit-text-stroke: 1.2px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--game-ink);
@@ -45,7 +49,7 @@
   font-weight: 800;
   text-transform: uppercase;
   color: var(--game-ink);
-  background: linear-gradient(180deg, var(--gold-300), var(--team-tangerine));
+  background: linear-gradient(180deg, #ffe49a, #ffb347);
   border: 1.5px solid var(--game-ink);
   animation: run-score-best-pop 0.5s ease;
 }
@@ -75,7 +79,7 @@
   justify-content: space-between;
   gap: 6px;
   font-size: 12.5px;
-  color: var(--game-cream);
+  color: var(--game-cream, #f6ecd9);
 }
 
 .run-score-component-label {
@@ -89,7 +93,7 @@
 .run-score-hero-bonus {
   margin: 8px 0 0;
   font-size: 12.5px;
-  color: var(--divider);
+  color: #9ad4ff;
 }
 
 @media (prefers-reduced-motion: reduce) {

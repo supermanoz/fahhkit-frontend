@@ -1,14 +1,4 @@
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import { getCurrentPosition, watchPosition, clearWatch } from '../utils/geo'
-import { buzzAlert } from '../utils/haptics'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconCheck,
   IconChevronDown,
@@ -21,7 +11,6 @@ import {
   IconFlagCheckered,
   IconHelmet,
   IconLock,
-  IconLogout,
   IconMap,
   IconMenuOrb,
   IconPlay,
@@ -36,26 +25,13 @@ import {
   IconVolumeMute,
   IconVolumeUp,
 } from '../components/GameIcons'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
-import { VehicleState } from '../utils/vehicleDetection'
-import {
-  isAccessibilityModeEnabled,
-  isAntiCheatDebugEnabled,
-  setAccessibilityModeEnabled,
-} from '../utils/antiCheatSettings'
-import VehicleDebugOverlay from '../components/VehicleDebugOverlay'
-import { useAuthFlow } from '../hooks/useAuthFlow'
-
-// Dynamically imported (not bundled with the rest of the game) - a logged-
-// in player never triggers this import at all, so it doesn't add to the
-// bundle they actually download. See the logged-out branch below.
-const GameAuthGate = lazy(() => import('../components/game-auth/GameAuthGate'))
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
 import { mySide, usePvp } from '../hooks/usePvp'
@@ -73,13 +49,7 @@ import {
   getTopIndividualsLocal,
 } from '../api/territory'
 import { findClubs, getMyClub, inviteToClub } from '../api/club'
-import {
-  requestRollout,
-  ALREADY_ROLLED_OUT_MESSAGE,
-} from '../api/territoryRollout'
-import { useRolloutStatus } from '../hooks/useRolloutStatus'
-import RolloutRequestModal from '../components/RolloutRequestModal'
-import RolloutRequestedChip from '../components/RolloutRequestedChip'
+import { requestRollout } from '../api/territoryRollout'
 import { warnMissingEmoteAssets } from '../utils/emotes'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
@@ -139,12 +109,7 @@ import {
   playMenuSound,
   playMilestoneChime,
 } from '../utils/gameSound'
-import {
-  isBlazeHero,
-  isCometHero,
-  isBoltHero,
-  isPlaceholderHero,
-} from '../utils/hero'
+import { isBlazeHero, isCometHero, isPlaceholderHero } from '../utils/hero'
 import HeroSprite from '../components/HeroSprite'
 import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
@@ -160,7 +125,6 @@ import SkinShelf from '../components/SkinShelf'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
-import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
 import RunRewardAnimation from '../components/RunRewardAnimation'
 import RunScoreCard from '../components/RunScoreCard'
 import ClubBadge from '../components/ClubBadge'
@@ -190,9 +154,6 @@ import {
   fetchSkyConditions,
   pickWeatherHype,
 } from '../utils/mapAmbience'
-import '../game/styles/tokens.css'
-import '../game/styles/fonts.css'
-import { useGameFontPreload } from '../game/styles/useFontPreload'
 import './GamePage.css'
 import '../components/GameCards.css'
 
@@ -466,29 +427,7 @@ function summarizeRunEvents(events) {
 export default function GamePage() {
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
-  const auth = useAuthFlow()
-  useGameFontPreload()
   const tracker = useRunTracker()
-  const [accessibilityMode, setAccessibilityModeState] = useState(
-    isAccessibilityModeEnabled
-  )
-  const [antiCheatDebug] = useState(isAntiCheatDebugEnabled)
-  function handleToggleAccessibilityMode() {
-    const next = !accessibilityMode
-    setAccessibilityModeEnabled(next)
-    setAccessibilityModeState(next)
-  }
-
-  // A full reload (not just clearing the token + re-rendering) is
-  // deliberate here - this page holds dozens of pieces of React state tied
-  // to the signed-in player (hero, territory, run tracker, club, etc.) that
-  // have no single "reset to signed-out" path; reloading guarantees none of
-  // it leaks into whatever the next GameAuthGate session does, at the cost
-  // of a logout being the one action in the game that isn't instant.
-  function handleLogout() {
-    auth.signOut()
-    window.location.reload()
-  }
   // The live "Distance" stat during a run - throttled to refresh once every
   // 5s instead of on every render (tracker.elapsedSeconds ticks every
   // second, which would otherwise redraw this on every tick even though
@@ -530,12 +469,6 @@ export default function GamePage() {
   const [center, setCenter] = useState(DEFAULT_CENTER)
   const [locating, setLocating] = useState(true)
   const [liveLocation, setLiveLocation] = useState(null)
-  // liveLocation only ever holds a real GPS fix (never the DEFAULT_CENTER
-  // fallback the map itself falls back to) - exactly what the rollout
-  // check needs, since a denied/unavailable location should fail the check
-  // open (nothing shown), not silently check Kathmandu's rollout status.
-  // See hooks/useRolloutStatus.js.
-  const rolloutStatus = useRolloutStatus(liveLocation)
   // Gates the "Preparing your run…" loading screen - true only once the
   // basemap has actually finished loading tiles (see TerritoryMap.jsx's
   // PokemonStyleBaseLayer, which fires this on MapLibre's "idle" event), not
@@ -858,7 +791,7 @@ export default function GamePage() {
       return
     }
     const timeout = setTimeout(() => setLocating(false), 5000)
-    getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         clearTimeout(timeout)
         setCenter({
@@ -882,9 +815,7 @@ export default function GamePage() {
   useEffect(() => {
     if (!isAuthed) return
     if (!('geolocation' in navigator)) return
-    let cancelled = false
-    let watchId = null
-    watchPosition(
+    const watchId = navigator.geolocation.watchPosition(
       (position) => {
         setLiveLocation({
           lat: position.coords.latitude,
@@ -898,17 +829,8 @@ export default function GamePage() {
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-    ).then((id) => {
-      if (cancelled) {
-        clearWatch(id)
-        return
-      }
-      watchId = id
-    })
-    return () => {
-      cancelled = true
-      clearWatch(watchId)
-    }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
   }, [isAuthed])
 
   // Territory-capture rollout request (see api/territoryRollout.js) - the
@@ -930,6 +852,14 @@ export default function GamePage() {
   const [rolloutRequestBusy, setRolloutRequestBusy] = useState(false)
   const [rolloutRequestError, setRolloutRequestError] = useState(null)
   const [rolloutRequestResult, setRolloutRequestResult] = useState(null)
+
+  // Matched by message text, not an error code - ApiError only carries the
+  // backend's already-humanized description (see TerritoryRolloutErrorCode.
+  // ALREADY_ROLLED_OUT), same pattern ClubWarPanel.jsx's own
+  // ALREADY_AT_WAR_MESSAGE already uses for telling one specific business
+  // error apart from a generic one.
+  const ALREADY_ROLLED_OUT_MESSAGE =
+    'The game is already rolled out in your city.'
 
   async function handleRequestRollout() {
     const loc = liveLocation || center
@@ -964,14 +894,43 @@ export default function GamePage() {
       : liveLocation || center
 
   const mailbox = useMailbox()
-  // IMPORTANT_NOTICE broadcasts, popped up front and center the moment the
-  // game opens instead of waiting for the player to find them in the Mail
-  // tab - see BroadcastPrompt below. Backed by the server
-  // (BroadcastMailReadState.noticeShownAt, per user), not a client-side
-  // guess: once dismissed, GET /v1/mail/broadcast/notices/pending simply
-  // never returns it again, on any device, even after logout/login. A
-  // genuinely new one still shows once. See hooks/useAnnouncementNotices.js.
-  const announcementNotices = useAnnouncementNotices(isAuthed ? user?.id : null)
+  // Broadcasts (news/announcements), queued to pop up front and center the
+  // moment the game opens instead of waiting for the player to find them in
+  // the Mail tab - see BroadcastPrompt below. Deliberately NOT gated on
+  // readAt: the point is this reappears every time the game opens, even for
+  // a broadcast the player already saw last session (listActive has no
+  // expiry - everything published stays "active" until a moderator pulls
+  // it), so dismissing one just marks it read for the Mail tab's unread
+  // badge, it never permanently suppresses the popup. introducedIds tracks
+  // which broadcasts this session has already offered, so only the single
+  // newest one shows on open (not the whole backlog) while a broadcast
+  // published later in the same session (a live socket push) still queues
+  // immediately as its own pop-up.
+  const [broadcastQueue, setBroadcastQueue] = useState([])
+  const introducedBroadcastIdsRef = useRef(new Set())
+  const initialBroadcastShownRef = useRef(false)
+  useEffect(() => {
+    if (mailbox.broadcasts.length === 0) return
+    if (!initialBroadcastShownRef.current) {
+      initialBroadcastShownRef.current = true
+      mailbox.broadcasts.forEach((b) =>
+        introducedBroadcastIdsRef.current.add(b.id)
+      )
+      setBroadcastQueue([mailbox.broadcasts[0]])
+      return
+    }
+    const fresh = mailbox.broadcasts.filter(
+      (b) => !introducedBroadcastIdsRef.current.has(b.id)
+    )
+    if (fresh.length === 0) return
+    fresh.forEach((b) => introducedBroadcastIdsRef.current.add(b.id))
+    setBroadcastQueue((prev) => [...prev, ...fresh])
+  }, [mailbox.broadcasts])
+  function dismissBroadcastPrompt() {
+    const current = broadcastQueue[0]
+    if (current) mailbox.openBroadcast(current)
+    setBroadcastQueue((q) => q.slice(1))
+  }
   // Whether the player is actually looking at the PvP tab right now - the
   // recurring challenge/discoverable-ping polls only run while this is
   // true (see usePvp); the incoming-challenge pop-up itself still works
@@ -1016,10 +975,7 @@ export default function GamePage() {
       showRunOutcome(outcome)
     },
     onMail: mailbox.receiveMail,
-    onBroadcastMail: (broadcast) => {
-      mailbox.receiveBroadcast(broadcast)
-      announcementNotices.receive(broadcast)
-    },
+    onBroadcastMail: mailbox.receiveBroadcast,
     onPvp: (eventName, payload) => {
       pvp.handlePush(eventName, payload)
       // Stakes move on accept, payouts on resolve.
@@ -1067,7 +1023,7 @@ export default function GamePage() {
   )
   useEffect(() => {
     if (!warAlert) return
-    buzzAlert()
+    navigator.vibrate?.([120, 60, 120])
     playMilestoneChime()
     refreshProfile()
     const hide = setTimeout(clearWarAlert, 9000)
@@ -1128,7 +1084,7 @@ export default function GamePage() {
     const c = incomingChallenge
     if (!c || notifiedChallengeIdsRef.current.has(c.id)) return
     notifiedChallengeIdsRef.current.add(c.id)
-    buzzAlert()
+    navigator.vibrate?.([120, 60, 120])
     playMilestoneChime()
     if (
       document.hidden &&
@@ -2365,7 +2321,7 @@ export default function GamePage() {
     }
   }
 
-  async function attemptSubmit(pendingRun, { force = false } = {}) {
+  async function attemptSubmit(pendingRun) {
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
@@ -2377,17 +2333,6 @@ export default function GamePage() {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
         message: `Only ${formatDuration(pendingRun.duration)} on the clock — runs need at least ${MIN_VALID_RUN_DURATION_SECONDS}s to count. Say fk it and go again.`,
-      })
-      return
-    }
-    // More than 30% of this run looked vehicle-assisted - block the normal
-    // auto-submit and let the athlete either discard or explicitly insist
-    // (the backend re-validates the raw points independently either way).
-    if (pendingRun.isVehicleInvalid && !force) {
-      setSaveError({
-        title: 'Mostly vehicle, not legs 🚗',
-        message: `About ${Math.round((pendingRun.vehicleSuspiciousRatio || 0) * 100)}% of this run looked vehicle-assisted, so it won't score as-is. Discard it, or save anyway if this was a false alarm (it'll still be reviewed).`,
-        offerForceSave: true,
       })
       return
     }
@@ -2408,13 +2353,6 @@ export default function GamePage() {
         endedAt: toLocalDateTimeString(pendingRun.endedAt),
         challengeId: pendingRun.challengeId || undefined,
         clubWarId: pendingRun.clubWarId || undefined,
-        segmentFlags: pendingRun.segments,
-        maxSpeedMps: pendingRun.maxSpeedMps,
-        avgSpeedMps: pendingRun.avgSpeedMps,
-        stepCount: pendingRun.stepCount,
-        vehicleSuspiciousRatio: pendingRun.vehicleSuspiciousRatio,
-        clientFlaggedInvalid: pendingRun.isVehicleInvalid,
-        vehicleDisputeCount: pendingRun.disputes?.length || 0,
       })
       if (pendingRun.challengeId) pvp.refreshChallenges()
       const isRace = Boolean(pendingRun.challengeId)
@@ -2778,17 +2716,15 @@ export default function GamePage() {
   const activeHeroName = equippedHero
     ? equippedHero.storeItem.name
     : currentAvatar?.name
-  // Blaze, Comet and Bolt each have a full animated run-cycle sprite on the
-  // map marker (TerritoryMap.jsx's HERO_MAP_SHEETS) instead of the flat
-  // avatar photo - any other hero has no sheet built, so their marker
-  // stays the flat image (see buildPlayerMarkerIcon there).
+  // Blaze and Comet both have a full animated run-cycle sprite on the map
+  // marker (TerritoryMap.jsx's HERO_MAP_SHEETS) instead of the flat avatar
+  // photo - any other hero has no sheet built, so their marker stays the
+  // flat image (see buildPlayerMarkerIcon there).
   const animatedMarkerHero = isBlazeHero(activeHeroName)
     ? 'blaze'
     : isCometHero(activeHeroName)
       ? 'comet'
-      : isBoltHero(activeHeroName)
-        ? 'bolt'
-        : null
+      : null
   // Blaze and Comet are also the heroes with an animated turntable
   // (HeroSprite) instead of a flat image on the Me tab, whether it's the
   // real equipped Store Hero or just the free local avatars.js pick - any
@@ -2844,34 +2780,41 @@ export default function GamePage() {
   // — nothing here works signed out, so the game itself never renders until
   // login is confirmed. userLoading gates this so a page refresh with a still-
   // valid token doesn't flash the gate before useCurrentUser() resolves.
-  // GameAuthGate owns the welcome/sign-in/sign-up/forgot/set-password screens
-  // (see src/components/game-auth/) - once any of them succeeds it calls
-  // replaceUser(user), which updates useCurrentUser's cache and re-renders
-  // this component with isAuthed now true, so the gate just stops rendering
-  // rather than navigating anywhere (the player never leaves /game).
   if (!userLoading && !isAuthed) {
     return (
-      <div className="game-page game-root">
-        <Suspense
-          fallback={
-            <div className="game-loading-overlay">
-              <img
-                src={runConquestLogo}
-                alt="Run Conquest"
-                className="game-loading-logo"
-              />
+      <div className="game-page">
+        <div className="game-loading-overlay">
+          <img
+            src={runConquestLogo}
+            alt="Run Conquest"
+            className="game-loading-logo"
+          />
+          <div className="game-loading-footer game-loading-footer--gate">
+            <p className="game-loading-text">
+              Sign in to play Territory Run — claiming ground, GPS runs, and
+              Fahhcoin are for logged-in athletes only.
+            </p>
+            <div className="game-confirm-actions">
+              <Link to="/" className="btn btn-outline">
+                Back to Home
+              </Link>
+              <Link
+                to="/login"
+                state={{ from: '/game' }}
+                className="btn btn-primary"
+              >
+                Sign In
+              </Link>
             </div>
-          }
-        >
-          <GameAuthGate onAuthenticated={replaceUser} />
-        </Suspense>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
     <div
-      className="game-page game-root"
+      className="game-page"
       style={{ '--sheet-h': `${controlsHeight}px` }}
       onClickCapture={handleGameClick}
     >
@@ -2997,23 +2940,6 @@ export default function GamePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Task 2: shown once the game has actually finished loading (never
-          over the loading splash/intro), only when the region genuinely
-          needs a rollout request and hasn't been dismissed this session -
-          see useRolloutStatus.js for the full decision logic. */}
-      {gameReady && !introPlaying && rolloutStatus.showModal && (
-        <RolloutRequestModal
-          cityName={rolloutStatus.state.cityName}
-          countryName={rolloutStatus.state.countryName}
-          requestCount={rolloutStatus.state.requestCount}
-          submitting={rolloutStatus.state.submitting}
-          submitError={rolloutStatus.state.submitError}
-          justRequested={rolloutStatus.state.justRequested}
-          onRequest={rolloutStatus.request}
-          onDismiss={rolloutStatus.dismiss}
-        />
-      )}
 
       {profile?.level != null && (
         <button
@@ -3192,12 +3118,12 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {announcementNotices.current && (
+        {broadcastQueue[0] && (
           <BroadcastPrompt
-            key={announcementNotices.current.id}
-            broadcast={announcementNotices.current}
-            hasMore={announcementNotices.hasMore}
-            onDismiss={announcementNotices.dismiss}
+            key={broadcastQueue[0].id}
+            broadcast={broadcastQueue[0]}
+            hasMore={broadcastQueue.length > 1}
+            onDismiss={dismissBroadcastPrompt}
           />
         )}
       </AnimatePresence>
@@ -3676,118 +3602,61 @@ export default function GamePage() {
             <h3>{saveError.title}</h3>
             <p>{saveError.message}</p>
             <div className="game-highlight-toast-actions">
-              {pendingRun && saveError.offerForceSave ? (
-                <>
-                  <button
-                    type="button"
-                    className="game-btn game-btn-red"
-                    onClick={() => {
-                      discardDraft()
-                      setSaveError(null)
-                    }}
-                  >
-                    Discard
-                  </button>
-                  <button
-                    type="button"
-                    className="game-btn game-btn-green"
-                    onClick={() => attemptSubmit(pendingRun, { force: true })}
-                    disabled={saving}
-                  >
-                    {saving ? 'Saving...' : 'Save Anyway'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  {pendingRun && (
-                    <button
-                      type="button"
-                      className="game-btn game-btn-green"
-                      onClick={() => attemptSubmit(pendingRun)}
-                      disabled={saving}
-                    >
-                      Retry Save
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood"
-                    onClick={() => setSaveError(null)}
-                  >
-                    Dismiss
-                  </button>
-                </>
+              {pendingRun && (
+                <button
+                  type="button"
+                  className="game-btn game-btn-green"
+                  onClick={() => attemptSubmit(pendingRun)}
+                  disabled={saving}
+                >
+                  Retry Save
+                </button>
               )}
+              <button
+                type="button"
+                className="game-btn game-btn-wood"
+                onClick={() => setSaveError(null)}
+              >
+                Dismiss
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {tracker.status === 'tracking' &&
-          tracker.vehicleState === VehicleState.SUSPECT &&
-          !tracker.suspectDismissed && (
-            <motion.div
-              className="game-claim-toast glass-card"
-              initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
-              animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-              exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
-            >
-              <h3>Moving fast — are you in a vehicle? 🛵</h3>
-              <p>
-                {tracker.vehicleReason === 'no-gait'
-                  ? "You're covering ground fast with no running stride detected."
-                  : tracker.vehicleReason === 'pattern'
-                    ? 'That pace has been suspiciously steady for a human stride.'
-                    : 'This pace is faster than running allows.'}{' '}
-                Still counting, but keep this up and distance will pause.
-              </p>
-              <div className="game-highlight-toast-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
-                  onClick={tracker.dismissSuspect}
-                >
-                  Keep Going
-                </button>
-              </div>
-            </motion.div>
-          )}
+        {tracker.invalidMotion && (
+          <motion.div
+            className="game-claim-toast glass-card"
+            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
+            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
+          >
+            <h3>Whoa there, speedster 🛵</h3>
+            <p>
+              {tracker.invalidMotion.reason === 'no-gait'
+                ? "You're covering ground fast with no running stride detected. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."
+                : "This pace is faster than running allows. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."}
+            </p>
+            <div className="game-highlight-toast-actions">
+              <button
+                type="button"
+                className="game-btn game-btn-green"
+                onClick={() => tracker.stop()}
+              >
+                Stop Run
+              </button>
+              <button
+                type="button"
+                className="game-btn game-btn-wood"
+                onClick={tracker.dismissInvalidMotion}
+              >
+                Keep Going
+              </button>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
-
-      <AnimatePresence>
-        {tracker.status === 'tracking' &&
-          tracker.vehicleState === VehicleState.VEHICLE && (
-            <motion.div
-              className="game-claim-toast glass-card"
-              initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
-              animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-              exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
-            >
-              <h3>Vehicle detected 🛵</h3>
-              <p>
-                Distance paused — it won&apos;t count toward territory until you
-                slow down to a run. Not in a vehicle?
-              </p>
-              <div className="game-highlight-toast-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
-                  onClick={tracker.disputeVehicle}
-                >
-                  I&apos;m not in a vehicle
-                </button>
-              </div>
-            </motion.div>
-          )}
-      </AnimatePresence>
-
-      {antiCheatDebug && tracker.status === 'tracking' && (
-        <VehicleDebugOverlay
-          getDebugInfo={tracker.getDebugInfo}
-          vehicleState={tracker.vehicleState}
-        />
-      )}
 
       <AnimatePresence>
         {runResult && (
@@ -4817,31 +4686,6 @@ export default function GamePage() {
 
                 <button
                   type="button"
-                  role="switch"
-                  aria-checked={accessibilityMode}
-                  className="game-settings-row"
-                  onClick={handleToggleAccessibilityMode}
-                >
-                  <span className="game-settings-row-label">
-                    <IconRunning />
-                    <span className="game-settings-row-text">
-                      Wheelchair / Hand-Cycle Mode
-                      <span className="game-settings-row-sub">
-                        Raises vehicle-detection speed limits and skips stride
-                        detection
-                      </span>
-                    </span>
-                  </span>
-                  <span
-                    className={`game-switch ${accessibilityMode ? 'is-on' : ''}`}
-                    aria-hidden="true"
-                  >
-                    <span className="game-switch-knob" />
-                  </span>
-                </button>
-
-                <button
-                  type="button"
                   className="game-settings-row"
                   onClick={() => navigate('/profile/edit')}
                 >
@@ -4857,74 +4701,45 @@ export default function GamePage() {
                   <IconChevronRight />
                 </button>
 
-                <button
-                  type="button"
-                  className="game-settings-row game-settings-row-danger"
-                  onClick={handleLogout}
-                >
+                {/* Standing home for this, always available - there's no
+                    passive "is my area rolled out" check (see
+                    requestRollout's own comment in api/territoryRollout.js),
+                    so this doesn't know in advance whether the player needs
+                    it; tapping it either requests (not rolled out yet) or
+                    comes back ALREADY_ROLLED_OUT (good news, told as such,
+                    not an error). */}
+                <div className="game-settings-row game-settings-row-static">
                   <span className="game-settings-row-label">
-                    <IconLogout />
+                    <IconLock />
                     <span className="game-settings-row-text">
-                      Log Out
+                      Territory Capture Here
                       <span className="game-settings-row-sub">
-                        Clears your session and returns to the sign-in screen
+                        Not live everywhere yet - PvP and Club Wars always are.
+                        Ask for your area below.
                       </span>
                     </span>
                   </span>
-                </button>
-
-                {/* Once useRolloutStatus.js positively knows the player
-                    already requested their region (see api/
-                    territoryRollout.js's GET .../status spec - not yet
-                    implemented server-side), swap the standing row below
-                    for the non-blocking chip instead - there's nothing left
-                    to request. Until that endpoint exists (or while it's
-                    still loading), this always-available row is the
-                    fallback: it doesn't know in advance whether the player
-                    needs it, so tapping it either requests (not rolled out
-                    yet) or comes back ALREADY_ROLLED_OUT (good news, told
-                    as such, not an error). */}
-                {rolloutStatus.showChip ? (
-                  <RolloutRequestedChip
-                    cityName={rolloutStatus.state.cityName}
-                    countryName={rolloutStatus.state.countryName}
-                  />
-                ) : (
-                  <>
-                    <div className="game-settings-row game-settings-row-static">
-                      <span className="game-settings-row-label">
-                        <IconLock />
-                        <span className="game-settings-row-text">
-                          Territory Capture Here
-                          <span className="game-settings-row-sub">
-                            Not live everywhere yet - PvP and Club Wars always
-                            are. Ask for your area below.
-                          </span>
-                        </span>
-                      </span>
-                      {rolloutRequestResult ? (
-                        <span className="game-settings-row-requested">
-                          {rolloutRequestResult.alreadyRolledOut
-                            ? 'Already live here!'
-                            : 'Requested'}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={handleRequestRollout}
-                          disabled={rolloutRequestBusy}
-                        >
-                          {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
-                        </button>
-                      )}
-                    </div>
-                    {rolloutRequestError && (
-                      <p className="game-controls-hint game-controls-hint-error">
-                        {rolloutRequestError}
-                      </p>
-                    )}
-                  </>
+                  {rolloutRequestResult ? (
+                    <span className="game-settings-row-requested">
+                      {rolloutRequestResult.alreadyRolledOut
+                        ? 'Already live here!'
+                        : 'Requested'}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={handleRequestRollout}
+                      disabled={rolloutRequestBusy}
+                    >
+                      {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
+                    </button>
+                  )}
+                </div>
+                {rolloutRequestError && (
+                  <p className="game-controls-hint game-controls-hint-error">
+                    {rolloutRequestError}
+                  </p>
                 )}
               </div>
             )}

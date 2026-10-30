@@ -1,7 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { IconCrosshairs } from './GameIcons'
-import { getCurrentPosition } from '../utils/geo'
 import {
   MapContainer,
   Polygon,
@@ -36,8 +35,6 @@ import blazeIdleSheet from '../assets/images/blaze-map-idle-stretch.png'
 import blazeRunSheet from '../assets/images/blaze-map-run-up.png'
 import cometIdleSheet from '../assets/images/comet-map-idle-stretch.png'
 import cometRunSheet from '../assets/images/comet-map-run-up.png'
-import boltIdleSheet from '../assets/images/bolt-map-idle-stretch.png'
-import boltRunSheet from '../assets/images/bolt-map-run-up.png'
 import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -249,10 +246,6 @@ const HERO_MAP_SHEETS = {
   comet: {
     idle: { src: cometIdleSheet, frames: 48 },
     run: { src: cometRunSheet, frames: 15 },
-  },
-  bolt: {
-    idle: { src: boltIdleSheet, frames: 48 },
-    run: { src: boltRunSheet, frames: 15 },
   },
 }
 
@@ -1161,7 +1154,7 @@ function LocateButton({ map, onLocated }) {
       setError('Location is not supported on this device.')
       return
     }
-    getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         setError(null)
         onLocated?.()

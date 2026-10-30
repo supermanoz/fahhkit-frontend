@@ -24,7 +24,7 @@
     var(--game-gold) 50%,
     var(--game-gold-dark) 100%
   );
-  color: var(--white);
+  color: #fff;
   font-size: 28px;
 }
 
@@ -66,7 +66,7 @@
   justify-content: center;
   border-radius: 8px;
   border: 2px solid var(--game-ink);
-  color: var(--ink);
+  color: #fff;
   font-size: 17px;
 }
 
@@ -110,7 +110,7 @@
 }
 
 .game-club-input.club-input-light {
-  background: var(--white);
+  background: #fff;
   border-color: rgba(61, 43, 26, 0.35);
   color: var(--game-ink);
   font-family:
@@ -171,8 +171,8 @@
   padding: 3px 9px;
   border: 2px solid rgba(0, 0, 0, 0.35);
   border-radius: 8px;
-  background: linear-gradient(180deg, var(--gold-300), var(--team-tangerine));
-  color: var(--ink);
+  background: linear-gradient(180deg, #f7d77a, #d9a531);
+  color: #3b2505;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -215,7 +215,7 @@
   gap: 8px;
   padding: 10px;
   border-radius: 10px;
-  background: rgb(56, 41, 28);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .club-treasury-balance {
@@ -238,14 +238,14 @@
   border-radius: 50%;
   border: 2px solid var(--game-ink);
   background: var(--game-gold);
-  color: var(--white);
+  color: #fff;
   font-size: 20px;
 }
 
 .club-treasury-value {
   font-size: 20px;
   font-weight: 900;
-  color: var(--ink);
+  color: #fff;
 }
 
 .club-donate {
@@ -259,7 +259,7 @@
 }
 
 /* Role pill - on the banner ("You: Leader") and on every roster row. A
-   plain bold UI face (not Fredoka) reads cleanly at this size without
+   plain bold UI face (not Passion One) reads cleanly at this size without
    needing an outline to prop up its strokes. */
 .club-role {
   display: inline-block;
@@ -274,7 +274,7 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   text-shadow: none;
-  background: rgb(105, 88, 70);
+  background: rgba(246, 236, 217, 0.18);
   color: var(--game-cream);
 }
 
@@ -350,7 +350,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone-dark);
-  color: var(--white);
+  color: #fff;
   font-size: 13px;
   font-weight: 900;
   text-shadow:
@@ -389,10 +389,10 @@
   border-radius: 12px;
   background: linear-gradient(
     90deg,
-    rgb(110, 80, 49) 0%,
-    rgb(81, 60, 40) 42%,
-    rgb(81, 56, 40) 58%,
-    rgb(110, 62, 46) 100%
+    rgba(255, 179, 92, 0.2) 0%,
+    rgba(255, 179, 92, 0.04) 42%,
+    rgba(255, 90, 77, 0.04) 58%,
+    rgba(255, 90, 77, 0.2) 100%
   );
 }
 
@@ -416,7 +416,7 @@
 .club-war-score {
   font-size: 22px;
   font-weight: 900;
-  color: var(--ink);
+  color: #fff;
 }
 
 .club-war-sub {
@@ -468,7 +468,7 @@
   flex-shrink: 0;
   padding: 2px 9px;
   border-radius: 999px;
-  background: rgb(73, 54, 37);
+  background: rgba(61, 43, 26, 0.1);
   color: var(--game-ink);
   font-size: 11px;
   font-weight: 700;
@@ -543,7 +543,7 @@
   transform: rotate(45deg);
   background: var(--game-green);
   border: 1px solid var(--game-ink);
-  color: var(--white);
+  color: #fff;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
@@ -583,14 +583,14 @@
   justify-content: center;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--ink);
-  background: rgb(88, 71, 55);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .club-war-history-back:hover,
 .club-war-history-back:focus-visible {
   outline: none;
-  background: rgb(103, 87, 73);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .club-war-history-back svg {
@@ -614,7 +614,7 @@
 .club-war-history-badge-mine {
   margin-right: -10px;
   z-index: 1;
-  filter: drop-shadow(-2px 0 0 var(--ink));
+  filter: drop-shadow(-2px 0 0 #46362a);
 }
 
 .club-war-history-result {
@@ -623,7 +623,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone-dark);
-  color: var(--ink);
+  color: #fff;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -662,7 +662,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(52, 38, 27);
+  background: rgba(0, 0, 0, 0.3);
   border: 2px solid var(--game-ink);
   color: rgba(246, 236, 217, 0.6);
 }
@@ -724,16 +724,16 @@
 
 .club-war-run-badge.is-done {
   background: var(--game-green);
-  color: var(--white);
+  color: #fff;
 }
 
 .club-war-run-badge.is-missed {
   background: var(--game-red-dark);
-  color: var(--white);
+  color: #fff;
 }
 
 .club-war-run-badge.is-pending {
-  background: rgb(100, 82, 65);
+  background: rgba(246, 236, 217, 0.15);
   color: rgba(246, 236, 217, 0.6);
 }
 
@@ -758,8 +758,8 @@
   justify-content: center;
   border-radius: 6px;
   border: 2px solid var(--game-ink);
-  background: rgb(96, 79, 64);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
   font-size: 14px;
 }
 
@@ -798,7 +798,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  background: rgb(52, 38, 27);
+  background: rgba(0, 0, 0, 0.3);
   color: rgba(246, 236, 217, 0.75);
   font-size: 11px;
   font-weight: 800;
@@ -897,7 +897,7 @@
 
 .club-member-rows .game-row-clickable:hover,
 .club-member-rows .game-row-clickable:focus-visible {
-  background: rgb(85, 67, 51);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 8px;
 }
 

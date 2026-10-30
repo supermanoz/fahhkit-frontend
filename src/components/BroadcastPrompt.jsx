@@ -15,7 +15,6 @@ export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onDismiss}
     >
       <motion.div
         className="broadcast-prompt"
@@ -26,7 +25,6 @@ export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="broadcast-prompt-titlebar">
           <IconMegaphone aria-hidden="true" />
