@@ -229,3 +229,52 @@
 .game-row-meta.is-error {
   color: var(--red-text);
 }
+
+/* --- Shared close (X) button - every panel/modal/popup/toast dismiss
+   control in /game uses this one class for its colour, size and press
+   state, and only adds its own class for POSITION (each context anchors
+   it differently: a floating corner badge, an inline header button,
+   etc.) - see GamePage.css's own comment at .game-menu-close for the
+   rule each of those per-context classes now keeps vs. drops. --- */
+.game-close-btn {
+  all: unset;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--close-red-300) 0%,
+    var(--close-red-500) 55%,
+    var(--close-red-700) 100%
+  );
+  box-shadow: 0 3px 0 var(--game-ink);
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game-close-btn svg {
+  width: 1em;
+  height: 1em;
+  stroke-width: 3;
+  color: #fff;
+}
+
+.game-close-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--game-ink);
+}
+
+.game-close-btn:focus-visible {
+  outline: 3px solid var(--game-gold);
+  outline-offset: 2px;
+}

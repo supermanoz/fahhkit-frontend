@@ -77,7 +77,7 @@ export default function HeroDetailModal({
       >
         <button
           type="button"
-          className="game-run-viewer-close"
+          className="game-close-btn game-run-viewer-close"
           aria-label="Close"
           onClick={onClose}
         >

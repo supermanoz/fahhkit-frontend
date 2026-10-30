@@ -53,7 +53,7 @@ export default function EmoteShowcase({
       >
         <button
           type="button"
-          className="game-run-viewer-close emote-showcase-close"
+          className="game-close-btn game-run-viewer-close emote-showcase-close"
           aria-label="Back"
           onClick={onClose}
         >

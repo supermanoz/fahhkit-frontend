@@ -418,8 +418,6 @@
 .game-radial-btn svg,
 .game-menu-picker-medal svg,
 .game-menu-picker-knob svg,
-.game-menu-close svg,
-.game-run-viewer-close svg,
 .game-hud-icon-flag svg {
   color: #fff;
 }
@@ -645,20 +643,11 @@
   white-space: nowrap;
 }
 
+/* .game-close-btn (GameCards.css) owns colour/size/press state here -
+   this rule is layout only: a row child that can't be squeezed by its
+   neighbour, the weather headline text. */
 .game-weather-toast-close {
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
-  font-size: 11px;
-  cursor: pointer;
 }
 
 /* Auto-dismiss progress bar - shrinks over the same 5s the weatherHype
@@ -1433,23 +1422,12 @@
 
 /* Corner dismiss, separate from the primary action button below the text -
    lets "View Profile" stay a real commitment while this stays the quick
-   "never mind" out. */
+   "never mind" out. .game-close-btn owns colour/size/press state; this
+   rule is position only. */
 .game-highlight-toast-close {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 50%;
-  border: 2px solid var(--game-ink);
-  background: var(--game-stone);
-  color: var(--game-ink);
-  font-size: 13px;
-  cursor: pointer;
+  top: 6px;
+  right: 6px;
 }
 
 .game-highlight-toast h3 {
@@ -1561,25 +1539,11 @@
 /* Close button, moved out of its shared base rule's absolute top-right
    corner (.game-highlight-toast-close above - still used as-is by the
    separate route-viewer popup) and into this header row as a normal flex
-   child instead - a 44px tap target (the visible circle stays smaller,
-   centered inside it) instead of the old 26px one. Scoped under
-   .game-territory-popup so the route popup's own close button is
-   untouched. */
+   child instead. Scoped under .game-territory-popup so the route popup's
+   own close button is untouched. .game-close-btn owns colour/size/press
+   state; this rule is position only. */
 .game-territory-popup .game-highlight-toast-close {
   position: static;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 50%;
-  border: none;
-  background: none;
-  color: var(--game-cream);
-  font-size: 15px;
-  cursor: pointer;
 }
 
 /* --- Stats row: two big dark inset panels, the actual focus of the
@@ -1757,27 +1721,14 @@
   max-width: 380px;
 }
 
+/* .game-close-btn owns colour/size/press state; this rule is position
+   only (shared by the hero modal, emote showcase, and the run viewer
+   popups below). */
 .game-run-viewer-close {
   position: absolute;
   top: -14px;
   right: -14px;
   z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--game-stone);
-  color: var(--game-ink);
-  border: 3px solid var(--game-ink);
-  box-shadow: 0 3px 0 var(--game-ink);
-  cursor: pointer;
-}
-
-.game-run-viewer-close:active {
-  transform: translateY(2px);
-  box-shadow: none;
 }
 
 /* --- Menu FAB: bottom-center pokéball. Tapping it fans three radial
@@ -2084,23 +2035,15 @@
   color: var(--game-cream);
 }
 
+/* .game-close-btn (GameCards.css) owns colour/size/press state here -
+   this rule is position only. */
 .game-menu-close {
   position: absolute;
   /* Tabs are position:relative (for their badges), so without this they
      paint over the X. */
   z-index: 2;
-  top: 14px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--game-wood);
-  border: 2px solid var(--game-ink);
-  color: var(--game-ink);
-  cursor: pointer;
+  top: 10px;
+  right: 10px;
 }
 
 .game-menu-tabs {
@@ -3197,31 +3140,12 @@
   }
 
   /* Close (X) perches on the picker bar's top-right corner, Clash-popup
-     style, above the bar (z-index over the picker's 5). */
+     style, above the bar (z-index over the picker's 5) - position only,
+     .game-close-btn still owns colour/size/press state. */
   .game-menu-close {
     z-index: 6;
     top: 2px;
     right: 6px;
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--game-ink);
-    background: var(--game-red);
-    color: #fff;
-    font-size: 12px;
-    box-shadow:
-      inset 0 -4px 0 var(--game-red-dark),
-      inset 0 2px 0 var(--game-red-light),
-      0 3px 0 var(--game-ink);
-    transition: transform 0.08s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .game-menu-close:active {
-    transform: translateY(2px);
-    box-shadow:
-      inset 0 -4px 0 var(--game-red-dark),
-      inset 0 2px 0 var(--game-red-light),
-      0 1px 0 var(--game-ink);
   }
 }
 
@@ -4530,30 +4454,17 @@
   letter-spacing: 0.06em;
 }
 
+/* .game-close-btn (its own all:unset base) owns colour/size/press state;
+   this rule is position only. Vertically centered against the titlebar's
+   own height (it can wrap to two lines) via a fixed negative margin, not
+   a translateY transform - .game-close-btn:active already puts a
+   transform on this element for its press state, and the two would
+   fight over the same property. */
 .broadcast-prompt-close {
-  all: unset;
   position: absolute;
   top: 50%;
   right: 12px;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  border: 2.5px solid var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    var(--game-red-light),
-    var(--game-red) 60%,
-    var(--game-red-dark)
-  );
-  color: #fff;
-  cursor: pointer;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    0 2px 0 var(--game-ink);
+  margin-top: -22px;
 }
 
 .broadcast-prompt-content {

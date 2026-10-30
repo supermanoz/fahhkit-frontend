@@ -73,6 +73,15 @@
      4.5; this clears it everywhere). */
   --red-text: #a82218;
 
+  /* Dedicated close-button red - every panel/modal/popup/toast's dismiss
+     (X) button, and only that, so it can move independently of the
+     general danger/badge red above (close-red-* are the exact values the
+     close-button spec called for; they're close to --red-* but not the
+     same triad). See .game-close-btn in GameCards.css. */
+  --close-red-300: #ff7a6e;
+  --close-red-500: #e5392c;
+  --close-red-700: #a5201a;
+
   /* Gold/orange - the existing ribbon/accent + secondary-primary button
      colour (matches the site's own brand orange, index.css --brand/
      --brand-amber/--brand-dark). Real gold is still coins/trophies only -

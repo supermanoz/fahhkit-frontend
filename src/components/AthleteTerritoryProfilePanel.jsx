@@ -130,7 +130,7 @@ export default function AthleteTerritoryProfilePanel({
     >
       <button
         type="button"
-        className="game-menu-close athlete-profile-close"
+        className="game-close-btn game-menu-close athlete-profile-close"
         onClick={onClose}
         aria-label="Close profile"
       >

@@ -270,7 +270,7 @@ export default function ClubWarHistory({
         <h3 className="game-card-title game-card-title-sm">War History</h3>
         <button
           type="button"
-          className="club-war-history-back"
+          className="game-close-btn club-war-history-close"
           onClick={onClose}
           aria-label="Close war history"
         >

@@ -68,7 +68,7 @@ export function Modal({
         {onClose && (
           <button
             type="button"
-            className="g-modal-close"
+            className="game-close-btn g-modal-close"
             onClick={onClose}
             aria-label="Close"
           >

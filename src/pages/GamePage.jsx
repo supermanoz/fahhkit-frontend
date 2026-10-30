@@ -663,6 +663,18 @@ export default function GamePage() {
     if (!radialOpen) setRadialMode('main')
   }, [radialOpen])
   const [tabPickerOpen, setTabPickerOpen] = useState(false)
+  // Esc closes the tab picker if it's open (same as tapping outside it),
+  // otherwise the whole menu sheet (same as its own X).
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleKeyDown(e) {
+      if (e.key !== 'Escape') return
+      if (tabPickerOpen) setTabPickerOpen(false)
+      else setMenuOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [menuOpen, tabPickerOpen])
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   // Size/distance warning shown inline on the territory popup before
@@ -2497,6 +2509,16 @@ export default function GamePage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [storeChoice])
 
+  // Esc closes the athlete profile overlay, same as its own X or backdrop.
+  useEffect(() => {
+    if (!viewingProfile) return
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') setViewingProfile(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [viewingProfile])
+
   // useCallback (empty deps - every function this touches, including
   // loadStore/loadHeroes, only closes over stable setState setters and
   // imported API calls, never per-render state, so there's nothing to go
@@ -3029,7 +3051,7 @@ export default function GamePage() {
             </span>
             <button
               type="button"
-              className="game-weather-toast-close"
+              className="game-close-btn game-weather-toast-close"
               aria-label="Dismiss"
               onClick={() => setWeatherHype(null)}
             >
@@ -3884,7 +3906,7 @@ export default function GamePage() {
                   </div>
                   <button
                     type="button"
-                    className="game-highlight-toast-close"
+                    className="game-close-btn game-highlight-toast-close"
                     aria-label="Close"
                     onClick={() => {
                       setHighlightedEntry(null)
@@ -4009,7 +4031,7 @@ export default function GamePage() {
           >
             <button
               type="button"
-              className="game-menu-close"
+              className="game-close-btn game-menu-close"
               onClick={() => {
                 setMenuOpen(false)
                 setTabPickerOpen(false)
@@ -4976,7 +4998,7 @@ export default function GamePage() {
             >
               <button
                 type="button"
-                className="game-run-viewer-close"
+                className="game-close-btn game-run-viewer-close"
                 aria-label="Close"
                 onClick={() => setViewingRun(null)}
               >
@@ -5077,7 +5099,7 @@ export default function GamePage() {
           >
             <button
               type="button"
-              className="game-highlight-toast-close"
+              className="game-close-btn game-highlight-toast-close"
               aria-label="Close"
               onClick={handleCloseViewingRoute}
             >
@@ -5239,7 +5261,7 @@ export default function GamePage() {
             >
               <button
                 type="button"
-                className="game-run-viewer-close"
+                className="game-close-btn game-run-viewer-close"
                 aria-label="Close"
                 onClick={() => setCoinShopOpen(false)}
               >
@@ -5368,7 +5390,7 @@ export default function GamePage() {
                 >
                   <button
                     type="button"
-                    className="game-run-viewer-close"
+                    className="game-close-btn game-run-viewer-close"
                     aria-label="Close"
                     onClick={closeStoreChoice}
                   >

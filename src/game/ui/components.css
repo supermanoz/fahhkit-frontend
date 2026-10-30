@@ -248,34 +248,12 @@
     var(--green-700) 100%
   );
 }
+/* .game-close-btn (GameCards.css) owns colour/size/press/focus state;
+   this rule is position only. */
 .g-modal-close {
   position: absolute;
   top: -14px;
   right: -14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: var(--border-sm) solid var(--ink);
-  background: linear-gradient(
-    180deg,
-    var(--red-300),
-    var(--red-500) 55%,
-    var(--red-700)
-  );
-  color: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 3px 0 var(--ink);
-}
-.g-modal-close:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--ink);
-}
-.g-modal-close:focus-visible {
-  outline: 3px solid var(--green-500);
-  outline-offset: 2px;
 }
 .g-modal-body {
   padding: var(--space-4);

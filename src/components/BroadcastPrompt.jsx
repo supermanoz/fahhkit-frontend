@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { IconClose, IconMegaphone } from './GameIcons'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
@@ -8,8 +9,16 @@ import { resolveFileUrl, toClubRoleWords } from '../api/client'
 // to find them in the Mail tab - a title-bar dialog in the middle of the
 // screen, same shape as a mobile game's "Events" popup (banner image, title,
 // body, one big action button) rather than a small bottom-anchored toast.
-// "Got it"/Next, the X, and tapping the backdrop all call onDismiss.
+// "Got it"/Next, the X, Esc, and tapping the backdrop all call onDismiss.
 export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') onDismiss()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onDismiss])
+
   return (
     <motion.div
       className="broadcast-prompt-backdrop"
@@ -34,7 +43,7 @@ export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
           <span>Announcement</span>
           <button
             type="button"
-            className="broadcast-prompt-close"
+            className="game-close-btn broadcast-prompt-close"
             onClick={onDismiss}
             aria-label="Close"
           >
