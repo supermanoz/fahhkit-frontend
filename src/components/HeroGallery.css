@@ -216,6 +216,26 @@
   flex-direction: row;
 }
 
+.hero-card-equip-btn {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+  -webkit-text-stroke: inherit;
+}
+
+.hero-card-equip-btn:disabled {
+  cursor: default;
+}
+
 .hero-card-foot-label {
   font-size: 13px;
 }

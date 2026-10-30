@@ -71,6 +71,7 @@ import { useRolloutStatus } from '../hooks/useRolloutStatus'
 import RolloutRequestModal from '../components/RolloutRequestModal'
 import RolloutRequestedChip from '../components/RolloutRequestedChip'
 import { warnMissingEmoteAssets } from '../utils/emotes'
+import { ToastProvider, useToast } from '../game/ui/Toast'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
@@ -451,7 +452,11 @@ function summarizeRunEvents(events) {
   return { title, totalArea }
 }
 
-export default function GamePage() {
+// Wrapped below so ToastProvider is an ancestor of this component (and so
+// its own useToast() call below resolves) - the equip error toast is the
+// first thing in /game to need it.
+function GamePageInner() {
+  const toast = useToast()
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const auth = useAuthFlow()
@@ -2538,6 +2543,12 @@ export default function GamePage() {
     } catch (err) {
       setStoreActionError(
         err instanceof ApiError ? err.message : 'Could not update that item.'
+      )
+      toast.push(
+        isEquipped
+          ? "Couldn't unequip, try again."
+          : "Couldn't equip, try again.",
+        { type: 'error' }
       )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4866,6 +4877,7 @@ export default function GamePage() {
                       setStoreActionError(null)
                       setSelectedHeroId(hero.id)
                     }}
+                    onEquip={handleEquip}
                   />
                 )}
 
@@ -5531,5 +5543,13 @@ export default function GamePage() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function GamePage() {
+  return (
+    <ToastProvider>
+      <GamePageInner />
+    </ToastProvider>
   )
 }

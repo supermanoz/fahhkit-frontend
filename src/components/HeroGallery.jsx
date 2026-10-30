@@ -9,6 +9,7 @@ import {
 } from './GameIcons'
 import HeroFigure from './HeroFigure'
 import { getHeroSprite } from '../utils/heroSprites'
+import { resolveHeroEquipState } from '../utils/heroEquipState'
 import './HeroGallery.css'
 
 // A swipe distance/velocity past either of these commits to the next/prev
@@ -36,10 +37,15 @@ export default function HeroGallery({
   activeHeroId,
   loading,
   onSelect,
+  onEquip,
 }) {
   const [index, setIndex] = useState(0)
   const [direction, setDirection] = useState(0)
   const [hovered, setHovered] = useState(false)
+  // Keyed by hero id (not a plain bool) so switching heroes mid-request
+  // doesn't leave the new card showing the old one's spinner, and a
+  // reused true/false can't go stale across the swap either.
+  const [equippingHeroId, setEquippingHeroId] = useState(null)
   const draggedRef = useRef(false)
 
   // Keep a valid index if the roster shrinks (or loads in) under us.
@@ -53,6 +59,19 @@ export default function HeroGallery({
     setDirection(clamped > index ? 1 : -1)
     setIndex(clamped)
     setHovered(false)
+  }
+
+  async function handleEquipClick(e, item) {
+    // The card itself opens the detail modal on click (onSelect below) -
+    // without this, tapping Equip would do both at once.
+    e.stopPropagation()
+    if (equippingHeroId) return
+    setEquippingHeroId(item.heroId)
+    try {
+      await onEquip(item, false)
+    } finally {
+      setEquippingHeroId(null)
+    }
   }
 
   function handleDragEnd(_, info) {
@@ -87,27 +106,17 @@ export default function HeroGallery({
   }
 
   const hero = heroes[index]
-  const equipped = hero.id === activeHeroId
-  const owned = ownedItems.some((o) => o.storeItem.heroId === hero.id)
-  const comingSoon = !equipped && !owned && hero.skins?.length === 0
+  const { equipped, owned, ownedHeroItem, tier } = resolveHeroEquipState(
+    hero,
+    ownedItems,
+    activeHeroId
+  )
+  const equipping = equippingHeroId === hero.id
   const animated = Boolean(getHeroSprite(hero.name))
   const prices = (hero.skins || [])
     .map((sk) => sk.priceFahhcoin || 0)
     .filter((n) => n > 0)
   const fromPrice = prices.length ? Math.min(...prices) : 0
-  // 'soon' (no skin released yet) stays its own tier for the grayscale
-  // look, and 'limited' (event/reward heroes, e.g. Blaze) keeps its art in
-  // colour - both just read "Limited" to the player (see hero-card-foot
-  // below), since "coming soon" over-promised a release date.
-  const tier = equipped
-    ? 'equipped'
-    : owned
-      ? 'owned'
-      : comingSoon
-        ? 'soon'
-        : hero.limited
-          ? 'limited'
-          : 'locked'
 
   return (
     <div className="hero-roster">
@@ -180,9 +189,24 @@ export default function HeroGallery({
               ) : (
                 <span className={`hero-card-foot is-${tier}`}>
                   {equipped ? (
-                    <>
+                    <button
+                      type="button"
+                      className="hero-card-equip-btn"
+                      disabled
+                    >
                       <IconCheck /> Equipped
-                    </>
+                    </button>
+                  ) : ownedHeroItem ? (
+                    <button
+                      type="button"
+                      className="hero-card-equip-btn"
+                      disabled={equipping}
+                      onClick={(e) =>
+                        handleEquipClick(e, ownedHeroItem.storeItem)
+                      }
+                    >
+                      {equipping ? 'Equipping…' : 'Equip'}
+                    </button>
                   ) : owned ? (
                     'Equip'
                   ) : (
