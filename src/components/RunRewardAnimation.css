@@ -29,7 +29,7 @@
       rgba(111, 185, 255, 0.35),
       transparent 70%
     ),
-    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
+    linear-gradient(180deg, var(--text-muted) 0%, var(--ink) 100%);
   color: var(--game-cream);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.12),
@@ -49,7 +49,7 @@
   margin: 0;
   font-size: 34px;
   font-weight: 900;
-  color: #9ad4ff;
+  color: var(--divider);
   -webkit-text-stroke: 1.5px var(--game-ink);
   paint-order: stroke fill;
   text-shadow: 0 3px 0 var(--game-ink);
@@ -81,7 +81,7 @@
 }
 
 .run-reward-level-num {
-  color: #fff;
+  color: var(--ink);
   font-weight: 900;
   font-size: 24px;
   line-height: 1;
@@ -109,8 +109,8 @@
   max-width: 100%;
   background: linear-gradient(
     180deg,
-    #9ad4ff 0%,
-    #9ad4ff 48%,
+    var(--divider) 0%,
+    var(--divider) 48%,
     #2f8ee8 52%,
     #1a5fb4 100%
   );

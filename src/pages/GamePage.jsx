@@ -160,6 +160,7 @@ import SkinShelf from '../components/SkinShelf'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
+import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
 import RunRewardAnimation from '../components/RunRewardAnimation'
 import RunScoreCard from '../components/RunScoreCard'
 import ClubBadge from '../components/ClubBadge'
@@ -963,43 +964,14 @@ export default function GamePage() {
       : liveLocation || center
 
   const mailbox = useMailbox()
-  // Broadcasts (news/announcements), queued to pop up front and center the
-  // moment the game opens instead of waiting for the player to find them in
-  // the Mail tab - see BroadcastPrompt below. Deliberately NOT gated on
-  // readAt: the point is this reappears every time the game opens, even for
-  // a broadcast the player already saw last session (listActive has no
-  // expiry - everything published stays "active" until a moderator pulls
-  // it), so dismissing one just marks it read for the Mail tab's unread
-  // badge, it never permanently suppresses the popup. introducedIds tracks
-  // which broadcasts this session has already offered, so only the single
-  // newest one shows on open (not the whole backlog) while a broadcast
-  // published later in the same session (a live socket push) still queues
-  // immediately as its own pop-up.
-  const [broadcastQueue, setBroadcastQueue] = useState([])
-  const introducedBroadcastIdsRef = useRef(new Set())
-  const initialBroadcastShownRef = useRef(false)
-  useEffect(() => {
-    if (mailbox.broadcasts.length === 0) return
-    if (!initialBroadcastShownRef.current) {
-      initialBroadcastShownRef.current = true
-      mailbox.broadcasts.forEach((b) =>
-        introducedBroadcastIdsRef.current.add(b.id)
-      )
-      setBroadcastQueue([mailbox.broadcasts[0]])
-      return
-    }
-    const fresh = mailbox.broadcasts.filter(
-      (b) => !introducedBroadcastIdsRef.current.has(b.id)
-    )
-    if (fresh.length === 0) return
-    fresh.forEach((b) => introducedBroadcastIdsRef.current.add(b.id))
-    setBroadcastQueue((prev) => [...prev, ...fresh])
-  }, [mailbox.broadcasts])
-  function dismissBroadcastPrompt() {
-    const current = broadcastQueue[0]
-    if (current) mailbox.openBroadcast(current)
-    setBroadcastQueue((q) => q.slice(1))
-  }
+  // IMPORTANT_NOTICE broadcasts, popped up front and center the moment the
+  // game opens instead of waiting for the player to find them in the Mail
+  // tab - see BroadcastPrompt below. Backed by the server
+  // (BroadcastMailReadState.noticeShownAt, per user), not a client-side
+  // guess: once dismissed, GET /v1/mail/broadcast/notices/pending simply
+  // never returns it again, on any device, even after logout/login. A
+  // genuinely new one still shows once. See hooks/useAnnouncementNotices.js.
+  const announcementNotices = useAnnouncementNotices(isAuthed ? user?.id : null)
   // Whether the player is actually looking at the PvP tab right now - the
   // recurring challenge/discoverable-ping polls only run while this is
   // true (see usePvp); the incoming-challenge pop-up itself still works
@@ -1044,7 +1016,10 @@ export default function GamePage() {
       showRunOutcome(outcome)
     },
     onMail: mailbox.receiveMail,
-    onBroadcastMail: mailbox.receiveBroadcast,
+    onBroadcastMail: (broadcast) => {
+      mailbox.receiveBroadcast(broadcast)
+      announcementNotices.receive(broadcast)
+    },
     onPvp: (eventName, payload) => {
       pvp.handlePush(eventName, payload)
       // Stakes move on accept, payouts on resolve.
@@ -3217,12 +3192,12 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {broadcastQueue[0] && (
+        {announcementNotices.current && (
           <BroadcastPrompt
-            key={broadcastQueue[0].id}
-            broadcast={broadcastQueue[0]}
-            hasMore={broadcastQueue.length > 1}
-            onDismiss={dismissBroadcastPrompt}
+            key={announcementNotices.current.id}
+            broadcast={announcementNotices.current}
+            hasMore={announcementNotices.hasMore}
+            onDismiss={announcementNotices.dismiss}
           />
         )}
       </AnimatePresence>

@@ -164,7 +164,7 @@
   justify-content: center;
   border-radius: 8px;
   background: linear-gradient(180deg, rgb(10, 23, 44) 0%, rgb(6, 14, 27) 100%);
-  border: 2px solid var(--rarity-color, var(--game-ink));
+  border: 2px solid var(--rarity-color);
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition: transform 0.08s ease;
@@ -178,8 +178,8 @@
 .emote-select-tile.is-selected {
   box-shadow:
     0 2px 0 rgba(0, 0, 0, 0.4),
-    0 0 0 2px var(--rarity-color, var(--game-gold-light)),
-    0 0 10px var(--rarity-color, var(--game-gold-light));
+    0 0 0 2px var(--rarity-color),
+    0 0 10px var(--rarity-color);
 }
 
 .emote-select-tile.is-locked {

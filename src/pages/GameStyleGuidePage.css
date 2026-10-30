@@ -15,9 +15,9 @@
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-xl);
-  color: var(--sky-300);
+  color: var(--green-700);
   margin-top: var(--space-8);
-  border-bottom: var(--border-sm) solid var(--line);
+  border-bottom: var(--border-sm) solid var(--divider);
   padding-bottom: var(--space-2);
 }
 .sg-page h3 {
@@ -83,7 +83,7 @@
 .sg-contrast-table td {
   text-align: left;
   padding: var(--space-2);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
   font-size: var(--text-sm);
 }
 .sg-note {
@@ -189,11 +189,11 @@
 }
 .sg-podium-2 .sg-podium-plinth {
   height: 46px;
-  background: linear-gradient(180deg, var(--rarity-common), var(--surface-700));
+  background: linear-gradient(180deg, var(--rarity-common), var(--divider));
 }
 .sg-podium-3 .sg-podium-plinth {
   height: 34px;
-  background: linear-gradient(180deg, var(--team-slate), var(--surface-700));
+  background: linear-gradient(180deg, var(--team-slate), var(--divider));
 }
 .sg-podium-score {
   font-size: var(--text-xs);

@@ -23,7 +23,7 @@
 }
 
 .game-card-dark {
-  background: linear-gradient(180deg, #5a4633 0%, #46362a 100%);
+  background: linear-gradient(180deg, var(--text-muted) 0%, var(--ink) 100%);
   color: var(--game-cream);
 }
 
@@ -35,7 +35,7 @@
 .game-card-light {
   align-items: center;
   text-align: center;
-  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
+  background: linear-gradient(180deg, var(--white) 0%, var(--row) 100%);
   color: var(--game-ink);
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
@@ -50,7 +50,7 @@
   margin: 0;
   font-family: inherit;
   text-align: center;
-  color: #fff;
+  color: var(--ink);
   font-size: 22px;
   font-weight: 900;
   line-height: 1.15;
@@ -85,7 +85,7 @@
   padding: 9px 16px;
   border-radius: 10px;
   border: 3px solid var(--game-ink);
-  color: #fff;
+  color: var(--white);
   font: inherit;
   font-size: 14px;
   font-weight: 900;
@@ -218,7 +218,7 @@
   font-weight: 800;
   font-size: 14px;
   letter-spacing: 0.03em;
-  color: #fff;
+  color: var(--ink);
 }
 
 .game-row-actions {

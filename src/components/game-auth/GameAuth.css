@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0806;
+  background: var(--ink);
   padding: max(20px, env(safe-area-inset-top))
     max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
     max(20px, env(safe-area-inset-left));
@@ -49,7 +49,7 @@
   font-size: 24px;
   font-family: var(--font-display);
   font-weight: 600;
-  color: var(--text);
+  color: var(--white);
   text-shadow:
     -1.5px -1.5px 0 var(--game-ink),
     1.5px -1.5px 0 var(--game-ink),
@@ -61,7 +61,7 @@
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.04em;
-  color: rgba(182, 194, 232, 0.75);
+  color: rgba(90, 90, 84, 0.75);
   font-family: var(--font-body);
 }
 
@@ -80,7 +80,7 @@
 .game-auth-label {
   font-size: 12px;
   letter-spacing: 0.06em;
-  color: rgba(182, 194, 232, 0.8);
+  color: rgba(90, 90, 84, 0.8);
   font-family: var(--font-body);
 }
 
@@ -88,21 +88,34 @@
    min-height matches the tap-target floor used elsewhere in the game
    (.google-signin-button). */
 .game-auth-input,
-.game-auth-select {
+.game-auth-select,
+.game-auth-card .password-field input {
   width: 100%;
   min-height: 44px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1.5px solid rgba(182, 194, 232, 0.25);
-  background: rgb(7, 6, 4);
-  color: var(--game-cream);
+  border: 1.5px solid var(--ink);
+  background: var(--white);
+  color: var(--ink);
   font-size: 16px;
   font-family: var(--font-body);
   letter-spacing: 0.02em;
 }
 
+/* PasswordField (src/components/PasswordField.jsx) is a shared, non-game
+   component with no background/colour of its own - it just inherits the
+   browser's native input chrome, which left it visibly darker than its
+   .game-auth-input siblings once those became solid white. Matched here
+   instead of in PasswordField.css, which the rest of the site also uses. */
+.game-auth-card .password-field-toggle {
+  color: var(--text-muted);
+}
+.game-auth-card .password-field-toggle:hover {
+  color: var(--ink);
+}
+
 .game-auth-input::placeholder {
-  color: rgba(182, 194, 232, 0.4);
+  color: rgba(90, 90, 84, 0.4);
 }
 
 .game-auth-input:focus-visible,
@@ -133,7 +146,7 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: rgba(182, 194, 232, 0.7);
+  color: rgba(90, 90, 84, 0.7);
   cursor: pointer;
 }
 
@@ -150,7 +163,7 @@
 .game-auth-hint {
   margin: 0;
   font-size: 11.5px;
-  color: rgba(182, 194, 232, 0.6);
+  color: rgba(90, 90, 84, 0.6);
   font-family: var(--font-body);
 }
 
@@ -176,7 +189,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: rgba(182, 194, 232, 0.55);
+  color: rgba(90, 90, 84, 0.55);
 }
 
 .game-auth-strength li.met {
@@ -197,7 +210,7 @@
   gap: 10px;
   font-size: 12.5px;
   line-height: 1.4;
-  color: rgba(182, 194, 232, 0.85);
+  color: rgba(90, 90, 84, 0.85);
   font-family: var(--font-body);
 }
 
@@ -210,7 +223,7 @@
 }
 
 .game-auth-terms a {
-  color: var(--game-gold-light);
+  color: var(--green-text);
   text-decoration: underline;
 }
 
@@ -224,15 +237,15 @@
 }
 
 .game-auth-banner.error {
-  background: rgb(54, 23, 19);
+  background: var(--red-tint);
   border: 1px solid var(--game-red);
-  color: var(--game-red-light);
+  color: var(--red-700);
 }
 
 .game-auth-banner.success {
-  background: rgb(22, 43, 22);
+  background: var(--green-tint);
   border: 1px solid var(--game-green);
-  color: var(--game-green-light);
+  color: var(--green-text);
 }
 
 .game-auth-actions {
@@ -274,9 +287,9 @@
   width: 100%;
   min-height: 48px;
   border-radius: 14px;
-  border: 2px solid rgba(182, 194, 232, 0.35);
-  background: rgb(8, 6, 5);
-  color: var(--game-cream);
+  border: 2px solid var(--ink);
+  background: var(--white);
+  color: var(--ink);
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.04em;
@@ -287,7 +300,7 @@
   background: none;
   border: none;
   padding: 2px;
-  color: var(--game-gold-light);
+  color: var(--green-text);
   font-size: 13px;
   font-family: var(--font-body);
   text-decoration: underline;
@@ -311,7 +324,7 @@
   padding: 0 4px;
   background: none;
   border: none;
-  color: rgba(182, 194, 232, 0.8);
+  color: rgba(90, 90, 84, 0.8);
   font-size: 13px;
   font-family: var(--font-body);
   cursor: pointer;
@@ -322,7 +335,7 @@
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: rgba(182, 194, 232, 0.5);
+  color: rgba(90, 90, 84, 0.5);
   font-family: var(--font-body);
 }
 
@@ -331,7 +344,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: rgb(53, 54, 62);
+  background: var(--divider);
 }
 
 .game-auth-oauth {

@@ -13,9 +13,9 @@
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  background: rgb(59, 33, 64);
+  background: var(--red-tint);
   border: var(--border-sm) solid var(--red-500);
-  color: var(--red-300);
+  color: var(--red-700);
   font-family: var(--font-body);
   font-size: var(--text-sm);
 }

@@ -17,7 +17,7 @@
   z-index: 2;
   margin: -4px -4px 12px;
   padding: 4px 4px 0;
-  background: var(--game-panel, #2c2014);
+  background: var(--game-panel);
 }
 
 .mail-panel-header {
@@ -83,7 +83,7 @@
 }
 
 .mail-tab.active {
-  color: #fff;
+  color: var(--ink);
   background: rgb(88, 71, 55);
   border-bottom-color: var(--game-gold);
 }
@@ -212,7 +212,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #fff;
+  color: var(--ink);
   font-size: 14px;
 }
 
@@ -313,7 +313,7 @@
   border-radius: 14px;
   border: 2px solid var(--game-ink);
   border-top: 4px solid var(--game-gold);
-  background: linear-gradient(180deg, #4a3a2a 0%, #3a2b1f 100%);
+  background: linear-gradient(180deg, var(--text-muted) 0%, var(--ink) 100%);
   overflow: hidden;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -387,7 +387,7 @@
   font-weight: 800;
   font-size: 14px;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: var(--ink);
 }
 
 .news-card-meta {

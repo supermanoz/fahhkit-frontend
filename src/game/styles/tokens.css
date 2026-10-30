@@ -1,74 +1,80 @@
-/* Design tokens for the /game re-skin - "Frost & Amethyst": deep
-   night-indigo surfaces, sky blue as the brand/primary colour, white frost
-   cards for readable content, violet for premium/rare, green only for
-   go/success, red only for danger, gold ONLY for coins/trophies/rank-1.
-   Scoped on .game-root so the rest of the site is unaffected. .game-root is
-   added alongside the existing .game-page class on GamePage's root element.
-   THIS FILE REPLACES the earlier "warm wooden war-table" token set and the
-   original --game-* custom properties in GamePage.css - no hex colour
-   should exist anywhere in /game outside this file once migration is
-   complete. Check with:
+/* Design tokens for /game.
+   CoC-style default (2026-10-30): whitish/light-grey panels, black/near-
+   black ink for borders+text+outlines, green as the default button colour,
+   red for close/danger, gold reserved for coins/trophies/rank-1 only.
+   Replaces the earlier "Frost & Amethyst" indigo/sky/violet set as the
+   default everywhere in /game, EXCEPT the loading/splash screen (still
+   --bg-900 below - kept only for that, not a general-purpose token any
+   more) and the globe (untokenized either way - MapLibre's own sky),
+   which stay exactly as they are. Scoped on .game-root so the rest of the
+   site is unaffected. No hex colour should exist anywhere in /game outside
+   this file once migration is complete. Check with:
      grep -rEo "#[0-9a-fA-F]{3,8}" src/game src/pages/GamePage.css src/components/*.css
-   and confirm every hit is inside this file. */
+   and confirm every hit is inside this file (or the loading-screen /
+   globe exemption, see style.md). */
 .game-root {
-  /* Ink (outlines, text strokes) */
-  --ink: #0a0f2c;
-
-  /* Surfaces (dark, premium) */
+  /* Splash screen only - everything else in /game reads --ink/--panel/
+     etc below instead. Kept as its own token (not reused for anything
+     else) so the loading screen's look can't drift if this file's other
+     tokens change later. */
   --bg-900: #0b1026;
-  --bg-800: #141b3d;
-  --surface-700: #1e2a5a;
-  --surface-600: #2a3a78;
-  --line: #3b4f9a;
 
-  /* Frost / white (light cards, readable content) */
-  --frost-50: #f7faff;
-  --frost-100: #eaf2ff;
-  --frost-200: #d3e3ff;
-  --frost-ink: #1a2550;
+  /* Ink - borders (2-3px), body text, icons */
+  --ink: #1a1a1a;
 
-  /* Sky blue - brand + primary action */
-  --sky-300: #7fd6ff;
-  --sky-500: #2fa8ff;
-  --sky-700: #1673d6;
-  --sky-900: #0b4a99;
+  /* Panels / menus / modals / cards - fully solid, no alpha */
+  --panel: #f4f4f0;
+  --row: #e3e3dd;
+  --divider: #cfcfc8;
+  --white: #ffffff;
+  --tab-inactive: #d9d9d3;
 
-  /* Violet - premium, epic/legendary, active tab highlight */
-  --violet-300: #b79bff;
-  --violet-500: #7c4dff;
-  --violet-700: #5229cc;
-  --violet-900: #331a85;
+  /* Green - the default/primary button colour */
+  --green-300: #8ee04a;
+  --green-500: #5cb82a;
+  --green-700: #3c8a18;
+  /* Pale green surface for success banners - same reasoning as --red-tint
+     above. */
+  --green-tint: #e6f7d9;
+  /* Darker than --green-700 specifically for green TEXT on --green-tint -
+     --green-700 itself is only 3.86:1 there (fails AA); this clears 4.5:1. */
+  --green-text: #2f6e13;
 
-  /* Green - success only */
-  --green-300: #6ef0a6;
-  --green-500: #22c55e;
-  --green-700: #15803d;
-
-  /* Red - danger only */
-  --red-300: #ff8a96;
-  --red-500: #ef3b4f;
-  --red-700: #b3192d;
+  /* Red - close/danger only */
+  --red-300: #ff6b5c;
+  --red-500: #e23b2e;
+  --red-700: #a82a1f;
+  /* Pale red surface for error banners/chips on the light panel - not part
+     of the spec's literal colour list, derived to stay in the same red
+     family for a "this is an error" surface that isn't the saturated
+     button/icon red. */
+  --red-tint: #fbe4e1;
 
   /* Gold - ONLY coins, trophies, rank-1 */
   --gold-300: #ffe07a;
   --gold-500: #ffc531;
   --gold-700: #c98a00;
+  /* Darker than --gold-700 specifically for gold TEXT on the light panel -
+     --gold-700 itself is only 2.68:1 there (fails AA); this clears 4.5:1. */
+  --gold-text: #8a5e00;
 
   /* Text */
-  --text: #ffffff;
-  --text-muted: #b6c2e8;
-  --text-on-frost: var(--frost-ink);
-  --text-link: var(--sky-300);
+  --text: #1a1a1a;
+  --text-muted: #5a5a54;
+  --text-on-panel: var(--ink);
+  --text-link: var(--green-700);
 
-  /* Rarity */
-  --rarity-common: #a9b6d6;
-  --rarity-rare: #2fa8ff;
-  --rarity-epic: #7c4dff;
+  /* Rarity (shop/emote tiles) */
+  --rarity-common: #8a8a84;
+  --rarity-rare: #3a7bd5;
+  --rarity-epic: #8a4fe0;
   --rarity-legendary: #ffc531;
 
-  /* Team / territory colours - 8 saturated, CVD-leaning-safe hues that read
-     clean against the sky/violet UI (no muddy browns). Best-effort: not run
-     through an actual CVD simulator tool, re-check before ship. */
+  /* Team / territory colours - 8 saturated, CVD-leaning-safe hues that
+     read clean against the white/green/black UI (no muddy browns).
+     Best-effort: not run through an actual CVD simulator tool, re-check
+     before ship. Unchanged from the previous palette - these were never
+     wood/gold-themed to begin with. */
   --team-coral: #ff6b6b;
   --team-tangerine: #ff9f43;
   --team-lime: #a3e635;

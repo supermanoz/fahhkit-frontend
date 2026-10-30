@@ -1,12 +1,12 @@
-/* Shared component library styles for the /game re-skin ("Frost &
-   Amethyst"). Every rule in this file (and every other file under
-   src/game/) must use tokens from ../styles/tokens.css - no hex colours
-   here. All motion is transform/opacity only and respects
-   prefers-reduced-motion (see the blanket rule at the bottom of this
-   file). Readability rules (see fonts.css): no heavy text strokes below
-   20px - button/tab labels use ink-or-white fill chosen per variant so
-   they clear WCAG AA without a stroke (see GameStyleGuidePage's contrast
-   table for the exact pairs checked). */
+/* Shared component library styles for the /game re-skin (CoC-style
+   whitish/black/green default, 2026-10-30). Every rule in this file (and
+   every other file under src/game/) must use tokens from
+   ../styles/tokens.css - no hex colours here. All motion is
+   transform/opacity only and respects prefers-reduced-motion (see the
+   blanket rule at the bottom of this file). Headings and button labels are
+   white with a 2px ink stroke + a soft dark drop shadow (so they read on
+   any button colour); plain body text/labels are ink-coloured directly -
+   see GameStyleGuidePage's contrast table for the pairs checked. */
 
 /* ---------- GameButton ---------- */
 .gb {
@@ -22,8 +22,10 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--text-lg);
-  color: var(--ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: var(--white);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
   cursor: pointer;
   user-select: none;
   box-shadow: var(--inner-highlight), var(--inner-shade), var(--press-drop);
@@ -39,7 +41,7 @@
     var(--inner-highlight), var(--inner-shade), var(--press-drop-active);
 }
 .gb:focus-visible {
-  outline: 3px solid var(--sky-300);
+  outline: 3px solid var(--green-500);
   outline-offset: 2px;
 }
 .gb:disabled {
@@ -60,10 +62,6 @@
     var(--inner-highlight), var(--inner-shade), var(--press-drop-active);
 }
 
-/* sm buttons are a known, documented exception to the AA-via-large-text
-   strategy below (16px doesn't clear the 18.66px large-text bar) - avoid
-   gb-premium at gb-sm size; every other variant still clears normal 4.5:1
-   with ink fill even at this size (see the contrast table). */
 .g-full-width {
   width: 100%;
 }
@@ -80,32 +78,20 @@
   font-size: var(--text-xl);
 }
 
-/* Ink-on-bright-gradient text passes AA at --text-lg/700-weight (clears the
-   WCAG "large text" 18.66px-bold bar, so the relaxed 3:1 threshold
-   legitimately applies) across every variant below - see the contrast
-   table in GameStyleGuidePage. */
-.gb-primary {
-  background: linear-gradient(
-    180deg,
-    var(--sky-300) 0%,
-    var(--sky-500) 55%,
-    var(--sky-700) 100%
-  );
-}
-.gb-success {
+/* Green is the default/primary button colour - .gb-success is the same
+   gradient (the old system split "primary action" from "success" into two
+   colours; this one doesn't need to). .gb-premium has no colour of its own
+   any more either - no 4th accent exists in this palette - so it reuses
+   the same green gradient too, just keeping the class as a hook for future
+   styling. */
+.gb-primary,
+.gb-success,
+.gb-premium {
   background: linear-gradient(
     180deg,
     var(--green-300) 0%,
     var(--green-500) 55%,
     var(--green-700) 100%
-  );
-}
-.gb-premium {
-  background: linear-gradient(
-    180deg,
-    var(--violet-300) 0%,
-    var(--violet-500) 55%,
-    var(--violet-700) 100%
   );
 }
 .gb-danger {
@@ -115,18 +101,19 @@
     var(--red-500) 55%,
     var(--red-700) 100%
   );
-  color: var(--text);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  /* color/stroke inherited from .gb above - white-on-red needs the same
+     treatment as every other variant, not a separate override. */
 }
 .gb-secondary {
-  background: var(--frost-100);
-  color: var(--text-on-frost);
-  border-color: var(--line);
+  background: var(--white);
+  color: var(--ink);
+  -webkit-text-stroke: 0;
   text-shadow: none;
 }
 .gb-ghost {
-  background: rgb(10, 10, 19);
-  color: var(--sky-300);
+  background: transparent;
+  color: var(--ink);
+  -webkit-text-stroke: 0;
   text-shadow: none;
   box-shadow: var(--inner-shade);
 }
@@ -172,14 +159,18 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 3px solid rgba(10, 15, 44, 0.3);
+  border: 3px solid rgba(26, 26, 26, 0.25);
   border-top-color: var(--ink);
   animation: gb-spin 0.7s linear infinite;
 }
 .gb-danger .gb-spinner,
 .gb-ghost .gb-spinner {
   border: 3px solid rgba(255, 255, 255, 0.35);
-  border-top-color: var(--text);
+  border-top-color: var(--white);
+}
+.gb-ghost .gb-spinner {
+  border: 3px solid rgba(26, 26, 26, 0.2);
+  border-top-color: var(--ink);
 }
 @keyframes gb-spin {
   to {
@@ -192,13 +183,13 @@
 
 /* ---------- Panel / Modal ---------- */
 .g-panel {
-  background: var(--bg-800);
+  background: var(--panel);
   border: var(--border-md) solid var(--ink);
   border-radius: var(--radius-lg);
   box-shadow:
-    inset 0 0 0 var(--border-sm) var(--surface-700),
+    inset 0 0 0 var(--border-sm) var(--divider),
     0 6px 0 var(--ink);
-  color: var(--text);
+  color: var(--ink);
   position: relative;
 }
 
@@ -229,11 +220,15 @@
     transform: scale(1);
   }
 }
-/* Header ribbon: sky by default, violet for premium-context modals
-   (.g-modal-ribbon-premium) - never orange. White text clears AA against
-   the 700 anchor stop (see contrast table). */
+/* Header ribbon: green by default - no separate premium colour exists in
+   this palette, .g-modal-ribbon-premium is kept only as a styling hook.
+   White stroked text, same treatment as button labels. */
 .g-modal-ribbon {
-  background: linear-gradient(180deg, var(--sky-500) 0%, var(--sky-700) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--green-500) 0%,
+    var(--green-700) 100%
+  );
   border-bottom: var(--border-md) solid var(--ink);
   border-radius: calc(var(--radius-lg) - var(--border-md))
     calc(var(--radius-lg) - var(--border-md)) 0 0;
@@ -241,14 +236,16 @@
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-lg);
-  color: var(--text);
+  color: var(--white);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 .g-modal-ribbon-premium {
   background: linear-gradient(
     180deg,
-    var(--violet-500) 0%,
-    var(--violet-700) 100%
+    var(--green-500) 0%,
+    var(--green-700) 100%
   );
 }
 .g-modal-close {
@@ -265,7 +262,7 @@
     var(--red-500) 55%,
     var(--red-700)
   );
-  color: var(--text);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -277,20 +274,21 @@
   box-shadow: 0 1px 0 var(--ink);
 }
 .g-modal-close:focus-visible {
-  outline: 3px solid var(--sky-300);
+  outline: 3px solid var(--green-500);
   outline-offset: 2px;
 }
 .g-modal-body {
   padding: var(--space-4);
   font-family: var(--font-body);
   line-height: 1.35;
+  color: var(--ink);
 }
 
 /* ---------- Tabs ---------- */
 .g-tabs {
   display: flex;
   gap: var(--space-2);
-  background: var(--bg-900);
+  background: var(--row);
   border: var(--border-sm) solid var(--ink);
   border-radius: var(--radius-md);
   padding: var(--space-1);
@@ -304,28 +302,28 @@
   gap: var(--space-1);
   border-radius: var(--radius-sm);
   border: none;
-  background: var(--surface-600);
-  color: var(--text-muted);
+  background: var(--tab-inactive);
+  color: var(--ink);
   font-family: var(--font-body);
   font-weight: 800;
   font-size: var(--text-sm);
   cursor: pointer;
   position: relative;
 }
-/* Anchored on sky-700 (not a lighter stop) so white text clears AA - see
-   contrast table. Premium sections use .g-tab-premium instead. */
+/* Active tab merges into the (light) panel instead of taking a button
+   colour - white background, dark text, same as the rest of the panel. */
 .g-tab[aria-selected='true'] {
-  background: linear-gradient(180deg, var(--sky-500), var(--sky-700));
-  color: var(--text);
+  background: var(--white);
+  color: var(--ink);
   box-shadow:
     var(--inner-highlight),
     0 3px 0 var(--ink);
 }
 .g-tab-premium[aria-selected='true'] {
-  background: linear-gradient(180deg, var(--violet-500), var(--violet-700));
+  background: var(--white);
 }
 .g-tab:focus-visible {
-  outline: 3px solid var(--sky-300);
+  outline: 3px solid var(--green-500);
   outline-offset: 2px;
 }
 .g-tab-badge {
@@ -339,7 +337,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  background: var(--bg-800);
+  background: var(--panel);
   border: var(--border-sm) solid var(--ink);
   border-radius: 999px;
   padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
@@ -351,14 +349,15 @@
   margin-left: -2px;
   flex-shrink: 0;
 }
-/* Coins/gems are the ONE sanctioned gold use outside rank-1 - outlined per
-   the >=20px numbers-on-bright-backgrounds rule. */
+/* Coins/gems are the ONE sanctioned gold use outside rank-1. Gold-300 on
+   the light panel needs the ink outline to stay readable (gold alone is
+   too close to the panel's own lightness). */
 .g-currency-value {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-lg);
   font-variant-numeric: tabular-nums;
-  color: var(--gold-300);
+  color: var(--gold-text);
 }
 .g-currency-value.text-outlined {
   font-size: var(--text-lg);
@@ -402,11 +401,11 @@
 }
 .g-badge-count {
   background: var(--red-500);
-  color: var(--text);
+  color: var(--white);
 }
 .g-badge-level {
-  background: var(--sky-500);
-  color: var(--text);
+  background: var(--green-500);
+  color: var(--white);
 }
 .g-badge-new {
   background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
@@ -445,23 +444,24 @@
   background: none;
   font-family: var(--font-body);
   font-size: var(--text-md);
+  color: var(--ink);
 }
 .g-row-frost {
-  background: var(--frost-100);
-  color: var(--text-on-frost);
+  background: var(--white);
+  color: var(--ink);
 }
 .g-row-dark {
-  background: var(--surface-600);
-  color: var(--text);
+  background: var(--row);
+  color: var(--ink);
 }
 .g-row-selected {
-  box-shadow: inset 4px 0 0 var(--sky-500);
+  box-shadow: inset 4px 0 0 var(--green-500);
 }
 .g-row:active {
   transform: translateY(1px);
 }
 .g-row:focus-visible {
-  outline: 3px solid var(--sky-300);
+  outline: 3px solid var(--green-500);
   outline-offset: -1px;
 }
 .g-row-chevron {
@@ -477,12 +477,12 @@
   font-family: var(--font-body);
 }
 .g-card-frost {
-  background: var(--frost-100);
-  color: var(--text-on-frost);
+  background: var(--white);
+  color: var(--ink);
 }
 .g-card-dark {
-  background: var(--surface-600);
-  color: var(--text);
+  background: var(--row);
+  color: var(--ink);
 }
 
 /* ---------- ProgressBar ---------- */
@@ -500,9 +500,7 @@
   transition: width var(--dur-slow) var(--ease-out);
   position: relative;
 }
-.g-progress-sky {
-  background: linear-gradient(180deg, var(--sky-300), var(--sky-700));
-}
+.g-progress-sky,
 .g-progress-green {
   background: linear-gradient(180deg, var(--green-300), var(--green-700));
 }
@@ -525,7 +523,7 @@
   font-weight: 900;
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: var(--white);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
 }
 
@@ -545,11 +543,11 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: var(--bg-800);
+  background: var(--panel);
   border: var(--border-sm) solid var(--ink);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
-  color: var(--text);
+  color: var(--ink);
   font-family: var(--font-body);
   position: relative;
   overflow: hidden;
@@ -582,14 +580,14 @@
   background: var(--red-500);
 }
 .g-toast-info .g-toast-icon {
-  background: var(--sky-500);
+  background: var(--green-500);
 }
 .g-toast-progress {
   position: absolute;
   left: 0;
   bottom: 0;
   height: 3px;
-  background: var(--sky-500);
+  background: var(--green-500);
   animation: g-toast-timer linear forwards;
 }
 @keyframes g-toast-timer {
@@ -608,20 +606,22 @@
   align-items: center;
   gap: 2px;
 }
-/* Huge outlined numbers on a dark background pass the >=20px-stroke
-   exception on their own (white fill, then an ink stroke for extra punch).
-   Gold is reserved for genuinely currency/trophy stats (pass color="gold"
-   explicitly) - everything else defaults to white. */
+/* Huge outlined numbers - white fill, ink stroke, same label treatment as
+   buttons/headings. Gold is reserved for genuinely currency/trophy stats
+   (pass color="gold" explicitly) - everything else defaults to white. */
 .g-stat-value {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-3xl);
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  color: var(--text);
+  color: var(--white);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 .g-stat-value.g-stat-gold {
-  color: var(--gold-300);
+  color: var(--gold-500);
 }
 .g-stat-label {
   font-family: var(--font-body);
@@ -652,13 +652,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-600);
-  color: var(--text);
+  background: var(--row);
+  color: var(--ink);
   font-family: var(--font-display);
   font-weight: 600;
 }
 .g-avatar-ring {
-  box-shadow: 0 0 0 3px var(--ring-color, var(--sky-500));
+  box-shadow: 0 0 0 3px var(--ring-color, var(--green-500));
 }
 .g-avatar-level {
   position: absolute;
@@ -672,7 +672,7 @@
   aspect-ratio: 1;
   border-radius: var(--radius-md);
   border: var(--border-sm) solid var(--ink);
-  background: var(--surface-600);
+  background: var(--row);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -684,12 +684,12 @@
 .g-rarity-rare {
   box-shadow:
     0 0 0 2px var(--rarity-rare) inset,
-    0 0 12px rgba(47, 168, 255, 0.5);
+    0 0 12px rgba(58, 123, 213, 0.5);
 }
 .g-rarity-epic {
   box-shadow:
     0 0 0 2px var(--rarity-epic) inset,
-    0 0 12px rgba(124, 77, 255, 0.5);
+    0 0 12px rgba(138, 79, 224, 0.5);
 }
 .g-rarity-legendary {
   box-shadow:
@@ -716,7 +716,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--white);
 }
 .g-rarity-equipped {
   position: absolute;
@@ -743,9 +743,9 @@
   display: inline-block;
   background: linear-gradient(
     180deg,
-    var(--sky-300),
-    var(--sky-500) 60%,
-    var(--sky-700)
+    var(--green-300),
+    var(--green-500) 60%,
+    var(--green-700)
   );
   border: var(--border-sm) solid var(--ink);
   border-radius: var(--radius-sm);
@@ -754,7 +754,7 @@
   font-weight: 900;
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
-  color: var(--text);
+  color: var(--white);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 .g-ribbon-gold {
@@ -770,9 +770,9 @@
 
 .g-divider {
   height: var(--border-sm);
-  background: var(--line);
+  background: var(--divider);
   border-radius: 999px;
-  opacity: 0.6;
+  opacity: 1;
   margin: var(--space-3) 0;
 }
 
@@ -781,8 +781,8 @@
   height: 44px;
   border-radius: var(--radius-sm);
   border: var(--border-sm) solid var(--ink);
-  background: var(--surface-600);
-  color: var(--text);
+  background: var(--row);
+  color: var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -794,7 +794,7 @@
   box-shadow: var(--press-drop-active);
 }
 .g-icon-btn:focus-visible {
-  outline: 3px solid var(--sky-300);
+  outline: 3px solid var(--green-500);
   outline-offset: 2px;
 }
 
@@ -802,7 +802,7 @@
   position: absolute;
   z-index: var(--z-tooltip);
   background: var(--ink);
-  color: var(--text);
+  color: var(--white);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-body);
@@ -816,9 +816,9 @@
   border-radius: var(--radius-sm);
   background: linear-gradient(
     90deg,
-    var(--surface-600) 25%,
-    var(--surface-700) 50%,
-    var(--surface-600) 75%
+    var(--row) 25%,
+    var(--divider) 50%,
+    var(--row) 75%
   );
   background-size: 200% 100%;
   animation: g-shimmer 1.4s ease-in-out infinite;

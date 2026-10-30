@@ -7,7 +7,7 @@
   background: rgb(10, 10, 14);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
-  color: var(--text);
+  color: #fff;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 11px;
   line-height: 1.4;
