@@ -20,18 +20,13 @@
   background: var(--game-panel);
 }
 
-.mail-panel-header {
+/* Inbox/News (below) now carry the section title - this row just gives
+   "Mark all read" a place to sit, so it collapses to nothing instead of
+   a stray gap when there's no unread mail to clear. */
+.mail-panel-header:has(.mail-mark-all-btn) {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-end;
   padding-bottom: 10px;
-}
-
-.mail-panel-title {
-  margin: 0;
-  font-size: 17px;
-  color: var(--game-gold);
 }
 
 .mail-mark-all-btn {

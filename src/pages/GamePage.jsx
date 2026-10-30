@@ -4056,14 +4056,22 @@ export default function GamePage() {
                 onClick={() => setTabPickerOpen((open) => !open)}
                 aria-haspopup="listbox"
                 aria-expanded={tabPickerOpen}
+                aria-label={
+                  activeMenuTab.id === 'mail' ? activeMenuTab.label : undefined
+                }
               >
                 <span
                   className={`game-menu-picker-medal tone-${activeMenuTab.tone}`}
                 >
                   <activeMenuTab.Icon />
                 </span>
+                {/* Mail's own Inbox/News tabs serve as the title once this
+                    opens, so the text here would just repeat "Mail" right
+                    above them - left empty for that one tab only (the span
+                    stays, as the flex-1 spacer that keeps the badge/knob
+                    pinned right), everything else still shows its name. */}
                 <span className="game-menu-picker-label">
-                  {activeMenuTab.label}
+                  {activeMenuTab.id !== 'mail' && activeMenuTab.label}
                 </span>
                 {!tabPickerOpen && otherTabsBadgeCount > 0 && (
                   <span className="game-menu-tab-badge game-menu-picker-badge">

@@ -2129,7 +2129,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 3px solid var(--game-ink);
   font: inherit;
   cursor: pointer;
   text-align: left;
@@ -2140,28 +2139,18 @@
 .game-menu-picker-current {
   padding: 7px 8px 7px 7px;
   border-radius: 16px;
-  background: linear-gradient(
-    180deg,
-    var(--game-wood-light) 0%,
-    var(--game-wood) 45%,
-    var(--game-wood-dark) 100%
-  );
-  box-shadow:
-    inset 0 3px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -6px 0 rgba(120, 70, 25, 0.55),
-    0 5px 0 var(--game-ink),
-    0 8px 14px rgba(0, 0, 0, 0.35);
+  border: 3px solid var(--game-panel-border);
+  background: var(--white);
+  box-shadow: 0 3px 0 var(--game-panel-border-dark);
 }
 
 .game-menu-picker-current:active {
-  transform: translateY(4px);
-  box-shadow:
-    inset 0 3px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -6px 0 rgba(120, 70, 25, 0.55),
-    0 1px 0 var(--game-ink);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--game-panel-border-dark);
 }
 
-/* Outlined chunky label - same stroke trick as the HUD counters. */
+/* Dark ink, no outline - every picker surface is off-white/white now, not
+   a dark wood plank (same failure mode as .game-card-title's own comment). */
 .game-menu-picker-label {
   flex: 1;
   min-width: 0;
@@ -2256,7 +2245,8 @@
   transform: rotate(180deg);
 }
 
-/* The dropped-down board: dark wood frame with a lighter inner border. */
+/* The dropped-down board: off-white panel, solid border, flat shadow -
+   same recipe as every other card in this theme, no blur/transparency. */
 .game-menu-picker-list {
   position: absolute;
   top: calc(100% + 10px);
@@ -2269,46 +2259,34 @@
   flex-direction: column;
   gap: 8px;
   border-radius: 18px;
-  border: 3px solid var(--game-ink);
-  background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.025) 0 6px,
-      transparent 6px 12px
-    ),
-    linear-gradient(180deg, #5a3e24, #3a2816);
-  box-shadow:
-    inset 0 0 0 3px rgba(224, 163, 85, 0.35),
-    inset 0 3px 0 rgba(255, 255, 255, 0.12),
-    0 6px 0 var(--game-ink),
-    0 14px 28px rgba(0, 0, 0, 0.55);
+  border: 3px solid var(--game-panel-border);
+  background: var(--game-panel);
+  box-shadow: 0 6px 0 var(--game-panel-border-dark);
   transform-origin: top center;
 }
 
 .game-menu-picker-option {
   padding: 6px 12px 6px 6px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #7a5634, #5e4027);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -4px 0 rgba(0, 0, 0, 0.25),
-    0 4px 0 var(--game-ink);
-}
-
-.game-menu-picker-option .game-menu-picker-label {
-  font-size: 18px;
-  -webkit-text-stroke-width: 2px;
+  border-radius: 12px;
+  border: 2px solid var(--border-soft);
+  background: var(--white);
 }
 
 .game-menu-picker-option:active {
-  transform: translateY(3px);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -4px 0 rgba(0, 0, 0, 0.25),
-    0 1px 0 var(--game-ink);
+  transform: translateY(2px);
 }
 
-/* Current tab: lit-up gold plank. */
+/* Normal weight, no outline, at least 16px - the heavy chunky stroke this
+   used to carry read as an unreadable dark blob once the row went from
+   dark wood to white (see .game-btn-wood's comment on the same bug). */
+.game-menu-picker-option .game-menu-picker-label {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Current tab: lit-up gold row - the one picker row that's a real colour
+   fill, so its label goes back to white+outline below (every other row is
+   dark text on white/off-white). */
 .game-menu-picker-option.active {
   background: linear-gradient(
     180deg,
@@ -2316,11 +2294,18 @@
     var(--game-gold) 55%,
     var(--game-gold-dark)
   );
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -4px 0 rgba(0, 0, 0, 0.2),
-    0 4px 0 var(--game-ink),
-    0 0 14px rgba(255, 122, 41, 0.55);
+  border-color: var(--game-ink);
+  box-shadow: 0 3px 0 var(--game-ink);
+}
+
+.game-menu-picker-option.active .game-menu-picker-label {
+  color: #fff;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
 }
 
 .game-menu-picker-here {

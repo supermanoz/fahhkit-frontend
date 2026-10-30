@@ -176,7 +176,6 @@ export default function MailPanel({ mailbox, onClaimed }) {
             clips overflow. */}
         <div className="mail-panel-sticky-head">
           <div className="mail-panel-header">
-            <h3 className="mail-panel-title">Mail</h3>
             {view === 'inbox' && unreadInbox > 0 && (
               <button
                 type="button"
