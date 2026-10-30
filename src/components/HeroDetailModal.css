@@ -28,13 +28,7 @@
   padding-bottom: 44px;
   border-radius: 17px 17px 0 0;
   overflow: hidden;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--white);
   border-bottom: 3px solid var(--game-ink);
 }
 
@@ -56,8 +50,8 @@
   gap: 4px;
   padding: 3px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1.5px solid rgba(255, 177, 92, 0.35);
+  background: var(--game-ink);
+  border: 1.5px solid var(--gold-500);
 }
 
 .hero-modal-poses button {
@@ -67,7 +61,7 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
-  color: rgba(246, 236, 217, 0.75);
+  color: var(--white);
 }
 
 .hero-modal-poses button.is-active {
@@ -102,7 +96,7 @@
   margin: 2px 0 0;
   font-size: 13px;
   font-style: italic;
-  color: var(--game-gold-light);
+  color: var(--gold-700);
 }
 
 .hero-modal-heading {
@@ -111,7 +105,7 @@
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(246, 236, 217, 0.55);
+  color: var(--text-muted);
 }
 
 .hero-modal-stats {
@@ -139,12 +133,12 @@
 }
 
 .hero-modal-stat-label svg {
-  color: var(--game-gold-light);
+  color: var(--gold-700);
 }
 
 .hero-modal-stat-value {
   font-weight: 900;
-  color: var(--game-green-light);
+  color: var(--green-700);
 }
 
 .hero-modal-stat-bar {
@@ -152,7 +146,7 @@
   height: 8px;
   border-radius: 999px;
   border: 1.5px solid var(--game-ink);
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--divider);
   overflow: hidden;
 }
 

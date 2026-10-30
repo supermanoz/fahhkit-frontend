@@ -17,7 +17,7 @@
   z-index: 2;
   margin: -4px -4px 12px;
   padding: 4px 4px 0;
-  background: var(--game-panel, #2c2014);
+  background: var(--game-panel);
 }
 
 .mail-panel-header {
@@ -41,14 +41,14 @@
   border-radius: 8px;
   font-size: 11px;
   font-weight: 800;
-  color: rgba(246, 236, 217, 0.85);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-body);
+  background: var(--row);
+  border: 1.5px solid var(--border-soft);
   cursor: pointer;
 }
 
 .mail-mark-all-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--white);
 }
 
 /* --- Inbox/News segmented tabs - a fill + underline active state and an
@@ -60,7 +60,7 @@
   gap: 4px;
   margin: 0 -4px;
   padding: 0 4px 10px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid var(--divider);
 }
 
 .mail-tab {
@@ -76,15 +76,15 @@
   border-radius: 10px 10px 0 0;
   font-weight: 800;
   font-size: 13px;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
   cursor: pointer;
   border-bottom: 3px solid transparent;
   margin-bottom: -12px;
 }
 
 .mail-tab.active {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-title);
+  background: var(--row);
   border-bottom-color: var(--game-gold);
 }
 
@@ -114,7 +114,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(246, 236, 217, 0.5);
+  color: var(--text-muted);
 }
 
 /* In-game inbox rows - no longer riding on the shared .game-menu-list
@@ -131,20 +131,21 @@
 
 .mail-item {
   border-radius: 12px;
-  border: 2px solid rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--border-soft);
+  background: var(--row);
   overflow: hidden;
   transition: background 0.12s ease;
 }
 
 .mail-item.is-unread {
-  border-color: rgba(255, 177, 92, 0.55);
-  background: rgba(255, 122, 41, 0.14);
+  border-color: var(--gold-500);
+  background: var(--gold-tint);
 }
 
 /* Read rows dim - deliberately lower-contrast than unread so the two
    states are tellable apart at a glance, not just by the title weight. */
 .mail-item.is-read {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--row);
   opacity: 0.68;
 }
 
@@ -162,7 +163,7 @@
 }
 
 .mail-item-row:active {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--white);
 }
 
 .mail-item-icon {
@@ -212,7 +213,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #fff;
+  color: var(--text-title);
   font-size: 14px;
 }
 
@@ -230,7 +231,7 @@
 .mail-item-source {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(246, 236, 217, 0.65);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -246,13 +247,13 @@
 .mail-item-date {
   font-size: 11px;
   font-weight: 700;
-  color: rgba(246, 236, 217, 0.55);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
 .mail-item-chevron {
   font-size: 12px;
-  color: rgba(246, 236, 217, 0.4);
+  color: var(--text-muted);
 }
 
 .mail-item-dot {
@@ -269,7 +270,7 @@
    dead-end empty row once the list is exhausted. */
 .mail-list-sentinel {
   text-align: center;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
   font-size: 12px;
   padding: 8px 0;
 }
@@ -277,7 +278,7 @@
 .mail-item-body {
   padding: 0 12px 10px 58px;
   font-size: 13px;
-  color: rgba(246, 236, 217, 0.85);
+  color: var(--text-body);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -313,19 +314,16 @@
   border-radius: 14px;
   border: 2px solid var(--game-ink);
   border-top: 4px solid var(--game-gold);
-  background: linear-gradient(180deg, #4a3a2a 0%, #3a2b1f 100%);
+  background: var(--game-panel);
   overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 2px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 0 var(--game-ink);
 }
 
 .news-card.is-unread {
   border-color: var(--game-gold);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 1px rgba(255, 177, 92, 0.4),
-    0 2px 0 rgba(0, 0, 0, 0.3);
+    0 0 0 1px var(--gold-500),
+    0 2px 0 var(--game-ink);
 }
 
 .news-card-trigger {
@@ -360,7 +358,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--game-gold-light);
+  color: var(--gold-700);
   font-size: 20px;
 }
 
@@ -387,7 +385,7 @@
   font-weight: 800;
   font-size: 14px;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: var(--text-title);
 }
 
 .news-card-meta {
@@ -398,7 +396,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--game-gold-light);
+  color: var(--gold-700);
 }
 
 .news-card-meta svg {
@@ -408,7 +406,7 @@
 .news-card-body {
   padding: 0 14px 14px 78px;
   font-size: 13px;
-  color: rgba(246, 236, 217, 0.85);
+  color: var(--text-body);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }

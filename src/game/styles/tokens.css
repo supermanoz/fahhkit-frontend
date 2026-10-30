@@ -1,14 +1,15 @@
 /* Design tokens for /game.
-   Original warm wood/gold "war-table" default: wood-tan panels, dark-brown
-   ink for borders+text+outlines, orange-gold as the default button/accent
-   colour, green for success/go, red for close/danger, real gold reserved
-   for coins/trophies/rank-1. The intro globe (untokenized either way -
-   MapLibre's own sky) stays exactly as it is. Scoped on .game-root so the
-   rest of the site is unaffected. No hex colour should exist anywhere in
-   /game outside this file once migration is complete. Check with:
+   Off-white "clean paper" default: off-white/white panels, warm-grey
+   borders, dark near-black text, with the existing green/orange button
+   colours and ribbon accent kept as the only saturated colour. Real gold
+   reserved for coins/trophies, red for close/danger only. The intro globe
+   and the loading/splash screen (still --bg-900 below) stay exactly as
+   they are. Scoped on .game-root so the rest of the site is unaffected.
+   No hex colour should exist anywhere in /game outside this file once
+   migration is complete. Check with:
      grep -rEo "#[0-9a-fA-F]{3,8}" src/game src/pages/GamePage.css src/components/*.css
-   and confirm every hit is inside this file (or the globe exemption, see
-   style.md). */
+   and confirm every hit is inside this file (or the splash/globe
+   exemption, see style.md). */
 .game-root {
   /* Loading overlay only - everything else in /game reads --ink/--panel/
      etc below instead. Kept as its own token (not reused for anything
@@ -23,17 +24,30 @@
   --font-display: 'Passion One', 'Trebuchet MS', sans-serif;
   --font-body: 'Trebuchet MS', sans-serif;
 
-  /* Ink - borders (2-3px), body text, icons */
-  --ink: #3d2b1a;
+  /* Ink - borders (2-3px) on buttons/rows/badges/icons, and darkest text.
+     Buttons keep their existing dark outline (this didn't change) - only
+     the PANEL-level border below is a different, lighter tone. */
+  --ink: #2b2a24;
 
-  /* Panels / menus / modals / cards - fully solid, no alpha (wood tones) */
-  --panel: #e0a355;
-  --row: #a8672c;
-  --divider: #767a6d;
+  /* Panel outer border (3px) and a secondary button's border. Narrower in
+     scope than --ink above - just the outermost panel/modal/card wrapper
+     and secondary buttons, per the spec's own split (everything else's
+     border stays --ink). */
+  --panel-border: #8a8574;
+  /* Darker outer edge ring around a panel, just outside --panel-border. */
+  --panel-border-dark: #5e5a4c;
+  /* Inset row/input border (2px) - the "New Events box" treatment. */
+  --border-soft: #cfcbbc;
+
+  /* Panels / menus / modals / cards - fully solid, no alpha */
+  --panel: #e9e7dd;
+  /* Inset sections/rows inside a panel (the "New Events" box treatment). */
+  --row: #f6f5ef;
+  --divider: #d6d2c3;
   --white: #ffffff;
-  --tab-inactive: #aeb3a6;
+  --tab-inactive: #d8d5c9;
 
-  /* Green - success/go, not the default button colour here */
+  /* Green - success/go, and the existing primary button colour. */
   --green-300: #a8f0af;
   --green-500: #4fc85e;
   --green-700: #268a3a;
@@ -51,18 +65,34 @@
      "this is an error" surface that isn't the saturated button/icon red. */
   --red-tint: #fbe0dc;
 
-  /* Gold - the default/primary button+accent colour here (matches the
-     site's own brand orange, index.css --brand/--brand-amber/--brand-dark -
-     one warm orange identity, not a separate in-game yellow) */
+  /* Gold/orange - the existing ribbon/accent + secondary-primary button
+     colour (matches the site's own brand orange, index.css --brand/
+     --brand-amber/--brand-dark). Real gold is still coins/trophies only -
+     see --coin-* below for that. */
   --gold-300: #ffb15c;
   --gold-500: #ff7a29;
   --gold-700: #c94a08;
   --gold-text: var(--gold-700);
+  /* Pale orange surface for tinted rows/badges (unread mail, "needs you",
+     low-funds) - same reasoning as --red-tint. */
+  --gold-tint: #ffe8d3;
 
-  /* Text */
-  --text: var(--ink);
-  --text-muted: #6e5a42;
-  --text-on-panel: var(--ink);
+  /* Real gold - coins/trophies/rank-1 only, kept distinct from the
+     gold/orange accent above (that one's closer to the site's brand
+     orange; this is an actual metallic gold). */
+  --coin-300: #ffe07a;
+  --coin-500: #ffc531;
+  --coin-700: #c98a00;
+
+  /* Text - titles darkest, body slightly lighter, muted/secondary lighter
+     still, placeholder lightest of the four (all still well past AA on
+     --panel/--row/--white - see style.md's contrast table). */
+  --text-title: #2b2a24;
+  --text-body: #3a382f;
+  --text-muted: #6b6759;
+  --text-placeholder: #7a7668;
+  --text: var(--text-body);
+  --text-on-panel: var(--text-body);
   --text-link: var(--green-700);
 
   /* Rarity (shop/emote tiles) */

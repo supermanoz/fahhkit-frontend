@@ -17,25 +17,22 @@
   padding: 14px;
   border-radius: 14px;
   border: 3px solid var(--game-ink);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.12),
-    0 3px 0 var(--game-ink);
+  box-shadow: 0 3px 0 var(--game-ink);
 }
 
+/* Both card variants are the same off-white panel now (see
+   src/game/styles/tokens.css) - kept as two classes (not merged into one)
+   so call sites don't all need renaming, but there's no longer a real
+   dark/light split to pick between. */
 .game-card-dark {
-  background: linear-gradient(180deg, #5a4633 0%, #46362a 100%);
+  background: var(--game-panel);
   color: var(--game-cream);
 }
 
-/* Dark ink text reads better in a plain bold UI face than in Passion One
-   (a display/poster font meant to be filled white with a hard outline -
-   see .game-card-title below - not set solid in a dark colour at small
-   sizes). Every light-card descendant inherits this instead of the
-   game's usual font. */
 .game-card-light {
   align-items: center;
   text-align: center;
-  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
+  background: linear-gradient(180deg, var(--white) 0%, var(--row) 100%);
   color: var(--game-ink);
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
@@ -45,38 +42,23 @@
   text-shadow: none;
 }
 
-/* White lettering with a hard ink outline - the Clash title treatment. */
+/* Dark ink fill, no outline - both card variants are light now, so this is
+   the only treatment .game-card-title needs (a white+outline version only
+   ever made sense against a dark card). */
 .game-card-title {
   margin: 0;
   font-family: inherit;
   text-align: center;
-  color: #fff;
+  color: var(--text-title);
   font-size: 22px;
   font-weight: 900;
   line-height: 1.15;
   letter-spacing: 0.04em;
-  text-shadow:
-    1.5px 0 0 var(--game-ink),
-    -1.5px 0 0 var(--game-ink),
-    0 1.5px 0 var(--game-ink),
-    0 -1.5px 0 var(--game-ink),
-    1px 1px 0 var(--game-ink),
-    -1px -1px 0 var(--game-ink),
-    0 3px 0 var(--game-ink);
 }
 
 .game-card-title-sm {
   font-size: 17px;
   text-align: left;
-}
-
-/* On a light/cream card, the white fill above goes nearly invisible
-   against the near-white background - only the thin ink outline shows,
-   so the heading reads as hollow, hard-to-read strokes. Flip to a solid
-   ink fill with a soft parchment highlight instead. */
-.game-card-light .game-card-title {
-  color: var(--game-ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 /* --- Buttons: fat cel-shaded slabs with outlined white text. --- */
@@ -160,7 +142,7 @@
 .game-row-meta {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(246, 236, 217, 0.75);
+  color: var(--text-muted);
 }
 
 /* --- Rows (join requests, roster, browse list) --- */
@@ -182,12 +164,12 @@
   gap: 10px;
   padding: 8px 10px;
   border-radius: 10px;
-  border: 2px solid rgba(0, 0, 0, 0.35);
-  background: rgba(255, 255, 255, 0.07);
+  border: 2px solid var(--border-soft);
+  background: var(--row);
 }
 
 .game-row.is-me {
-  background: rgba(255, 201, 77, 0.16);
+  background: var(--gold-tint);
   border-color: var(--game-gold);
 }
 
@@ -198,7 +180,7 @@
 
 .game-row-clickable:hover,
 .game-row-clickable:focus-visible {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--white);
   outline: none;
 }
 
@@ -218,7 +200,7 @@
   font-weight: 800;
   font-size: 14px;
   letter-spacing: 0.03em;
-  color: #fff;
+  color: var(--text-title);
 }
 
 .game-row-actions {
@@ -233,9 +215,9 @@
   margin: 0;
   text-align: center;
   font-size: 13px;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-muted);
 }
 
 .game-row-meta.is-error {
-  color: var(--game-red-light);
+  color: var(--red-700);
 }

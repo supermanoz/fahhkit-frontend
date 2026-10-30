@@ -208,10 +208,15 @@ button {
 }
 
 /* /game keeps its original, simpler glass-card look — it isn't part of the
-   site-wide liquid-glass pass. */
+   site-wide liquid-glass pass. Fully solid (no blur, no translucent
+   background/border) so toasts/popups built on this primitive never let
+   the live map show through, regardless of what --glass-bg/--glass-border
+   resolve to for the rest of the site's light/dark themes. */
 .game-page .glass-card {
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: var(--game-panel, #e9e7dd);
+  border-color: var(--game-ink, #2b2a24);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: var(--shadow-md);
 }
 
@@ -388,8 +393,11 @@ button {
   content: none;
 }
 
+/* Secondary button: white with a solid border, not transparent. */
 .game-page .btn-outline {
-  background: transparent;
+  background: var(--white, #fff);
+  border-color: var(--game-panel-border, #8a8574);
+  color: var(--text-title, #2b2a24);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
