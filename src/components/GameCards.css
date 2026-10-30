@@ -114,6 +114,12 @@
     0 3px 0 var(--game-ink);
 }
 
+/* Secondary button - this is the one .game-btn variant that's gone light
+   (wood-light/wood/wood-dark all alias to the off-white panel family now),
+   so it needs the dark-ink-fill-no-outline treatment every other light
+   surface's text got, not the base white-fill-plus-outline that goes
+   hollow/illegible on a near-white background (see .game-card-title's own
+   comment on the same failure mode). */
 .game-btn-wood {
   background: linear-gradient(
     180deg,
@@ -124,6 +130,8 @@
   box-shadow:
     inset 0 -4px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
+  color: var(--text-title);
+  text-shadow: none;
 }
 
 .game-btn-lg {

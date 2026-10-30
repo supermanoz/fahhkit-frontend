@@ -1002,12 +1002,12 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
 }
 
 .game-controls-hint {
   margin: 0;
-  color: rgba(246, 236, 217, 0.75);
+  color: var(--text-body);
   font-size: 12px;
 }
 
@@ -1294,32 +1294,29 @@
     0 1px 0 var(--game-ink);
 }
 
+/* Secondary button - white with a solid border and dark text (see
+   .game-btn-wood's own comment in GameCards.css for why: wood-light/wood/
+   wood-dark all alias to the off-white panel family now, so the base
+   .game-page .btn's white-fill-plus-outline above goes hollow/illegible
+   here specifically - this is the one .btn variant that went light). */
 .game-page .btn-outline {
-  background: linear-gradient(
-    180deg,
-    var(--game-wood-light) 0%,
-    var(--game-wood) 45%,
-    var(--game-wood-dark) 100%
-  );
-  color: #fff;
-  border: 3px solid var(--game-ink);
+  background: var(--white);
+  color: var(--text-title);
+  text-shadow: none;
+  border: 3px solid var(--game-panel-border);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow:
-    inset 0 -4px 0 var(--game-wood-dark),
-    0 3px 0 var(--game-ink);
+  box-shadow: 0 3px 0 var(--game-panel-border-dark);
 }
 
 .game-page .btn-outline:hover {
   border-color: var(--game-ink);
-  color: #fff;
+  color: var(--text-title);
 }
 
 .game-page .btn-outline:active {
   transform: translateY(2px);
-  box-shadow:
-    inset 0 -4px 0 var(--game-wood-dark),
-    0 1px 0 var(--game-ink);
+  box-shadow: 0 1px 0 var(--game-panel-border-dark);
 }
 
 .game-page .btn:disabled {
@@ -1530,7 +1527,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(246, 236, 217, 0.55);
+  color: var(--text-muted);
 }
 
 .game-highlight-toast-header h3 {
@@ -1555,7 +1552,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--game-ink);
   font-weight: 800;
   font-size: 22px;
   background: var(--game-wood);
@@ -1627,7 +1624,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
 }
 
 /* --- Secondary info line: distance to the generated route's start --- */
@@ -1638,7 +1635,7 @@
   margin: 0 0 10px;
   font-size: 12px;
   font-weight: 600;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-body);
 }
 
 .game-territory-distance svg {
@@ -1652,7 +1649,7 @@
   display: block;
   font-size: 11px;
   font-weight: 500;
-  color: rgba(246, 236, 217, 0.5);
+  color: var(--text-muted);
 }
 
 .game-highlight-toast-actions {
@@ -2171,12 +2168,7 @@
   font-size: 20px;
   font-weight: 900;
   letter-spacing: 0.03em;
-  color: #fff;
-  /* Same outlined lettering as the HUD / hero names: black stroke painted
-     under a white fill, plus a drop edge. */
-  -webkit-text-stroke: 2.5px var(--game-ink);
-  paint-order: stroke fill;
-  text-shadow: 0 3px 0 var(--game-ink);
+  color: var(--text-title);
 }
 
 /* Round enamel coin behind each tab icon. */
@@ -2465,15 +2457,9 @@
   box-shadow:
     inset 0 -3px 0 var(--game-wood-dark),
     0 2px 0 var(--game-ink);
-  color: #fff;
+  color: var(--text-title);
   font-weight: 900;
   font-size: 13px;
-  text-shadow:
-    1px 0 0 var(--game-ink),
-    -1px 0 0 var(--game-ink),
-    0 1px 0 var(--game-ink),
-    0 -1px 0 var(--game-ink),
-    0 2px 0 var(--game-ink);
   cursor: pointer;
 }
 
@@ -2515,7 +2501,7 @@
   box-shadow:
     inset 0 -4px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
-  color: #fff;
+  color: var(--text-title);
   font-weight: 900;
   font-size: 13px;
   cursor: pointer;
@@ -2556,6 +2542,8 @@
     var(--game-gold) 55%,
     var(--game-gold-dark)
   );
+  /* White, not the base's dark text - this is a real colour fill. */
+  color: #fff;
 }
 
 /* Global/City (Solo) or Global/National (Club) scope row under the
@@ -2583,6 +2571,14 @@
   );
   box-shadow:
     inset 0 -3px 0 var(--game-green-dark),
+    0 2px 0 var(--game-ink);
+  /* White, not the base's dark text - this is a real colour fill. */
+  color: #fff;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
     0 2px 0 var(--game-ink);
 }
 
@@ -2626,7 +2622,7 @@
   text-align: center;
   font-size: 13px;
   font-style: italic;
-  color: rgba(246, 236, 217, 0.8);
+  color: var(--text-body);
   margin: 2px 0 0;
 }
 
@@ -2695,7 +2691,7 @@
 
 .game-menu-summary-label {
   font-size: 12px;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -2714,7 +2710,7 @@
 .game-menu-parcel-flags-more {
   font-size: 11px;
   font-weight: 700;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-muted);
   margin-left: 2px;
 }
 
@@ -2753,12 +2749,7 @@
     inset 0 -3px 0 var(--game-stone-dark),
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     0 2px 0 var(--game-ink);
-  color: #fff;
-  text-shadow:
-    1px 0 0 var(--game-ink),
-    -1px 0 0 var(--game-ink),
-    0 1px 0 var(--game-ink),
-    0 -1px 0 var(--game-ink);
+  color: var(--text-title);
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
@@ -2776,6 +2767,13 @@
     inset 0 -3px 0 var(--game-green-dark),
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     0 2px 0 var(--game-ink);
+  /* White, not the base's dark text - this is a real colour fill. */
+  color: #fff;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink);
 }
 
 .game-route-visibility-btn:active:not(:disabled) {
@@ -2819,7 +2817,7 @@
 .game-route-pager-label {
   font-size: 12px;
   font-weight: 700;
-  color: rgba(246, 236, 217, 0.75);
+  color: var(--text-muted);
 }
 
 .game-menu-section-title {
@@ -2827,14 +2825,8 @@
   text-align: left;
   font-weight: 900;
   font-size: 17px;
-  color: #fff;
+  color: var(--text-title);
   margin: 18px 0 8px;
-  text-shadow:
-    1.5px 0 0 var(--game-ink),
-    -1.5px 0 0 var(--game-ink),
-    0 1.5px 0 var(--game-ink),
-    0 -1.5px 0 var(--game-ink),
-    0 3px 0 var(--game-ink);
 }
 
 /* Inside a card the card's own padding and gap do the spacing. */
@@ -2851,7 +2843,7 @@
 
 .game-menu-empty {
   text-align: center;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-muted);
   font-size: 13px;
   padding: 12px 0 4px;
 }
@@ -2862,7 +2854,7 @@
 .game-leaderboard-notice {
   margin: 10px 0 0;
   text-align: center;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
   font-size: 12px;
   font-style: italic;
 }
@@ -2903,14 +2895,14 @@
 
 .game-menu-list-area {
   font-weight: 800;
-  color: #fff;
+  color: var(--text-title);
   font-size: 14px;
 }
 
 .game-menu-list-meta {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(246, 236, 217, 0.75);
+  color: var(--text-muted);
 }
 
 .game-menu-shop {
@@ -2946,7 +2938,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: rgba(246, 236, 217, 0.75);
+  color: var(--text-body);
   font-size: 13px;
   margin: 0;
 }
@@ -2975,14 +2967,8 @@
   text-align: left;
   font-weight: 900;
   font-size: 18px;
-  color: #fff;
+  color: var(--text-title);
   margin: 0;
-  text-shadow:
-    1.5px 0 0 var(--game-ink),
-    -1.5px 0 0 var(--game-ink),
-    0 1.5px 0 var(--game-ink),
-    0 -1.5px 0 var(--game-ink),
-    0 3px 0 var(--game-ink);
 }
 
 /* Shop section headers are one word, dead center - "Avatar" / "Map" /
@@ -3265,11 +3251,11 @@
   margin: 0;
   padding: 14px 4px;
   border: none;
-  border-bottom: 1px solid rgba(246, 236, 217, 0.12);
+  border-bottom: 1px solid var(--divider);
   border-radius: 0;
   background: none;
   box-shadow: none;
-  color: #fff;
+  color: var(--text-title);
   font-weight: 900;
   cursor: pointer;
 }
@@ -3303,7 +3289,7 @@
 .game-settings-row-sub {
   font-size: 12px;
   font-weight: 400;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-muted);
 }
 
 /* Territory-capture rollout row (see GamePage.jsx's captureLocked) - a
@@ -3381,13 +3367,15 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone);
-  color: #fff;
+  color: var(--game-ink);
   font-size: 12px;
   text-align: center;
 }
 
 .game-settings-toggle.is-on {
   background: var(--game-green);
+  /* White, not the base's dark text - this is a real colour fill. */
+  color: #fff;
 }
 
 /* --- Shop: Territory Colors - same Dota-style packed grid as the heroes,
@@ -3483,19 +3471,12 @@
   gap: 4px;
   padding: 2px 8px 2px 3px;
   border-radius: 999px;
-  border: 2px solid rgba(0, 0, 0, 0.6);
+  border: 2px solid var(--game-ink);
   font-size: 13px;
   line-height: 1.3;
   color: #fff;
-  -webkit-text-stroke: 0.8px var(--game-ink);
-  paint-order: stroke fill;
-  text-shadow: 0 1px 0 var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    rgba(40, 28, 18, 0.92),
-    rgba(20, 13, 7, 0.92)
-  );
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  background: var(--game-ink);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 
 .shade-tile.is-owned .shade-tile-chip,
@@ -4277,7 +4258,7 @@
 .medal-tile-how {
   font-size: 10px;
   line-height: 1.3;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -4323,10 +4304,7 @@
 
 .game-shop-wallet-value {
   font-size: 24px;
-  color: #fff;
-  -webkit-text-stroke: 1px var(--game-ink);
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 var(--game-ink);
+  color: var(--text-title);
 }
 
 /* Small HUD coin (same face as .game-hud-icon-coin) for inline prices. */
@@ -4438,10 +4416,7 @@
   margin: 0;
   font-size: 22px;
   line-height: 1.1;
-  color: #fff;
-  -webkit-text-stroke: 1px var(--game-ink);
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 var(--game-ink);
+  color: var(--text-title);
 }
 
 .challenge-prompt-terms {
@@ -4486,7 +4461,7 @@
 .challenge-prompt-note {
   margin: 0;
   font-size: 12px;
-  color: rgba(246, 236, 217, 0.7);
+  color: var(--text-muted);
 }
 
 .challenge-prompt-actions {
@@ -4504,7 +4479,7 @@
   all: unset;
   cursor: pointer;
   font-size: 13px;
-  color: rgba(246, 236, 217, 0.65);
+  color: var(--text-muted);
   text-decoration: underline;
   padding: 4px;
 }

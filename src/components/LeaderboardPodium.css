@@ -269,7 +269,7 @@
 
 .lb-list-head {
   padding: 0 14px;
-  color: rgba(246, 236, 217, 0.6);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -363,7 +363,7 @@
 }
 
 .lb-row .lb-col-area {
-  color: rgba(246, 236, 217, 0.65);
+  color: var(--text-body);
   font-weight: 700;
   font-size: 14px;
 }

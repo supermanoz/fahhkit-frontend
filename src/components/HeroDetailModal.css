@@ -166,13 +166,13 @@
   font-size: 13px;
   line-height: 1.55;
   white-space: pre-line;
-  color: rgba(246, 236, 217, 0.88);
+  color: var(--text-body);
 }
 
 .hero-modal-muted {
   margin: 0;
   font-size: 12px;
-  color: rgba(246, 236, 217, 0.55);
+  color: var(--text-muted);
 }
 
 .hero-modal-skins {
