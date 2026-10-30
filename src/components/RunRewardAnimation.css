@@ -23,18 +23,11 @@
   text-align: center;
   border-radius: 20px;
   border: 3px solid var(--game-ink);
-  background:
-    radial-gradient(
-      ellipse 80% 50% at 50% 0%,
-      rgba(111, 185, 255, 0.35),
-      transparent 70%
-    ),
-    linear-gradient(180deg, #5a4633 0%, #3a2b1f 100%);
+  background: var(--game-panel);
   color: var(--game-cream);
   box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.12),
     0 5px 0 var(--game-ink),
-    0 24px 50px rgba(0, 0, 0, 0.65);
+    0 24px 50px rgba(0, 0, 0, 0.35);
 }
 
 .run-reward-kicker {
@@ -42,17 +35,17 @@
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(246, 236, 217, 0.65);
+  color: var(--text-muted);
 }
 
 .run-reward-xp-gained {
   margin: 0;
   font-size: 34px;
   font-weight: 900;
-  color: #9ad4ff;
-  -webkit-text-stroke: 1.5px var(--game-ink);
-  paint-order: stroke fill;
-  text-shadow: 0 3px 0 var(--game-ink);
+  /* Darker than the badge/fill's own light blue (#9ad4ff) - that reads
+     fine on a coloured fill but fails contrast directly on the now
+     off-white card. */
+  color: #1a5fb4;
 }
 
 .run-reward-level-row {
@@ -98,10 +91,10 @@
   flex: 1;
   height: 26px;
   border-radius: 8px;
-  background: rgba(225, 228, 218, 0.3);
+  background: var(--divider);
   border: 2.5px solid var(--game-ink);
   overflow: hidden;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 0 var(--game-ink);
 }
 
 .run-reward-bar-fill {

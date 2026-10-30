@@ -602,14 +602,14 @@
   max-width: 200px;
   padding: 8px 12px;
   border-radius: 12px;
-  background: var(--game-panel, rgba(44, 32, 20, 0.9));
-  border: 2px solid var(--game-ink, #3d2b1a);
-  color: var(--game-cream, #f6ecd9);
+  background: var(--game-panel);
+  border: 2px solid var(--game-ink);
+  color: var(--game-cream);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
   text-align: right;
-  box-shadow: 0 3px 0 var(--game-ink, #3d2b1a);
+  box-shadow: 0 3px 0 var(--game-ink);
 }
 
 @media (max-width: 560px) {
