@@ -2,20 +2,18 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  height: var(--header-h);
+  /* Solid, not glass - a translucent bar read as "crowded/low-contrast"
+     once the link count grew (see the Admin grouping below). */
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
   transition:
     box-shadow 0.2s ease,
     background-color 0.2s ease;
 }
 
 .navbar.scrolled {
-  box-shadow:
-    var(--shadow-sm),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .navbar-inner {
@@ -25,7 +23,6 @@
   padding: 0 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   position: relative;
 }
@@ -34,6 +31,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -90,6 +88,7 @@
   color: var(--brand);
   cursor: pointer;
   font-size: 15px;
+  flex-shrink: 0;
   transition:
     transform 0.2s ease,
     background 0.15s ease,
@@ -117,43 +116,163 @@
   border-color: var(--brand);
 }
 
+/* --- Link row: a left/centre group (public + permission-gated page links,
+   plus the Admin dropdown) and a right-aligned group (balance, profile,
+   theme) pushed apart by .navbar-links itself taking the remaining width -
+   see the brief's "coin pill crowds the Shop link" complaint, which this
+   split fixes by giving the balance its own place far from Shop. --- */
 .navbar-links {
   display: flex;
   align-items: center;
-  gap: 20px;
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
+  margin-left: 24px;
 }
 
-.navbar-links a:not(.btn) {
+.navbar-links-main {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.navbar-links-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+/* Every top-row item (plain links and the Admin trigger button alike)
+   shares this one recipe, so they're the same height, size and weight. */
+.navbar-link {
+  all: unset;
   position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  height: 44px;
   color: var(--text);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding-bottom: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.navbar-links a:not(.btn)::after {
+.navbar-link::after {
   content: '';
   position: absolute;
   left: 0;
-  bottom: 0;
-  width: 0;
+  right: 0;
+  bottom: 10px;
   height: 2px;
   border-radius: 999px;
   background: var(--gradient-brand);
-  transition: width 0.2s ease;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
 }
 
-.navbar-links a:not(.btn):hover {
+.navbar-link:hover,
+.navbar-link:focus-visible {
   color: var(--brand);
 }
 
-.navbar-links a:not(.btn):hover::after {
-  width: 100%;
+.navbar-link:hover::after,
+.navbar-link:focus-visible::after,
+.navbar-link.is-active::after {
+  transform: scaleX(1);
+}
+
+.navbar-link.is-active {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.navbar-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.navbar-admin-menu {
+  position: relative;
+}
+
+.navbar-admin-trigger {
+  gap: 4px;
+}
+
+.navbar-admin-caret {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.navbar-admin-trigger.is-open {
+  color: var(--brand);
+}
+
+.navbar-admin-trigger.is-open .navbar-admin-caret {
+  transform: rotate(180deg);
+}
+
+.navbar-admin-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  z-index: 60;
+}
+
+.navbar-admin-dropdown a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navbar-admin-dropdown a:hover,
+.navbar-admin-dropdown a:focus-visible {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+/* Compact, solid balance chip - sits by the profile menu, not the Shop
+   link, so it reads as "your account" chrome rather than crowding a nav
+   item. */
+.navbar-balance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.navbar-balance-pill .coin-stack {
+  flex-shrink: 0;
 }
 
 .navbar-user-menu {
   position: relative;
+  flex-shrink: 0;
 }
 
 .navbar-user-trigger {
@@ -194,7 +313,8 @@
   mix-blend-mode: overlay;
 }
 
-.navbar-user-trigger:hover {
+.navbar-user-trigger:hover,
+.navbar-user-trigger:focus-visible {
   background: var(--brand-light);
   border-color: var(--brand);
 }
@@ -298,7 +418,9 @@
   transform: translateY(-7px) rotate(-45deg);
 }
 
-@media (max-width: 768px) {
+/* Collapses earlier than the old 768px - at tablet widths the grown link
+   count (Shop, the Admin group) still doesn't comfortably fit in one row. */
+@media (max-width: 1024px) {
   .navbar-toggle {
     display: flex;
   }
@@ -308,13 +430,16 @@
     top: 100%;
     left: 0;
     right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    margin-left: 0;
+    padding: 8px 20px 20px;
+    max-height: calc(100vh - var(--header-h));
+    overflow-y: auto;
     background: var(--card);
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow-md);
-    flex-direction: column;
-    align-items: stretch;
-    padding: 16px 20px 24px;
-    gap: 14px;
     display: none;
   }
 
@@ -322,7 +447,64 @@
     display: flex;
   }
 
+  .navbar-links-main,
+  .navbar-links-side {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+  }
+
+  .navbar-links-side {
+    margin-top: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    gap: 10px;
+  }
+
+  .navbar-link {
+    width: 100%;
+  }
+
+  /* The sliding underline reads oddly on a full-width stacked row - a
+     tinted background says "active" more clearly there. */
+  .navbar-link::after {
+    display: none;
+  }
+
+  .navbar-link.is-active {
+    background: var(--brand-light);
+    border-radius: 8px;
+    padding-left: 10px;
+  }
+
+  .navbar-admin-menu {
+    width: 100%;
+  }
+
+  .navbar-admin-trigger {
+    width: 100%;
+    justify-content: space-between;
+    padding-right: 4px;
+  }
+
+  /* Collapsible, inline - not a floating panel - under the row it opens
+     from, same show/hide state as the desktop dropdown. */
+  .navbar-admin-dropdown {
+    position: static;
+    margin: 0 0 4px;
+    padding: 0 0 0 14px;
+    background: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .navbar-balance-pill {
+    align-self: flex-start;
+  }
+
   .navbar-links .btn {
     width: 100%;
+    justify-content: center;
   }
 }

@@ -252,7 +252,6 @@
   gap: 6px;
   background: linear-gradient(180deg, #8a8c90, #5d5f62);
   font-size: 13px;
-  -webkit-text-stroke: 0;
 }
 
 /* Position in the roster, and a quick way to jump straight to a hero. */

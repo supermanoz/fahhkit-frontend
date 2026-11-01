@@ -96,6 +96,15 @@ export function IconPlay(props) {
   )
 }
 
+export function IconPause(props) {
+  return (
+    <GameIcon {...props}>
+      <rect x="7" y="5" width="4" height="14" rx="1.2" {...TINT} />
+      <rect x="13" y="5" width="4" height="14" rx="1.2" {...TINT} />
+    </GameIcon>
+  )
+}
+
 // Race (PvP) - two crossed blades, each with a crossguard and grip.
 export function IconSwords(props) {
   return (
@@ -269,6 +278,16 @@ export function IconChevronRight(props) {
   return (
     <GameIcon {...props}>
       <path d="m9 6 6 6-6 6" />
+    </GameIcon>
+  )
+}
+
+// Diagonal "maximize" glyph (two corner brackets pointing NE/SW) - the
+// run-stats card's expand/collapse toggle, replacing IconChevronDown there.
+export function IconExpand(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
     </GameIcon>
   )
 }

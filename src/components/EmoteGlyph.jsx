@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { memo } from 'react'
 import AnimatedSprite from './AnimatedSprite'
 import { IconLock } from './GameIcons'
 import { resolveEmoteAsset } from '../utils/emotes'
@@ -11,22 +12,20 @@ import './EmoteGlyph.css'
 // read the same way on purpose (both mean "nothing to show yet"); see
 // warnMissingEmoteAssets for surfacing the gap itself in dev tools.
 //
-// Animates only when `active`, or (via EmoteGlyph.css) while hovered/
-// focused inside a `.emote-tile`/`.emote-hero-pick` - every other instance
-// sits frozen on its first frame (animation-play-state: paused never even
-// advances past the `from` keyframe, so this is a real static frame, not a
-// mid-animation freeze). Shop grids used to run every tile's animation at
-// once continuously regardless of whether it was being looked at - a
-// real contributor to the Me/Emotes-section lag this was built to fix, on
-// top of the asset-size one (see utils/emotes.js). Pass `active` for the
-// one deliberately-selected instance (the buy/showcase popup) so it always
-// plays even with no hover concept (touch devices).
-export default function EmoteGlyph({
-  heroName,
-  emoteName,
-  size = 96,
-  active = false,
-}) {
+// Animates only when `active` - every other instance sits frozen on its
+// first frame (animation-play-state: paused never even advances past the
+// `from` keyframe, so this is a real static frame, not a mid-animation
+// freeze). Shop grids used to run every tile's animation at once
+// continuously regardless of whether it was being looked at - a real
+// contributor to the Me/Emotes-section lag this was built to fix, on top
+// of the asset-size one (see utils/emotes.js).
+//
+// memo()'d - every prop here is a primitive (heroName/emoteName/size/
+// active), so a parent re-rendering for an unrelated reason (GamePage's
+// standing GPS watch re-renders it every few seconds whether or not any of
+// this changed) no longer re-creates/re-decodes the sprite each time, only
+// an actual prop change does.
+function EmoteGlyph({ heroName, emoteName, size = 96, active = false }) {
   const asset = resolveEmoteAsset(heroName, emoteName)
   if (!asset) {
     return (
@@ -55,3 +54,5 @@ export default function EmoteGlyph({
     />
   )
 }
+
+export default memo(EmoteGlyph)

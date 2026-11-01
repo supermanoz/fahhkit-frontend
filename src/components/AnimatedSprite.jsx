@@ -6,11 +6,13 @@ import './AnimatedSprite.css'
 // HeroFigure.jsx's hero-body poses and EmoteGlyph.jsx's emote poses both
 // need, pulled out once here so neither duplicates it. `fast` swaps in
 // the quicker run/charge-cycle pacing (125ms/frame) instead of the
-// default relaxed-stretch pacing (150ms/frame) - same two speeds
-// HeroFigure.jsx always used. `frameMs`, when given, overrides both and
-// sets the per-frame duration directly - see EmoteGlyph.jsx, which needs
-// its own pacing (matching the source capture's ~12-24fps) rather than
-// HeroFigure's slower stretch-pose timing.
+// default relaxed-stretch pacing (~83ms/frame, ~12fps - matches
+// HeroSprite.jsx's own idle pace, so the Me tab and the Shop's hero
+// carousel/codex page read the same speed for the exact same strip).
+// `frameMs`, when given, overrides both and sets the per-frame duration
+// directly - see EmoteGlyph.jsx, which needs its own pacing (matching the
+// source capture's ~12-24fps) rather than HeroFigure's stretch-pose
+// timing.
 export default function AnimatedSprite({
   src,
   frames,
@@ -22,7 +24,7 @@ export default function AnimatedSprite({
   className = '',
 }) {
   const width = Math.round((height * frameWidth) / frameHeight)
-  const frameMs = frameMsProp ?? (fast ? 125 : 150)
+  const frameMs = frameMsProp ?? (fast ? 125 : 83)
   return (
     <span
       key={src}

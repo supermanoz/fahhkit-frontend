@@ -17,6 +17,17 @@
   overflow-y: auto;
 }
 
+/* The motion.div GameAuthGate wraps each screen in. Without an explicit
+   width it shrink-wraps inside the centred flex gate, so each card ended up
+   as wide as its own content (Welcome wider than Sign In). margin:auto
+   rather than align-items centring also stops tall cards (sign-up) being
+   clipped at the top when the gate scrolls. */
+.game-auth-screen {
+  width: 100%;
+  max-width: 380px;
+  margin: auto;
+}
+
 .game-auth-card {
   width: 100%;
   max-width: 380px;
@@ -150,14 +161,109 @@
   cursor: pointer;
 }
 
+/* Sign-up step fields: one column, with only short pairs (Country/City)
+   going two-up once there's room - see the min-width query at the bottom. */
 .game-auth-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.game-auth-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+/* Roomier sizing for the long sign-up form only, so Sign In/Forgot keep
+   their current density. */
+.game-auth-signup .game-auth-form {
+  gap: 18px;
+}
+
+.game-auth-signup .game-auth-field {
+  gap: 8px;
+}
+
+.game-auth-signup .game-auth-label {
+  font-size: 14px;
+}
+
+.game-auth-signup .game-auth-input,
+.game-auth-signup .game-auth-select {
+  min-height: 48px;
+  height: 48px;
+  text-overflow: ellipsis;
+}
+
+.game-auth-signup .game-auth-hint {
+  font-size: 13px;
+}
+
+.game-auth-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-auth-progress-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--game-cream);
+  font-family: var(--font-body);
+  text-align: center;
+}
+
+.game-auth-progress-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-auth-progress-bar li {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--divider);
+  transition: background 0.2s ease;
+}
+
+.game-auth-progress-bar li.done {
+  background: var(--game-gold);
+}
+
+/* Back + Next/Register side by side; Next alone fills the row on step 1. */
+.game-auth-step-nav {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
-.game-auth-grid .game-auth-field.full {
-  grid-column: 1 / -1;
+.game-auth-step-nav .game-auth-secondary {
+  width: auto;
+}
+
+/* TermsAgreement is shared with the website, so it's resized here rather
+   than in TermsAgreement.css: the whole label is the tap target (44px+),
+   with a bigger box and body-size text. */
+.game-auth-card .terms-agreement {
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.game-auth-card .terms-agreement input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
 }
 
 .game-auth-hint {
@@ -268,7 +374,7 @@
     var(--game-gold) 60%,
     var(--game-gold-dark)
   );
-  color: var(--ink);
+  color: var(--game-text);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 18px;
@@ -289,7 +395,7 @@
   border-radius: 14px;
   border: 2px solid var(--ink);
   background: var(--white);
-  color: var(--ink);
+  color: var(--game-text);
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.04em;
@@ -364,11 +470,9 @@
   gap: 12px;
 }
 
-@media (max-width: 360px) {
-  .game-auth-grid {
-    grid-template-columns: 1fr;
-  }
-  .game-auth-grid .game-auth-field {
-    grid-column: 1 / -1;
+@media (min-width: 420px) {
+  .game-auth-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 }

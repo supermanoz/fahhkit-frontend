@@ -11,8 +11,7 @@ import {
 import ClubTrophyIcon from './ClubTrophyIcon'
 import ClubBadge from './ClubBadge'
 import ClubWarHistory from './ClubWarHistory'
-import HeroFigure from './HeroFigure'
-import { getHeroSprite } from '../utils/heroSprites'
+import ClubWarHeroPicker from './ClubWarHeroPicker'
 import { ApiError, resolveFileUrl } from '../api/client'
 import {
   CLUB_WAR_BATTLE_HOURS,
@@ -248,7 +247,33 @@ export default function ClubWarPanel({
   }
 
   if (loading) {
-    return <p className="game-menu-empty">Scouting the battlefield…</p>
+    return (
+      <div className="game-cards" aria-hidden="true">
+        <section className="game-card game-card-dark club-war-matchup">
+          <span className="g-skeleton club-war-skeleton-phase" />
+          <div className="club-war-matchup-grid">
+            {[0, 1].map((side) => (
+              <div className="club-war-matchup-col" key={side}>
+                <div className="club-war-matchup-col-head">
+                  <span className="g-skeleton club-war-skeleton-badge" />
+                  <span className="g-skeleton club-war-skeleton-name" />
+                </div>
+                <ul className="game-rows club-war-roster">
+                  {[0, 1, 2, 3].map((row) => (
+                    <li key={row}>
+                      <div className="game-row club-war-row">
+                        <span className="g-skeleton club-war-skeleton-avatar" />
+                        <span className="g-skeleton club-war-skeleton-row-name" />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    )
   }
   if (loadError) {
     return <p className="game-menu-empty">{loadError}</p>
@@ -339,10 +364,21 @@ export default function ClubWarPanel({
     // Every real hero in the shop, not just owned ones (see render below) -
     // this used to filter ownedItems straight to HERO rows, which meant an
     // account that only owns one hero only ever saw that one hero here
-    // instead of the full roster with the rest shown locked.
-    const allHeroItems = storeCatalog.filter(
-      (i) => i.category === 'HERO' && !isPlaceholderHero(i.name)
+    // instead of the full roster with the rest shown locked. Owned heroes
+    // sort first so the picker opens on something you can actually select,
+    // not a random locked one; .sort is stable, so order within each group
+    // (owned / locked) stays whatever the catalog gave us.
+    const ownedHeroIds = new Set(
+      ownedItems
+        .filter((o) => o.storeItem.category === 'HERO')
+        .map((o) => o.storeItem.id)
     )
+    const allHeroItems = storeCatalog
+      .filter((i) => i.category === 'HERO' && !isPlaceholderHero(i.name))
+      .sort(
+        (a, b) =>
+          Number(ownedHeroIds.has(b.id)) - Number(ownedHeroIds.has(a.id))
+      )
     const equippedHero = ownedItems.find(
       (o) => o.equipped && o.storeItem.category === 'HERO'
     )
@@ -403,13 +439,16 @@ export default function ClubWarPanel({
                   <span className="game-row-name">
                     {isMe ? 'You' : playerNameOf(p)}
                   </span>
-                  <span className="game-row-meta">
-                    {masked
-                      ? 'Hero hidden until battle'
-                      : p.lockedHeroStoreItemId
-                        ? `${heroName(p.lockedHeroStoreItemId)} locked in`
-                        : 'No hero yet'}
-                  </span>
+                  {/* The avatar above already carries the hero (a portrait
+                      once locked in, a lock/helmet placeholder otherwise) -
+                      the two side-by-side columns don't have room for a
+                      second text line repeating the same thing, so this
+                      only appears where that avatar can't say it alone. */}
+                  {!masked && p.lockedHeroStoreItemId && (
+                    <span className="game-row-meta club-war-row-hero">
+                      {heroName(p.lockedHeroStoreItemId)}
+                    </span>
+                  )}
                 </span>
                 {war.status !== 'PREPARING' && (
                   <span
@@ -458,7 +497,9 @@ export default function ClubWarPanel({
                 </span>
               )}
             </div>
-            <span className="game-card-title club-war-vs-label">VS</span>
+            <span className="club-war-vs-badge" aria-hidden="true">
+              <IconSwords />
+            </span>
             <div className="club-war-side">
               <ClubBadge name={theirs.name} size={56} />
               <span className="game-row-name">{theirs.name}</span>
@@ -531,66 +572,19 @@ export default function ClubWarPanel({
                 {allHeroItems.length === 0 ? (
                   <p className="club-blurb">No heroes in the shop yet.</p>
                 ) : (
-                  <div className="club-war-heroes">
-                    {allHeroItems.map((item) => {
-                      const owned = ownedItems.some(
-                        (o) => o.storeItem.id === item.id
+                  <ClubWarHeroPicker
+                    heroItems={allHeroItems}
+                    ownedItems={ownedItems}
+                    lockedHeroStoreItemId={me.lockedHeroStoreItemId}
+                    busy={busy === 'lock'}
+                    onLockIn={(item) =>
+                      runAction(
+                        'lock',
+                        () => lockInClubWarHero(war.id, item.id),
+                        'Could not lock in that hero.'
                       )
-                      const lockedIn = item.id === me.lockedHeroStoreItemId
-                      const animated = Boolean(getHeroSprite(item.name))
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`game-menu-avatar-card ${lockedIn ? 'is-selected' : ''} ${!owned ? 'is-locked' : ''} ${animated ? 'is-animated' : ''}`}
-                          disabled={!owned || lockedIn || busy === 'lock'}
-                          title={
-                            owned
-                              ? undefined
-                              : `Own ${item.name} first - grab it from the Shop`
-                          }
-                          onClick={() =>
-                            runAction(
-                              'lock',
-                              () => lockInClubWarHero(war.id, item.id),
-                              'Could not lock in that hero.'
-                            )
-                          }
-                        >
-                          {animated ? (
-                            <span className="club-war-hero-figure">
-                              <HeroFigure
-                                hero={{ name: item.name }}
-                                pose="idle"
-                                height={88}
-                              />
-                            </span>
-                          ) : (
-                            item.assetUrl && (
-                              <img
-                                src={resolveFileUrl(item.assetUrl)}
-                                alt=""
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none'
-                                }}
-                              />
-                            )
-                          )}
-                          {!owned && (
-                            <span
-                              className="club-war-hero-lock"
-                              aria-hidden="true"
-                            >
-                              <IconLock />
-                            </span>
-                          )}
-                          <span className="game-menu-avatar-name">
-                            {item.name}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
+                    }
+                  />
                 )}
               </>
             ) : me.runId ? (
@@ -661,18 +655,44 @@ export default function ClubWarPanel({
           </section>
         )}
 
-        <section className="game-card game-card-dark">
-          <h3 className="game-card-title game-card-title-sm">
-            {ours.name} ({ourSquad.length})
-          </h3>
-          {squadList(ourSquad, false)}
-        </section>
+        <section className="game-card game-card-dark club-war-matchup">
+          <div className="club-war-matchup-grid">
+            <div className="club-war-matchup-col">
+              <div className="club-war-matchup-col-head">
+                <ClubBadge name={ours.name} size={32} />
+                <span className="club-war-matchup-col-name">{ours.name}</span>
+                <span className="club-war-matchup-col-trophies">
+                  🏆 {ours.trophies ?? 0}
+                </span>
+              </div>
+              {squadList(ourSquad, false)}
+            </div>
 
-        <section className="game-card game-card-dark">
-          <h3 className="game-card-title game-card-title-sm">
-            {theirs.name} ({theirSquad.length})
-          </h3>
-          {squadList(theirSquad, war.status === 'PREPARING')}
+            <span className="club-war-matchup-vs" aria-hidden="true">
+              <IconSwords />
+            </span>
+
+            <div className="club-war-matchup-col">
+              <div className="club-war-matchup-col-head">
+                <ClubBadge name={theirs.name || '?'} size={32} />
+                <span className="club-war-matchup-col-name">
+                  {theirs.name || 'Unknown club'}
+                </span>
+                {theirs.name && (
+                  <span className="club-war-matchup-col-trophies">
+                    🏆 {theirs.trophies ?? 0}
+                  </span>
+                )}
+              </div>
+              {!theirs.name ? (
+                <p className="game-card-empty club-war-matchup-empty">
+                  Opponent details aren&apos;t in yet - check back shortly.
+                </p>
+              ) : (
+                squadList(theirSquad, war.status === 'PREPARING')
+              )}
+            </div>
+          </div>
         </section>
       </div>
     )

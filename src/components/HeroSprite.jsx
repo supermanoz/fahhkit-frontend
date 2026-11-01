@@ -8,8 +8,9 @@ import './HeroSprite.css'
 // exception, standing in for a "3D model" turntable on the Me tab/profile
 // panel with a looping animation instead.
 //
-// Only ever plays the hero's `idle` pose (see heroSprites.js's HERO_SPRITES)
-// - the Me tab's "showcase" is deliberately idle-only, by rule: any other
+// Only ever plays the hero's `idle` pose (see heroSprites.js/
+// heroManifest.js) - the Me tab's "showcase" is deliberately idle-only, by
+// rule: any other
 // pose (a wave, a dance, a stretch - anything that reads as a deliberate
 // gesture rather than a relaxed loop) belongs in the Shop's Emote section
 // instead, not here. This is data-driven off heroSprites.js's own `poses`
@@ -19,10 +20,14 @@ import './HeroSprite.css'
 // neck-stretch loop pulled from a different sheet entirely - replaced with
 // the shared idle pose both to enforce that rule and to stop duplicating a
 // hero-turntable concept across two different sprite sources.)
-// Same per-frame pacing as the map marker's own idle loop (see
-// TerritoryMap.css's blaze-frames-48) - keeps every idle animation in the
-// game moving at the same real-world speed.
-const FRAME_MS = 150
+// ~12fps (same pace AnimatedSprite.jsx's own idle default uses, so the Me
+// tab and the Shop's hero carousel/codex page - which show this exact same
+// idle strip via HeroFigure.jsx - move at the same speed). This used to be
+// 70ms, briefly a two-pose [64, 85] array, then got bumped to 150ms
+// (~6.7fps) when this component was rewritten to the current single-pose
+// loop - which read as sluggish/stuttery rather than a smooth stretch.
+// Reverted to the original pace.
+const FRAME_MS = 83
 
 export default function HeroSprite({ size = 96, hero }) {
   const idle = getHeroSprite(hero).poses.idle

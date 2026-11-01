@@ -1,0 +1,90 @@
+{
+  "hero": "cyclone",
+  "map": {
+    "idle": {
+      "file": "map/idle.png",
+      "frames": 48,
+      "frameWidth": 128,
+      "frameHeight": 170
+    },
+    "run": {
+      "file": "map/run.png",
+      "frames": 15,
+      "frameWidth": 128,
+      "frameHeight": 170
+    }
+  },
+  "profile": {
+    "idle": {
+      "file": "profile/idle.webp",
+      "frames": 48,
+      "frameWidth": 172,
+      "frameHeight": 320
+    }
+  },
+  "emotes": {
+    "emote1": {
+      "pose": "idle"
+    },
+    "emote2": {
+      "file": "profile/emote2.webp",
+      "frames": 60,
+      "frameWidth": 183,
+      "frameHeight": 320
+    },
+    "emote3": {
+      "file": "emotes/emote3.webp",
+      "frames": 60,
+      "frameWidth": 132,
+      "frameHeight": 190
+    },
+    "emote4": {
+      "file": "emotes/emote4.webp",
+      "frames": 60,
+      "frameWidth": 122,
+      "frameHeight": 190
+    },
+    "emote5": {
+      "file": "emotes/emote5.webp",
+      "frames": 23,
+      "frameWidth": 134,
+      "frameHeight": 190
+    },
+    "emote6": {
+      "file": "emotes/emote6.webp",
+      "frames": 60,
+      "frameWidth": 119,
+      "frameHeight": 190
+    },
+    "emote7": {
+      "file": "emotes/emote7.webp",
+      "frames": 45,
+      "frameWidth": 98,
+      "frameHeight": 190
+    },
+    "emote8": {
+      "file": "emotes/emote8.webp",
+      "frames": 60,
+      "frameWidth": 108,
+      "frameHeight": 190
+    },
+    "emote9": {
+      "file": "emotes/emote9.webp",
+      "frames": 60,
+      "frameWidth": 88,
+      "frameHeight": 190
+    },
+    "emote10": {
+      "file": "emotes/emote10.webp",
+      "frames": 60,
+      "frameWidth": 111,
+      "frameHeight": 190
+    },
+    "emote11": {
+      "file": "emotes/emote11.webp",
+      "frames": 60,
+      "frameWidth": 101,
+      "frameHeight": 190
+    }
+  }
+}

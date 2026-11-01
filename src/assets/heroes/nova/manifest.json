@@ -1,0 +1,84 @@
+{
+  "hero": "nova",
+  "map": {
+    "idle": {
+      "file": "map/idle.png",
+      "frames": 48,
+      "frameWidth": 128,
+      "frameHeight": 170
+    },
+    "run": {
+      "file": "map/run.png",
+      "frames": 15,
+      "frameWidth": 128,
+      "frameHeight": 170
+    }
+  },
+  "profile": {
+    "idle": {
+      "file": "profile/idle.webp",
+      "frames": 48,
+      "frameWidth": 123,
+      "frameHeight": 320
+    }
+  },
+  "emotes": {
+    "emote1": {
+      "pose": "idle"
+    },
+    "emote2": {
+      "file": "profile/emote2.webp",
+      "frames": 60,
+      "frameWidth": 222,
+      "frameHeight": 320
+    },
+    "emote3": {
+      "file": "emotes/emote3.webp",
+      "frames": 49,
+      "frameWidth": 76,
+      "frameHeight": 190
+    },
+    "emote4": {
+      "file": "emotes/emote4.webp",
+      "frames": 60,
+      "frameWidth": 91,
+      "frameHeight": 190
+    },
+    "emote5": {
+      "file": "emotes/emote5.webp",
+      "frames": 27,
+      "frameWidth": 118,
+      "frameHeight": 190
+    },
+    "emote6": {
+      "file": "emotes/emote6.webp",
+      "frames": 60,
+      "frameWidth": 82,
+      "frameHeight": 190
+    },
+    "emote7": {
+      "file": "emotes/emote7.webp",
+      "frames": 45,
+      "frameWidth": 82,
+      "frameHeight": 190
+    },
+    "emote8": {
+      "file": "emotes/emote8.webp",
+      "frames": 60,
+      "frameWidth": 76,
+      "frameHeight": 190
+    },
+    "emote9": {
+      "file": "emotes/emote9.webp",
+      "frames": 60,
+      "frameWidth": 77,
+      "frameHeight": 190
+    },
+    "emote10": {
+      "file": "emotes/emote10.webp",
+      "frames": 60,
+      "frameWidth": 109,
+      "frameHeight": 190
+    }
+  }
+}

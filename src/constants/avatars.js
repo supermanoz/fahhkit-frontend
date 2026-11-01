@@ -1,13 +1,9 @@
-import windAvatar from '../assets/images/player-avatar-wind.png'
-import blazeAvatar from '../assets/images/player-avatar-blaze.png'
-import boltAvatar from '../assets/images/player-avatar-bolt.png'
-import novaAvatar from '../assets/images/player-avatar-nova.png'
-import stormAvatar from '../assets/images/player-avatar-storm.png'
-import turboAvatar from '../assets/images/player-avatar-turbo.png'
-import flashAvatar from '../assets/images/player-avatar-flash.png'
-import pulseAvatar from '../assets/images/player-avatar-pulse.png'
-import cometAvatar from '../assets/images/player-avatar-comet.png'
-import cycloneAvatar from '../assets/images/player-avatar-cyclone.png'
+import blazeAvatar from '../assets/avatars/blaze.png'
+import boltAvatar from '../assets/avatars/bolt.png'
+import novaAvatar from '../assets/avatars/nova.png'
+import pulseAvatar from '../assets/avatars/pulse.png'
+import cometAvatar from '../assets/avatars/comet.png'
+import cycloneAvatar from '../assets/avatars/cyclone.png'
 
 // Map-marker avatar choice. Local-only (localStorage), not synced to the
 // backend — free placeholders, not real Store inventory. The Store does
@@ -24,12 +20,8 @@ import cycloneAvatar from '../assets/images/player-avatar-cyclone.png'
 // characters themselves are just cosmetic art, not stat-bearing.
 export const AVATARS = [
   { id: 'blaze', name: 'Blaze', src: blazeAvatar },
-  { id: 'wind', name: 'Wind', src: windAvatar },
   { id: 'bolt', name: 'Bolt', src: boltAvatar },
   { id: 'nova', name: 'Nova', src: novaAvatar },
-  { id: 'storm', name: 'Storm', src: stormAvatar },
-  { id: 'turbo', name: 'Turbo', src: turboAvatar },
-  { id: 'flash', name: 'Flash', src: flashAvatar },
   { id: 'pulse', name: 'Pulse', src: pulseAvatar },
   { id: 'comet', name: 'Comet', src: cometAvatar },
   { id: 'cyclone', name: 'Cyclone', src: cycloneAvatar },

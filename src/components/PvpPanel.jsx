@@ -873,21 +873,6 @@ export default function PvpPanel({
         </section>
       )}
 
-      <section className="pvp-section-card pvp-rewards-card">
-        <p className="pvp-section-label">Stakes &amp; rewards</p>
-        <ul className="pvp-rewards-list">
-          {PVP_MODES.map((m) => (
-            <li key={m.id}>
-              <span className="pvp-rewards-mode">{m.label}</span>
-              <span className="pvp-rewards-terms">
-                {m.queueStake} <Coin /> stake · winner takes {m.queueStake * 2}{' '}
-                <Coin />
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       {errorLine}
     </div>
   )

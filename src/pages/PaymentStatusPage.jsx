@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { FaEnvelopeOpenText } from 'react-icons/fa'
 import { ApiError, getJson, postJson } from '../api/client'
+import { getTerritoryProfile } from '../api/territory'
+import { formatCoins } from '../utils/format'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import CoinStack from '../components/CoinStack'
 import './PaymentStatusPage.css'
 
 const STATUS_CONTENT = {
@@ -72,12 +75,22 @@ export default function PaymentStatusPage() {
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState(null)
   const [showEmailPopup, setShowEmailPopup] = useState(false)
+  const [balance, setBalance] = useState(null)
 
   useEffect(() => {
     // Coin-purchase redirects carry everything needed (status) in the URL
-    // itself - nothing to fetch, just stop the "checking..." spinner.
+    // itself - nothing to fetch, just stop the "checking..." spinner. A
+    // PAID top-up DOES still need one fetch, though: the fresh balance to
+    // show here, from the same /v1/territory/profile the game's own HUD and
+    // the Shop page read (no coin-purchase GET-by-id exists to pull it off
+    // the purchase itself - see api/coinPurchase.js).
     if (purchaseId) {
       setLoading(false)
+      if (coinStatus === 'PAID') {
+        getTerritoryProfile()
+          .then((profile) => setBalance(profile?.fahhcoinBalance ?? null))
+          .catch(() => {})
+      }
       return
     }
     if (!registrationId) {
@@ -101,7 +114,7 @@ export default function PaymentStatusPage() {
         )
       )
       .finally(() => setLoading(false))
-  }, [registrationId, purchaseId])
+  }, [registrationId, purchaseId, coinStatus])
 
   async function handleRetry() {
     setRetryError(null)
@@ -166,8 +179,19 @@ export default function PaymentStatusPage() {
 
           {!loading && purchaseId && coinContent && (
             <>
+              {coinStatus === 'PAID' && (
+                <div className="coin-burst" aria-hidden="true">
+                  <CoinStack tier={4} size={72} />
+                </div>
+              )}
               <h1>{coinContent.title}</h1>
               <p>{coinContent.message}</p>
+
+              {coinStatus === 'PAID' && balance != null && (
+                <p className="coin-burst-balance">
+                  New balance: <strong>{formatCoins(balance)}</strong> Fahhcoin
+                </p>
+              )}
 
               <dl className="payment-status-meta">
                 <div>
@@ -183,6 +207,9 @@ export default function PaymentStatusPage() {
               <div className="payment-status-actions">
                 <Link to="/game" className="btn btn-primary">
                   Back to Territory Run
+                </Link>
+                <Link to="/shop" className="btn btn-outline">
+                  Buy More Fahhcoin
                 </Link>
               </div>
             </>

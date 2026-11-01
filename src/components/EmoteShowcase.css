@@ -1,7 +1,10 @@
 /* Full-screen Fortnite-style emote showcase - see EmoteShowcase.jsx. Its
    own fixed overlay (not the small .game-confirm-overlay card other Shop
    categories still use) since this is meant to fill the screen, not pop a
-   dialog over it. */
+   dialog over it. Flat, fully opaque scrim (not the old radial brown
+   gradient, which read as patchy/translucent) - it's still a scrim (meant
+   to dim what's behind it, not hide it), "solid" here means evenly solid,
+   not literally opaque to the page. */
 .emote-showcase-overlay {
   position: fixed;
   inset: 0;
@@ -10,13 +13,17 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: radial-gradient(
-    circle at 50% 35%,
-    rgba(80, 50, 20, 0.92),
-    rgba(10, 8, 6, 0.97) 75%
-  );
+  background: rgba(10, 8, 6, 0.75);
 }
 
+/* The card itself never had its own background before (see git blame) -
+   it only ever looked opaque because of the overlay's old heavy gradient
+   behind it; with that gone it needs a real one. Off-white, matching every
+   other card/modal in /game (.hero-modal, .game-confirm-card) rather than
+   the dark-wood look - no overflow:hidden (nothing inside needs clipping
+   now that it's just the pedestal + one button), so the close button's
+   -4px overhang stays safely outside any clip, unlike the hero modal fix
+   earlier this session. */
 .emote-showcase-card {
   position: relative;
   width: 100%;
@@ -33,7 +40,13 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 28px 20px 24px;
+  padding: 36px 20px 28px;
+  background: var(--white);
+  border: 3px solid var(--game-ink);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 5px 0 var(--game-ink);
 }
 
 .emote-showcase-close {
@@ -41,64 +54,20 @@
   right: -4px;
 }
 
-.emote-showcase-rarity {
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.emote-showcase-rarity-sep {
-  opacity: 0.5;
-}
-
-.emote-showcase-name {
-  font-weight: 900;
-  font-style: italic;
-  text-transform: uppercase;
-  font-size: 28px;
-  color: var(--game-cream);
-  text-align: center;
-  letter-spacing: 0.02em;
-}
-
 .emote-showcase-pedestal {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   width: 100%;
   min-height: 260px;
-  margin: 8px 0;
-}
-
-.emote-showcase-pedestal-ring {
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  width: 180px;
-  height: 36px;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse at 50% 30%,
-    rgba(255, 220, 160, 0.5),
-    rgba(0, 0, 0, 0) 75%
-  );
-  box-shadow: 0 0 0 2px rgba(255, 193, 110, 0.35);
-}
-
-.emote-showcase-play {
-  font-size: 13px;
-  padding: 8px 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .emote-showcase-short {
   font-size: 13px;
-  color: var(--game-red-light);
+  /* --red-text, not --game-red-light - this sits directly on the card's
+     off-white body (1.46:1 there, fails AA; --red-text clears 5.8:1). */
+  color: var(--red-text);
   text-align: center;
 }
 
@@ -112,11 +81,23 @@
   width: 100%;
 }
 
-@media (max-width: 420px) {
-  .emote-showcase-name {
-    font-size: 22px;
-  }
+/* Icon-only disabled "already equipped" state - the aria-label on the
+   button itself carries the meaning, this is just sizing the glyph up
+   since there's no text alongside it to anchor to. */
+.emote-showcase-equipped {
+  font-size: 20px;
+}
 
+/* .game-page .btn:disabled (GamePage.css) fades every disabled button to
+   0.55 - wrong here, this isn't "can't click because something's wrong",
+   it's "this is the current state". Extra class on the selector for
+   specificity (0,5,0) to reliably beat that (0,3,0) rule regardless of
+   CSS import order, no !important needed. */
+.emote-showcase-actions .btn.emote-showcase-equipped:disabled {
+  opacity: 1;
+}
+
+@media (max-width: 420px) {
   .emote-showcase-pedestal {
     min-height: 200px;
   }

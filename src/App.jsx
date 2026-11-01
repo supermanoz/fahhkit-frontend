@@ -22,6 +22,7 @@ import HistoryPage from './pages/HistoryPage'
 import TrackRunPage from './pages/TrackRunPage'
 import RunDetailPage from './pages/RunDetailPage'
 import ContactPage from './pages/ContactPage'
+import ShopPage from './pages/ShopPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import EventRegistrantsPage from './pages/EventRegistrantsPage'
 import EventReportPage from './pages/EventReportPage'
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/runs/track" element={<TrackRunPage />} />
         <Route path="/runs/:id" element={<RunDetailPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/shop" element={<ShopPage />} />
         <Route path="/game" element={<GamePage />} />
         <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
         <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />

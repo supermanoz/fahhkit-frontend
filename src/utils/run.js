@@ -50,6 +50,20 @@ export function formatPace(minutesPerKm) {
   return `${m}:${String(s).padStart(2, '0')} /km`
 }
 
+// Moving-time duration (what gets submitted with the run as `duration`) -
+// wall clock between start/end minus every pause's own span (see
+// useRunTracker.js's pause()/resume()) so pace stays honest. Identical to
+// the plain "endedAt - startedAt" a run always used before pause existed,
+// for any run that never paused (pausedMs stays 0) - Conquer/PvP/Club War
+// never call pause(), so this is a safe drop-in, not Training-only math.
+export function computeRunDurationSeconds(
+  startedAtMs,
+  endedAtMs,
+  pausedMs = 0
+) {
+  return Math.max(0, Math.round((endedAtMs - startedAtMs - pausedMs) / 1000))
+}
+
 export function calculatePaceMinPerKm(distanceMeters, durationSeconds) {
   if (!distanceMeters || distanceMeters <= 0 || !durationSeconds) return null
   const distanceKm = distanceMeters / 1000

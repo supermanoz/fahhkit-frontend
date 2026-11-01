@@ -1,0 +1,100 @@
+// Loads every hero's bundled sprite art from its own manifest.json (see
+// src/assets/heroes/<hero>/) instead of a hand-written object per file -
+// heroSprites.js and emotes.js both build their own narrower, function-
+// shaped API on top of this. A new hero needs only a new
+// src/assets/heroes/<hero>/ folder + manifest.json; nothing in this file or
+// its two callers changes.
+//
+// Only the three heroes with real animated art (Blaze/Comet/Bolt) have a
+// folder here - everything else (HERO/SKIN/AVATAR_BORDER/etc. store items,
+// and any other hero's portrait) is an admin-uploaded image referenced by
+// StoreItem.assetUrl/Hero.portraitUrl and resolved via resolveFileUrl
+// instead, same as before this reorg - that content is never bundled, so it
+// has no place in a build-time manifest like this one.
+//
+// Frame geometry here is native pixel size (frameWidth/frameHeight), used
+// only for things like aspect-ratio math (see HeroSprite.jsx) - it's NOT
+// the on-screen display size, which TerritoryMap.css's own constants
+// control for the map marker (see PLAYER_MARKER_SCALE in TerritoryMap.jsx).
+// Playback speed (ms/frame) is likewise application logic, not asset
+// metadata - see HeroSprite.jsx's/AnimatedSprite.jsx's own FRAME_MS - so
+// it's deliberately not a manifest field.
+const manifestModules = import.meta.glob('../assets/heroes/*/manifest.json', {
+  eager: true,
+  import: 'default',
+})
+const assetUrls = import.meta.glob('../assets/heroes/**/*.{png,webp}', {
+  eager: true,
+  import: 'default',
+  query: '?url',
+})
+
+const HEROES = {}
+for (const [manifestPath, manifest] of Object.entries(manifestModules)) {
+  const heroDir = manifestPath.slice(0, -'/manifest.json'.length)
+  HEROES[manifest.hero] = resolveManifest(manifest, heroDir)
+}
+
+// Turns one {file, frames, frameWidth, frameHeight} manifest entry into
+// {src, frames, frameWidth, frameHeight} by looking the file up in
+// assetUrls - warns (not throws) if a manifest lists a file that isn't
+// actually on disk, so a bad manifest edit shows up loudly in the console/
+// CI instead of silently rendering a broken image.
+function resolveEntry(heroName, heroDir, entry) {
+  const url = assetUrls[`${heroDir}/${entry.file}`]
+  if (!url) {
+    console.warn(
+      `[heroManifest] ${heroName}: "${entry.file}" is listed in manifest.json but no such asset was found`
+    )
+  }
+  return {
+    frames: entry.frames,
+    frameWidth: entry.frameWidth,
+    frameHeight: entry.frameHeight,
+    src: url,
+  }
+}
+
+function resolveGroup(heroName, heroDir, group) {
+  const out = {}
+  for (const [key, entry] of Object.entries(group || {})) {
+    out[key] = resolveEntry(heroName, heroDir, entry)
+  }
+  return out
+}
+
+function resolveManifest(manifest, heroDir) {
+  const poses = resolveGroup(manifest.hero, heroDir, manifest.profile)
+  const map = resolveGroup(manifest.hero, heroDir, manifest.map)
+
+  // An emote entry is either its own dedicated art ({file: ...}, resolved
+  // the same way poses/map are - this is how "Hip Hop" works: same file as
+  // the old profile hiphop pose, but only reachable as an EMOTE now, never
+  // as a free pose preview - see HeroFigure/HeroGallery/HeroDetailModal,
+  // none of which ever request anything but "idle") or an alias onto this
+  // hero's own idle pose ({pose: "idle"}, e.g. "Classic" - see each
+  // manifest.json) - poses are already resolved above by the time this
+  // runs, so the alias just reuses that same {src, frames, ...}.
+  const emotes = {}
+  for (const [name, entry] of Object.entries(manifest.emotes || {})) {
+    emotes[name] = entry.pose
+      ? poses[entry.pose]
+      : resolveEntry(manifest.hero, heroDir, entry)
+  }
+
+  return { poses, map, emotes }
+}
+
+// The hero names with a real manifest (blaze/comet/bolt today) - unlike
+// getHeroSprite, never coerced to a fallback.
+export function hasHero(name) {
+  return typeof name === 'string' && Boolean(HEROES[name.trim().toLowerCase()])
+}
+
+// TEMP: heroes with no manifest still borrow Blaze's art (shows Blaze's
+// look under a different name) until each one gets its own folder - same
+// fallback heroSprites.js/emotes.js always had.
+export function getHero(name) {
+  if (typeof name !== 'string') return HEROES.blaze
+  return HEROES[name.trim().toLowerCase()] || HEROES.blaze
+}

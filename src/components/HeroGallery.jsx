@@ -41,7 +41,6 @@ export default function HeroGallery({
 }) {
   const [index, setIndex] = useState(0)
   const [direction, setDirection] = useState(0)
-  const [hovered, setHovered] = useState(false)
   // Keyed by hero id (not a plain bool) so switching heroes mid-request
   // doesn't leave the new card showing the old one's spinner, and a
   // reused true/false can't go stale across the swap either.
@@ -58,7 +57,6 @@ export default function HeroGallery({
     if (clamped === index) return
     setDirection(clamped > index ? 1 : -1)
     setIndex(clamped)
-    setHovered(false)
   }
 
   async function handleEquipClick(e, item) {
@@ -166,17 +164,13 @@ export default function HeroGallery({
                   onSelect(hero)
                 }
               }}
-              onPointerEnter={() => setHovered(true)}
-              onPointerLeave={() => setHovered(false)}
-              onFocus={() => setHovered(true)}
-              onBlur={() => setHovered(false)}
             >
               <span className="hero-card-stage">
-                <HeroFigure
-                  hero={hero}
-                  pose={hovered ? 'hiphop' : 'idle'}
-                  height={240}
-                />
+                {/* Idle only - Hip Hop is a purchasable emote (see
+                    heroManifest.js: it's no longer under this hero's
+                    `poses` at all, only under `emotes`), so it can't be
+                    free-previewed here regardless of ownership. */}
+                <HeroFigure hero={hero} pose="idle" height={240} />
               </span>
 
               <span className="hero-card-name">{hero.name}</span>

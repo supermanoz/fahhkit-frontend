@@ -1,9 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { IconClose, IconPlay } from './GameIcons'
+import { IconCheck, IconClose } from './GameIcons'
 import EmoteGlyph from './EmoteGlyph'
-import { getEmoteRarity } from '../utils/emoteRarity'
 import './EmoteShowcase.css'
 
 // Full-screen "first screen shown after clicking an emote" - replaces the
@@ -13,6 +11,15 @@ import './EmoteShowcase.css'
 // Esc and the backdrop click both close through the same `storeChoice`
 // state GamePage already had - its own Esc effect keys off storeChoice
 // itself, not this component, so no separate listener is needed here.
+//
+// Stripped down to just the animation + one action button - no name,
+// rarity or any other text on screen (an unowned emote's name/flavor isn't
+// really "the point" the way it is in, say, Fortnite's locker; the art and
+// the buy decision are). The emote name still reaches screen readers via
+// this card's own aria-label and the pedestal's, since nothing visual
+// carries it anymore. Always plays (EmoteGlyph's `active`, unconditional)
+// even when locked - this is the one deliberately-selected instance, same
+// reasoning as HeroDetailModal.jsx's slider now uses.
 export default function EmoteShowcase({
   item,
   heroName,
@@ -28,13 +35,6 @@ export default function EmoteShowcase({
   onEquip,
   onGetCoins,
 }) {
-  // "Preview" replays the animation from frame 1 - AnimatedSprite's CSS
-  // already loops infinitely, so there's nothing to actually start/stop;
-  // remounting EmoteGlyph via a changing key is the simplest way to give
-  // it a visible, deliberate restart on tap.
-  const [playKey, setPlayKey] = useState(0)
-  const rarity = getEmoteRarity(item.priceFahhcoin)
-
   return (
     <motion.div
       className="emote-showcase-overlay"
@@ -45,6 +45,9 @@ export default function EmoteShowcase({
     >
       <motion.div
         className="emote-showcase-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={item.name}
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.94 }}
@@ -54,36 +57,24 @@ export default function EmoteShowcase({
         <button
           type="button"
           className="game-close-btn game-run-viewer-close emote-showcase-close"
-          aria-label="Back"
+          aria-label="Close"
           onClick={onClose}
         >
           <IconClose />
         </button>
 
-        <p className="emote-showcase-rarity" style={{ color: rarity.color }}>
-          {rarity.label} <span className="emote-showcase-rarity-sep">|</span>{' '}
-          EMOTE
-        </p>
-        <p className="emote-showcase-name">{item.name}</p>
-
-        <div className="emote-showcase-pedestal">
-          <span className="emote-showcase-pedestal-ring" aria-hidden="true" />
+        <div
+          className="emote-showcase-pedestal"
+          role="img"
+          aria-label={`${item.name} emote`}
+        >
           <EmoteGlyph
-            key={playKey}
             heroName={heroName}
             emoteName={item.name}
             size={220}
             active
           />
         </div>
-
-        <button
-          type="button"
-          className="btn btn-outline emote-showcase-play"
-          onClick={() => setPlayKey((k) => k + 1)}
-        >
-          <IconPlay /> Preview
-        </button>
 
         {(purchaseError || storeActionError) && (
           <p className="game-controls-hint game-controls-hint-error">
@@ -99,9 +90,24 @@ export default function EmoteShowcase({
 
         <div className="emote-showcase-actions">
           {owned ? (
-            <button type="button" className="btn btn-primary" onClick={onEquip}>
-              {owned.equipped ? 'Unequip' : 'Equip'}
-            </button>
+            owned.equipped ? (
+              <button
+                type="button"
+                className="btn btn-primary emote-showcase-equipped"
+                disabled
+                aria-label="Equipped"
+              >
+                <IconCheck aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={onEquip}
+              >
+                Equip
+              </button>
+            )
           ) : short ? (
             <button
               type="button"

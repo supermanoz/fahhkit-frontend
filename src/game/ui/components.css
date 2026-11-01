@@ -106,15 +106,11 @@
 }
 .gb-secondary {
   background: var(--white);
-  color: var(--ink);
-  -webkit-text-stroke: 0;
-  text-shadow: none;
+  color: var(--game-text);
 }
 .gb-ghost {
   background: transparent;
-  color: var(--ink);
-  -webkit-text-stroke: 0;
-  text-shadow: none;
+  color: var(--game-text);
   box-shadow: var(--inner-shade);
 }
 .gb-ghost:active:not(:disabled) {
@@ -189,7 +185,7 @@
   box-shadow:
     inset 0 0 0 var(--border-sm) var(--divider),
     0 6px 0 var(--ink);
-  color: var(--ink);
+  color: var(--game-text);
   position: relative;
 }
 
@@ -249,17 +245,22 @@
   );
 }
 /* .game-close-btn (GameCards.css) owns colour/size/press/focus state;
-   this rule is position only. */
+   this rule is position only. A positive inset (not the floating -14px
+   overhang other close buttons in this app use) because .g-modal above is
+   itself the scrolling element (overflow-y: auto, which computes
+   overflow-x to auto too per spec) - a negatively-offset child gets
+   clipped right at the edge instead of floating outside it. Safe-area
+   aware in case this modal is ever shown full-bleed on a notched phone. */
 .g-modal-close {
   position: absolute;
-  top: -14px;
-  right: -14px;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
 }
 .g-modal-body {
   padding: var(--space-4);
   font-family: var(--font-body);
   line-height: 1.35;
-  color: var(--ink);
+  color: var(--game-text);
 }
 
 /* ---------- Tabs ---------- */
@@ -281,7 +282,7 @@
   border-radius: var(--radius-sm);
   border: none;
   background: var(--tab-inactive);
-  color: var(--ink);
+  color: var(--game-text);
   font-family: var(--font-body);
   font-weight: 800;
   font-size: var(--text-sm);
@@ -292,7 +293,7 @@
    colour - white background, dark text, same as the rest of the panel. */
 .g-tab[aria-selected='true'] {
   background: var(--white);
-  color: var(--ink);
+  color: var(--game-text);
   box-shadow:
     var(--inner-highlight),
     0 3px 0 var(--ink);
@@ -351,7 +352,7 @@
     var(--green-500) 60%,
     var(--green-700)
   );
-  color: var(--ink);
+  color: var(--game-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -387,7 +388,7 @@
 }
 .g-badge-new {
   background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
-  color: var(--ink);
+  color: var(--game-text);
   animation: g-wobble 2.4s ease-in-out infinite;
 }
 @keyframes g-wobble {
@@ -422,15 +423,15 @@
   background: none;
   font-family: var(--font-body);
   font-size: var(--text-md);
-  color: var(--ink);
+  color: var(--game-text);
 }
 .g-row-frost {
   background: var(--white);
-  color: var(--ink);
+  color: var(--game-text);
 }
 .g-row-dark {
   background: var(--row);
-  color: var(--ink);
+  color: var(--game-text);
 }
 .g-row-selected {
   box-shadow: inset 4px 0 0 var(--green-500);
@@ -456,11 +457,11 @@
 }
 .g-card-frost {
   background: var(--white);
-  color: var(--ink);
+  color: var(--game-text);
 }
 .g-card-dark {
   background: var(--row);
-  color: var(--ink);
+  color: var(--game-text);
 }
 
 /* ---------- ProgressBar ---------- */
@@ -525,7 +526,7 @@
   border: var(--border-sm) solid var(--ink);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
-  color: var(--ink);
+  color: var(--game-text);
   font-family: var(--font-body);
   position: relative;
   overflow: hidden;
@@ -611,32 +612,42 @@
 }
 
 /* ---------- Avatar ---------- */
-.g-avatar {
-  position: relative;
-  border-radius: 50%;
-  display: inline-flex;
+/* Defaults wrapped in :where() (zero specificity) so a caller's own class
+   - the leaderboard podium's shield, the territory popup's thicker border
+   - overrides them without !important. See Avatar.jsx. */
+:where(.g-avatar) {
+  width: var(--avatar-size, 48px);
+  height: var(--avatar-size, 48px);
   flex-shrink: 0;
-}
-.g-avatar-img,
-.g-avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  border: var(--border-sm) solid var(--ink);
   box-sizing: border-box;
+  border-radius: 50%;
+  border: var(--border-sm) solid var(--ink);
+  object-fit: cover;
+  background: var(--row);
 }
-.g-avatar-fallback {
-  display: flex;
+:where(.g-avatar-fallback) {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--row);
-  color: var(--ink);
+  background: var(--avatar-bg, var(--game-wood));
+  color: var(--game-text);
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 800;
+  font-size: calc(var(--avatar-size, 48px) * 0.4);
+  line-height: 1;
+}
+.g-avatar-silhouette {
+  width: 62%;
+  height: 62%;
+  color: var(--white);
 }
 .g-avatar-ring {
   box-shadow: 0 0 0 3px var(--ring-color, var(--green-500));
+}
+.g-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
 }
 .g-avatar-level {
   position: absolute;
@@ -708,7 +719,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink);
+  color: var(--game-text);
 }
 .g-rarity-new {
   position: absolute;
@@ -742,8 +753,7 @@
     var(--gold-500) 60%,
     var(--gold-700)
   );
-  color: var(--ink);
-  text-shadow: none;
+  color: var(--game-text);
 }
 
 .g-divider {

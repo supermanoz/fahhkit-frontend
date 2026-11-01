@@ -1,0 +1,136 @@
+/* Rendered inside GameMechanicsPage's section body, so it reuses that
+   page's .game-mechanics-muted / -section-chevron classes (see
+   GameMechanicsPage.css) the same way HeroAdminPanel.css does - this file
+   only covers what's specific to sponsor-banner rows/forms. */
+
+.sponsor-admin-new-btn {
+  margin-bottom: 16px;
+}
+
+.sponsor-admin-create {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sponsor-admin-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.sponsor-admin-form .field {
+  margin-bottom: 12px;
+}
+
+.sponsor-admin-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.sponsor-admin-form label .opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.sponsor-admin-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.sponsor-admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.sponsor-admin-checkbox input {
+  width: auto;
+}
+
+.sponsor-admin-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sponsor-admin-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sponsor-admin-row-head {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.sponsor-admin-row-thumb {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: contain;
+  background: var(--card);
+}
+
+.sponsor-admin-row-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.sponsor-admin-row-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sponsor-admin-row-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sponsor-admin-row-body {
+  padding: 0 14px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sponsor-admin-row-actions {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.sponsor-admin-row-body .sponsor-admin-form {
+  margin-top: 4px;
+}

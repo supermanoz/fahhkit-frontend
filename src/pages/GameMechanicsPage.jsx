@@ -16,6 +16,7 @@ import Footer from '../components/Footer'
 import HeroAdminPanel from '../components/HeroAdminPanel'
 import EmoteAdminPanel from '../components/EmoteAdminPanel'
 import MailToolsPanel from '../components/MailToolsPanel'
+import SponsorBannerAdminPanel from '../components/SponsorBannerAdminPanel'
 import './GameMechanicsPage.css'
 
 const INITIAL_NEWS_FORM = { title: '', body: '' }
@@ -65,6 +66,7 @@ export default function GameMechanicsPage() {
   const [heroesOpen, setHeroesOpen] = useState(false)
   const [emotesOpen, setEmotesOpen] = useState(false)
   const [mailToolsOpen, setMailToolsOpen] = useState(false)
+  const [sponsorBannersOpen, setSponsorBannersOpen] = useState(false)
 
   const [cities, setCities] = useState([])
   const [citiesLoading, setCitiesLoading] = useState(true)
@@ -443,6 +445,15 @@ export default function GameMechanicsPage() {
           onToggle={() => setMailToolsOpen((o) => !o)}
         >
           <MailToolsPanel />
+        </Section>
+
+        <Section
+          title="Sponsor Banners"
+          hint="Rotating partner logo shown above the game Leaderboard - name, email, season, logo image URL, redirect link and active toggle (the Partner entity has no banner/logo split, date range or sort order)."
+          open={sponsorBannersOpen}
+          onToggle={() => setSponsorBannersOpen((o) => !o)}
+        >
+          <SponsorBannerAdminPanel />
         </Section>
       </div>
       <Footer />

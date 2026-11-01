@@ -4,6 +4,7 @@ import {
   VehicleState,
   SegmentKind,
   compressSegments,
+  buildPauseResumeJumpSegment,
 } from './vehicleDetection'
 
 const METERS_PER_DEGREE_LAT = 111320
@@ -327,5 +328,34 @@ describe('compressSegments', () => {
       fromTimestamp: 8,
       toTimestamp: 10,
     })
+  })
+})
+
+describe('buildPauseResumeJumpSegment', () => {
+  it('always excludes the pause-to-resume gap, even if it looks like real movement', () => {
+    // A runner could genuinely cover real ground during a pause (walking to
+    // a water stop and back) - this still must never count as distance,
+    // unlike every other segment kind, which is classified from the
+    // evidence (see addGpsPoint above).
+    const before = { lat: 10, lng: 10, timestamp: 1_700_000_000_000 }
+    // ~1.1km away, 10 minutes later - easily a "SUSPECT"/"VEHICLE"-looking
+    // implied speed if it were run through the normal detector.
+    const after = { lat: 10.01, lng: 10, timestamp: 1_700_000_600_000 }
+    const segment = buildPauseResumeJumpSegment(before, after)
+    expect(segment.kind).toBe(SegmentKind.JUMP)
+    expect(segment.excluded).toBe(true)
+    expect(segment.distanceMeters).toBeGreaterThan(0)
+    expect(segment.fromTimestamp).toBe(before.timestamp)
+    expect(segment.toTimestamp).toBe(after.timestamp)
+  })
+
+  it('still carries a real distanceMeters for moderator review, not zero', () => {
+    const before = { lat: 10, lng: 10, timestamp: 0 }
+    const after = { lat: 10, lng: 10.001, timestamp: 60_000 }
+    const segment = buildPauseResumeJumpSegment(before, after)
+    // ~111m at the equator for 0.001deg of longitude - just needs to be in
+    // the right ballpark, not an exact haversine re-derivation.
+    expect(segment.distanceMeters).toBeGreaterThan(50)
+    expect(segment.distanceMeters).toBeLessThan(200)
   })
 })

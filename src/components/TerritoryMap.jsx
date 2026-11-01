@@ -30,13 +30,8 @@ import { haversineDistance } from '../utils/run'
 // used to be a different local avatar (Wind), so a broken avatarSrc (e.g.
 // the account's equipped Hero's assetUrl 404ing) showed one character on
 // the map and a different one in the Me panel instead of matching.
-import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
-import blazeIdleSheet from '../assets/images/blaze-map-idle-stretch.png'
-import blazeRunSheet from '../assets/images/blaze-map-run-up.png'
-import cometIdleSheet from '../assets/images/comet-map-idle-stretch.png'
-import cometRunSheet from '../assets/images/comet-map-run-up.png'
-import boltIdleSheet from '../assets/images/bolt-map-idle-stretch.png'
-import boltRunSheet from '../assets/images/bolt-map-run-up.png'
+import defaultAvatarImage from '../assets/avatars/blaze.png'
+import { getHero } from '../utils/heroManifest'
 import TapEffect from './TapEffect'
 import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -194,6 +189,17 @@ function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
   return null
 }
 
+// Scales up the on-map player marker - both the round avatar/GPS-dot variant
+// below and the animated hero sprite further down - from its original size.
+// The one number every marker dimension in this file is computed from:
+// iconSize/iconAnchor read it directly in JS, and every size/offset in
+// TerritoryMap.css that can't just be a percentage of its parent (the pulse
+// ring's inset, the sprite's transform-origin/ground offset, the sheet's
+// background-size/position) reads it back via the `--s` custom property set
+// inline on each marker's own html below - the same pattern already used
+// for --hero-heading - so CSS can never drift out of sync with this value.
+const PLAYER_MARKER_SCALE = 1.5
+
 // A pulsing GPS "radar" dot instead of a plain pin — the single most
 // recognizable piece of Pokémon GO's map, and the thing that sells "you are
 // standing in this game world" better than any tile styling can. Always
@@ -210,50 +216,42 @@ function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
 // the game had been open a while. onerror falls back to a guaranteed-local
 // bundled image and clears itself so it can't loop.
 // Plain GPS dot - no Google Maps-style heading cone fanning out from it.
+const AVATAR_ICON_SIZE = 40 * PLAYER_MARKER_SCALE
+
 function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
   return L.divIcon({
     className: 'territory-map-player-icon',
     html:
+      `<span style="--s:${PLAYER_MARKER_SCALE}">` +
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
-      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+      `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />` +
+      '</span>',
+    iconSize: [AVATAR_ICON_SIZE, AVATAR_ICON_SIZE],
+    iconAnchor: [AVATAR_ICON_SIZE / 2, AVATAR_ICON_SIZE / 2],
   })
 }
 
-// Blaze and Comet each get a full-body animated sprite on the map instead
-// of the round avatar photo: idle when standing still, and a single
-// back-view run cycle while moving. There is only ever ONE sheet per pose
-// now (no more separate up/down/left/right sheets to switch between) -
-// the sprite always shows the character from behind/top-down, and faces
-// the right way by ROTATING via CSS (see .territory-map-blaze-body's
+// Blaze, Comet and Bolt each get a full-body animated sprite on the map
+// instead of the round avatar photo: idle when standing still, and a
+// single back-view run cycle while moving. There is only ever ONE sheet
+// per pose (no separate up/down/left/right sheets to switch between) - the
+// sprite always shows the character from behind/top-down, and faces the
+// right way by ROTATING via CSS (see .territory-map-blaze-body's
 // --hero-heading, driven imperatively by useSmoothMarkerHeading below),
 // the same way a real top-down game character would, instead of snapping
 // between four fixed-angle drawings. Each sheet is a horizontal strip
 // stepped through by CSS (see .territory-map-blaze) - idle is a slower
-// 48-frame stretch (shoulder, then arm), running is a finer 15-frame
-// cycle at 24fps (see the [data-frames] overrides in TerritoryMap.css),
-// so frame count travels with the sheet here instead of being hard-coded
-// in one class - that CSS keys purely off frame count, not which hero, so
-// both heroes' sheets reuse it unchanged. See
-// scripts/build_blaze_stretch_strips.py / build_comet_stretch_strips.py.
-// Any other hero has no entry here and falls back to the flat avatar photo
-// (see animatedMarkerHero in GamePage.jsx).
-const HERO_MAP_SHEETS = {
-  blaze: {
-    idle: { src: blazeIdleSheet, frames: 48 },
-    run: { src: blazeRunSheet, frames: 15 },
-  },
-  comet: {
-    idle: { src: cometIdleSheet, frames: 48 },
-    run: { src: cometRunSheet, frames: 15 },
-  },
-  bolt: {
-    idle: { src: boltIdleSheet, frames: 48 },
-    run: { src: boltRunSheet, frames: 15 },
-  },
-}
+// 48-frame stretch (shoulder, then arm), running is a finer 15-frame cycle
+// at 24fps (see the [data-frames] overrides in TerritoryMap.css), so frame
+// count travels with the sheet (see each hero's manifest.json, read via
+// heroManifest.js's getHero) instead of being hard-coded in one class -
+// that CSS keys purely off frame count, not which hero, so every hero's
+// sheet reuses it unchanged. See scripts/build_<hero>_stretch_strips.py.
+// Any hero with no manifest falls back to the flat avatar photo instead of
+// Blaze's sprite (see animatedMarkerHero in GamePage.jsx, which only ever
+// passes 'blaze'/'comet'/'bolt' here - any other hero never reaches
+// buildAnimatedMarkerIcon at all).
 
 // Anchored at his feet (not the icon's center) so he stands on the GPS
 // point; the sonar pulse sits flattened on the ground underneath him.
@@ -261,20 +259,38 @@ const HERO_MAP_SHEETS = {
 // separately, imperatively, by useSmoothMarkerHeading rotating
 // .territory-map-blaze-body, so this icon never needs rebuilding on a
 // heading change (only on an idle<->running swap).
+const BLAZE_ICON_WIDTH = 48 * PLAYER_MARKER_SCALE
+const BLAZE_ICON_HEIGHT = 64 * PLAYER_MARKER_SCALE
+const BLAZE_ICON_ANCHOR_X = 24 * PLAYER_MARKER_SCALE
+const BLAZE_ICON_ANCHOR_Y = 58 * PLAYER_MARKER_SCALE
+
 function buildAnimatedMarkerIcon(heroKey, moving) {
-  const sheet = HERO_MAP_SHEETS[heroKey][moving ? 'run' : 'idle']
+  const sheet = getHero(heroKey).map[moving ? 'run' : 'idle']
+  // The sprite's per-frame cell, scaled from the sheet's REAL pixel size
+  // (sheet.frameWidth/frameHeight, read straight off each hero's own
+  // manifest.json - see scripts/build_<hero>_stretch_strips.py) down to
+  // this marker's fixed on-screen height (64px at 1x - BLAZE_ICON_HEIGHT),
+  // preserving the real aspect ratio exactly. TerritoryMap.css used to
+  // hardcode this as a flat 48x64 cell (the old hand-cut sprites this
+  // replaced) - that silently went stale and slightly stretched every
+  // frame once the pipeline moved to these auto-built 128x170 sheets,
+  // since nothing forced the two to stay in sync. Passed in as inline
+  // custom properties so CSS never has to guess the sheet's real size
+  // again.
+  const cellHeight = 64
+  const cellWidth = (sheet.frameWidth / sheet.frameHeight) * cellHeight
   return L.divIcon({
     className: 'territory-map-player-icon territory-map-blaze-icon',
     html:
-      '<span class="territory-map-blaze-body">' +
+      `<span class="territory-map-blaze-body" style="--s:${PLAYER_MARKER_SCALE}">` +
       '<span class="territory-map-blaze-ground">' +
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
       '</span>' +
-      `<span class="territory-map-blaze is-${moving ? 'running' : 'idle'}" data-frames="${sheet.frames}" style="background-image:url('${sheet.src}')"></span>` +
+      `<span class="territory-map-blaze is-${moving ? 'running' : 'idle'}" data-frames="${sheet.frames}" style="background-image:url('${sheet.src}');--cell-w:${cellWidth};--cell-h:${cellHeight}"></span>` +
       '</span>',
-    iconSize: [48, 64],
-    iconAnchor: [24, 58],
+    iconSize: [BLAZE_ICON_WIDTH, BLAZE_ICON_HEIGHT],
+    iconAnchor: [BLAZE_ICON_ANCHOR_X, BLAZE_ICON_ANCHOR_Y],
   })
 }
 
@@ -753,7 +769,7 @@ function applyMarkerHeading(marker, deg) {
 // is expected to already be GPS-course-only (see playerHeading in
 // GamePage.jsx) - this hook has no idea where it came from and doesn't
 // care, it just animates toward whatever number it's given.
-function useSmoothMarkerHeading(markerRef, heading) {
+function useSmoothMarkerHeading(markerRef, heading, icon) {
   const currentRef = useRef(null) // unwrapped running total, can exceed 0-360
   const fromRef = useRef(0)
   const toRef = useRef(0)
@@ -806,6 +822,23 @@ function useSmoothMarkerHeading(markerRef, heading) {
     rafRef.current = requestAnimationFrame(tick)
   }, [markerRef, heading])
 
+  // An idle<->running swap gives this marker a brand new icon - Leaflet's
+  // own setIcon() rebuilds the DOM element from scratch (same L.Marker
+  // instance, see PlayerMarker's own comment, but a fresh element), which
+  // starts with no --hero-heading set on it at all. Without this, the
+  // character would visibly snap to facing north (CSS's
+  // var(--hero-heading, 0deg) fallback) for a moment after every
+  // idle<->running transition, not easing back to the real heading until
+  // the next genuine heading CHANGE happened to come in (the tween effect
+  // above only re-fires then, never on an icon-only swap). Re-stamps the
+  // already-known current angle straight onto the new element instead -
+  // no easing needed, it's the same value it already had.
+  useEffect(() => {
+    const marker = markerRef.current
+    if (!marker || currentRef.current == null) return
+    applyMarkerHeading(marker, currentRef.current)
+  }, [markerRef, icon])
+
   useEffect(
     () => () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
@@ -854,7 +887,7 @@ function PlayerMarker({ playerLocation, icon, heading }) {
   const markerRef = useRef(null)
   const originRef = useRef(playerLocation)
   useSmoothMarkerPosition(markerRef, playerLocation)
-  useSmoothMarkerHeading(markerRef, heading)
+  useSmoothMarkerHeading(markerRef, heading, icon)
   useWarnOnDuplicateCharacter()
   return (
     <Marker
@@ -1318,7 +1351,7 @@ export default function TerritoryMap({
   // Warm the cache so switching idle -> running never shows a blank frame.
   useEffect(() => {
     if (!animatedMarkerHero) return
-    Object.values(HERO_MAP_SHEETS[animatedMarkerHero]).forEach(({ src }) => {
+    Object.values(getHero(animatedMarkerHero).map).forEach(({ src }) => {
       new Image().src = src
     })
   }, [animatedMarkerHero])

@@ -13,8 +13,8 @@ import {
   IconChevronRight,
   IconClose,
   IconCrosshairs,
-  IconEmote,
   IconEnvelope,
+  IconExpand,
   IconFlag,
   IconFlagCheckered,
   IconHelmet,
@@ -22,6 +22,7 @@ import {
   IconLogout,
   IconMap,
   IconMenuOrb,
+  IconPause,
   IconPlay,
   IconRunning,
   IconSettings,
@@ -70,8 +71,14 @@ import {
 import { useRolloutStatus } from '../hooks/useRolloutStatus'
 import RolloutRequestModal from '../components/RolloutRequestModal'
 import RolloutRequestedChip from '../components/RolloutRequestedChip'
-import { warnMissingEmoteAssets } from '../utils/emotes'
+import {
+  resolveEmoteAsset,
+  resolveEquippedEmoteItem,
+  warnMissingEmoteAssets,
+} from '../utils/emotes'
+import EmoteGlyph from '../components/EmoteGlyph'
 import { ToastProvider, useToast } from '../game/ui/Toast'
+import Avatar from '../game/ui/Avatar'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
@@ -130,12 +137,8 @@ import {
   playMenuSound,
   playMilestoneChime,
 } from '../utils/gameSound'
-import {
-  isBlazeHero,
-  isCometHero,
-  isBoltHero,
-  isPlaceholderHero,
-} from '../utils/hero'
+import { isCometHero, isPlaceholderHero } from '../utils/hero'
+import { hasHero as hasHeroManifest } from '../utils/heroManifest'
 import HeroSprite from '../components/HeroSprite'
 import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
@@ -145,7 +148,6 @@ import HeroGallery from '../components/HeroGallery'
 import ShadeFlag from '../components/ShadeFlag'
 import TrailPreview from '../components/TrailPreview'
 import ColorShelf from '../components/ColorShelf'
-import EmoteShelf from '../components/EmoteShelf'
 import EmoteShowcase from '../components/EmoteShowcase'
 import SkinShelf from '../components/SkinShelf'
 import MedalGrid from '../components/MedalGrid'
@@ -157,15 +159,17 @@ import RunScoreCard from '../components/RunScoreCard'
 import ClubBadge from '../components/ClubBadge'
 import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
+import { formatCoins } from '../utils/format'
 import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
 import LeaderboardPodium, {
   LeaderboardSkeleton,
 } from '../components/LeaderboardPodium'
+import SponsorBannerCarousel from '../components/SponsorBannerCarousel'
 import RouteTurnIndicator from '../components/RouteTurnIndicator'
 import { getRouteGuidance } from '../utils/routeNav'
-import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
+import defaultAvatarImage from '../assets/avatars/blaze.png'
 import runConquestLogo from '../assets/images/run-conquest-logo.png'
 // TEMP: AVATARS / COMING_SOON_AVATARS / loadAvatarId return with the
 // Shop's Avatar picker (see avatarId below).
@@ -191,59 +195,12 @@ function formatMeters(meters) {
   return `${(meters / 1000).toFixed(2)} km`
 }
 
-/* eslint-disable react/prop-types -- no prop-types dependency in this project */
-// Territory popup's owner avatar (see handleParcelClick) - unlike other
-// broken-asset spots in this codebase that just vanish on error (e.g.
-// HeroItemShelf's portrait), this one falls back to a colored initial
-// instead, since a popup that's otherwise just "[name]'s territory" with a
-// blank gap where a face should be reads as broken, not as "no avatar set."
-// `key={src}` on every call site remounts this (resetting `broken`) the
-// moment a different owner's territory is tapped, instead of carrying a
-// stale broken-flag over from whichever entry was open before.
-// `ringColor` is the territory's own display color (gold for the player's
-// own ground, their hashed/shade color otherwise - see toDisplayParcel) so
-// the avatar visually ties back to the ground it's standing on. Explicit
-// width/height (not just CSS) avoid a layout shift while the image loads,
-// and loading="lazy" defers the fetch until the popup is actually open
-// (it's never pre-rendered off-screen, but costs nothing to declare).
-function TerritoryAvatar({ src, name, ringColor, size = 60 }) {
-  const [broken, setBroken] = useState(false)
-  const style = {
-    width: size,
-    height: size,
-    '--avatar-ring-color': ringColor || 'var(--game-gold)',
-  }
-  if (!src || broken) {
-    return (
-      <span
-        className="game-highlight-toast-avatar is-placeholder"
-        style={style}
-      >
-        {(name || '?')[0]}
-      </span>
-    )
-  }
-  return (
-    <img
-      className="game-highlight-toast-avatar"
-      style={style}
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      loading="lazy"
-      onError={() => setBroken(true)}
-    />
-  )
-}
-/* eslint-enable react/prop-types */
-
 // Pokémon GO-style menu: tapping the FAB (which turns into a close X) lays
-// these out above it, each labelled - five big buttons in an X (two up top,
-// the red Play button dead center, two below), with Mail and Settings as
-// small icons on either side of the FAB. x/y are each button's center offset
-// from the FAB's, so the layout itself is the point here, not incidental
-// styling.
+// these out above it - five big buttons in an X (two up top, the red Play
+// button dead center, two below), with Mail and Settings as small icons on
+// either side of the FAB. x/y are each button's center offset from the
+// FAB's, so the layout itself is the point here, not incidental styling.
+// Icon-only - the name only surfaces via aria-label/title, no text label.
 // The red Play button opens PLAY_OPTIONS instead of a menu tab.
 const RADIAL_ITEMS = [
   { tab: 'me', label: 'Me', Icon: IconUser, tone: 'green', x: -112, y: -300 },
@@ -389,7 +346,6 @@ function describeRunRejection(outcome) {
 const SHOP_SECTIONS = [
   { id: 'heroes', label: 'Heroes', Icon: IconHelmet },
   { id: 'skins', label: 'Skins', Icon: IconSkin },
-  { id: 'emotes', label: 'Emotes', Icon: IconEmote },
   { id: 'territory', label: 'Territory', Icon: IconFlag },
   { id: 'trail', label: 'Trail', Icon: IconRunning },
   { id: 'map', label: 'Map', Icon: IconMap },
@@ -420,8 +376,6 @@ const IDLE_NUDGE_SNOOZE_MS = 3 * 60 * 1000
 const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
 const ROUTES_PAGE_SIZE = 5
-// Clash-style digit grouping with spaces ("4 138 274") for the HUD counters.
-const formatCoins = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 // Minimum time the loading screen stays up, even on a fast load.
 const LOADING_MIN_MS = 4500
 
@@ -727,18 +681,12 @@ function GamePageInner() {
     }
   })
   const musicRef = useRef(null)
-  // Browsers refuse audio.play() with sound until the page has had a real
-  // user gesture, and the loading sequence (logo/bar, then the automatic
-  // "Zeroing in on your turf" globe dive - see GameIntroGlobe) has no
-  // button anywhere in it - so left alone, music stays silent until
-  // whatever the player happens to tap first once the live map appears,
-  // well after that dive already played out. Gating the dive behind a
-  // one-time "Tap to begin" on the splash (see the loading overlay below)
-  // gives this a guaranteed gesture to start the music on, right before
-  // the dive plays rather than sometime after it. The hint/gesture only
-  // activates once gameReady - while "Preparing your run…" is still
-  // loading there's nothing to tap yet.
-  const [audioGateTapped, setAudioGateTapped] = useState(false)
+  // The game starts itself (globe dive, then music) the instant gameReady
+  // flips true - no "tap anywhere to begin" gesture to wait on. Browsers
+  // can refuse audio.play() with sound without a real user gesture, so the
+  // music start below is best-effort (caught, not guaranteed) rather than
+  // gated behind a tap the way it used to be.
+  const [introStarted, setIntroStarted] = useState(false)
 
   // Real-world sky for the map (replaces the old manual dark/light
   // toggle) - weather + sunrise/sunset for the player's actual location,
@@ -1233,6 +1181,15 @@ function GamePageInner() {
   // flips true, right before the loading overlay lifts - see the overlay's
   // render below.
   const [introPlaying, setIntroPlaying] = useState(true)
+
+  // Starts the dive (and tries to start the music on the same beat) the
+  // moment loading finishes, instead of waiting for a "tap anywhere" - see
+  // the overlay's render below.
+  useEffect(() => {
+    if (!gameReady || introStarted) return
+    setIntroStarted(true)
+    musicRef.current?.play().catch(() => {})
+  }, [gameReady, introStarted])
 
   useEffect(() => {
     if (!gameReady || introPlaying || weatherHypeShownRef.current) return
@@ -2073,6 +2030,17 @@ function GamePageInner() {
     beginCountdownThenStart(() => tracker.start(null))
   }
 
+  // Training - the exact same plain territory draw as Start Run (same
+  // submit path, same exp/territory/leaderboard outcome - see
+  // useRunTracker's isTraining comment), just entered from its own menu
+  // screen and with Pause/Resume available on the run panel. Closes the
+  // menu first, same as handleStartRace, so the countdown/run take over the
+  // full screen instead of playing out behind it.
+  function handleStartTraining() {
+    setMenuOpen(false)
+    beginCountdownThenStart(() => tracker.start(null, { isTraining: true }))
+  }
+
   // "Run This Route" on the viewingRoute toast - same plain loop run as
   // Start Run, just with followingRoute on so the turn-by-turn HUD guides
   // the runner along viewingRoute.points instead of leaving them to eyeball
@@ -2148,12 +2116,10 @@ function GamePageInner() {
     if (routeDraftMode) return
     const isMine = Boolean(user?.id) && parcel.ownerId === user.id
     // Avatar: the owner's own real uploaded profile picture, never a
-    // cosmetic (equipped Hero skin, map marker art, etc.) - for the
-    // player's own tapped territory, `user.profilePictureUrl` is already
-    // right here; for anyone else, see toDisplayParcel's own comment on
-    // ownerProfilePictureUrl - it's null until the backend sends it, and
-    // TerritoryAvatar falls back to a colored initial either way.
-    const ownerRaw = nearbyParcels.find((p) => p.ownerId === parcel.ownerId)
+    // cosmetic (equipped Hero skin, map marker art, etc.) - only ever shown
+    // for the player's own tapped territory (`user.profilePictureUrl`).
+    // TEMP: other players' real photos are hidden here for now - this
+    // popup falls back to their colored initial instead.
     // Run score: TerritoryParcel.currentScore, summed across exactly the
     // parcels that make up this tapped (merged) shape - see
     // toDisplayParcel's own comment on why this isn't a player-wide total.
@@ -2168,7 +2134,7 @@ function GamePageInner() {
       areaSqMeters: parcel.area,
       avatarSrc: isMine
         ? resolveFileUrl(user?.profilePictureUrl) || null
-        : resolveFileUrl(ownerRaw?.ownerProfilePictureUrl) || null,
+        : null,
       // The territory's own display color (gold for mine, hashed/shade for
       // anyone else - see toDisplayParcel) - the avatar's ring color.
       color: parcel.color,
@@ -2527,10 +2493,10 @@ function GamePageInner() {
   // useCallback (empty deps - every function this touches, including
   // loadStore/loadHeroes, only closes over stable setState setters and
   // imported API calls, never per-render state, so there's nothing to go
-  // stale) so EmoteShelf/SkinShelf/ColorShelf below can actually be
-  // React.memo'd - passing a plain function here would hand them a new
-  // prop identity every render and defeat that memo regardless of how
-  // stable their other props are.
+  // stale) so SkinShelf/ColorShelf below can actually be React.memo'd -
+  // passing a plain function here would hand them a new prop identity
+  // every render and defeat that memo regardless of how stable their
+  // other props are.
   const handleEquip = useCallback(async (item, isEquipped) => {
     setStoreActionError(null)
     try {
@@ -2557,13 +2523,11 @@ function GamePageInner() {
   // Memoized (not just filtered inline) because GamePage re-renders every
   // few seconds from the standing GPS watch above (liveLocation) whether
   // or not the Shop is even open - without this, every one of those ticks
-  // handed EmoteShelf/SkinShelf/ColorShelf a brand-new array, which not
-  // only re-ran this filter for nothing but also defeated any attempt to
-  // skip their own re-render (see those components' own React.memo), since
-  // a changed array reference looks like changed data even when none of
-  // the items actually did. A real contributor to the Me/Emotes-section
-  // lag this was built to fix, same root cause class as the asset-size one
-  // in utils/emotes.js - unrelated parent state forcing child re-renders.
+  // handed SkinShelf/ColorShelf a brand-new array, which not only re-ran
+  // this filter for nothing but also defeated any attempt to skip their
+  // own re-render (see those components' own React.memo), since a changed
+  // array reference looks like changed data even when none of the items
+  // actually did.
   const galleryHeroes = useMemo(
     () => heroes.filter((h) => !isPlaceholderHero(h.name)),
     [heroes]
@@ -2581,13 +2545,12 @@ function GamePageInner() {
     () => storeCatalog.filter((i) => i.category === 'TRAIL_COLOR'),
     [storeCatalog]
   )
-  // Emotes/Skins (see EmoteShelf/SkinShelf) - every item in either category
-  // belongs to a hero (heroId), so they get their own per-hero shelf
-  // instead of folding into the color shops above.
-  const emoteItems = useMemo(
-    () => storeCatalog.filter((i) => i.category === 'EMOTE'),
-    [storeCatalog]
-  )
+  // Skins (see SkinShelf) - every item belongs to a hero (heroId), so it
+  // gets its own per-hero shelf instead of folding into the color shops
+  // above. Emotes no longer have a Shop shelf of their own - they're
+  // browsed from inside each hero's own HeroDetailModal now (see
+  // HeroEmoteStage there) - but EMOTE StoreItems are still read straight
+  // off storeCatalog for that, no separate memo needed here.
   const skinItems = useMemo(
     () => storeCatalog.filter((i) => i.category === 'SKIN'),
     [storeCatalog]
@@ -2702,6 +2665,17 @@ function GamePageInner() {
     },
     { id: 'me', label: 'Me', Icon: IconUser, tone: 'green' },
     { id: 'shop', label: 'Shop', Icon: IconStore, tone: 'wood' },
+    // Icon-only (no visible label, unlike every other tab here) - its own
+    // short intro screen (menuTab === 'training' below) already says what
+    // it is, so the tab itself just needs to be found and named for
+    // screen readers.
+    {
+      id: 'training',
+      label: 'Training',
+      Icon: IconRunning,
+      tone: 'green',
+      iconOnly: true,
+    },
     { id: 'settings', label: 'Settings', Icon: IconSettings, tone: 'stone' },
   ]
   const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
@@ -2759,18 +2733,19 @@ function GamePageInner() {
   const activeHeroName = equippedHero
     ? equippedHero.storeItem.name
     : currentAvatar?.name
-  // Blaze, Comet and Bolt all have a full animated run-cycle sprite on the
-  // map marker (TerritoryMap.jsx's HERO_MAP_SHEETS) instead of the flat
-  // avatar photo - any other hero has no sheet built, so their marker
-  // stays the flat image (see buildPlayerMarkerIcon there).
-  const animatedMarkerHero = isBlazeHero(activeHeroName)
-    ? 'blaze'
-    : isCometHero(activeHeroName)
-      ? 'comet'
-      : isBoltHero(activeHeroName)
-        ? 'bolt'
-        : null
-  // Blaze and Comet are also the heroes with an animated turntable
+  // Any hero with a real bundled manifest (src/assets/heroes/<hero>/ - see
+  // heroManifest.js) gets a full animated run-cycle sprite on the map
+  // marker (TerritoryMap.jsx's getHero(...).map) instead of the flat
+  // avatar photo; any other hero has no sheet built, so their marker stays
+  // the flat image (see buildPlayerMarkerIcon there). Used to be a
+  // hardcoded Blaze/Comet/Bolt-only ternary - heroManifest.js's own
+  // hasHero() already auto-discovers every hero folder, so a new one (as
+  // of the 2026-11-02 asset refresh: Cyclone/Nova/Phantom/Pulse) just
+  // works here too without another line added.
+  const animatedMarkerHero = hasHeroManifest(activeHeroName)
+    ? activeHeroName.trim().toLowerCase()
+    : null
+  // Any hero with a real manifest also gets an animated turntable
   // (HeroSprite) instead of a flat image on the Me tab, whether it's the
   // real equipped Store Hero or just the free local avatars.js pick - any
   // other hero still falls back to Blaze's turntable (see HeroSprite.jsx).
@@ -2781,6 +2756,41 @@ function GamePageInner() {
   const equippedPhrase = ownedItems.find(
     (o) => o.equipped && o.storeItem.category === 'PHRASE'
   )
+  // The Me tab's character display plays this (instead of the idle
+  // turntable) when one's equipped - see the game-menu-hero render below.
+  // resolveEquippedEmoteItem is the one shared selector every "which emote
+  // is equipped" screen uses (also HeroDetailModal.jsx's HeroEmoteStage and
+  // AthleteTerritoryProfilePanel.jsx), so there's exactly one definition of
+  // "equipped" instead of three separate .find()s that could drift. Scoped
+  // to the active hero's own heroId - equip is per-hero server-side (see
+  // HeroItemShelf.jsx's own comment), so a player could have a different
+  // emote equipped for a hero they aren't currently playing as; this is
+  // specifically the one that'll actually play right now. Memoized so
+  // GamePage's frequent unrelated re-renders (the standing GPS watch ticks
+  // every few seconds) don't hand EmoteGlyph a new object identity and
+  // force it to re-evaluate despite being memo()'d itself.
+  const equippedEmoteItem = useMemo(
+    () =>
+      resolveEquippedEmoteItem(
+        ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
+        activeHeroId
+      ),
+    [ownedItems, activeHeroId]
+  )
+  const equippedEmoteAsset = equippedEmoteItem
+    ? resolveEmoteAsset(activeHeroName, equippedEmoteItem.name)
+    : null
+  // Falls back to idle (see game-menu-hero below) rather than a broken/
+  // blank image if an equipped emote has no local art mapped - same gap
+  // warnMissingEmoteAssets already catches for the Shop catalog generally,
+  // this just also catches it live for whichever one is actually equipped.
+  useEffect(() => {
+    if (equippedEmoteItem && !equippedEmoteAsset) {
+      console.warn(
+        `[Me tab] equipped emote "${equippedEmoteItem.name}" has no local art for ${activeHeroName} - falling back to idle`
+      )
+    }
+  }, [equippedEmoteItem, equippedEmoteAsset, activeHeroName])
 
   // TERRITORY_SHADE/TRAIL_COLOR are buy/equip-able like every other Store
   // category, but only take effect once threaded into TerritoryMap here -
@@ -2908,13 +2918,8 @@ function GamePageInner() {
             initial={false}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.7, ease: 'easeInOut' }}
-            onClick={() => {
-              if (!gameReady || audioGateTapped) return
-              setAudioGateTapped(true)
-              musicRef.current?.play().catch(() => {})
-            }}
           >
-            {gameReady && audioGateTapped && introPlaying ? (
+            {gameReady && introStarted && introPlaying ? (
               <GameIntroGlobe
                 center={center}
                 styleUrl={currentMapStyle?.styleUrl}
@@ -2941,11 +2946,6 @@ function GamePageInner() {
                       style={{ width: `${loadPct}%` }}
                     />
                   </div>
-                  {gameReady && !audioGateTapped && (
-                    <p className="game-loading-text game-loading-tap-hint">
-                      Tap anywhere to begin
-                    </p>
-                  )}
                 </div>
               </>
             )}
@@ -3272,6 +3272,7 @@ function GamePageInner() {
                           openMenu(item.tab)
                         }}
                         aria-label={item.label}
+                        title={item.label}
                       >
                         <item.Icon />
                         {badge > 0 && (
@@ -3280,9 +3281,6 @@ function GamePageInner() {
                           </span>
                         )}
                       </button>
-                      {item.tone !== 'mini' && (
-                        <span className="game-radial-label">{item.label}</span>
-                      )}
                     </motion.div>
                   )
                 }
@@ -3344,49 +3342,66 @@ function GamePageInner() {
       >
         {tracker.status === 'tracking' && (
           <>
-            {/* DISTANCE/PACE/TIME is the hero here, not the buttons below it
-                - a 3-column row with dividers, Time biggest (the number
-                most runners actually glance at mid-run). */}
-            <div className="game-controls-stats game-run-stats">
-              <span className="game-stat">
-                <span className="game-stat-value">
-                  {formatMeters(displayedDistance)}
-                </span>
-                <span className="game-stat-label">Distance</span>
-              </span>
-              <span className="game-run-stats-divider" aria-hidden="true" />
-              <span className="game-stat">
-                <span className="game-stat-value">
-                  {formatPace(
-                    tracker.elapsedSeconds < 30 ||
-                      tracker.distance < MIN_DISTANCE_FOR_PACE_METERS
-                      ? null
-                      : calculatePaceMinPerKm(
-                          tracker.distance,
-                          tracker.elapsedSeconds
-                        )
-                  )}
-                </span>
-                <span className="game-stat-label">Pace</span>
-              </span>
-              <span className="game-run-stats-divider" aria-hidden="true" />
-              <span className="game-stat game-stat-hero">
-                <span className="game-stat-value">
-                  {formatDuration(tracker.elapsedSeconds)}
-                </span>
-                <span className="game-stat-label">Time</span>
-              </span>
-            </div>
-            <button
-              type="button"
-              className={`game-controls-handle${statsOnly ? '' : ' is-open'}`}
-              aria-label={statsOnly ? 'Show run controls' : 'Hide run controls'}
-              aria-expanded={!statsOnly}
-              onClick={() => setStatsOnly((collapsed) => !collapsed)}
+            {/* Status/stats card - a header strip (Running/Paused + the
+                expand/collapse toggle, replacing the old separate chevron
+                pill) over a white Time/Pace/Distance row, with a purely
+                decorative drag-handle grip at the card's own bottom edge.
+                "Paused" only ever shows for a Training run (see
+                useRunTracker's pause()) - every other mode stays "Running"
+                the whole time it's tracking. Pace is the hero here now (the
+                number most runners actually glance at mid-run), not Time.
+                Pace/Time both read off movingSeconds, not elapsedSeconds -
+                identical for any run that never pauses, but keeps a
+                Training run's pace honest instead of counting paused time
+                as covered ground. Same tracker fields/formatters as before,
+                just reflowed - no tracking logic changed here. */}
+            <div
+              className={`game-run-card${tracker.paused ? ' is-paused' : ''}`}
             >
-              <span className="game-controls-handle-grip" aria-hidden="true" />
-              <IconChevronDown />
-            </button>
+              <button
+                type="button"
+                className="game-run-card-header"
+                aria-label={
+                  statsOnly ? 'Show run controls' : 'Hide run controls'
+                }
+                aria-expanded={!statsOnly}
+                onClick={() => setStatsOnly((collapsed) => !collapsed)}
+              >
+                <span className="game-run-card-status">
+                  {tracker.paused ? 'Paused' : 'Running'}
+                </span>
+                <IconExpand className="game-run-card-expand-icon" />
+              </button>
+              <div className="game-run-card-stats">
+                <span className="game-stat">
+                  <span className="game-stat-value">
+                    {formatDuration(tracker.movingSeconds)}
+                  </span>
+                  <span className="game-stat-label">Time</span>
+                </span>
+                <span className="game-stat game-stat-hero">
+                  <span className="game-stat-value">
+                    {formatPace(
+                      tracker.movingSeconds < 30 ||
+                        tracker.distance < MIN_DISTANCE_FOR_PACE_METERS
+                        ? null
+                        : calculatePaceMinPerKm(
+                            tracker.distance,
+                            tracker.movingSeconds
+                          )
+                    ).replace(' /km', '')}
+                  </span>
+                  <span className="game-stat-label">Avg. pace (/km)</span>
+                </span>
+                <span className="game-stat">
+                  <span className="game-stat-value">
+                    {formatDistance(displayedDistance).replace(' km', '')}
+                  </span>
+                  <span className="game-stat-label">Distance (km)</span>
+                </span>
+              </div>
+              <span className="game-run-card-handle" aria-hidden="true" />
+            </div>
             <AnimatePresence initial={false}>
               {!statsOnly && (
                 <motion.div
@@ -3401,8 +3416,29 @@ function GamePageInner() {
                       muted, no fat drop-shadow) so a thumb reaching for End
                       doesn't land on it by accident - the actual
                       "are you sure" step is the modal below, triggered by
-                      either one. */}
+                      either one. Pause/Resume only ever renders for a
+                      Training run (tracker.isTraining) - every other mode
+                      (Conquer, PvP, Club War) keeps exactly the two buttons
+                      it always had. */}
                   <div className="game-controls-actions game-run-actions">
+                    {tracker.isTraining &&
+                      (tracker.paused ? (
+                        <button
+                          type="button"
+                          className="game-run-btn game-run-btn-resume"
+                          onClick={tracker.resume}
+                        >
+                          <IconPlay /> Resume
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="game-run-btn game-run-btn-pause"
+                          onClick={tracker.pause}
+                        >
+                          <IconPause /> Pause
+                        </button>
+                      ))}
                     <button
                       type="button"
                       className="game-run-btn game-run-btn-end"
@@ -3902,12 +3938,12 @@ function GamePageInner() {
               >
                 {/* --- Header: avatar + owner name + close --- */}
                 <div className="game-highlight-toast-header">
-                  <TerritoryAvatar
-                    key={highlightedEntry.avatarSrc || highlightedEntry.userId}
+                  <Avatar
                     src={highlightedEntry.avatarSrc}
                     name={playerNameOf(highlightedEntry)}
-                    ringColor={highlightedEntry.color}
+                    ring={highlightedEntry.color || 'var(--game-gold)'}
                     size={60}
+                    className="game-highlight-toast-avatar"
                   />
                   <div className="game-highlight-toast-owner">
                     <p className="game-highlight-toast-owner-label">
@@ -4062,13 +4098,14 @@ function GamePageInner() {
                   type="button"
                   className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}`}
                   onClick={() => switchTab(tab.id)}
+                  aria-label={tab.iconOnly ? tab.label : undefined}
                 >
                   <span
                     className={`game-menu-picker-medal game-menu-tab-medal tone-${tab.tone}`}
                   >
                     <tab.Icon />
                   </span>
-                  {tab.label}
+                  {!tab.iconOnly && tab.label}
                   {tab.badge && (
                     <span className="game-menu-tab-badge">{tab.badge}</span>
                   )}
@@ -4143,6 +4180,7 @@ function GamePageInner() {
                           type="button"
                           role="option"
                           aria-selected={menuTab === tab.id}
+                          aria-label={tab.iconOnly ? tab.label : undefined}
                           className={`game-menu-picker-option ${menuTab === tab.id ? 'active' : ''}`}
                           onClick={() => {
                             switchTab(tab.id)
@@ -4154,9 +4192,11 @@ function GamePageInner() {
                           >
                             <tab.Icon />
                           </span>
-                          <span className="game-menu-picker-label">
-                            {tab.label}
-                          </span>
+                          {!tab.iconOnly && (
+                            <span className="game-menu-picker-label">
+                              {tab.label}
+                            </span>
+                          )}
                           {tab.badge && (
                             <span className="game-menu-tab-badge game-menu-picker-badge">
                               {tab.badge}
@@ -4177,9 +4217,10 @@ function GamePageInner() {
 
             {menuTab === 'leaderboard' && (
               <div className="game-menu-panel game-cards">
+                <SponsorBannerCarousel />
                 <section className="game-card game-card-dark">
                   <div
-                    className="game-leaderboard-mode"
+                    className="game-menu-subtabs game-shop-tabs game-leaderboard-mode"
                     role="tablist"
                     aria-label="Leaderboard"
                   >
@@ -4192,14 +4233,19 @@ function GamePageInner() {
                         "score/rank" elsewhere on this same screen (the
                         podium medals, the stat chips), so reusing it here
                         too for "this is the Players section" read as the
-                        wrong concept once the label text was gone. */}
+                        wrong concept once the label text was gone.
+                        game-shop-tabs reused as-is for sizing/spacing (same
+                        small squircle buttons as the Shop's section menu) -
+                        game-leaderboard-mode only still exists to keep this
+                        row's active state gold instead of the shop's
+                        green, see GamePage.css. */}
                     <button
                       type="button"
                       role="tab"
                       aria-selected={leaderboardMode === 'individual'}
                       aria-label="Top Players"
                       title="Top Players"
-                      className={`game-leaderboard-mode-box ${leaderboardMode === 'individual' ? 'active' : ''}`}
+                      className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
                       onClick={() => switchLeaderboardMode('individual')}
                     >
                       <IconUser />
@@ -4210,7 +4256,7 @@ function GamePageInner() {
                       aria-selected={leaderboardMode === 'club'}
                       aria-label="Top Clubs"
                       title="Top Clubs"
-                      className={`game-leaderboard-mode-box ${leaderboardMode === 'club' ? 'active' : ''}`}
+                      className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
                       onClick={() => switchLeaderboardMode('club')}
                     >
                       <IconUsers />
@@ -4407,6 +4453,53 @@ function GamePageInner() {
               </div>
             )}
 
+            {menuTab === 'training' && (
+              <div className="game-menu-panel">
+                <div className="training-intro">
+                  <span className="training-intro-icon" aria-hidden="true">
+                    <IconRunning />
+                  </span>
+                  <h2 className="training-intro-title">Training</h2>
+                  {tracker.isTraining && tracker.paused ? (
+                    <>
+                      <p className="training-intro-text">
+                        You&apos;ve got a paused run waiting -{' '}
+                        {formatMeters(tracker.distance)} so far. Pick up right
+                        where you left off (needs a quick tap to re-arm GPS).
+                      </p>
+                      <button
+                        type="button"
+                        className="game-btn game-btn-green game-btn-lg"
+                        onClick={tracker.resume}
+                      >
+                        <IconPlay /> Resume unfinished run
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="training-intro-text">
+                        A free run with no pressure - pause whenever you need to
+                        and pick up right where you left off. Counts the same as
+                        any run otherwise: exp, territory, the works.
+                      </p>
+                      <button
+                        type="button"
+                        className="game-btn game-btn-green game-btn-lg"
+                        onClick={handleStartTraining}
+                        disabled={
+                          (tracker.status === 'tracking' &&
+                            !tracker.isTraining) ||
+                          Boolean(pendingRun)
+                        }
+                      >
+                        <IconPlay /> Start
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             {menuTab === 'me' && (
               <div
                 className="game-menu-panel"
@@ -4420,7 +4513,23 @@ function GamePageInner() {
               >
                 <div className="game-menu-hero">
                   {showHeroTurntable ? (
-                    <HeroSprite size={260} hero={activeHeroName} />
+                    // Plays the equipped emote in place of the idle
+                    // turntable when one's equipped and its art actually
+                    // resolves (see equippedEmoteItem/equippedEmoteAsset
+                    // above) - same spot, same size, just a different
+                    // sprite/pace (EmoteGlyph's own 20fps, tuned for emote
+                    // content, not HeroSprite's slower idle pace). Falls
+                    // back to the idle turntable otherwise, same as before.
+                    equippedEmoteItem && equippedEmoteAsset ? (
+                      <EmoteGlyph
+                        heroName={activeHeroName}
+                        emoteName={equippedEmoteItem.name}
+                        size={260}
+                        active
+                      />
+                    ) : (
+                      <HeroSprite size={260} hero={activeHeroName} />
+                    )
                   ) : (
                     <img
                       className="game-menu-hero-img"
@@ -4891,17 +5000,6 @@ function GamePageInner() {
                   />
                 )}
 
-                {shopSection === 'emotes' && (
-                  <EmoteShelf
-                    emotes={emoteItems}
-                    heroes={heroes}
-                    ownedItems={ownedItems}
-                    onBuy={setStoreChoice}
-                    onEquip={handleEquip}
-                    onShowcase={setStoreChoice}
-                  />
-                )}
-
                 {shopSection === 'territory' && (
                   <ColorShelf
                     title="Territory"
@@ -5326,6 +5424,7 @@ function GamePageInner() {
             key={selectedHero.id}
             hero={selectedHero}
             ownedItems={ownedItems}
+            activeHeroId={activeHeroId}
             isActive={selectedHero.id === activeHeroId}
             error={storeActionError}
             onClose={closeHeroModal}
@@ -5334,6 +5433,13 @@ function GamePageInner() {
               setSelectedHeroId(null)
               setStoreChoice(skin)
             }}
+            // Emote slides stay open behind the buy/showcase popup (unlike
+            // Skins' onBuy above, which closes this modal first) - the
+            // point is browsing the hero's whole emote slider in place;
+            // closing storeChoice afterwards just returns to it, and a
+            // freshly-bought emote unlocks on its own slide immediately
+            // since ownedItems is the same prop driving both.
+            onShowcase={setStoreChoice}
           />
         )}
       </AnimatePresence>

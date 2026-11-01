@@ -1,0 +1,323 @@
+.shop-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shop-wrap {
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+.shop-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.shop-header h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+}
+
+.shop-header p {
+  margin: 0;
+  max-width: 520px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.shop-balance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--brand-light);
+  border: 1px solid var(--brand);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.shop-balance-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.shop-retry-link {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+/* --- Pack grid - scoped to .game-root for the game's own tokens/font/
+   white-stroked-text style (see tokens.css), independent of whether
+   GamePage.jsx is mounted (its @font-face lives in tokens.css too). --- */
+.shop-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .shop-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+}
+
+@media (min-width: 1000px) {
+  .shop-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.shop-pack-card {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 34px 10px 14px;
+  border-radius: 18px;
+  border: 3px solid var(--ink);
+  background: linear-gradient(180deg, var(--white) 0%, var(--panel) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    0 4px 0 var(--ink);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    transform 0.12s var(--ease-pop),
+    box-shadow 0.12s ease;
+}
+
+.shop-pack-card:hover {
+  transform: translateY(-3px) scale(1.015);
+}
+
+.shop-pack-card:active {
+  transform: translateY(3px) scale(0.99);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    0 1px 0 var(--ink);
+}
+
+.shop-pack-card.is-skeleton {
+  cursor: default;
+  min-height: 190px;
+  background: var(--row);
+  animation: shop-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes shop-skeleton-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.shop-pack-badge {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.shop-pack-badge.is-best {
+  background: linear-gradient(
+    180deg,
+    var(--green-300),
+    var(--green-500) 60%,
+    var(--green-700)
+  );
+}
+
+.shop-pack-badge.is-popular {
+  background: linear-gradient(
+    180deg,
+    var(--gold-300),
+    var(--gold-500) 60%,
+    var(--gold-700)
+  );
+}
+
+.shop-pack-coins {
+  margin: 8px 0 2px;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.25));
+}
+
+.shop-pack-amount {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.03em;
+  color: var(--text-title);
+}
+
+.shop-pack-amount-label {
+  margin-top: -4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.shop-pack-ribbon {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--green-tint);
+  color: var(--green-text);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.shop-pack-buy {
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2.5px solid var(--ink);
+  background: linear-gradient(
+    180deg,
+    var(--green-300),
+    var(--green-500) 55%,
+    var(--green-700)
+  );
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow:
+    inset 0 -3px 0 var(--green-700),
+    0 2px 0 var(--ink);
+}
+
+/* --- Confirm modal --- */
+.shop-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 8, 6, 0.6);
+}
+
+.shop-confirm-card {
+  max-width: 320px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 26px 24px 22px;
+  text-align: center;
+  border-radius: 20px;
+  border: 3px solid var(--ink);
+  background: var(--panel);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 5px 0 var(--ink),
+    0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.shop-confirm-amount {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--text-title);
+}
+
+.shop-confirm-price {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.shop-confirm-error {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--red-text);
+}
+
+.shop-confirm-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.shop-btn-ghost,
+.shop-buy-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.shop-btn-ghost {
+  border: 2.5px solid var(--panel-border);
+  background: var(--row);
+  color: var(--text-title);
+}
+
+.shop-buy-btn {
+  border: 3px solid var(--ink);
+  background: linear-gradient(
+    180deg,
+    var(--green-300),
+    var(--green-500) 55%,
+    var(--green-700)
+  );
+  color: #fff;
+  box-shadow:
+    inset 0 -3px 0 var(--green-700),
+    0 3px 0 var(--ink);
+}
+
+.shop-buy-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -3px 0 var(--green-700),
+    0 1px 0 var(--ink);
+}
+
+.shop-btn-ghost:disabled,
+.shop-buy-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 420px) {
+  .shop-pack-amount {
+    font-size: 20px;
+  }
+}

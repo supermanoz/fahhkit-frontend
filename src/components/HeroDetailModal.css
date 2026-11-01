@@ -5,6 +5,7 @@
   max-height: calc(100dvh - 40px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--game-panel);
   border: 3px solid var(--game-ink);
   border-radius: 20px;
@@ -14,18 +15,42 @@
   color: var(--game-cream);
 }
 
+/* .game-run-viewer-close floats the X outside the card's top-right corner
+   (top/right: -14px) - fine for the other popups sharing that class (none
+   of them clip), but this card got `overflow: hidden` above (to stop the
+   bigger hero stage causing horizontal overflow) and that clips a
+   negatively-positioned child right at the edge, cutting the button off.
+   Overridden here to a positive inset instead (safe-area-aware, in case
+   this modal is ever shown full-bleed on a notched phone) rather than
+   changing the shared rule and affecting the run viewer/coin shop/buy-card
+   popups that still want the floating look. z-index raised past the
+   stage's own slide/arrows (1/2) so it's never covered. Specificity (two
+   classes, not one) beats .game-run-viewer-close regardless of CSS import
+   order, no !important needed. */
+.hero-modal .hero-modal-close {
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 3;
+}
+
 /* Glassy white stage (not the dark wood/orange glow the rest of the modal
-   uses) so the hero's own art - idle or hiphop, both painted for a light
-   backdrop - actually reads clearly instead of fighting a busy dark glow
-   behind it. */
+   uses) so the hero's own idle art - painted for a light backdrop -
+   actually reads clearly instead of fighting a busy dark glow behind it.
+   Sized to be the focal point of the card (~34-36% of the modal's own
+   height - dialed down twice from an initial 58-60vh pass that read too
+   big, close to the old fixed 250px again but still responsive/centred).
+   Lore/Skins below are deliberately demoted to make room (see
+   .hero-modal-lore/.hero-modal-collapse). Centred both axes (not the old
+   bottom-anchored crop) so the figure doesn't crowd either edge -
+   HeroDetailModal.jsx measures this box's real height via ResizeObserver
+   and sizes the sprite to ~87.5% of it. */
 .hero-modal-stage {
   position: relative;
   flex-shrink: 0;
-  height: 250px;
+  height: clamp(200px, 34vh, 36vh);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding-bottom: 44px;
   border-radius: 17px 17px 0 0;
   overflow: hidden;
   background: var(--white);
@@ -41,41 +66,127 @@
   margin: auto;
 }
 
-.hero-modal-poses {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+/* --- Emote slider inside the stage (see HeroDetailModal.jsx's
+   HeroEmoteStage) - arrows float over the image instead of flanking it in
+   a row (unlike HeroGallery's hero roster) so the stage keeps its full
+   width; `.hero-roster-arrow`/`.hero-roster-dots`/`.hero-roster-dot` are
+   reused as-is from HeroGallery.css for the same look/feel the brief
+   asked for. --- */
+.hero-emote-slide {
   display: flex;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--game-ink);
-  border: 1.5px solid var(--gold-500);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: pan-y;
 }
 
-.hero-modal-poses button {
-  all: unset;
-  cursor: pointer;
-  padding: 3px 12px;
+.hero-emote-slide-figure {
+  position: relative;
+  display: inline-flex;
+}
+
+/* A light dim, not grayscale - a locked emote still plays (see
+   HeroDetailModal.jsx's EmoteGlyph call), so a heavier treatment read as a
+   frozen/silhouette frame it isn't. The lock badge below is the real
+   "locked" signal. */
+.hero-emote-slide-figure.is-locked {
+  opacity: 0.8;
+}
+
+.hero-emote-lock-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 16px;
+}
+
+/* Subtle green ring/glow around the equipped slide's figure - no text, the
+   corner badge below is the only label (and the only thing screen readers
+   get, via its own aria-label). A soft rounded-rect, not a circle - the
+   sprites themselves are tall rectangles (native strip aspect), so a
+   circular ring would cut across the art instead of framing it. */
+.hero-emote-slide-figure.is-equipped {
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 3px var(--green-500),
+    0 0 18px 4px rgba(79, 200, 94, 0.45);
+}
+
+.hero-emote-equipped-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  background: var(--game-green);
+  color: #fff;
+  font-size: 15px;
+}
+
+/* Owned-not-equipped label - bottom-center so it never covers the art the
+   way the lock badge's center placement does (that one's meant to signal
+   "blocked"; this one's just informational). */
+.hero-emote-available-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 3px 10px;
   border-radius: 999px;
+  border: 1.5px solid var(--game-ink);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
   font-size: 11px;
   font-weight: 800;
-  color: var(--white);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.hero-modal-poses button.is-active {
-  background: var(--game-gold);
-  color: var(--game-ink);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  font-weight: 700;
-  text-shadow: none;
+.hero-emote-arrow {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 2;
 }
 
-.hero-modal-poses button:focus-visible {
-  outline: 2px solid var(--game-gold-light);
+.hero-emote-arrow.is-prev {
+  left: 8px;
+}
+
+.hero-emote-arrow.is-next {
+  right: 8px;
+}
+
+.hero-emote-dots {
+  margin: 10px 0 2px;
+}
+
+/* A dot is only 8px - too small for the 24px+ check badge the slide figure
+   gets, so a solid green fill is this dot's own version of the same
+   "equipped" signal. Scoped to .hero-emote-dots rather than editing
+   .hero-roster-dot's own rule in HeroGallery.css, which has no equipped
+   concept for a hero dot. */
+.hero-emote-dots .hero-roster-dot.is-equipped {
+  background: var(--game-green);
+}
+
+.hero-emote-dots .hero-roster-dot.is-equipped.active {
+  background: var(--green-700);
 }
 
 .hero-modal-body {
@@ -97,6 +208,17 @@
   font-size: 13px;
   font-style: italic;
   color: var(--gold-text);
+}
+
+/* Buy/Equip for the hero itself (not a skin) - the one action the gallery
+   card's "Unlock" label promises but this modal used to have no button
+   for at all, see HeroDetailModal.jsx's own heroItem comment. */
+.hero-modal-unlock {
+  margin: 12px 0 0;
+}
+
+.hero-modal-unlock .btn {
+  width: 100%;
 }
 
 .hero-modal-heading {
@@ -161,18 +283,88 @@
   );
 }
 
+/* Clamped to ~3 lines by default (1.5 line-height * 3 + a hair of slack) -
+   HeroDetailModal.jsx only shows the Read more/Show less toggle when the
+   text actually overflows this, and .is-expanded lifts the cap so the
+   height change animates instead of snapping. */
 .hero-modal-lore {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   white-space: pre-line;
-  color: var(--text-body);
+  color: var(--text-body-dark);
+  max-height: 4.6em;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.hero-modal-lore.is-expanded {
+  max-height: 60em;
+}
+
+.hero-modal-lore-toggle {
+  all: unset;
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--green-text);
+  cursor: pointer;
+}
+
+.hero-modal-lore-toggle:hover {
+  text-decoration: underline;
 }
 
 .hero-modal-muted {
   margin: 0;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* Skins is a full collapsed-by-default accordion (not a text clamp like
+   Lore - a swatch list has no natural "3 lines") - same "give the hero
+   figure the room, not the lists below it" goal. The grid-rows 0fr/1fr
+   trick animates open/closed without having to measure the list's height
+   in JS (it varies with however many skins a hero has). */
+.hero-modal-section-toggle {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+}
+
+.hero-modal-section-toggle .hero-modal-heading {
+  margin: 16px 0 8px;
+}
+
+.hero-modal-section-toggle svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.hero-modal-section-toggle.is-open svg {
+  transform: rotate(180deg);
+}
+
+.hero-modal-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.hero-modal-collapse.is-open {
+  grid-template-rows: 1fr;
+}
+
+.hero-modal-collapse > div {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .hero-modal-skins {
@@ -217,7 +409,9 @@
   margin: 10px 0 0;
   font-size: 12px;
   font-weight: 700;
-  color: var(--game-red-light);
+  /* --red-text, not --game-red-light - this sits directly on the modal's
+     off-white body (1.46:1 there, fails AA; --red-text clears 5.8:1). */
+  color: var(--red-text);
 }
 
 .hero-modal-active {

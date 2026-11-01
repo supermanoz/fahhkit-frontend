@@ -16,10 +16,6 @@
   animation-play-state: paused;
 }
 
-.emote-glyph-sprite.is-active,
-.emote-tile:hover .emote-glyph-sprite,
-.emote-tile:focus-visible .emote-glyph-sprite,
-.emote-hero-pick:hover .emote-glyph-sprite,
-.emote-hero-pick:focus-visible .emote-glyph-sprite {
+.emote-glyph-sprite.is-active {
   animation-play-state: running;
 }

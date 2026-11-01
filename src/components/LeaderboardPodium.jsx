@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useState } from 'react'
 import { IconCrown } from './GameIcons'
+import Avatar from '../game/ui/Avatar'
 import './LeaderboardPodium.css'
 
 // Top-3 podium (2 · 1 · 3, winner raised with light rays) above a ranked
@@ -25,35 +25,6 @@ function colorFor(name) {
   let hash = 0
   for (const ch of name || '') hash = (hash * 31 + ch.charCodeAt(0)) | 0
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-function initialsOf(name) {
-  const parts = (name || '?').trim().split(/\s+/)
-  return (
-    parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')
-  ).toUpperCase()
-}
-
-function Avatar({ name, src, className }) {
-  const [failed, setFailed] = useState(false)
-  if (src && !failed) {
-    return (
-      <img
-        className={`lb-avatar ${className}`}
-        src={src}
-        alt=""
-        onError={() => setFailed(true)}
-      />
-    )
-  }
-  return (
-    <span
-      className={`lb-avatar lb-avatar-initials ${className}`}
-      style={{ background: colorFor(name) }}
-    >
-      {initialsOf(name)}
-    </span>
-  )
 }
 
 // Ray angles (deg, 0 = pointing right) fanned out on both sides of #1.
@@ -90,7 +61,10 @@ function PodiumSpot({ entry, place }) {
             <Avatar
               name={entry.name}
               src={entry.avatarSrc}
-              className="lb-podium-avatar"
+              size={place === 1 ? 84 : 66}
+              fallbackColor={colorFor(entry.name)}
+              initials={2}
+              className="lb-avatar lb-podium-avatar"
             />
           )}
         </span>
@@ -176,7 +150,10 @@ export default function LeaderboardPodium({
                     <Avatar
                       name={entry.name}
                       src={entry.avatarSrc}
-                      className="lb-row-avatar"
+                      size={40}
+                      fallbackColor={colorFor(entry.name)}
+                      initials={2}
+                      className="lb-avatar lb-row-avatar"
                     />
                   )}
                   <span className="lb-col-name">{entry.name}</span>

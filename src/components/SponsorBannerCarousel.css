@@ -1,0 +1,183 @@
+/* Sponsor banner strip above the Leaderboard - see SponsorBannerCarousel.jsx.
+   Full-width ad card, no outer padding/empty space - the card's own fixed
+   aspect-ratio controls its height, so the leaderboard list below it just
+   follows at the parent .game-cards panel's normal 12px gap (no margin of
+   its own added on top of that). Capped on large screens so it doesn't get
+   too tall; full width of the panel on phones either way. */
+.sponsor-banner-carousel {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.sponsor-banner-viewport {
+  position: relative;
+  width: 100%;
+}
+
+.sponsor-banner-track {
+  width: 100%;
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: 14px;
+}
+
+.sponsor-banner-track::-webkit-scrollbar {
+  display: none;
+}
+
+.sponsor-banner-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: center;
+}
+
+/* The card IS the image's own box - no padding, no letterboxing. Solid
+   background shows as the loading placeholder before the cover-fit image
+   paints over it. 16/5 on desktop, taller 16/7 on phones (below) so a
+   full-width card doesn't go too short to read on a narrow screen. */
+.sponsor-banner-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  overflow: hidden;
+  background: var(--game-panel);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.sponsor-banner-card:focus-visible {
+  outline: 3px solid var(--game-gold-light);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .sponsor-banner-card {
+    aspect-ratio: 16 / 7;
+  }
+}
+
+.sponsor-banner-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Readable footing for the "View" pill regardless of how busy the image's
+   own bottom edge is - fades out well above center so it doesn't wash out
+   a logo/product shot placed higher in the frame. */
+.sponsor-banner-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 0) 55%
+  );
+  pointer-events: none;
+}
+
+.sponsor-banner-ad-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Same recipe as every other primary green button in /game
+   (.game-page .btn-primary / .game-btn-green - light top, base, dark
+   bottom, ink outline, hard drop shadow) - decorative only (see
+   SponsorBannerCarousel.jsx's own comment on why this isn't a real nested
+   <button>), the card itself carries the click/keyboard/focus behaviour. */
+.sponsor-banner-view-btn {
+  position: absolute;
+  left: 50%;
+  /* Clears the dots row below (see .sponsor-banner-dots) when there's more
+     than one partner - both are centred/overlaid at the bottom, this just
+     needs enough headroom not to touch it. */
+  bottom: 22px;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 45%,
+    var(--game-green-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-green-dark),
+    0 3px 0 var(--game-ink);
+  color: #fff;
+  font-weight: 900;
+  font-size: 15px;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
+}
+
+.sponsor-banner-card:active .sponsor-banner-view-btn {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -4px 0 var(--game-green-dark),
+    0 1px 0 var(--game-ink);
+}
+
+/* Overlaid on the viewport, not per-slide - stays put at a fixed spot
+   above whichever card is currently scrolled into view instead of
+   scrolling away with the track. */
+.sponsor-banner-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  translate: -50% 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+
+.sponsor-banner-dot {
+  all: unset;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.sponsor-banner-dot.active {
+  background: var(--game-gold);
+  transform: scale(1.3);
+}

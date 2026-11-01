@@ -271,6 +271,7 @@ export default function GameAuthGate({ onAuthenticated }) {
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}
+          className="game-auth-screen"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}

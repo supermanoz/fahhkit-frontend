@@ -275,19 +275,18 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  text-shadow: none;
   background: var(--row);
   color: var(--game-cream);
 }
 
 .club-role.role-leader {
   background: var(--game-gold);
-  color: var(--game-ink);
+  color: var(--game-text);
 }
 
 .club-role.role-co_leader {
   background: var(--game-green);
-  color: var(--game-ink);
+  color: var(--game-text);
 }
 
 .club-rank {
@@ -424,8 +423,25 @@
   text-align: center;
 }
 
-.club-war-vs-label {
-  font-size: 28px;
+/* Crossed-swords badge between the two sides - replaces the old plain
+   "VS" text, same enamel-coin recipe as .club-war-matchup-vs below it. */
+.club-war-vs-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: var(--game-gold);
+  color: var(--game-text);
+  box-shadow: 0 3px 0 var(--game-ink);
+}
+
+.club-war-vs-badge svg {
+  width: 22px;
+  height: 22px;
 }
 
 .club-war-score {
@@ -484,90 +500,295 @@
   padding: 2px 9px;
   border-radius: 999px;
   background: var(--divider);
-  color: var(--game-ink);
+  color: var(--game-text);
   font-size: 11px;
   font-weight: 700;
 }
 
-/* A hero pick is a bigger moment than choosing a map skin, so these cards
-   run larger than the plain .game-menu-avatar-card grid used elsewhere
-   (Map/Avatar shop) - a Dota-draft-style pick, not a settings list. */
-.club-war-heroes {
+/* --- "Lock In Your Hero" swipeable strip (ClubWarHeroPicker.jsx) --- */
+.club-war-hero-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 14px;
 }
 
-.club-war-heroes .game-menu-avatar-card {
-  position: relative;
-  overflow: hidden;
-  padding: 16px 8px 12px;
+.club-war-hero-picker-row {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  width: 100%;
+}
+
+/* The actual swipe surface - native scroll-snap, not a drag library, so
+   it inherits real momentum/rubber-banding for free. Each slide is the
+   track's full width (no side padding, no gap) so exactly one hero shows
+   at a time, like the Shop's single-hero gallery, instead of the old
+   peeking-neighbours strip. */
+.club-war-hero-track {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.club-war-hero-track::-webkit-scrollbar {
+  display: none;
+}
+
+.club-war-hero-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: center;
+  display: flex;
+  justify-content: center;
+}
+
+.club-war-hero-card {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px 16px;
+  border-radius: 16px;
+  border: 3px solid var(--game-panel-border);
+  background: var(--white);
+  box-shadow: 0 3px 0 var(--game-panel-border-dark);
+  cursor: pointer;
+  text-align: center;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
 }
 
-.club-war-heroes .game-menu-avatar-card:not(:disabled):hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 0 var(--game-ink);
+.club-war-hero-card.is-selected {
+  border-color: var(--game-green);
+  box-shadow:
+    0 0 0 3px var(--game-green-light),
+    0 3px 0 var(--game-ink);
 }
 
-.club-war-heroes .game-menu-avatar-card img {
-  width: 72px;
-  height: 72px;
+.club-war-hero-card.is-locked {
+  cursor: default;
+  opacity: 0.55;
 }
 
-.club-war-heroes .club-war-hero-figure {
-  height: 88px;
+.club-war-hero-card:disabled {
+  cursor: default;
 }
 
-.club-war-heroes .game-menu-avatar-name {
-  font-size: 15px;
-}
-
-/* Small padlock badge on a not-yet-owned hero's card, top-right corner -
-   same "locked" meaning as EmoteShelf's hero picker, distinct from the
-   diagonal "LOCKED" ribbon below (that one marks the war pick you've
-   committed to, a different sense of the word). */
-.club-war-heroes .club-war-hero-lock {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+.club-war-hero-card-stage {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--game-ink);
-  /* Literal white, not --game-cream (dark now) - dark-ink fill. */
-  color: var(--white);
-  font-size: 12px;
+  width: 100%;
+  height: 170px;
 }
 
-/* Diagonal "LOCKED" ribbon across the selected card's corner - the
-   classic mobile-game "equipped" badge, replacing the plain inline tag. */
-.club-war-heroes .game-menu-avatar-card.is-selected::after {
-  content: 'LOCKED';
+.club-war-hero-card-stage img {
+  max-width: 140px;
+  max-height: 170px;
+  object-fit: contain;
+}
+
+.club-war-hero-card.is-locked .club-war-hero-card-stage img,
+.club-war-hero-card.is-locked .hero-figure-portrait {
+  filter: grayscale(0.7);
+}
+
+.club-war-hero-card-lock {
   position: absolute;
-  top: 12px;
-  right: -30px;
-  width: 110px;
-  padding: 2px 0;
-  transform: rotate(45deg);
-  background: var(--game-green);
-  border: 1px solid var(--game-ink);
-  color: #fff;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
+  inset: auto 0 2px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.club-war-hero-card-lock svg {
+  width: 16px;
+  height: 16px;
+}
+
+.club-war-hero-card-name {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  /* Room inside the clip box for the text stroke + drop shadow. */
+  line-height: 1.3;
+  padding: 1px 1px 2px;
+}
+
+.club-war-hero-card-cta {
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--row);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.club-war-hero-card.is-selected .club-war-hero-card-cta {
+  background: var(--game-green);
+  color: #fff;
+}
+
+.club-war-hero-card-cta.is-locked-in {
+  background: var(--game-gold);
+  color: var(--game-text);
+}
+
+.club-war-hero-lock-in-btn {
+  width: 100%;
+}
+
+/* --- Head-to-head squad columns (ClubWarPanel.jsx) --- */
+.club-war-matchup-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 8px;
+}
+
+.club-war-matchup-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.club-war-matchup-col-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   text-align: center;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.club-war-matchup-col-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--text-title);
+  /* Room inside the clip box for the text stroke + drop shadow. */
+  line-height: 1.3;
+  padding: 1px 1px 2px;
+}
+
+.club-war-matchup-col-trophies {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-text);
+}
+
+.club-war-matchup-vs {
+  align-self: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2.5px solid var(--game-ink);
+  background: var(--game-gold);
+  color: var(--game-text);
+}
+
+.club-war-matchup-vs svg {
+  width: 17px;
+  height: 17px;
+}
+
+.club-war-matchup-empty {
+  margin-top: 8px;
+}
+
+/* Narrower rows - no room for a second text line under the name (see
+   squadList's own comment on when the hero-name line even renders), and
+   the rank number drops to save a little more width. */
+.club-war-matchup .club-war-row {
+  padding: 6px 7px;
+  gap: 6px;
+}
+
+.club-war-matchup .club-war-rank {
+  display: none;
+}
+
+.club-war-matchup .club-war-avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.club-war-matchup .game-row-name {
+  font-size: 13px;
+}
+
+.club-war-row-hero {
+  overflow-wrap: anywhere;
+}
+
+.club-war-matchup .club-war-run-badge,
+.club-war-matchup .club-war-points {
+  font-size: 10px;
+}
+
+/* --- Loading skeleton (ClubWarPanel.jsx's own `loading` branch) --- */
+.club-war-skeleton-phase {
+  width: 160px;
+  height: 20px;
+  margin: 0 auto 10px;
+  border-radius: 999px;
+}
+
+.club-war-skeleton-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.club-war-skeleton-name {
+  width: 70px;
+  height: 11px;
+  margin-top: 4px;
+}
+
+.club-war-skeleton-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.club-war-skeleton-row-name {
+  flex: 1;
+  height: 11px;
 }
 
 .club-war-points {
@@ -599,7 +820,7 @@
   justify-content: center;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--game-ink);
+  color: var(--game-text);
   background: var(--row);
 }
 
@@ -713,7 +934,7 @@
   border-radius: 999px;
   border: 1.5px solid var(--game-ink);
   background: linear-gradient(180deg, var(--game-gold-light), var(--game-gold));
-  color: var(--game-ink);
+  color: var(--game-text);
   font-size: 9.5px;
   font-weight: 900;
   text-transform: uppercase;
@@ -817,7 +1038,7 @@
   justify-content: center;
   border-radius: 6px;
   background: var(--row);
-  color: var(--game-ink);
+  color: var(--game-text);
   font-size: 11px;
   font-weight: 800;
 }

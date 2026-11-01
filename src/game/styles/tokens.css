@@ -1,3 +1,24 @@
+/* Custom in-game display font (Passion One, bold slab) - bundled locally
+   rather than loaded from Google Fonts so the game still reads right
+   offline/on a flaky connection. Declared here (not in GamePage.css, where
+   it used to live) so every .game-root consumer gets it, including ones
+   that render without GamePage.jsx ever mounting (e.g. ShopPage). */
+@font-face {
+  font-family: 'Passion One';
+  src: url('../../assets/fonts/PassionOne-Bold.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Passion One';
+  src: url('../../assets/fonts/PassionOne-Black.ttf') format('truetype');
+  font-weight: 800 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Design tokens for /game.
    Off-white "clean paper" default: off-white/white panels, warm-grey
    borders, dark near-black text, with the existing green/orange button
@@ -17,10 +38,10 @@
      tokens change later. */
   --bg-900: #0a0806;
 
-  /* Typography - matches GamePage.css's existing Passion One @font-face
-     (loaded there, not pulled in here) so restored components (game-auth,
-     the rollout modal/chip) use the same type the rest of /game already
-     has, instead of introducing a different font family. */
+  /* Typography - Passion One's @font-face is declared at the top of this
+     file, so every .game-root consumer (game-auth, the rollout modal/chip,
+     ShopPage) uses the same type instead of introducing a different font
+     family. */
   --font-display: 'Passion One', 'Trebuchet MS', sans-serif;
   --font-body: 'Trebuchet MS', sans-serif;
 
@@ -104,15 +125,35 @@
   --coin-500: #ffc531;
   --coin-700: #c98a00;
 
-  /* Text - titles darkest, body slightly lighter, muted/secondary lighter
-     still, placeholder lightest of the four (all still well past AA on
-     --panel/--row/--white - see style.md's contrast table). */
-  --text-title: #2b2a24;
-  --text-body: #3a382f;
-  --text-muted: #6b6759;
+  /* Text - every bit of /game text is white with a black stroke + drop
+     shadow (see .game-text below), so the title/body/muted roles all
+     resolve to --game-text now. The old dark values are kept as *-dark
+     for the places that must stay dark: typed input text (re-pointed on
+     inputs below) and the two surfaces that used to borrow a text token
+     as a background (.game-switch-knob, .idle-nudge-bubble). Placeholder
+     stays dark - it only ever appears inside a white input. Accent text
+     (--gold-text/--red-text/--green-text/--text-link) keeps its colour
+     and just picks up the stroke. */
+  --game-text: #fff;
+  --game-text-stroke-color: #000;
+  /* Stroke and shadow both scale with the element's own font-size: 1px
+     (and a 1px drop) for anything under 16px - heavier than that smeared
+     small row text - stepping up to 2px at 20px+. Resolved per element by
+     the :where() rule at the bottom of this file. */
+  --game-text-size-step: clamp(1px, calc(0.25em - 3px), 2px);
+  --game-text-stroke-width: var(--game-text-size-step);
+  --game-text-shadow: 0 var(--game-text-size-step) 0 #000;
+  --text-title-dark: #2b2a24;
+  --text-body-dark: #3a382f;
+  --text-muted-dark: #6b6759;
+  --text-title: var(--game-text);
+  --text-body: var(--game-text);
+  --text-muted: var(--game-text);
   --text-placeholder: #7a7668;
   --text: var(--text-body);
   --text-on-panel: var(--text-body);
+  /* Site-level token (index.css) some /game panels still read. */
+  --muted: var(--game-text);
   --text-link: var(--green-700);
 
   /* Rarity (shop/emote tiles) */
@@ -186,4 +227,41 @@
   --press-drop-active: 0 1px 0 var(--ink);
   --inner-highlight: inset 0 2px 0 rgba(255, 255, 255, 0.4);
   --inner-shade: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Shared game text style - white fill, thin black stroke painted behind
+   the fill (so it doesn't eat into the glyph), solid drop shadow. Applied
+   to everything in /game through the zero-specificity :where() rule, so
+   any component that already sets its own stroke/shadow recipe (titles,
+   .game-btn, the HUD coin value) still wins. .game-text is the same
+   recipe as an opt-in class, for anything rendered outside .game-root.
+   SVG is excluded - paint-order would change how icons with both a fill
+   and a stroke draw. The em-based width has to be resolved per element
+   (an inherited em is fixed at the parent's size), hence `*` rather than
+   setting it once on .game-root. */
+.game-text,
+:where(.game-root) :where(*:not(svg, svg *)) {
+  -webkit-text-stroke-width: var(--game-text-stroke-width);
+  -webkit-text-stroke-color: var(--game-text-stroke-color);
+  paint-order: stroke fill;
+  text-shadow: var(--game-text-shadow);
+}
+
+.game-text {
+  color: var(--game-text);
+}
+
+/* Typed input text stays dark on its white field: the text tokens are
+   re-pointed back to their dark values on the control itself, so any
+   `color: var(--text-*)` rule on an input resolves dark again. */
+.game-root :is(input, select, textarea) {
+  --text-title: var(--text-title-dark);
+  --text-body: var(--text-body-dark);
+  --text-muted: var(--text-muted-dark);
+  --muted: var(--text-muted-dark);
+  --game-cream: var(--text-body-dark);
+  --text: var(--text-body-dark);
+  --text-on-panel: var(--text-body-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
 }

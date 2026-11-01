@@ -4,6 +4,7 @@ import {
   clearActiveRun,
   loadActiveRun,
   saveActiveRun,
+  computeRunDurationSeconds,
 } from '../utils/run'
 import { VEHICLE_RUN_INVALID_RATIO } from '../constants/antiCheat'
 import {
@@ -11,6 +12,7 @@ import {
   VehicleState,
   SegmentKind,
   compressSegments,
+  buildPauseResumeJumpSegment,
 } from '../utils/vehicleDetection'
 import { isAccessibilityModeEnabled } from '../utils/antiCheatSettings'
 import { useWakeLock } from './useWakeLock'
@@ -44,6 +46,13 @@ const MIN_POINT_INTERVAL_MS = 2500
 export function useRunTracker() {
   const [status, setStatus] = useState('idle')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  // Elapsed minus accumulated paused time - identical to elapsedSeconds for
+  // any run that never pauses (Conquer, PvP, Club War - none of them call
+  // pause()), so every existing consumer of elapsedSeconds is unaffected.
+  // Training's live "Time" stat and the duration submitted with the run
+  // both read this instead (see stop() below) - see pause()/resume().
+  const [movingSeconds, setMovingSeconds] = useState(0)
+  const [paused, setPaused] = useState(false)
   const [distance, setDistance] = useState(0)
   // Mirrors pointsRef as render-visible state, {lat,lng} only — for callers
   // that draw the live trail on a map (e.g. GamePage). TrackRunPanel doesn't
@@ -90,8 +99,27 @@ export function useRunTracker() {
   // Club war this run is the player's entry for (see api/clubWar.js) - same
   // persistence as challengeId.
   const clubWarIdRef = useRef(null)
+  // Started from the Training screen - a normal territory run in every way
+  // (same submit path, same exp/territory/leaderboard outcome), the ONLY
+  // difference is that GamePage's run panel shows the Pause/Resume button
+  // only when this is true. Persisted the same way as challengeId/
+  // clubWarId so a reload mid-run (or mid-pause) still knows to show it.
+  const isTrainingRef = useRef(false)
   const fixCountRef = useRef(0)
   const lastAccuracyRef = useRef(null)
+  // Total ms spent paused so far this run, across every pause/resume cycle -
+  // subtracted from wall-clock elapsed to get movingSeconds/the submitted
+  // duration. pausedAtRef is the timestamp of the CURRENTLY open pause (null
+  // when not paused) - its own span gets folded into pausedMsRef on resume()
+  // (or on stop(), if the run ends while still paused).
+  const pausedMsRef = useRef(0)
+  const pausedAtRef = useRef(null)
+  const pausedRef = useRef(false)
+  pausedRef.current = paused
+  // Set by resume(), consumed by the next accepted GPS fix after it - see
+  // the point handler in beginWatch for why this fix is excluded from
+  // distance instead of scored normally.
+  const resumeJumpPendingRef = useRef(false)
   const hiddenAtRef = useRef(null)
   // watchPosition's id now arrives asynchronously (the native Geolocation
   // plugin has to await an OS permission check first) - this flags that
@@ -108,8 +136,11 @@ export function useRunTracker() {
   // keep tracking through it.
   useEffect(() => {
     function onVisibilityChange() {
+      // Paused already means "GPS is deliberately off" - backgrounding
+      // through a break the runner asked for isn't a route gap to warn
+      // about, unlike backgrounding mid-tracking.
       if (document.visibilityState === 'hidden') {
-        if (statusRef.current === 'tracking') {
+        if (statusRef.current === 'tracking' && !pausedRef.current) {
           hiddenAtRef.current = Date.now()
         }
         return
@@ -119,6 +150,7 @@ export function useRunTracker() {
       hiddenAtRef.current = null
       if (
         statusRef.current === 'tracking' &&
+        !pausedRef.current &&
         hiddenMs > BACKGROUND_GAP_THRESHOLD_MS
       ) {
         setBackgroundGapSeconds(Math.round(hiddenMs / 1000))
@@ -244,8 +276,16 @@ export function useRunTracker() {
     watchCancelledRef.current = false
 
     timerRef.current = setInterval(() => {
+      const now = Date.now()
       setElapsedSeconds(
-        Math.round((Date.now() - startedAtRef.current.getTime()) / 1000)
+        Math.round((now - startedAtRef.current.getTime()) / 1000)
+      )
+      setMovingSeconds(
+        computeRunDurationSeconds(
+          startedAtRef.current.getTime(),
+          now,
+          pausedMsRef.current
+        )
       )
     }, 1000)
 
@@ -285,7 +325,27 @@ export function useRunTracker() {
         pointsRef.current = [...pointsRef.current, point]
         setPath(pointsRef.current)
 
-        if (previous && detectorRef.current) {
+        if (previous && resumeJumpPendingRef.current) {
+          // The first fix after resume() - the real-world gap since the
+          // last pre-pause point (which may include real movement, e.g.
+          // walking at a water stop) never counts as run distance, but the
+          // route line still connects straight through it rather than
+          // showing a break. Recorded as an explicit JUMP/excluded segment
+          // (same shape a GPS teleport gets) so moderator review still
+          // shows what happened here instead of an unexplained silent gap.
+          // detectorRef.current was reset fresh in resume() - feeding it
+          // this point only primes its internal lastPoint/timing state,
+          // scoring nothing, the same as any run's very first fix.
+          resumeJumpPendingRef.current = false
+          segmentsRef.current.push(buildPauseResumeJumpSegment(previous, point))
+          detectorRef.current?.addGpsPoint({
+            lat: point.lat,
+            lng: point.lng,
+            timestamp: point.timestamp,
+            accuracy: point.accuracy,
+            speedMps: point.speed,
+          })
+        } else if (previous && detectorRef.current) {
           const result = detectorRef.current.addGpsPoint({
             lat: point.lat,
             lng: point.lng,
@@ -333,8 +393,11 @@ export function useRunTracker() {
           eventId: eventIdRef.current,
           challengeId: challengeIdRef.current,
           clubWarId: clubWarIdRef.current,
+          isTraining: isTrainingRef.current,
           points: pointsRef.current,
           distance: distanceRef.current,
+          paused: false,
+          pausedMs: pausedMsRef.current,
         })
       },
       (err) => {
@@ -376,6 +439,7 @@ export function useRunTracker() {
         eventId: saved.eventId ?? null,
         challengeId: saved.challengeId ?? null,
         clubWarId: saved.clubWarId ?? null,
+        isTraining: saved.isTraining ?? false,
         points: saved.points,
         distance: saved.distance || 0,
         duration: saved.duration ?? 0,
@@ -401,6 +465,8 @@ export function useRunTracker() {
     eventIdRef.current = saved.eventId ?? null
     challengeIdRef.current = saved.challengeId ?? null
     clubWarIdRef.current = saved.clubWarId ?? null
+    isTrainingRef.current = saved.isTraining ?? false
+    pausedMsRef.current = saved.pausedMs || 0
     detectorRef.current = createVehicleDetector({
       hasMotionSensing: true,
       accessibilityMode: isAccessibilityModeEnabled(),
@@ -414,6 +480,34 @@ export function useRunTracker() {
     disputesRef.current = []
     setPath(pointsRef.current)
     setDistance(distanceRef.current)
+
+    // A paused run needs an explicit tap (resume(), below) to re-arm
+    // geolocation rather than silently restarting it - most browsers want
+    // a fresh user gesture for that after a reload anyway, and backgroundGap
+    // detection has nothing meaningful to say about a deliberate pause. The
+    // timer/distance/route stay exactly as they were at pause time until
+    // then (see GamePage's "Resume unfinished run").
+    if (saved.paused) {
+      pausedAtRef.current = saved.pausedAt
+        ? new Date(saved.pausedAt).getTime()
+        : Date.now()
+      setPaused(true)
+      setStatus('tracking')
+      setElapsedSeconds(
+        Math.round(
+          (pausedAtRef.current - startedAtRef.current.getTime()) / 1000
+        )
+      )
+      setMovingSeconds(
+        computeRunDurationSeconds(
+          startedAtRef.current.getTime(),
+          pausedAtRef.current,
+          pausedMsRef.current
+        )
+      )
+      return
+    }
+
     setElapsedSeconds(
       Math.round((Date.now() - startedAtRef.current.getTime()) / 1000)
     )
@@ -433,7 +527,10 @@ export function useRunTracker() {
   }, [])
 
   const start = useCallback(
-    (eventId, { challengeId = null, clubWarId = null } = {}) => {
+    (
+      eventId,
+      { challengeId = null, clubWarId = null, isTraining = false } = {}
+    ) => {
       if (!('geolocation' in navigator)) {
         setStatus('unsupported')
         return
@@ -454,9 +551,14 @@ export function useRunTracker() {
         hasMotionSensing: true,
         accessibilityMode: isAccessibilityModeEnabled(),
       })
+      pausedMsRef.current = 0
+      pausedAtRef.current = null
+      resumeJumpPendingRef.current = false
+      setPaused(false)
       setPath([])
       setDistance(0)
       setElapsedSeconds(0)
+      setMovingSeconds(0)
       setBackgroundGapSeconds(null)
       setPendingRun(null)
       applyVehicleState(VehicleState.RUNNING, null)
@@ -464,12 +566,16 @@ export function useRunTracker() {
       eventIdRef.current = eventId ?? null
       challengeIdRef.current = challengeId
       clubWarIdRef.current = clubWarId
+      isTrainingRef.current = isTraining
 
       saveActiveRun({
         startedAt: startedAtRef.current.toISOString(),
         eventId: eventIdRef.current,
         challengeId: challengeIdRef.current,
         clubWarId: clubWarIdRef.current,
+        isTraining: isTrainingRef.current,
+        paused: false,
+        pausedMs: 0,
         points: [],
         distance: 0,
       })
@@ -486,6 +592,15 @@ export function useRunTracker() {
 
     const endedAt = new Date()
     const startedAt = startedAtRef.current ?? endedAt
+    // Ending while still paused (no explicit resume() first) folds that
+    // open pause's own span in too - time spent paused never counts as
+    // moving time either way.
+    const totalPausedMs =
+      pausedAtRef.current != null
+        ? pausedMsRef.current + (endedAt.getTime() - pausedAtRef.current)
+        : pausedMsRef.current
+    pausedAtRef.current = null
+    setPaused(false)
     const segments = compressSegments(segmentsRef.current)
     const vehicleExcludedMeters = vehicleExcludedMetersRef.current
     const consideredMeters = distance + vehicleExcludedMeters
@@ -495,9 +610,17 @@ export function useRunTracker() {
       eventId: eventIdRef.current,
       challengeId: challengeIdRef.current,
       clubWarId: clubWarIdRef.current,
+      isTraining: isTrainingRef.current,
       points: pointsRef.current,
       distance,
-      duration: Math.round((endedAt - startedAt) / 1000),
+      // Moving time, not wall clock - see pause()/resume() and the
+      // movingSeconds state above. Identical to the old plain elapsed
+      // calculation for any run that never paused (totalPausedMs stays 0).
+      duration: computeRunDurationSeconds(
+        startedAt.getTime(),
+        endedAt.getTime(),
+        totalPausedMs
+      ),
       startedAt,
       endedAt,
       fixCount: fixCountRef.current,
@@ -528,6 +651,7 @@ export function useRunTracker() {
         eventId: result.eventId,
         challengeId: result.challengeId,
         clubWarId: result.clubWarId,
+        isTraining: result.isTraining,
         points: result.points,
         distance: result.distance,
         stopped: true,
@@ -555,19 +679,66 @@ export function useRunTracker() {
     setPendingRun(null)
     setDistance(0)
     setElapsedSeconds(0)
+    setMovingSeconds(0)
     setPath([])
   }, [])
+
+  // Training-only (other modes never call this - see GamePage's run panel,
+  // which only ever shows a Pause button there). Stops watchPosition and the
+  // timer exactly like a full stop() would, but leaves everything else
+  // (points, distance, the wake lock - kept deliberately, unlike stop()) in
+  // place so resume() picks up right where this left off.
+  const pause = useCallback(() => {
+    if (statusRef.current !== 'tracking' || pausedAtRef.current != null) return
+    clearTimers()
+    pausedAtRef.current = Date.now()
+    setPaused(true)
+    saveActiveRun({
+      startedAt: startedAtRef.current.toISOString(),
+      eventId: eventIdRef.current,
+      challengeId: challengeIdRef.current,
+      clubWarId: clubWarIdRef.current,
+      isTraining: isTrainingRef.current,
+      points: pointsRef.current,
+      distance: distanceRef.current,
+      paused: true,
+      pausedAt: new Date(pausedAtRef.current).toISOString(),
+      pausedMs: pausedMsRef.current,
+    })
+  }, [clearTimers])
+
+  const resume = useCallback(() => {
+    if (pausedAtRef.current == null) return
+    pausedMsRef.current += Date.now() - pausedAtRef.current
+    pausedAtRef.current = null
+    setPaused(false)
+    resumeJumpPendingRef.current = true
+    // Fresh detector - the pause itself may include real movement (a water
+    // stop, walking off and back), so whatever RUNNING/SUSPECT/VEHICLE
+    // evidence it had built up shouldn't carry across the gap - same reset
+    // start() already does for a brand new run.
+    detectorRef.current = createVehicleDetector({
+      hasMotionSensing: motionAvailableRef.current,
+      accessibilityMode: isAccessibilityModeEnabled(),
+    })
+    beginWatch()
+  }, [beginWatch])
 
   return {
     // Read on render (status/distance changes re-render often enough).
     challengeId: challengeIdRef.current,
     clubWarId: clubWarIdRef.current,
+    isTraining: isTrainingRef.current,
     status,
     elapsedSeconds,
+    movingSeconds,
+    paused,
     distance,
     path,
     start,
     stop,
+    pause,
+    resume,
     backgroundGapSeconds,
     dismissBackgroundGap,
     pendingRun,

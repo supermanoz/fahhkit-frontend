@@ -84,7 +84,7 @@
   z-index: 400;
   padding: 0 5px;
   background: rgba(255, 255, 255, 0.75);
-  color: #333;
+  color: var(--game-text);
   font-size: 10px;
   line-height: 1.4;
 }
@@ -368,10 +368,15 @@
 /* --- Player avatar: Pokémon GO's most recognizable map element, and always
    on screen (not just mid-run) so the game reads as "you're standing here"
    from the moment it loads. --- */
+/* Leaflet sets this element's actual width/height inline from the icon's
+   own iconSize (see buildPlayerMarkerIcon/AVATAR_ICON_SIZE in
+   TerritoryMap.jsx, which is always what's really in effect) - these are
+   just its initial dimensions so nothing flashes unsized before Leaflet
+   applies that inline style. */
 .territory-map-player-icon {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
 }
 
 /* Start/finish pin for the route currently being previewed or run - see
@@ -403,12 +408,15 @@
    rather than one ring pulsing with a visible gap between beats. */
 .territory-map-player-pulse {
   position: absolute;
-  inset: -18px;
+  /* Scales with the marker (see PLAYER_MARKER_SCALE/--s in
+     TerritoryMap.jsx) so the ring stays proportionate to the avatar/sprite
+     instead of a fixed offset shrinking relative to a bigger marker. */
+  inset: calc(-18px * var(--s, 1));
   border-radius: 50%;
   background: rgba(224, 165, 55, 0.35);
   animation: territoryPulse 2s ease-out infinite;
   /* The ring scales up to 1.8x and overflows well past the marker's own
-     40x40 box, overlapping nearby territory flags. The Marker is already
+     box, overlapping nearby territory flags. The Marker is already
      interactive={false} in TerritoryMap.jsx, but this belt-and-suspenders
      so the ring never eats a click meant for a flag underneath it. */
   pointer-events: none;
@@ -418,14 +426,22 @@
   animation-delay: 1s;
 }
 
-/* Blaze's (or Comet's - see buildAnimatedMarkerIcon/HERO_MAP_SHEETS) full-
-   body map sprite, 48x64. The icon's anchor is at his feet, so the ground
-   pulse is centered there and squashed flat to read as a ring on the
-   ground rather than a halo. Class names stayed Blaze-named since he was
-   first; nothing below is actually Blaze-specific. */
+/* Blaze's (or Comet's/Bolt's - see buildAnimatedMarkerIcon/HERO_MAP_SHEETS)
+   full-body map sprite - a 48x64 ON-SCREEN display cell at the original 1x
+   scale (NOT the sheet's own real pixel size, which is 128x170 per frame -
+   see buildAnimatedMarkerIcon's --cell-w/--cell-h, scaled down to fit
+   here), at PLAYER_MARKER_SCALE in TerritoryMap.jsx for the real,
+   currently-in-effect size - Leaflet sets this element's actual width/
+   height inline from the icon's own iconSize, same as
+   .territory-map-player-icon above (so the width/height below are
+   effectively just documentation, Leaflet's own inline style wins). The
+   icon's anchor is at his feet, so the ground pulse is centered there and
+   squashed flat to read as a ring on the ground rather than a halo. Class
+   names stayed Blaze-named since he was first; nothing below is actually
+   Blaze-specific. */
 .territory-map-blaze-icon {
-  width: 48px;
-  height: 64px;
+  width: 72px;
+  height: 96px;
 }
 
 /* Rotates to face the direction of travel - set imperatively, straight onto
@@ -442,15 +458,18 @@
   position: absolute;
   inset: 0;
   rotate: var(--hero-heading, 0deg);
-  transform-origin: 24px 58px;
+  /* Same feet point buildAnimatedMarkerIcon anchors the icon at
+     (BLAZE_ICON_ANCHOR_X/Y, scaled from 24/58) - scales via --s, set
+     inline on this element, which every descendant below reads too. */
+  transform-origin: calc(24px * var(--s, 1)) calc(58px * var(--s, 1));
 }
 
 .territory-map-blaze-ground {
   position: absolute;
-  left: 4px;
-  top: 38px;
-  width: 40px;
-  height: 40px;
+  left: calc(4px * var(--s, 1));
+  top: calc(38px * var(--s, 1));
+  width: calc(40px * var(--s, 1));
+  height: calc(40px * var(--s, 1));
   transform: scaleY(0.45);
   pointer-events: none;
 }
@@ -466,9 +485,15 @@
    HERO_MAP_SHEETS and scripts/build_blaze_stretch_strips.py /
    build_comet_stretch_strips.py) - this is now the marker's ONLY run
    sheet (it rotates to face travel direction instead of switching between
-   separate per-direction sheets - see .territory-map-blaze-body above). */
+   separate per-direction sheets - see .territory-map-blaze-body above).
+   --cell-w/--cell-h (set inline per hero/pose by buildAnimatedMarkerIcon,
+   scaled from the sheet's real manifest.json frameWidth/frameHeight) drive
+   the size/step math here instead of a hardcoded pixel total, so this
+   can't go stale again the way it did when the art pipeline moved off the
+   old hand-cut 48x64 sprites this used to assume. */
 .territory-map-blaze[data-frames='15'] {
-  background-size: 720px 64px;
+  background-size: calc(var(--cell-w) * 1px * 15 * var(--s, 1))
+    calc(var(--cell-h) * 1px * var(--s, 1));
   animation: blaze-frames-15 0.625s steps(15) infinite;
 }
 
@@ -477,7 +502,7 @@
     background-position: 0 0;
   }
   to {
-    background-position: -720px 0;
+    background-position: calc(var(--cell-w) * 1px * -15 * var(--s, 1)) 0;
   }
 }
 
@@ -485,7 +510,8 @@
    arm - see BLAZE_SHEETS), paced close to real time rather than a quick
    breathing loop like the old 4-frame idle. */
 .territory-map-blaze[data-frames='48'] {
-  background-size: 2304px 64px;
+  background-size: calc(var(--cell-w) * 1px * 48 * var(--s, 1))
+    calc(var(--cell-h) * 1px * var(--s, 1));
   animation: blaze-frames-48 7.2s steps(48) infinite;
 }
 
@@ -494,7 +520,7 @@
     background-position: 0 0;
   }
   to {
-    background-position: -2304px 0;
+    background-position: calc(var(--cell-w) * 1px * -48 * var(--s, 1)) 0;
   }
 }
 

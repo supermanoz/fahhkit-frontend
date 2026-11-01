@@ -47,6 +47,25 @@ export const SegmentKind = Object.freeze({
   JUMP: 'jump',
 })
 
+// The segment recorded between the last point before a pause (useRunTracker
+// .js's pause()) and the first point after resume() - always an excluded
+// JUMP, regardless of the implied distance/speed, unlike every other
+// segment above (which addGpsPoint classifies from the evidence). A pause
+// is a deliberate stop, not GPS noise or a real sustained-speed violation,
+// so there's no "maybe it's cheating" case to weigh here - it never counts
+// toward distance, and feeding the detector itself a fresh instance after
+// resume() (see createVehicleDetector there) means nothing before this gap
+// carries forward as evidence either.
+export function buildPauseResumeJumpSegment(previousPoint, resumedPoint) {
+  return {
+    fromTimestamp: previousPoint.timestamp,
+    toTimestamp: resumedPoint.timestamp,
+    distanceMeters: haversineDistance(previousPoint, resumedPoint),
+    kind: SegmentKind.JUMP,
+    excluded: true,
+  }
+}
+
 // Why the current state/segment is what it is - drives the banner copy in
 // TrackRunPanel.jsx/GamePage.jsx. Null when there's nothing to explain.
 export const EvidenceReason = Object.freeze({

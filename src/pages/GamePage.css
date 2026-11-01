@@ -1,23 +1,5 @@
-/* Custom in-game display font (Passion One, bold slab) - bundled locally
-   rather than loaded from Google Fonts so the game still reads right
-   offline/on a flaky connection. Scoped to .game-page (see the font-family
-   rule below) so the rest of the site keeps its own type. */
-@font-face {
-  font-family: 'Passion One';
-  src: url('../assets/fonts/PassionOne-Bold.ttf') format('truetype');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Passion One';
-  src: url('../assets/fonts/PassionOne-Black.ttf') format('truetype');
-  font-weight: 800 900;
-  font-style: normal;
-  font-display: swap;
-}
-
+/* Passion One's @font-face now lives in tokens.css (loaded by anything that
+   uses .game-root, not just this file) - see its own comment there. */
 /* Off-white "clean paper" default (see src/game/styles/tokens.css) -
    --game-* here aliases those tokens, same one-place-cascades-everywhere
    mechanism this file has used for every earlier palette. Two things stay
@@ -50,6 +32,16 @@
   --game-gold: var(--gold-500);
   --game-gold-dark: var(--gold-700);
   --game-gold-light: var(--gold-300);
+  /* Run-stats card header strip (see .game-run-card-header) - its own
+     semantic pair so the header's gradient can move independently of
+     --game-gold elsewhere, even though it currently aliases the exact same
+     orange triad. Dark anchor + a slightly lighter stop for the Running
+     gradient; Paused reuses the same triad one tier up (lighter/brighter)
+     so the two states read as clearly different at a glance. */
+  --run-header-dark: var(--gold-700);
+  --run-header-light: var(--gold-500);
+  --run-header-paused-dark: var(--gold-500);
+  --run-header-paused-light: var(--gold-300);
   --game-green: var(--green-500);
   --game-green-dark: var(--green-700);
   --game-green-light: var(--green-300);
@@ -206,27 +198,6 @@
   font-size: 15px;
   letter-spacing: 0.02em;
   text-align: center;
-}
-
-/* One-time prompt on the splash's first frame - tapping it is the real
-   user gesture the music needs to be allowed to play at all (see
-   audioGateTapped in GamePage.jsx), so it has to read as something to
-   tap rather than just more loading copy. */
-.game-loading-tap-hint {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--game-gold-light);
-  animation: game-loading-tap-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes game-loading-tap-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 
 /* Signed-out gate reuses the loading poster - the sign-in copy + buttons sit
@@ -983,7 +954,10 @@
 .game-stat-value {
   font-size: 20px;
   font-weight: 800;
-  color: var(--game-gold);
+  /* --gold-text, not --game-gold - every container this renders in
+     (.game-claim-toast, .game-controls) is off-white now (2.10:1 there,
+     fails AA; --gold-text clears 5:1). */
+  color: var(--gold-text);
 }
 
 .game-stat-label {
@@ -1057,50 +1031,6 @@
   font-weight: 600;
 }
 
-/* Collapse handle for the in-run HUD (see GamePage.jsx's statsOnly) - a
-   44px tap target (the visible pill stays its original small size,
-   centered inside it, plus a drag-handle "grip" mark so it actually reads
-   as a handle instead of a stray button) that flips 180deg open/closed
-   (same rotate-on-toggle convention as SearchFilters' chevron) to reveal/
-   hide End/Discard below it. */
-.game-controls-handle {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--game-cream);
-  cursor: pointer;
-}
-
-.game-controls-handle-grip {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  translate: -50% 0;
-  width: 34px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--game-wood);
-  border: 1.5px solid var(--game-ink);
-}
-
-.game-controls-handle svg {
-  position: relative;
-  top: 4px;
-  width: 16px;
-  height: 16px;
-  transition: transform 0.2s ease;
-}
-
-.game-controls-handle.is-open svg {
-  transform: rotate(180deg);
-}
-
 .game-controls-expand {
   display: flex;
   flex-direction: column;
@@ -1110,36 +1040,121 @@
   width: 100%;
 }
 
-/* --- In-run stats: DISTANCE / PACE / TIME is the hero of this panel, not
-   the buttons below it - bigger numbers than the shared .game-stat
-   default, dividers between columns, Time biggest (see .game-stat-hero). */
-.game-run-stats {
+/* --- In-run status/stats card: a white card floating on the dark
+   .game-controls sheet (unlike the plain .game-stat rows used elsewhere in
+   this sheet), replacing the old bare Distance/Pace/Time row + separate
+   chevron pill. Header strip is itself the statsOnly toggle (was
+   .game-controls-handle) - a dark-to-light orange gradient (--run-header-*,
+   see the .game-page alias block up top) with the game's normal white
+   stroked text, one tier lighter/brighter while .is-paused so the two
+   states read as clearly different. The grip at the card's own bottom edge
+   is purely decorative (drag-handle look), not a second control. The stats
+   row below stays dark-on-white rather than the usual white-stroked
+   .game-text treatment (see tokens.css's :where() rule) since that part of
+   the card is its own light surface, same reasoning as the input-text
+   override there - the header strip above it is a normal coloured game
+   surface, so its text keeps the default stroke/shadow. */
+.game-run-card {
   width: 100%;
-  justify-content: center;
-  gap: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--white);
+  border: 2px solid var(--panel-border);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
 }
 
-.game-run-stats .game-stat {
+.game-run-card-header {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 44px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(
+    180deg,
+    var(--run-header-light) 0%,
+    var(--run-header-dark) 100%
+  );
+}
+
+.game-run-card.is-paused .game-run-card-header {
+  background: linear-gradient(
+    180deg,
+    var(--run-header-paused-light) 0%,
+    var(--run-header-paused-dark) 100%
+  );
+}
+
+/* White with the game's usual thin black stroke + drop shadow (the default
+   :where() rule in tokens.css already gives every /game element this, so
+   this just has to stop pointing color at a dark ink value like the stats
+   row below it does - it doesn't need to re-opt-in to the stroke/shadow
+   themselves). Keeps header text legible over either header gradient
+   regardless of orange shade - same technique used everywhere else text
+   sits on a busy/coloured game surface. */
+.game-run-card-status {
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text-title);
+}
+
+.game-run-card-expand-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 18px;
+  height: 18px;
+  color: var(--text-title);
+}
+
+.game-run-card-stats {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 16px 18px 8px;
+}
+
+.game-run-card-stats .game-stat {
   flex: 1;
   min-width: 0;
-  padding: 0 6px;
+  padding: 0 4px;
 }
 
-.game-run-stats .game-stat-value {
+.game-run-card-stats .game-stat-value {
+  font-variant-numeric: tabular-nums;
   font-size: 24px;
+  font-weight: 900;
+  color: var(--text-title-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
-.game-stat-hero .game-stat-value {
-  font-size: 32px;
-  color: var(--game-gold-light);
+.game-run-card-stats .game-stat-hero .game-stat-value {
+  font-size: 34px;
 }
 
-.game-run-stats-divider {
-  width: 2px;
-  align-self: stretch;
-  margin: 2px 0;
-  background: rgba(246, 236, 217, 0.15);
-  border-radius: 1px;
+.game-run-card-stats .game-stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-muted-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.game-run-card-handle {
+  display: block;
+  width: 40px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 999px;
+  background: var(--panel-border);
 }
 
 /* --- End/Discard - side by side, thumb-sized (48px), End clearly the
@@ -1197,6 +1212,76 @@
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* Pause - secondary, same quiet treatment as Discard (not a second primary
+   action next to End). Resume swaps in for it while paused - the gold
+   accent (not End's green) so the two don't read as interchangeable. */
+.game-run-btn-pause {
+  border: 2px solid rgba(246, 236, 217, 0.35);
+  color: rgba(246, 236, 217, 0.9);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.game-run-btn-resume {
+  border: 3px solid var(--game-ink);
+  color: #fff;
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light) 0%,
+    var(--game-gold) 45%,
+    var(--game-gold-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-gold-dark),
+    0 3px 0 var(--game-ink);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* --- Training tab's own intro screen (menuTab === 'training') - icon,
+   title, a short description, one big Start/Resume button. --- */
+.training-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 12px 8px;
+  text-align: center;
+}
+
+.training-intro-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 45%,
+    var(--game-green-dark) 100%
+  );
+  color: #fff;
+  font-size: 28px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 3px 0 var(--game-ink);
+}
+
+.training-intro-title {
+  margin: 4px 0 0;
+  font-size: 22px;
+  color: var(--text-title);
+}
+
+.training-intro-text {
+  margin: 0 0 8px;
+  max-width: 320px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 /* --- End-run confirmation modal (GamePage.jsx's confirmAction === 'end'/
    'cancel') - a real overlay (Esc/backdrop-click close, see its own effect)
    with a slide-up+fade entrance, unlike the inline-in-sheet confirms this
@@ -1213,7 +1298,10 @@
 .game-end-run-title {
   margin: 0 0 6px;
   font-size: 19px;
-  color: var(--game-gold);
+  /* --gold-text, not --game-gold - this sits directly on the card's
+     off-white body now, not a dark surface (2.10:1 there, fails AA;
+     --gold-text clears 5:1). */
+  color: var(--gold-text);
 }
 
 .game-end-run-summary {
@@ -1291,7 +1379,6 @@
 .game-page .btn-outline {
   background: var(--white);
   color: var(--text-title);
-  text-shadow: none;
   border: 3px solid var(--game-panel-border);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -1353,7 +1440,9 @@
 
 .game-claim-toast h3 {
   margin: 0 0 6px;
-  color: var(--game-gold);
+  /* --gold-text, not --game-gold - sits on this toast's off-white body
+     (2.10:1 there, fails AA; --gold-text clears 5:1). */
+  color: var(--gold-text);
 }
 
 /* Distance/pace/time as the same neat .game-stat boxes used everywhere
@@ -1432,7 +1521,9 @@
 
 .game-highlight-toast h3 {
   margin: 0 0 4px;
-  color: var(--game-gold);
+  /* --gold-text, not --game-gold - sits on this toast's off-white body
+     (2.10:1 there, fails AA; --gold-text clears 5:1). */
+  color: var(--gold-text);
   font-size: 16px;
 }
 
@@ -1516,22 +1607,11 @@
 }
 
 .game-highlight-toast-avatar {
-  flex-shrink: 0;
-  border-radius: 50%;
-  object-fit: cover;
   border: 2.5px solid var(--game-ink);
   background: var(--game-stone);
-  /* The territory's own color as a ring around the face - see
-     TerritoryAvatar's `ringColor` prop. */
-  box-shadow: 0 0 0 3px var(--avatar-ring-color, var(--game-gold));
 }
 
-.game-highlight-toast-avatar.is-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--game-ink);
-  font-weight: 800;
+.game-highlight-toast-avatar.g-avatar-fallback {
   font-size: 22px;
   background: var(--game-wood);
 }
@@ -1605,7 +1685,10 @@
 .game-territory-distance svg {
   flex-shrink: 0;
   margin-top: 1px;
-  color: var(--game-gold);
+  /* --gold-text, not --game-gold - sits on the territory popup's
+     off-white body (2.10:1 there, under even the 3:1 icon floor;
+     --gold-text clears 5:1). */
+  color: var(--gold-text);
   font-size: 13px;
 }
 
@@ -1875,7 +1958,7 @@
 
 .game-radial-btn.radial-gold {
   background: var(--game-gold);
-  color: var(--game-ink);
+  color: var(--game-text);
   box-shadow:
     inset 0 -9px 0 var(--game-gold-dark),
     inset 0 3px 0 var(--game-gold-light),
@@ -1884,7 +1967,7 @@
 
 .game-radial-btn.radial-green {
   background: var(--game-green);
-  color: var(--game-ink);
+  color: var(--game-text);
   box-shadow:
     inset 0 -9px 0 var(--game-green-dark),
     inset 0 3px 0 var(--game-green-light),
@@ -1893,7 +1976,7 @@
 
 .game-radial-btn.radial-wood {
   background: var(--game-wood);
-  color: var(--game-ink);
+  color: var(--game-text);
   box-shadow:
     inset 0 -9px 0 var(--game-wood-dark),
     inset 0 3px 0 var(--game-wood-light),
@@ -2391,85 +2474,22 @@
   cursor: pointer;
 }
 
-/* Solo/Club chooser for the Leaderboard tab - two square picks side by
-   side, same chunky glossy-squircle recipe as .game-shop-tabs, just with
-   a label under the icon since "Top Players"/"Top Clubs" don't read from
-   an icon alone the way the shop's category glyphs do. */
-.game-leaderboard-mode {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-/* Icon-only now (see GamePage.jsx's own comment on why) - a 44px+ tap
-   target either way (min-height alone already clears it; flex:1 width on
-   a 2-up row clears it many times over), shorter than when it also held
-   a text label underneath the icon. */
-.game-leaderboard-mode-box {
-  position: relative;
-  flex: 1;
-  min-height: 48px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 8px;
-  border-radius: 18px;
-  border-width: 3px;
-  border-style: solid;
-  border-color: var(--game-ink);
-  overflow: hidden;
-  background: linear-gradient(
-    180deg,
-    var(--game-wood-light) 0%,
-    var(--game-wood) 45%,
-    var(--game-wood-dark) 100%
-  );
-  box-shadow:
-    inset 0 -4px 0 var(--game-wood-dark),
-    0 3px 0 var(--game-ink);
-  color: var(--text-title);
-  font-weight: 900;
-  font-size: 13px;
-  cursor: pointer;
-  transition: transform 0.08s ease;
-}
-
-.game-leaderboard-mode-box::before {
-  content: '';
-  position: absolute;
-  inset: 3px 3px auto 3px;
-  height: 46%;
-  border-radius: 14px 14px 50% 50%;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.55),
-    rgba(255, 255, 255, 0)
-  );
-  pointer-events: none;
-}
-
-.game-leaderboard-mode-box svg {
-  position: relative;
-  z-index: 1;
-  /* At least 28px, per the brief - these carry the whole "which tab is
-     this" meaning alone now that the text label is gone. */
-  font-size: 30px;
-  filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.35));
-}
-
-.game-leaderboard-mode-box:active {
-  transform: translateY(2px);
-}
-
-.game-leaderboard-mode-box.active {
+/* Solo/Club chooser for the Leaderboard tab reuses the Shop section menu's
+   own small icon-button class (.game-shop-tabs .game-menu-subtab) for
+   size/shape/spacing/press-state rather than keeping a bespoke box - see
+   the game-shop-tabs rules below. .game-leaderboard-mode only still exists
+   to keep this row's active state gold (its original colour), instead of
+   the shop's green .game-menu-subtab.active. */
+.game-leaderboard-mode .game-menu-subtab.active {
   background: linear-gradient(
     180deg,
     var(--game-gold-light),
     var(--game-gold) 55%,
     var(--game-gold-dark)
   );
+  box-shadow:
+    inset 0 -3px 0 var(--game-gold-dark),
+    0 2px 0 var(--game-ink);
   /* White, not the base's dark text - this is a real colour fill. */
   color: #fff;
 }
@@ -2973,8 +2993,7 @@
   font-weight: 700;
   font-size: 14px;
   letter-spacing: 0.02em;
-  text-shadow: none;
-  color: var(--game-ink);
+  color: var(--game-text);
   overflow-wrap: anywhere;
 }
 
@@ -2988,7 +3007,6 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  text-shadow: none;
   color: var(--game-green-dark);
 }
 
@@ -3020,7 +3038,9 @@
 
 .game-avatar-confirm-arrow {
   font-size: 18px;
-  color: var(--game-gold);
+  /* --gold-text, not --game-gold - sits on this confirm card's off-white
+     body (2.10:1 there, fails AA; --gold-text clears 5:1). */
+  color: var(--gold-text);
 }
 
 .game-store-list {
@@ -3254,7 +3274,7 @@
   height: 22px;
   border-radius: 50%;
   border: 2px solid var(--game-ink);
-  background: var(--game-cream);
+  background: var(--text-body-dark);
   box-shadow: inset 0 -3px 0 #d9c7a4;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -3276,7 +3296,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone);
-  color: var(--game-ink);
+  color: var(--game-text);
   font-size: 12px;
   text-align: center;
 }
@@ -3573,7 +3593,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 900;
-  color: var(--game-ink);
+  color: var(--game-text);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
@@ -3595,7 +3615,7 @@
   justify-content: center;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--game-ink);
+  color: var(--game-text);
   background: var(--white);
   border: 2px solid var(--game-ink);
 }
@@ -3655,7 +3675,7 @@
 }
 
 .emote-hero-filter-btn.active {
-  color: var(--game-ink);
+  color: var(--game-text);
   background: var(--game-gold);
   border-color: var(--game-ink);
 }
@@ -3796,7 +3816,7 @@
 
 .emote-hero-pick-badge.is-lock {
   background: var(--game-wood);
-  color: var(--game-ink);
+  color: var(--game-text);
 }
 
 .emote-hero-pick-badge.is-check {
@@ -3861,7 +3881,7 @@
   height: 30px;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--game-ink);
+  color: var(--game-text);
   background: var(--game-panel);
   border: 2px solid var(--game-ink);
 }
@@ -4044,7 +4064,7 @@
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: linear-gradient(180deg, var(--game-gold-light), var(--game-gold));
-  color: var(--game-ink);
+  color: var(--game-text);
   font-size: 11.5px;
   font-weight: 800;
 }
@@ -4318,7 +4338,10 @@
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--game-red-light);
+  /* --red-text, not --game-red-light - this sits directly on the card's
+     off-white body now, not a dark surface (1.46:1 there, fails AA badly;
+     --red-text clears 5.8:1). */
+  color: var(--red-text);
 }
 
 .challenge-prompt-title {
@@ -4429,7 +4452,7 @@
      dark wood most of this game's UI uses - this is the one popup meant to
      read like a mobile game's "Events" dialog, cream card and all. */
   background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
-  color: var(--game-ink);
+  color: var(--game-text);
   overflow: hidden;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.5),
@@ -4483,7 +4506,7 @@
   margin: 0;
   font-size: 26px;
   line-height: 1.15;
-  color: var(--game-ink);
+  color: var(--game-text);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { IconClose, IconFlag, IconTrophy } from './GameIcons'
 import { motion } from 'framer-motion'
 import HeroSprite from './HeroSprite'
+import EquippedEmoteBadge from './EquippedEmoteBadge'
+import { resolveEquippedEmoteItem } from '../utils/emotes'
 import LevelBar from './LevelBar'
 import ClubBadge from './ClubBadge'
 import { playerName } from '../utils/playerName'
@@ -15,7 +17,7 @@ import {
   isBoltHero,
   isPlaceholderHero,
 } from '../utils/hero'
-import defaultAvatarImage from '../assets/images/player-avatar-blaze.png'
+import defaultAvatarImage from '../assets/avatars/blaze.png'
 import './AthleteTerritoryProfilePanel.css'
 
 // TEMP: the territory flag tally and the Medals section are hidden on other
@@ -117,6 +119,23 @@ export default function AthleteTerritoryProfilePanel({
     isBoltHero(hero.storeItem.name)
   const background = equippedOf('PROFILE_BACKGROUND')
   const phrase = equippedOf('PHRASE')
+  // The one shared selector every "which emote is equipped" screen uses
+  // (also HeroDetailModal.jsx's HeroEmoteStage and GamePage.jsx's Me tab) -
+  // scoped to this player's equipped hero's own heroId, not just "any
+  // equipped emote" in the list, since equip is per-hero server-side (see
+  // HeroItemShelf.jsx's own comment) - they could have a different emote
+  // equipped for a hero they aren't actively playing as. No hero equipped
+  // (falls back to the default Comet pick) means no real heroId to scope
+  // by, so nothing shows rather than guessing. equippedCosmetics is
+  // already pre-filtered to equipped-only server-side (unlike ownedItems,
+  // which needs its own `.equipped` filter first - see each entry having
+  // no separate equipped flag here), so this just unwraps to StoreItems.
+  const equippedEmote = hero
+    ? resolveEquippedEmoteItem(
+        cosmetics.map((c) => c.storeItem),
+        hero.storeItem.heroId
+      )
+    : null
   const parcelCount = profile?.parcelCount ?? 0
   const flagCount = Math.min(Math.ceil(parcelCount / PARCELS_PER_FLAG), 8)
 
@@ -168,6 +187,13 @@ export default function AthleteTerritoryProfilePanel({
               />
             )}
           </div>
+        )}
+
+        {equippedEmote && (
+          <EquippedEmoteBadge
+            heroName={hero.storeItem.name}
+            emoteName={equippedEmote.name}
+          />
         )}
 
         <p className="game-menu-player-name">

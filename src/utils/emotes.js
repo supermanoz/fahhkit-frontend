@@ -1,20 +1,16 @@
-import { getHeroSprite } from './heroSprites'
-import blazeEmoteVictorySheet from '../assets/images/blaze-emote-victory.webp'
-import blazeEmoteCheckingShoesSheet from '../assets/images/blaze-emote-checking-shoes.webp'
-import blazeEmoteJumpingJackSheet from '../assets/images/blaze-emote-jumping-jack.webp'
-import blazeEmoteShoulderRubSheet from '../assets/images/blaze-emote-shoulder-rub.webp'
-import blazeEmoteSquatSheet from '../assets/images/blaze-emote-squat.webp'
-import cometEmoteVictorySheet from '../assets/images/comet-emote-victory.webp'
-import cometEmoteJumpingJackSheet from '../assets/images/comet-emote-jumping-jack.webp'
-import cometEmoteShoulderRubSheet from '../assets/images/comet-emote-shoulder-rub.webp'
-import cometEmoteSquatSheet from '../assets/images/comet-emote-squat.webp'
-import boltEmoteVictorySheet from '../assets/images/bolt-emote-victory.webp'
-import boltEmoteCheckingShoesSheet from '../assets/images/bolt-emote-checking-shoes.webp'
-import boltEmoteJumpingJackSheet from '../assets/images/bolt-emote-jumping-jack.webp'
-import boltEmoteShoulderRubSheet from '../assets/images/bolt-emote-shoulder-rub.webp'
-import boltEmoteSquatSheet from '../assets/images/bolt-emote-squat.webp'
-import boltEmoteThumbsUpSheet from '../assets/images/bolt-emote-thumbs-up.webp'
-import boltEmoteWavingHandSheet from '../assets/images/bolt-emote-waving-hand.webp'
+import { getHero, hasHero } from './heroManifest'
+
+// Emote names every real hero is expected to have - used only to decide
+// whether an UNKNOWN hero's request should fall back to Blaze's. A
+// genuinely hero-specific emote further down a hero's numbering (which
+// varies hero to hero - see each manifest.json's "emotes", built by
+// scripts/build_<hero>_stretch_strips.py) has no such universal
+// expectation, so it stays null instead of silently showing Blaze's under
+// the wrong name - see resolveEmoteAsset below. "emote1" is a pose alias
+// onto idle (every hero has one, same mechanism "classic" used to be);
+// "emote2" is its own dedicated file (a dance/hip-hop-style pose, the one
+// other animation every hero's asset drop also happens to include).
+const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 
 // Central emote registry - the ONLY place in the app that turns an EMOTE
 // StoreItem into a picture. StoreItem.assetUrl is never populated for
@@ -22,176 +18,42 @@ import boltEmoteWavingHandSheet from '../assets/images/bolt-emote-waving-hand.we
 // EMOTE isn't in its "populated for" list, and migration V1_64 seeds every
 // hero's free "Classic" emote with asset_url explicitly null), so there is
 // no server-provided image to resolve - every screen that shows emote art
-// (shop EmoteShelf/HeroItemShelf, the buy/preview confirm card, and
-// anywhere else one shows up later - PvP, run view, ...) must go through
-// resolveEmoteAsset below instead of reading item.assetUrl itself, or it
-// will always get a locked/blank card.
+// (the hero showcase's emote slider - HeroDetailModal.jsx's HeroEmoteStage
+// - the buy/preview confirm card, and anywhere else one shows up later -
+// PvP, run view, ...) must go through resolveEmoteAsset below instead of
+// reading item.assetUrl itself, or it will always get a locked/blank card.
 //
-// Keyed by hero name, then by the backend StoreItem.name, both lowercased
-// and trimmed to match getHeroSprite's own convention (utils/heroSprites.js)
-// - a new hero's emotes need only a new entry here (plus the art itself in
-// assets/images, built via scripts/build_<hero>_stretch_strips.py's own
-// "emote_*" sets), nothing else in the app.
+// Backed by each hero's own manifest.json (see heroManifest.js and
+// src/assets/heroes/<hero>/) - keyed by hero name, then by the backend
+// StoreItem.name, both lowercased and trimmed. A new hero's emotes need
+// only a matching "emotes" entry in its manifest.json plus the art itself
+// (built via scripts/build_<hero>_stretch_strips.py, which numbers every
+// hero's emotes densely as "emote1", "emote2", ... - idle is always
+// emote1 - since the artist's own animation-folder names/typos have no
+// shared vocabulary across heroes to key a descriptive name by), nothing
+// else in the app.
 //
 // An entry here only lights up in the Shop once a matching EMOTE StoreItem
 // row exists with that exact name (case-insensitive) and the right heroId -
 // see src/components/EmoteAdminPanel.jsx (GameMechanicsPage.jsx's "Emotes"
 // admin tool), which creates those rows against the backend's existing
 // POST /v1/store/admin/items.
-//
-//  - "Classic" (the one free emote every hero actually has a row for today,
-//    and this registry's "default emote" - see EmoteShelf.jsx's hero-picker
-//    card and HeroItemShelf.jsx's renderHeroCardArt) has no dedicated art of
-//    its own. Mapped here to the hero's own idle strip (heroSprites.js)
-//    rather than show a placeholder for literally every player's default
-//    emote.
-//  - "Hip Hop" is a second, buyable emote built the same way - the
-//    hiphop/"signature dance" strip (heroSprites.js) is real dedicated art,
-//    just not EMOTE-specific art, so it's reused here as its own emote
-//    instead of only backing Classic.
-//  - Everything below is EMOTE-dedicated art, built at EMOTE_CELL_H (see
-//    scripts/build_<hero>_stretch_strips.py) rather than the full profile
-//    height - these never render above ~140px (the buy/showcase popup is
-//    the largest caller), so the old 320px-tall strips were pure decode/
-//    memory waste, a root cause of the Me/Emotes-section lag this was
-//    rebuilt to fix.
-//  - Blaze's source drop has 4 extra poses nothing else in the app uses
-//    (Checking Shoes, Jumping Jack, Shoulder Rub, Squat) plus Victory;
-//    Comet's drop has only 3 of those (Jumping Jack, Shoulder Rub, Squat)
-//    plus Victory - no Checking Shoes folder for him, so he has one fewer
-//    emote available than Blaze until more art exists.
-const EXTRA_EMOTE_SPRITES = {
-  blaze: {
-    victory: {
-      src: blazeEmoteVictorySheet,
-      frames: 24,
-      frameWidth: 120,
-      frameHeight: 190,
-    },
-    'checking shoes': {
-      src: blazeEmoteCheckingShoesSheet,
-      frames: 24,
-      frameWidth: 114,
-      frameHeight: 190,
-    },
-    'jumping jack': {
-      src: blazeEmoteJumpingJackSheet,
-      frames: 24,
-      frameWidth: 133,
-      frameHeight: 190,
-    },
-    'shoulder rub': {
-      src: blazeEmoteShoulderRubSheet,
-      frames: 24,
-      frameWidth: 111,
-      frameHeight: 190,
-    },
-    squat: {
-      src: blazeEmoteSquatSheet,
-      frames: 24,
-      frameWidth: 100,
-      frameHeight: 190,
-    },
-  },
-  comet: {
-    victory: {
-      src: cometEmoteVictorySheet,
-      frames: 24,
-      frameWidth: 96,
-      frameHeight: 190,
-    },
-    'jumping jack': {
-      src: cometEmoteJumpingJackSheet,
-      frames: 24,
-      frameWidth: 148,
-      frameHeight: 190,
-    },
-    'shoulder rub': {
-      src: cometEmoteShoulderRubSheet,
-      frames: 24,
-      frameWidth: 127,
-      frameHeight: 190,
-    },
-    squat: {
-      src: cometEmoteSquatSheet,
-      frames: 24,
-      frameWidth: 98,
-      frameHeight: 190,
-    },
-  },
-  // See scripts/build_bolt_stretch_strips.py (the "Bolt_1/Bolt" drop) -
-  // Bolt's source has every pose Blaze does (Checking Shoes included) plus
-  // two nobody else has yet: Thumbs Up and Waving Hand. Both need a real
-  // EMOTE StoreItem row before they're purchasable (see this file's own
-  // top comment) - ask an admin to create them via EmoteAdminPanel.jsx
-  // with exactly these names, heroId = Bolt's.
-  bolt: {
-    victory: {
-      src: boltEmoteVictorySheet,
-      frames: 109,
-      frameWidth: 119,
-      frameHeight: 190,
-    },
-    'checking shoes': {
-      src: boltEmoteCheckingShoesSheet,
-      frames: 114,
-      frameWidth: 106,
-      frameHeight: 190,
-    },
-    'jumping jack': {
-      src: boltEmoteJumpingJackSheet,
-      frames: 27,
-      frameWidth: 132,
-      frameHeight: 190,
-    },
-    'shoulder rub': {
-      src: boltEmoteShoulderRubSheet,
-      frames: 141,
-      frameWidth: 99,
-      frameHeight: 190,
-    },
-    squat: {
-      src: boltEmoteSquatSheet,
-      frames: 45,
-      frameWidth: 104,
-      frameHeight: 190,
-    },
-    'thumbs up': {
-      src: boltEmoteThumbsUpSheet,
-      frames: 101,
-      frameWidth: 103,
-      frameHeight: 190,
-    },
-    'waving hand': {
-      src: boltEmoteWavingHandSheet,
-      frames: 36,
-      frameWidth: 107,
-      frameHeight: 190,
-    },
-  },
-}
-
-// Emote name -> hero-body pose key (heroSprites.js), for emotes that reuse
-// an existing body-pose strip instead of having dedicated emote art.
-const EMOTE_NAME_TO_POSE = {
-  classic: 'idle',
-  'hip hop': 'hiphop',
-}
 
 // Returns {src, frames, frameWidth, frameHeight} for a given hero name +
-// backend StoreItem.name, or null if this registry has no art for it (the
-// caller shows its own placeholder - see EmoteGlyph.jsx).
+// backend StoreItem.name, or null if no manifest has art for it (the
+// caller shows its own placeholder - see EmoteGlyph.jsx). Deliberately NOT
+// coerced through getHero's Blaze fallback for hero-specific art (a
+// hero-specific emote isn't appropriate to show under an unrelated hero's
+// name) - "emote1"/"emote2" still resolve through it (ALIAS_EMOTE_NAMES
+// above), since every real hero is expected to have both.
 export function resolveEmoteAsset(heroName, emoteName) {
   const heroKey = (heroName || '').trim().toLowerCase()
   const emoteKey = (emoteName || '').trim().toLowerCase()
   if (!heroKey || !emoteKey) return null
 
-  const extra = EXTRA_EMOTE_SPRITES[heroKey]?.[emoteKey]
-  if (extra) return extra
-
-  const poseKey = EMOTE_NAME_TO_POSE[emoteKey]
-  if (!poseKey) return null
-  return getHeroSprite(heroKey).poses[poseKey] || null
+  if (hasHero(heroKey)) return getHero(heroKey).emotes[emoteKey] || null
+  if (!ALIAS_EMOTE_NAMES.has(emoteKey)) return null
+  return getHero(heroKey).emotes[emoteKey] || null
 }
 
 function titleCase(key) {
@@ -204,8 +66,30 @@ function titleCase(key) {
 // registry's keys exactly instead of silently landing on no art.
 export function knownEmoteNames(heroName) {
   const heroKey = (heroName || '').trim().toLowerCase()
-  const extra = Object.keys(EXTRA_EMOTE_SPRITES[heroKey] || {})
-  return [...Object.keys(EMOTE_NAME_TO_POSE), ...extra].map(titleCase)
+  const names = hasHero(heroKey)
+    ? Object.keys(getHero(heroKey).emotes)
+    : ALIAS_EMOTE_NAMES
+  return [...names].map(titleCase)
+}
+
+// The ONE place that decides "which emote (if any) is equipped for this
+// hero" - shared by every screen that needs it (HeroDetailModal.jsx's
+// HeroEmoteStage, the Me tab, AthleteTerritoryProfilePanel.jsx) instead of
+// each re-deriving its own .find(), so there's exactly one definition of
+// "equipped" to keep correct. Takes a plain array of StoreItems already
+// known to be equipped, not a general owned-items list, because the
+// player's own data (ownedItems, every owned item with its own `equipped`
+// boolean) and another player's (profile.equippedCosmetics, pre-filtered
+// to equipped-only server-side) are shaped differently - each caller
+// normalizes its own shape into this flat list first (map to `.storeItem`,
+// filtering by `.equipped` first if that flag exists on its shape).
+export function resolveEquippedEmoteItem(equippedStoreItems, heroId) {
+  if (!heroId) return null
+  return (
+    (equippedStoreItems || []).find(
+      (item) => item?.category === 'EMOTE' && item?.heroId === heroId
+    ) || null
+  )
 }
 
 // Scans a catalog of EMOTE StoreItemResponse rows against this registry and
