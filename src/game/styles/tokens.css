@@ -125,6 +125,22 @@
   --coin-500: #ffc531;
   --coin-700: #c98a00;
 
+  /* Slate blue-grey - Leaderboard/Club War/PvP's shared red replacement
+     (see GamePage.css's --lb-accent, --slate-accent and --pvp-accent
+     tokens). Not used in the general --game-* palette above - every other
+     screen keeps its own colours, this is opted into per screen. The RGB
+     triplet is for glow/highlight box-shadows that need their own alpha
+     (rgba(var(--slate-500-rgb), 0.5)) - those can't go through a var() hex
+     colour directly, this is the one way to keep that out of hard-coded
+     hex too. */
+  --slate-300: #6d7b95;
+  --slate-500: #4e5b73;
+  --slate-500-rgb: 78, 91, 115;
+  --slate-700: #394357;
+  /* Pale wash for decorative "us vs them" backgrounds, same role
+     --red-tint/--gold-tint play elsewhere. */
+  --slate-tint: #e6e9ee;
+
   /* Text - every bit of /game text is white with a black stroke + drop
      shadow (see .game-text below), so the title/body/muted roles all
      resolve to --game-text now. The old dark values are kept as *-dark
@@ -145,6 +161,13 @@
   --game-text-shadow: 0 var(--game-text-size-step) 0 #000;
   --text-title-dark: #2b2a24;
   --text-body-dark: #3a382f;
+  /* Near-black for a plain SVG icon that needs to read clearly on a light
+     fill - darker than --text-title-dark/--ink, which lean warm/brown.
+     Icons don't inherit the global white-stroke rule (that's text-shadow/
+     -webkit-text-stroke, which only ever touches text glyphs, never an SVG
+     path's own stroke/fill) - so one sitting on a light background with no
+     colour override just reads invisible, not faded. */
+  --icon-dark: #1a1a1a;
   --text-muted-dark: #6b6759;
   --text-title: var(--game-text);
   --text-body: var(--game-text);

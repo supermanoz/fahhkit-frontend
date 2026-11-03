@@ -7,9 +7,8 @@ import './HeroFigure.css'
 
 // A hero's full-body look: its animated sprite strip when one exists (see
 // utils/heroSprites.js), else its flat portrait (hero.portraitUrl, then the
-// same-named character art from constants/avatars.js, then the first skin's
-// asset), else its initial. `pose` falls back to idle when the
-// hero has no strip for it.
+// same-named character art from constants/avatars.js), else its initial.
+// `pose` falls back to idle when the hero has no strip for it.
 export default function HeroFigure({ hero, pose = 'idle', height = 170 }) {
   const sprite = getHeroSprite(hero?.name)
   if (sprite) {
@@ -19,9 +18,7 @@ export default function HeroFigure({ hero, pose = 'idle', height = 170 }) {
   }
 
   const portrait =
-    resolveFileUrl(hero?.portraitUrl) ||
-    getAvatarByName(hero?.name)?.src ||
-    resolveFileUrl(hero?.skins?.find((s) => s.assetUrl)?.assetUrl)
+    resolveFileUrl(hero?.portraitUrl) || getAvatarByName(hero?.name)?.src
   if (portrait) {
     return (
       <img

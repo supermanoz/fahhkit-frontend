@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
 import {
   MapContainer,
@@ -874,6 +875,84 @@ function useWarnOnDuplicateCharacter() {
   }, [])
 }
 
+// Real-world sky/weather tint (see utils/mapAmbience.js) - a custom Leaflet
+// pane, not a plain viewport-fixed sibling of .territory-map-tilt the way
+// this used to be rendered. That older version sat OUTSIDE Leaflet's own
+// pane stack entirely, so its z-index (then 440/450) was only ever
+// compared against .territory-map-tilt itself (which has none, i.e.
+// stacks at the same "auto" level as any other unstyled element) - an
+// element with an explicit z-index always paints above an "auto" sibling
+// regardless of the actual number, no matter what's nested how deep
+// inside that sibling. That's what let it paint over literally
+// everything the map renders, including the player's own marker (ring,
+// sprite/avatar and shadow all live in one HTML blob in
+// .leaflet-marker-pane, z-index 600) - during rain, fog, storms or night,
+// the character was getting tinted and darkened right along with the
+// ground underneath it instead of staying clearly visible.
+//
+// A custom pane (TerritoryMap.css's .leaflet-ambience-pane, z-index 550)
+// shares the SAME local stacking context Leaflet's own panes do, so a
+// plain z-index number actually means something here: 550 sits above the
+// tile/territory-polygon layers (200/400) it's meant to tint, but below
+// the marker pane (600), so the character (and anyone else's marker)
+// renders untouched on top. Panes have no inherent size of their own
+// (every child pane here is itself position:absolute with no explicit
+// width/height), so this one's sized/positioned to the current viewport
+// by hand on every 'move'/'zoom'/'resize' - same L.DomUtil.setPosition
+// Leaflet itself uses to place its own panes, not a new mechanism. Still
+// pointer-events: none throughout (see TerritoryMap.css), and it inherits
+// the close-in zoom's 3D tilt along with the rest of the map for free,
+// being a real descendant of .territory-map-tilt now instead of a
+// sibling of it.
+function WeatherLayer({ ambience }) {
+  const map = useMap()
+  const [pane, setPane] = useState(null)
+
+  useEffect(() => {
+    const el = map.createPane('ambience')
+    el.style.pointerEvents = 'none'
+    setPane(el)
+
+    function sync() {
+      const size = map.getSize()
+      el.style.width = `${size.x}px`
+      el.style.height = `${size.y}px`
+      L.DomUtil.setPosition(el, map.containerPointToLayerPoint([0, 0]))
+    }
+    sync()
+    map.on('move zoom resize', sync)
+    return () => {
+      map.off('move zoom resize', sync)
+      el.remove()
+      // Leaflet has no public removePane() - createPane() always makes a
+      // brand new element (never reuses one by name), so without this a
+      // remount (StrictMode's dev double-mount, or TerritoryMap
+      // unmounting/remounting with a parent) would leave the previous
+      // mount's now-detached pane's registry entry dangling on the map
+      // instance (not just an orphaned DOM node, which el.remove() above
+      // already handles) alongside the fresh one the next mount creates.
+      delete map._panes.ambience
+      setPane(null)
+    }
+  }, [map])
+
+  if (!pane) return null
+  return createPortal(
+    <>
+      {ambience && (
+        <div
+          className={`territory-map-sky sky-phase-${ambience.phase} sky-${ambience.sky}`}
+          aria-hidden="true"
+        >
+          <div className="territory-map-sky-weather" />
+        </div>
+      )}
+      <div className="territory-map-vignette" aria-hidden="true" />
+    </>,
+    pane
+  )
+}
+
 // react-leaflet forwards a Marker's ref to the underlying Leaflet marker
 // instance, which is what lets the hooks above drive it directly. The
 // `position` prop is only ever the very first fix this instance sees
@@ -1556,6 +1635,7 @@ export default function TerritoryMap({
             onUserPan={onUserPan}
           />
           <CaptureMapInstance onReady={setMapInstance} />
+          <WeatherLayer ambience={ambience} />
           {activeTapEffects.map((effect) => (
             <TapEffect
               key={effect.id}
@@ -1576,15 +1656,6 @@ export default function TerritoryMap({
           onExit={exitGlobe}
         />
       )}
-      {ambience && (
-        <div
-          className={`territory-map-sky sky-phase-${ambience.phase} sky-${ambience.sky}`}
-          aria-hidden="true"
-        >
-          <div className="territory-map-sky-weather" />
-        </div>
-      )}
-      <div className="territory-map-vignette" aria-hidden="true" />
       {/* Hidden mid-run - GamePage's own Free/Follow location buttons sit in
           this exact spot then and fully replace it. */}
       {mapInstance && !isTracking && (

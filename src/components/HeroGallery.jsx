@@ -8,6 +8,7 @@ import {
   IconLock,
 } from './GameIcons'
 import HeroFigure from './HeroFigure'
+import HeroStage from './HeroStage'
 import { getHeroSprite } from '../utils/heroSprites'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
 import './HeroGallery.css'
@@ -166,11 +167,18 @@ export default function HeroGallery({
               }}
             >
               <span className="hero-card-stage">
-                {/* Idle only - Hip Hop is a purchasable emote (see
-                    heroManifest.js: it's no longer under this hero's
-                    `poses` at all, only under `emotes`), so it can't be
-                    free-previewed here regardless of ownership. */}
-                <HeroFigure hero={hero} pose="idle" height={240} />
+                <HeroStage hero={hero.name} className="hero-card-stage-bg">
+                  {(h) => (
+                    // Idle only - Hip Hop is a purchasable emote (see
+                    // heroManifest.js: it's no longer under this hero's
+                    // `poses` at all, only under `emotes`), so it can't be
+                    // free-previewed here regardless of ownership. Falls
+                    // back to 240 (the old fixed size) only for the one
+                    // frame before HeroStage's ResizeObserver reports a
+                    // real height.
+                    <HeroFigure hero={hero} pose="idle" height={h || 240} />
+                  )}
+                </HeroStage>
               </span>
 
               <span className="hero-card-name">{hero.name}</span>

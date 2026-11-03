@@ -224,7 +224,7 @@
 .game-card-empty {
   margin: 0;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 

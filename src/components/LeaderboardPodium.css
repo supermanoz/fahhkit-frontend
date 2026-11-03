@@ -12,13 +12,29 @@
   gap: 10px;
 }
 
-/* Club leaderboard's trophy count - the game's own flat cup icon instead
-   of the realistic 🏆 emoji, to match the rest of the icon set. */
+/* Club leaderboard's trophy count, and the Solo board's flag+area stat
+   (IconFlag + formatArea - same span, shared colour) - the game's own
+   flat icons instead of a realistic emoji, to match the rest of the icon
+   set. Plain solid amber text, no stroke/shadow: this inherited the
+   global white-stroke-text rule (tokens.css's .game-text/:where() rule)
+   like every other small /game text does, which reads fine on white but
+   turned this specifically into a muddy, heavy smear against its own
+   amber fill - the same double-stroke bug class as the leaderboard scope
+   tabs (see GamePage.css's .game-menu-subtab-scope-label for the fuller
+   writeup). The icon isn't touched here on purpose: it's a plain SVG with
+   stroke="currentColor" (GameIcons.jsx's GameIcon), so it already always
+   matches whatever colour this rule sets, with nothing extra needed to
+   keep it in sync. */
 .lb-trophy-stat {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--lb-gold);
+  color: #b45309;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 /* --- Podium: 2 · 1 · 3, winner raised --- */
@@ -49,6 +65,16 @@
 .lb-podium-spot.place-2,
 .lb-podium-spot.place-3 {
   padding-top: 48px;
+}
+
+/* Faint warm gold edge around the #1 spot, to go with the Inferno badge -
+   static (no animation), so it doesn't add to that badge's own animated-
+   element budget. */
+.lb-podium-spot.place-1 {
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 177, 92, 0.4),
+    0 0 16px rgba(255, 147, 41, 0.22);
 }
 
 .lb-podium-frame {
@@ -152,24 +178,18 @@
   font-size: 30px;
 }
 
+/* Sizing/fill/animation all live on RankBadge itself (RankBadge.css) -
+   this just anchors it to the frame's bottom-right corner, same spot the
+   old flat medal chip sat in. */
 .lb-podium-medal {
   position: absolute;
-  right: -8px;
-  bottom: 2px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 800;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
-  border: 2.5px solid var(--game-ink);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.4),
-    0 2px 0 var(--game-ink);
+  right: -10px;
+  bottom: 4px;
+}
+
+.place-1 .lb-podium-medal {
+  right: -14px;
+  bottom: 10px;
 }
 
 /* Gold glow around the current player/club's own podium spot - same
@@ -180,31 +200,6 @@
 .lb-podium-spot.is-player .lb-podium-border {
   filter: drop-shadow(0 3px 0 var(--game-ink))
     drop-shadow(0 0 6px var(--lb-gold-light));
-}
-
-.place-1 .lb-podium-medal {
-  width: 36px;
-  height: 36px;
-  right: -12px;
-  bottom: 8px;
-  font-size: 17px;
-  background: radial-gradient(circle at 35% 30%, #ffe3a3, var(--lb-gold) 70%);
-}
-
-.place-2 .lb-podium-medal {
-  background: radial-gradient(
-    circle at 35% 30%,
-    #f4f6f9,
-    var(--lb-silver-dark) 75%
-  );
-}
-
-.place-3 .lb-podium-medal {
-  background: radial-gradient(
-    circle at 35% 30%,
-    #f2c08f,
-    var(--lb-bronze-dark) 75%
-  );
 }
 
 /* Light rays fanned out either side of #1. */
@@ -263,6 +258,24 @@
 
 .lb-podium-spot.is-player .lb-podium-name {
   color: var(--lb-gold-light);
+}
+
+/* Small "You" tag next to the real name (podium spot and list row both) -
+   the name itself stays the player's actual name now instead of being
+   overwritten with the literal word "You" (see GamePage.jsx). */
+.lb-you-tag {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lb-gold);
+  color: #2b1a00;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  vertical-align: middle;
 }
 
 /* --- Rank 4+ list --- */
@@ -407,6 +420,27 @@
 .lb-row-badge .club-badge {
   width: 32px;
   height: auto;
+}
+
+/* Pinned duplicate of the player's own row (see LeaderboardPodium.jsx) -
+   only rendered once their real row (podium spot or list row) scrolls out
+   of view. Sticky, not fixed: its containing block is the nearest
+   scrolling ancestor, which is GamePage.css's .game-menu-sheet (this
+   panel always lives inside it), so it reliably sticks to the bottom of
+   THAT scroll view without needing to know this panel's own padding/safe-
+   area here. The drop shadow (box-shadow would get lost under the
+   following list content otherwise) is what reads it as "floating above"
+   rather than just another row. */
+.lb-pinned-you {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+  margin-top: 4px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+
+.lb-pinned-you .lb-row {
+  width: 100%;
 }
 
 /* --- Loading skeleton (see LeaderboardPodium.jsx's LeaderboardSkeleton) --- */

@@ -3,20 +3,16 @@ import { useEffect, useState } from 'react'
 import { IconClose, IconFlag, IconTrophy } from './GameIcons'
 import { motion } from 'framer-motion'
 import HeroSprite from './HeroSprite'
-import EquippedEmoteBadge from './EquippedEmoteBadge'
-import { resolveEquippedEmoteItem } from '../utils/emotes'
+import HeroStage from './HeroStage'
+import EmoteGlyph from './EmoteGlyph'
 import LevelBar from './LevelBar'
 import ClubBadge from './ClubBadge'
 import { playerName } from '../utils/playerName'
 import { getTerritoryProfileByUserId } from '../api/territory'
 import { resolveFileUrl } from '../api/client'
 import { PARCELS_PER_FLAG, formatArea } from '../utils/territoryGame'
-import {
-  isBlazeHero,
-  isCometHero,
-  isBoltHero,
-  isPlaceholderHero,
-} from '../utils/hero'
+import { DEFAULT_HERO_NAME, isPlaceholderHero } from '../utils/hero'
+import { resolveAthleteProfileHero } from '../utils/athleteProfileHero'
 import defaultAvatarImage from '../assets/avatars/blaze.png'
 import './AthleteTerritoryProfilePanel.css'
 
@@ -46,6 +42,18 @@ export default function AthleteTerritoryProfilePanel({
   // run }) - built by ClubPanel's memberActions. Ones with `confirm` need a
   // second tap. The panel closes after one succeeds.
   actions = [],
+  // True when this profile is the logged-in player's own. The territory
+  // profile fetch below (getTerritoryProfileByUserId) has no concept of a
+  // local (non-StoreItem) avatar pick, which used to leave this panel's
+  // hero/emote area blank for a player who hadn't bought/equipped a real
+  // HERO item yet - GamePage already resolves all of this reliably for
+  // the Me tab, so viewing your own profile reuses those same selectors
+  // (selfHeroName/selfEmoteName/selfShowsTurntable) instead of trusting
+  // this fetch's equippedCosmetics for hero/emote specifically.
+  isSelf = false,
+  selfHeroName = null,
+  selfEmoteName = null,
+  selfShowsTurntable = true,
 }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState(null)
@@ -108,34 +116,25 @@ export default function AthleteTerritoryProfilePanel({
   const cosmetics = profile?.equippedCosmetics || []
   const equippedOf = (category) =>
     cosmetics.find((c) => c.storeItem?.category === category)
-  const hero = cosmetics.find(
+  const cosmeticsHero = cosmetics.find(
     (c) =>
       c.storeItem?.category === 'HERO' && !isPlaceholderHero(c.storeItem.name)
   )
-  const showsTurntable =
-    !hero ||
-    isBlazeHero(hero.storeItem.name) ||
-    isCometHero(hero.storeItem.name) ||
-    isBoltHero(hero.storeItem.name)
   const background = equippedOf('PROFILE_BACKGROUND')
   const phrase = equippedOf('PHRASE')
-  // The one shared selector every "which emote is equipped" screen uses
-  // (also HeroDetailModal.jsx's HeroEmoteStage and GamePage.jsx's Me tab) -
-  // scoped to this player's equipped hero's own heroId, not just "any
-  // equipped emote" in the list, since equip is per-hero server-side (see
-  // HeroItemShelf.jsx's own comment) - they could have a different emote
-  // equipped for a hero they aren't actively playing as. No hero equipped
-  // (falls back to the default Comet pick) means no real heroId to scope
-  // by, so nothing shows rather than guessing. equippedCosmetics is
-  // already pre-filtered to equipped-only server-side (unlike ownedItems,
-  // which needs its own `.equipped` filter first - see each entry having
-  // no separate equipped flag here), so this just unwraps to StoreItems.
-  const equippedEmote = hero
-    ? resolveEquippedEmoteItem(
-        cosmetics.map((c) => c.storeItem),
-        hero.storeItem.heroId
-      )
-    : null
+  // See isSelf above, and resolveAthleteProfileHero's own comment
+  // (src/utils/athleteProfileHero.js) - pulled out as a pure function so
+  // "your own profile is never blank" has a real unit test
+  // (athleteProfileHero.test.js) without needing a DOM renderer.
+  const { heroName, heroAssetUrl, showsTurntable, equippedEmoteName } =
+    resolveAthleteProfileHero({
+      isSelf,
+      selfHeroName,
+      selfEmoteName,
+      selfShowsTurntable,
+      cosmeticsHero,
+      cosmetics,
+    })
   const parcelCount = profile?.parcelCount ?? 0
   const flagCount = Math.min(Math.ceil(parcelCount / PARCELS_PER_FLAG), 8)
 
@@ -170,14 +169,35 @@ export default function AthleteTerritoryProfilePanel({
         {profile && (
           <div className="game-menu-hero">
             {showsTurntable ? (
-              <HeroSprite
-                size={260}
-                hero={hero ? hero.storeItem.name : 'Comet'}
-              />
+              // Plays their equipped emote in place of the idle turntable,
+              // same as the Me tab's own hero display (GamePage.jsx) -
+              // equippedEmoteName is already validated against real local
+              // art by resolveAthleteProfileHero, so a null here means
+              // "show idle", not "something's missing".
+              <HeroStage
+                hero={heroName || DEFAULT_HERO_NAME}
+                className="game-menu-hero-stage"
+              >
+                {(h) =>
+                  equippedEmoteName ? (
+                    <EmoteGlyph
+                      heroName={heroName || DEFAULT_HERO_NAME}
+                      emoteName={equippedEmoteName}
+                      size={h || 260}
+                      active
+                    />
+                  ) : (
+                    <HeroSprite
+                      size={h || 260}
+                      hero={heroName || DEFAULT_HERO_NAME}
+                    />
+                  )
+                }
+              </HeroStage>
             ) : (
               <img
                 className="game-menu-hero-img"
-                src={resolveFileUrl(hero.storeItem.assetUrl)}
+                src={resolveFileUrl(heroAssetUrl)}
                 alt=""
                 onError={(e) => {
                   // Same broken-asset fallback as the Me tab.
@@ -187,13 +207,6 @@ export default function AthleteTerritoryProfilePanel({
               />
             )}
           </div>
-        )}
-
-        {equippedEmote && (
-          <EquippedEmoteBadge
-            heroName={hero.storeItem.name}
-            emoteName={equippedEmote.name}
-          />
         )}
 
         <p className="game-menu-player-name">

@@ -6,7 +6,20 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import prettier from 'eslint-config-prettier'
 
 export default [
-  { ignores: ['dist', 'android', 'ios'] },
+  {
+    ignores: [
+      'dist',
+      'android',
+      'ios',
+      // Playwright's own generated output (npm run test:e2e) - the HTML
+      // report bundles a minified viewer script, and test-results/ holds
+      // per-run traces/screenshots/videos, neither of which is this
+      // project's own source.
+      'e2e-report',
+      'test-results',
+      'playwright-report',
+    ],
+  },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -38,9 +51,22 @@ export default [
     },
   },
   {
-    files: ['vite.config.js'],
+    files: ['vite.config.js', 'playwright.config.js'],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    // Playwright fixtures (test.extend({ name: async (..., use) => {...} }))
+    // aren't React code - eslint-plugin-react-hooks' rules-of-hooks
+    // mistakes `use` (the fixture's own teardown-after-yield callback, an
+    // unrelated Playwright convention) for React's own use() hook.
+    files: ['e2e/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
     },
   },
 ]

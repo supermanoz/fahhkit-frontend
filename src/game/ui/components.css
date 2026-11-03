@@ -625,21 +625,36 @@
   object-fit: cover;
   background: var(--row);
 }
+/* color: var(--game-text) (white) used to be the default here - invisible
+   on var(--game-wood) (the off-white panel token now, not the old dark
+   wood fill) whenever a caller doesn't pass its own fallbackColor/
+   --avatar-bg. This is the single most-used avatar fallback in the app
+   (any player with no profile picture, across Leaderboard/Club/Mail/PvP/
+   territory popups), so this one default was likely the single biggest
+   contributor to the white-icon-on-light-background bug class. Stroke/
+   shadow killed as a normal (non-:where()) rule below, since no caller
+   actually wants those back - only `color` itself needs to stay
+   zero-specificity for a caller's own className to override (see this
+   file's own comment above .g-avatar). */
 :where(.g-avatar-fallback) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: var(--avatar-bg, var(--game-wood));
-  color: var(--game-text);
+  color: var(--text-body-dark);
   font-family: var(--font-display);
   font-weight: 800;
   font-size: calc(var(--avatar-size, 48px) * 0.4);
   line-height: 1;
 }
+.g-avatar-fallback {
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
 .g-avatar-silhouette {
   width: 62%;
   height: 62%;
-  color: var(--white);
+  color: var(--text-muted-dark);
 }
 .g-avatar-ring {
   box-shadow: 0 0 0 3px var(--ring-color, var(--green-500));

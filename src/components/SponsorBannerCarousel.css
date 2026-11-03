@@ -102,9 +102,10 @@ a.sponsor-banner-card:focus-visible {
   text-transform: uppercase;
 }
 
-/* Same recipe as every other primary green button in /game
-   (.game-page .btn-primary / .game-btn-green - light top, base, dark
-   bottom, ink outline, hard drop shadow) - decorative only (see
+/* Same recipe as every other primary button in /game (light top, base,
+   dark bottom, ink outline, hard drop shadow), but the Leaderboard's own
+   slate accent (--lb-accent*, see GamePage.css) instead of the usual
+   green - this banner only ever shows there. Decorative only (see
    SponsorBannerCarousel.jsx's own comment on why this isn't a real nested
    <button>), the card itself carries the click/keyboard/focus behaviour. */
 .sponsor-banner-view-btn {
@@ -125,12 +126,12 @@ a.sponsor-banner-card:focus-visible {
   border: 3px solid var(--game-ink);
   background: linear-gradient(
     180deg,
-    var(--game-green-light) 0%,
-    var(--game-green) 45%,
-    var(--game-green-dark) 100%
+    var(--lb-accent-light) 0%,
+    var(--lb-accent) 45%,
+    var(--lb-accent-dark) 100%
   );
   box-shadow:
-    inset 0 -4px 0 var(--game-green-dark),
+    inset 0 -4px 0 var(--lb-accent-dark),
     0 3px 0 var(--game-ink);
   color: #fff;
   font-weight: 900;
@@ -146,7 +147,7 @@ a.sponsor-banner-card:focus-visible {
 .sponsor-banner-card:active .sponsor-banner-view-btn {
   transform: translateY(2px);
   box-shadow:
-    inset 0 -4px 0 var(--game-green-dark),
+    inset 0 -4px 0 var(--lb-accent-dark),
     0 1px 0 var(--game-ink);
 }
 

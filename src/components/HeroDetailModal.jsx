@@ -4,19 +4,22 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   IconBolt,
   IconCheck,
-  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconClose,
   IconLock,
 } from './GameIcons'
 import HeroFigure from './HeroFigure'
+import HeroStage from './HeroStage'
 import EmoteGlyph from './EmoteGlyph'
-import { resolveFileUrl } from '../api/client'
 import { getHeroSprite } from '../utils/heroSprites'
 import { heroAbilityParts } from '../utils/hero'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
-import { resolveEmoteAsset, resolveEquippedEmoteItem } from '../utils/emotes'
+import {
+  filterVisibleEmotes,
+  resolveEmoteAsset,
+  resolveEquippedEmoteItem,
+} from '../utils/emotes'
 import './HeroDetailModal.css'
 
 // Stat bars fill against this boost - no hero perk goes near it, so a +10%
@@ -63,8 +66,12 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
   const spriteHeight = stageHeight ? Math.round(stageHeight * 0.875) : 190
 
   const idleSrc = sprite?.poses?.idle?.src
-  const emoteItems = (hero.skins || []).filter(
-    (item) => item.category === 'EMOTE'
+  // filterVisibleEmotes drops this hero's hidden emotes (see
+  // HIDDEN_EMOTES in emotes.js) before any slide/dot/count is built, so
+  // they never occupy a slot at all - not even a locked one.
+  const emoteItems = filterVisibleEmotes(
+    hero.name,
+    (hero.skins || []).filter((item) => item.category === 'EMOTE')
   )
   const isIdleAlias = (item) =>
     resolveEmoteAsset(hero.name, item.name)?.src === idleSrc
@@ -75,9 +82,13 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
   // start), so each slide's badge below updates the moment an equip call
   // resolves, with nothing extra to wire up, and is still correct after a
   // refresh since there's no separate local "equipped" state to go stale.
+  // Passing hero.name makes a hidden-but-still-equipped emote resolve to
+  // null here too, so this slider's idle slide falls back to "equipped"
+  // on its own.
   const equippedItem = resolveEquippedEmoteItem(
     ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
-    hero.id
+    hero.id,
+    hero.name
   )
   const idleAliasItem = emoteItems.find(isIdleAlias)
   const emoteSlides = emoteItems
@@ -88,10 +99,33 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
       owned: ownedItems.some((o) => o.storeItem.id === item.id),
       equipped: equippedItem?.id === item.id,
     }))
+  // No hero currently has a real "emote1" StoreItem row to find here - the
+  // 4 newest heroes never got one created (it's free, nothing to buy), and
+  // an older hero's "Classic" row (if it still exists under that name)
+  // can't be name-matched against the renamed manifest keys any more (see
+  // resolveEmoteAsset: a hero WITH a manifest never falls through to the
+  // alias-name check at all, only an unknown hero does) - idleAliasItem
+  // above is effectively always undefined in practice. Falls back to a
+  // virtual item (id: null - GamePage.jsx's onEquip checks for this and
+  // unequips whatever else is active instead of calling the API with a
+  // fake id) so the slide/popup still work correctly either way: "idle is
+  // equipped" means nothing ELSE is currently equipped for this hero, and
+  // "Equip" means clearing that, not equipping a specific row.
+  const idleItem = idleAliasItem || {
+    id: null,
+    name: 'Emote1',
+    heroId: hero.id,
+    category: 'EMOTE',
+    priceFahhcoin: 0,
+  }
   const slides = [
     {
       kind: 'idle',
-      equipped: idleAliasItem ? equippedItem?.id === idleAliasItem.id : false,
+      item: idleItem,
+      owned: true,
+      equipped: idleAliasItem
+        ? equippedItem?.id === idleAliasItem.id
+        : !equippedItem,
     },
     ...emoteSlides,
   ]
@@ -149,83 +183,95 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
         ref={stageRef}
         className={`hero-modal-stage ${sprite ? '' : 'is-flat'}`}
       >
-        <AnimatePresence mode="popLayout" custom={direction} initial={false}>
-          <motion.div
-            key={index}
-            custom={direction}
-            variants={emoteFlipVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
-            style={{ width: '100%', height: '100%', transformPerspective: 900 }}
-            className="hero-emote-slide"
-            role="group"
-            aria-label={slideLabel}
-            drag={slides.length > 1 ? 'x' : false}
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.15}
-            onDragStart={() => {
-              draggedRef.current = false
-            }}
-            onDragEnd={handleDragEnd}
-            onClick={() => {
-              if (draggedRef.current) {
+        <HeroStage hero={hero.name} className="hero-modal-stage-bg" fullBleed>
+          <AnimatePresence mode="popLayout" custom={direction} initial={false}>
+            <motion.div
+              key={index}
+              custom={direction}
+              variants={emoteFlipVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+              style={{
+                width: '100%',
+                height: '100%',
+                transformPerspective: 900,
+              }}
+              className="hero-emote-slide"
+              role="group"
+              aria-label={slideLabel}
+              drag={slides.length > 1 ? 'x' : false}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.15}
+              onDragStart={() => {
                 draggedRef.current = false
-                return
-              }
-              if (slide.kind === 'emote') onShowcase(slide.item)
-            }}
-          >
-            {/* Idle only - Hip Hop (or whatever a hero's own emote2 is) is
+              }}
+              onDragEnd={handleDragEnd}
+              onClick={() => {
+                if (draggedRef.current) {
+                  draggedRef.current = false
+                  return
+                }
+                // Idle counts too now (it carries the real "emote1" item
+                // when one exists - see its `item` above) - it used to be
+                // excluded entirely, so tapping it silently did nothing and
+                // there was no way to ever open its Equip button.
+                if (slide.item) onShowcase(slide.item)
+              }}
+            >
+              {/* Idle only - Hip Hop (or whatever a hero's own emote2 is) is
                 a purchasable emote (see heroManifest.js: it's under this
                 hero's `emotes`, not `poses`), so the idle slide itself
                 can't free-preview anything past idle. */}
-            <span
-              className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''} ${slide.equipped ? 'is-equipped' : ''}`}
-            >
-              {slide.kind === 'idle' ? (
-                <HeroFigure hero={hero} pose="idle" height={spriteHeight} />
-              ) : (
-                // Plays regardless of ownership - only the current slide is
-                // ever mounted at all (AnimatePresence swaps one slide at a
-                // time, see above), so there's no "every tile animating at
-                // once" cost here the way a grid has (that's what
-                // EmoteGlyph's `active` gate was originally built to avoid
-                // - see its own comment). Locked is communicated by the
-                // lock badge + a light dim below, not a frozen frame.
-                <EmoteGlyph
-                  heroName={hero.name}
-                  emoteName={slide.item.name}
-                  size={spriteHeight}
-                  active
-                />
-              )}
-              {slide.kind === 'emote' && !slide.owned && (
-                <span className="hero-emote-lock-badge" aria-hidden="true">
-                  <IconLock />
-                </span>
-              )}
-              {slide.equipped && (
-                <span
-                  className="hero-emote-equipped-badge"
-                  role="img"
-                  aria-label="Equipped"
-                >
-                  <IconCheck aria-hidden="true" />
-                </span>
-              )}
-              {/* Owned but not the active one - nothing else on the slide
+              <span
+                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''} ${slide.equipped ? 'is-equipped' : ''}`}
+              >
+                {slide.kind === 'idle' ? (
+                  <HeroFigure hero={hero} pose="idle" height={spriteHeight} />
+                ) : (
+                  // Plays regardless of ownership - only the current slide is
+                  // ever mounted at all (AnimatePresence swaps one slide at a
+                  // time, see above), so there's no "every tile animating at
+                  // once" cost here the way a grid has (that's what
+                  // EmoteGlyph's `active` gate was originally built to avoid
+                  // - see its own comment). Locked is communicated by the
+                  // lock badge + a light dim below, not a frozen frame.
+                  <EmoteGlyph
+                    heroName={hero.name}
+                    emoteName={slide.item.name}
+                    size={spriteHeight}
+                    active
+                  />
+                )}
+                {slide.kind === 'emote' && !slide.owned && (
+                  <span className="hero-emote-lock-badge" aria-hidden="true">
+                    <IconLock />
+                  </span>
+                )}
+                {slide.equipped && (
+                  <span
+                    className="hero-emote-equipped-badge"
+                    role="img"
+                    aria-label="Equipped"
+                  >
+                    <IconCheck aria-hidden="true" />
+                  </span>
+                )}
+                {/* Owned but not the active one - nothing else on the slide
                   said "you already bought this, tap to equip it" (the lock
                   badge only covers the unowned case). Purely informational;
                   tapping the slide already opens the showcase popup with
-                  the real Equip button either way, same as before. */}
-              {slide.kind === 'emote' && slide.owned && !slide.equipped && (
-                <span className="hero-emote-available-badge">Equip</span>
-              )}
-            </span>
-          </motion.div>
-        </AnimatePresence>
+                  the real Equip button either way, same as before. Idle is
+                  always "owned" (free), so it only needs a real item to
+                  equip against. */}
+                {slide.owned && slide.item && !slide.equipped && (
+                  <span className="hero-emote-available-badge">Equip</span>
+                )}
+              </span>
+            </motion.div>
+          </AnimatePresence>
+        </HeroStage>
 
         {slides.length > 1 && (
           <>
@@ -277,7 +323,7 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
 }
 
 // A hero's codex page: big animated figure, stats (score perks), lore and
-// skins. Rendered at page level by GamePage (inside AnimatePresence) so the
+// emotes. Rendered at page level by GamePage (inside AnimatePresence) so the
 // fixed overlay isn't trapped by the menu's transforms.
 export default function HeroDetailModal({
   hero,
@@ -296,12 +342,13 @@ export default function HeroDetailModal({
     ownedItems,
     activeHeroId
   )
-  // The hero-unlock item itself - mixed into `hero.skins` alongside his
-  // real skins/emotes (see the `skins` filter below), not owned yet if
-  // `ownedHeroItem` is null. Buying/equipping this (not a skin) is what
-  // the gallery card's own "Unlock"/price label and Equip button promise -
-  // this modal had no matching action at all before, so tapping "Unlock"
-  // landed on Stats/Lore/Skins with nothing to actually unlock the hero.
+  // The hero-unlock item itself - mixed into `hero.skins` (the backend's
+  // field name for every active store item tied to this hero, categories
+  // and all) alongside his emotes (see the `emoteItems` filter above), not
+  // owned yet if `ownedHeroItem` is null. Buying/equipping this is what the
+  // gallery card's own "Unlock"/price label and Equip button promise - this
+  // modal had no matching action at all before, so tapping "Unlock" landed
+  // here with nothing to actually unlock the hero.
   const heroItem = (hero.skins || []).find((item) => item.category === 'HERO')
 
   useEffect(() => {
@@ -327,21 +374,9 @@ export default function HeroDetailModal({
     setLoreOverflows(el.scrollHeight - el.clientHeight > 1)
   }, [hero.backstory])
 
-  // Skins starts collapsed, same "less dominant" goal as Lore's clamp -
-  // the hero figure above is the point of this screen now, not a scroll
-  // of secondary lists.
-  const [skinsOpen, setSkinsOpen] = useState(false)
-
   const abilities = (hero.abilities || [])
     .map((a) => ({ id: a.id, ...heroAbilityParts(a) }))
     .filter((a) => a.label)
-  // The backend's "skins" field is really every active store item tied to
-  // this hero (findByHeroAndActiveTrue has no category filter of its own),
-  // so it mixes in the hero-unlock item itself, his emotes (see
-  // HeroEmoteStage above) and real skins together - filtered down to just
-  // SKIN here so this section doesn't show either of the other two as a
-  // "skin" card.
-  const skins = (hero.skins || []).filter((item) => item.category === 'SKIN')
 
   return (
     <motion.div
@@ -402,7 +437,7 @@ export default function HeroDetailModal({
                   className="btn btn-primary"
                   onClick={() => onBuy(heroItem)}
                   // Limited heroes can't be bought (server rejects with
-                  // HERO_LIMITED) - same guard the skins section below uses.
+                  // HERO_LIMITED).
                   disabled={hero.limited}
                 >
                   {hero.limited
@@ -468,79 +503,6 @@ export default function HeroDetailModal({
             </p>
           )}
 
-          <button
-            type="button"
-            className={`hero-modal-section-toggle${skinsOpen ? ' is-open' : ''}`}
-            onClick={() => setSkinsOpen((v) => !v)}
-            aria-expanded={skinsOpen}
-          >
-            <h3 className="hero-modal-heading">Skins</h3>
-            <IconChevronDown />
-          </button>
-          <div className={`hero-modal-collapse${skinsOpen ? ' is-open' : ''}`}>
-            <div>
-              {skins.length === 0 ? (
-                <p className="hero-modal-muted">Arriving in the shop soon.</p>
-              ) : (
-                <ul className="hero-modal-skins">
-                  {skins.map((skin) => {
-                    const owned = ownedItems.find(
-                      (o) => o.storeItem.id === skin.id
-                    )
-                    return (
-                      <li key={skin.id}>
-                        <span className="hero-modal-skin-swatch">
-                          {skin.assetUrl && (
-                            <img
-                              src={resolveFileUrl(skin.assetUrl)}
-                              alt=""
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none'
-                              }}
-                            />
-                          )}
-                        </span>
-                        <span className="hero-modal-skin-name">
-                          {skin.name}
-                        </span>
-                        {owned ? (
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => onEquip(skin, owned.equipped)}
-                          >
-                            {owned.equipped ? (
-                              'Unequip'
-                            ) : (
-                              <>
-                                <IconCheck /> Equip
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => onBuy(skin)}
-                            // Limited heroes can't be bought (server
-                            // rejects with HERO_LIMITED) - reserved for
-                            // events/rewards.
-                            disabled={hero.limited}
-                          >
-                            {hero.limited
-                              ? 'Not for sale'
-                              : skin.priceFahhcoin > 0
-                                ? `${skin.priceFahhcoin} Fahhcoin`
-                                : 'Free'}
-                          </button>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
           {error && <p className="hero-modal-error">{error}</p>}
         </div>
       </motion.div>

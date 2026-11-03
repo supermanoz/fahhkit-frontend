@@ -9,6 +9,12 @@ export const CARD_W = 432
 export const CARD_H = 768
 export const EXPORT_SCALE = 2.5 // -> 1080x1920 export resolution
 
+// The one place the share card's brand wordmark text is set - every
+// drawWordmark call (all 3 variants below, preview canvas and export
+// canvas alike, since they run the exact same drawShareCard) reads from
+// here, so renaming the brand only ever means touching this one line.
+export const BRAND_NAME = 'RUN CONQUEST'
+
 export const SHARE_VARIANTS = {
   TRANSPARENT: 'transparent',
   GRADIENT: 'gradient',
@@ -80,16 +86,29 @@ export async function ensureWordmarkFontLoaded() {
   }
 }
 
+// maxWidth shrinks fontSize (down to a 10px floor) to keep BRAND_NAME from
+// clipping past the card edge - "RUN CONQUEST" is ~1.7x longer than the
+// old "FAHHKIT", and each variant anchors this at a different x/align, so
+// this can't just be eyeballed per call site the way the single old short
+// word could.
 export function drawWordmark(
   ctx,
-  { x, y, fontSize = 22, fillStyle, align = 'left' }
+  { x, y, fontSize = 22, fillStyle, align = 'left', maxWidth }
 ) {
   ctx.save()
-  ctx.font = `800 ${fontSize}px 'Poppins', sans-serif`
+  let size = fontSize
+  ctx.font = `800 ${size}px 'Poppins', sans-serif`
+  if (maxWidth) {
+    const width = ctx.measureText(BRAND_NAME).width
+    if (width > maxWidth) {
+      size = Math.max(10, Math.floor(fontSize * (maxWidth / width)))
+      ctx.font = `800 ${size}px 'Poppins', sans-serif`
+    }
+  }
   ctx.textAlign = align
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = fillStyle
-  ctx.fillText('FAHHKIT', x, y)
+  ctx.fillText(BRAND_NAME, x, y)
   ctx.restore()
 }
 
@@ -286,6 +305,7 @@ export async function drawShareCard(
       fontSize: 26,
       fillStyle: '#ffffff',
       align: 'center',
+      maxWidth: width - padding * 2,
     })
 
     drawStatsStack(ctx, {
@@ -318,6 +338,7 @@ export async function drawShareCard(
       y: wordmarkY,
       fillStyle: '#ffffff',
       align: 'center',
+      maxWidth: width - padding * 2,
     })
     drawStatsRow(ctx, {
       distance,
@@ -351,6 +372,7 @@ export async function drawShareCard(
       fontSize: 16,
       fillStyle: 'rgba(255,255,255,0.9)',
       align: 'right',
+      maxWidth: width - padding * 2,
     })
 
     ctx.save()

@@ -48,6 +48,24 @@
   --game-red: var(--red-500);
   --game-red-dark: var(--red-700);
   --game-red-light: var(--red-300);
+  /* Leaderboard-only accent (Players/Clubs tab, scope tabs, the partner
+     banner's "View" button) - replaces that screen's green/gold-orange
+     buttons; every other screen keeps its own. */
+  --lb-accent: var(--slate-500);
+  --lb-accent-dark: var(--slate-700);
+  --lb-accent-light: var(--slate-300);
+  /* Club War's own red replacement (letters/names/labels/scores only -
+     close/danger buttons stay red). Same slate as --lb-accent above, under
+     the name the brief asked for. */
+  --slate-accent: var(--slate-500);
+  /* PvP's own red replacement - full light/dark gradient pair for button
+     fills, same slate family. -rgb is for glow/highlight box-shadows that
+     need their own alpha (rgba(var(--pvp-accent-rgb), 0.5)). */
+  --pvp-accent: var(--slate-500);
+  --pvp-accent-light: var(--slate-300);
+  --pvp-accent-dark: var(--slate-700);
+  --pvp-accent-rgb: var(--slate-500-rgb);
+  --pvp-accent-tint: var(--slate-tint);
   --game-cream: var(--text-body);
   --game-panel: var(--row);
   --game-panel-border: var(--panel-border);
@@ -371,7 +389,7 @@
   white-space: nowrap;
   padding: 1px 8px 2px;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.1;
   text-shadow:
@@ -604,7 +622,7 @@
 }
 
 .game-weather-toast-line {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.25;
   color: rgba(255, 255, 255, 0.9);
@@ -1976,7 +1994,12 @@
 
 .game-radial-btn.radial-wood {
   background: var(--game-wood);
-  color: var(--game-text);
+  /* var(--text-body-dark), not --game-text (white) - var(--game-wood)
+     aliases to the off-white panel token now, same bug class as the
+     Settings row icons. */
+  color: var(--text-body-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
   box-shadow:
     inset 0 -9px 0 var(--game-wood-dark),
     inset 0 3px 0 var(--game-wood-light),
@@ -1996,6 +2019,12 @@
 
 .game-radial-btn.radial-stone {
   background: var(--game-stone);
+  /* var(--game-stone) aliases to a light tan token now - this had no own
+     color at all, inheriting the ambient white default, same bug class as
+     the Settings row icons. */
+  color: var(--text-body-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
   box-shadow:
     inset 0 -9px 0 var(--game-stone-dark),
     inset 0 3px 0 var(--game-stone-light),
@@ -2176,14 +2205,20 @@
 }
 
 /* Dark ink, no outline - every picker surface is off-white/white now, not
-   a dark wood plank (same failure mode as .game-card-title's own comment). */
+   a dark wood plank (same failure mode as .game-card-title's own comment).
+   The comment above was already right about this; the colour itself just
+   never actually got updated to match - still var(--text-title) (white),
+   reading as invisible-to-barely-legible on the white/off-white current-
+   tab button and option rows below. */
 .game-menu-picker-label {
   flex: 1;
   min-width: 0;
   font-size: 20px;
   font-weight: 900;
   letter-spacing: 0.03em;
-  color: var(--text-title);
+  color: var(--text-title-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 /* Round enamel coin behind each tab icon. */
@@ -2478,17 +2513,18 @@
    own small icon-button class (.game-shop-tabs .game-menu-subtab) for
    size/shape/spacing/press-state rather than keeping a bespoke box - see
    the game-shop-tabs rules below. .game-leaderboard-mode only still exists
-   to keep this row's active state gold (its original colour), instead of
-   the shop's green .game-menu-subtab.active. */
+   to keep this row's active state its own colour (slate, see --lb-accent*
+   in the tokens block above), instead of the shop's green
+   .game-menu-subtab.active. */
 .game-leaderboard-mode .game-menu-subtab.active {
   background: linear-gradient(
     180deg,
-    var(--game-gold-light),
-    var(--game-gold) 55%,
-    var(--game-gold-dark)
+    var(--lb-accent-light),
+    var(--lb-accent) 55%,
+    var(--lb-accent-dark)
   );
   box-shadow:
-    inset 0 -3px 0 var(--game-gold-dark),
+    inset 0 -3px 0 var(--lb-accent-dark),
     0 2px 0 var(--game-ink);
   /* White, not the base's dark text - this is a real colour fill. */
   color: #fff;
@@ -2496,18 +2532,86 @@
 
 /* Global/City (Solo) or Global/National (Club) scope row under the
    Solo/Club row - a secondary choice, so it reads smaller/quieter than the
-   primary tabs above it. */
+   primary tabs above it. Was 11px/44px-min-height - at that size the
+   global white-stroke-text rule (tokens.css's .game-text/:where() rule -
+   -webkit-text-stroke-width, 1px even at the clamp's floor) stacked with
+   .game-menu-subtab.active's OWN 5-offset text-shadow stroke simulation
+   below, double-stroking the glyphs until they smeared into each other.
+   Bumped to 14px with padding doing the sizing instead of a taller fixed
+   min-height - the label itself (not this rule) is what actually kills
+   the double-stroke, see .game-menu-subtab-scope-label below. */
 .game-menu-subtabs-scope .game-menu-subtab {
-  padding: 5px 8px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-size: 14px;
   border-width: 2px;
-  /* 44px minimum tap target (leaderboard-only override - this class has no
-     other consumer, see GamePage.jsx) - the compact 5px padding alone left
-     this well under that on a touch device. */
-  min-height: 44px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+}
+
+/* Dark on the light inactive tab (game-wood-light here is the off-white
+   panel token now, not actual brown wood - see GamePage.css's tokens
+   block) - the base .game-menu-subtab rule's colour is var(--text-title),
+   which resolves to white (--game-text) and read as a second, competing
+   light-on-light "stroke" against the double-stroke bug above. Active
+   stays the base rule's white, unchanged. #1f1e1a (not
+   var(--text-title-dark)/#2b2a24) to match the Top Players/Top Clubs row
+   exactly, same reasoning as that rule below. */
+.game-menu-subtabs-scope .game-menu-subtab:not(.active) {
+  color: #1f1e1a;
+}
+
+/* Global/District/Country icons (globe-scope.png - a provided raster
+   asset, see GamePage.jsx - and IconFlagScope in GameIcons.jsx) - fixed
+   18px regardless of the button's own font-size, and deliberately not
+   `flex-shrink` so they never get squeezed before the label does at
+   360px. Both carry their own fixed colours (not currentColor), so
+   nothing here needs to re-colour them per active/inactive state - that's
+   the whole point of them being fixed-colour. */
+.game-menu-subtab-scope-icon {
+  flex-shrink: 0;
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+/* The label can be a live city/country name (see GamePage.jsx), which can
+   run long - truncates instead of wrapping or pushing the row wider, so
+   both scope tabs keep the same width at 360px (overflow: hidden stays
+   for that horizontal ellipsis; kept vertically safe instead of removed,
+   via the generous line-height below, since an explicit height would
+   reintroduce the fixed-height clipping this is fixing).
+   -webkit-text-stroke-width: 0 + a single soft shadow (instead of
+   inheriting the global stroke AND .game-menu-subtab.active's own 5-way
+   stroke-simulating text-shadow on top of it) is what actually fixes the
+   garbled/clipped glyphs - see the rule above for why both were stacking.
+   Set directly on this span (not the button) because an element's own
+   declaration always wins over an inherited one regardless of the
+   ancestor rule's specificity, so this cleanly wins over
+   .game-menu-subtab.active's text-shadow without needing !important.
+   No shadow by default (plain solid text on the inactive tab, same as
+   the Top Players/Top Clubs row) - a shadow is added back below, scoped
+   to .active only, since that's the one state that actually needs it for
+   contrast against the coloured fill. */
+.game-menu-subtab-scope-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: normal;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+.game-menu-subtabs-scope
+  .game-menu-subtab.active
+  .game-menu-subtab-scope-label {
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 }
 
 .game-menu-subtab.active {
@@ -2530,6 +2634,25 @@
     0 2px 0 var(--game-ink);
 }
 
+/* Leaderboard-only override of the green active state just above -
+   .game-menu-subtabs-scope has no other consumer (see its own comment
+   above), so this can't bleed into the Shop's section tabs, which share
+   the same base .game-menu-subtab.active rule and need to keep their
+   green. Slate instead (--lb-accent*), same gradient/outline/shadow
+   recipe, just the one colour swapped - text-shadow (the stroke) is
+   unchanged, inherited from the rule above. */
+.game-menu-subtabs-scope .game-menu-subtab.active {
+  background: linear-gradient(
+    180deg,
+    var(--lb-accent-light) 0%,
+    var(--lb-accent) 45%,
+    var(--lb-accent-dark) 100%
+  );
+  box-shadow:
+    inset 0 -3px 0 var(--lb-accent-dark),
+    0 2px 0 var(--game-ink);
+}
+
 .game-menu-panel {
   min-height: 120px;
   background-size: cover;
@@ -2541,6 +2664,16 @@
   display: flex;
   justify-content: center;
   padding-top: 4px;
+}
+
+/* HeroStage.css's own .hero-stage defaults to width: 100% of its parent -
+   .game-menu-hero itself has no width (it just centers whatever's inside
+   it), so without this the stage would stretch to the full menu panel
+   width instead of staying the same compact size the turntable/EmoteGlyph
+   it wraps (size=260) always rendered at. */
+.game-menu-hero-stage {
+  width: 100%;
+  max-width: 300px;
 }
 
 .game-menu-hero-img {
@@ -2611,7 +2744,7 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   text-shadow:
     1px 0 0 var(--game-ink),
@@ -2792,7 +2925,7 @@
 .game-menu-empty {
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   padding: 12px 0 4px;
 }
 
@@ -3195,11 +3328,26 @@
   border-bottom: none;
 }
 
+/* Edit Profile's trailing chevron - sat bare before, inheriting
+   .game-settings-row's white text colour same as the row icons did. */
+.game-settings-row-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted-dark);
+  font-size: 16px;
+}
+
 .game-settings-row-label {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 15px;
+  /* Without this, the flex item refuses to shrink below its unwrapped
+     text's own width (flex items default to min-width: auto, not 0) and
+     the title/subtitle get pushed past the row's edge instead of wrapping
+     - the actual cause of "Nearby runners…"/"Clears your sess…" getting
+     cut off, not a font-size or overflow:hidden issue. */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .game-settings-row:disabled {
@@ -3207,42 +3355,76 @@
   cursor: progress;
 }
 
+/* Round "coin" badge behind each row's icon - same visual language as the
+   tab medals (.game-menu-picker-medal: ink-bordered circle, coloured
+   fill), just smaller and in a fixed-width column so every row's title/
+   subtitle lines up regardless of the badge's own size. The icons
+   themselves used to sit bare and inherit .game-settings-row's
+   color: var(--text-title) (white, the usual /game text treatment) -
+   invisible on this tab's off-white panel background, a leftover from
+   before this theme went light. Sized via font-size (every /game icon is
+   1em, currentColor) rather than forcing width/height on the svg. */
+.game-settings-row-icon {
+  flex-shrink: 0;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-settings-row-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--game-ink);
+  background: var(--row);
+  color: var(--text-body-dark);
+  font-size: 22px;
+}
+
+.game-settings-row-danger .game-settings-row-icon-badge {
+  background: var(--red-tint);
+  color: var(--red-text);
+}
+
 .game-settings-row-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
-  line-height: 1.1;
+  line-height: 1.3;
+  min-width: 0;
 }
 
 .game-settings-row-sub {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--text-muted);
-}
-
-/* Territory-capture rollout row (see GamePage.jsx's captureLocked) - a
-   plain div, not a toggle button like the rows above it, so this undoes
-   the pointer cursor .game-settings-row sets by default. */
-.game-settings-row-static {
-  cursor: default;
-}
-
-.game-settings-row-static .btn {
-  flex-shrink: 0;
+  /* Wraps instead of being clipped - no white-space: nowrap here, this
+     just needed the min-width: 0 above (and on the row-text column) to
+     actually take effect. */
+  white-space: normal;
 }
 
 .game-settings-row-requested {
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
-  color: var(--game-green-light, #a8f0af);
+  /* --green-text, not --game-green-light - this sits directly on the
+     off-white panel (light-on-light, same bug class as the row icons
+     above), --green-text clears AA there. */
+  color: var(--green-text);
 }
 
-/* Log Out - same row recipe, just red-tinted icon/label so it reads as the
-   one destructive action in this list. */
+/* Log Out - same row recipe, just red-tinted label/icon so it reads as the
+   one destructive action in this list. --red-text, not --game-red-light -
+   the light variant is a leftover from the old dark theme and is barely
+   readable on this tab's off-white panel. */
 .game-settings-row-danger .game-settings-row-label {
-  color: var(--game-red-light, #ffab9e);
+  color: var(--red-text);
 }
 
 /* Chunky on/off switch - stone track that turns green, cream knob with an
@@ -3516,537 +3698,10 @@
   margin-bottom: 10px;
 }
 
-/* Emote buy-confirm preview (see EmoteShelf.jsx) - a plain image instead of
-   ShadeFlag/TrailPreview's drawn swatch, since an emote's own art is
-   already the preview. "Tap a card to preview the emote before buying" -
-   tapping an unowned emote opens straight into this same confirm dialog
-   (EmoteShelf's onBuy), so this card already IS that preview step; the
-   little bounce loop is what makes it read as "playing" rather than a
-   static picture, the closest this gets to a live animated preview without
-   real per-frame emote art from the backend (see EmoteShelf.jsx's own
-   top-of-file comment on that). */
-.game-confirm-emote-preview {
-  display: block;
-  width: 100%;
-  max-width: 180px;
-  aspect-ratio: 1;
-  object-fit: contain;
-  margin: 0 auto 10px;
-  border: 3px solid var(--game-ink);
-  border-radius: 12px;
-  background: var(--row);
-  animation: emote-preview-bounce 1.1s ease-in-out infinite;
-}
-
-@keyframes emote-preview-bounce {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-6px) scale(1.04);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .game-confirm-emote-preview {
-    animation: none;
-  }
-}
-
-/* --- Emote shop shelf (see EmoteShelf.jsx) - a header banner, then either
-   a hero picker (tap a hero to see just their emotes) or that hero's card
-   grid, since an emote can't be bought or equipped without owning its
-   hero first. --- */
-.emote-shelf {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-/* Banner: carved-wood ribbon like the game's other section headers, not a
-   generic bar - the (i) button matches the HUD's small round icon buttons. */
-.emote-shelf-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    var(--game-wood, #e0a355),
-    var(--game-wood-dark, #a8672c)
-  );
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    0 3px 0 var(--game-ink);
-}
-
-.emote-shelf-banner-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.emote-shelf-banner-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 900;
-  color: var(--game-text);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.emote-shelf-banner-sub {
-  margin: 1px 0 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.emote-shelf-info-btn {
-  all: unset;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--game-text);
-  background: var(--white);
-  border: 2px solid var(--game-ink);
-}
-
-.emote-shelf-info-btn:hover,
-.emote-shelf-info-btn:focus-visible {
-  background: var(--row);
-  outline: none;
-}
-
-.emote-shelf-info-line {
-  margin: -6px 0 0;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: var(--game-panel);
-  border: 2px solid var(--border-soft);
-  color: var(--game-cream);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-/* --- Hero summary + All/Owned/Locked filter row (EmoteShelf.jsx only -
-   see HeroItemShelf.jsx's showHeroSummary prop) --- */
-.emote-hero-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.emote-hero-summary-text {
-  margin: 0;
-  font-weight: 800;
-  font-size: 12.5px;
-  color: var(--game-cream);
-}
-
-.emote-hero-filter-row {
-  display: flex;
-  gap: 6px;
-}
-
-.emote-hero-filter-btn {
-  all: unset;
-  box-sizing: border-box;
-  min-height: 30px;
-  padding: 5px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 11px;
-  color: var(--text-body);
-  background: var(--row);
-  border: 1.5px solid var(--border-soft);
-}
-
-.emote-hero-filter-btn.active {
-  color: var(--game-text);
-  background: var(--game-gold);
-  border-color: var(--game-ink);
-}
-
-/* --- Hero picker - tapping a hero drills into their emote grid below.
-   A sensible max card width (not 3 equal-width columns stretching to
-   fill whatever the panel's width happens to be) so cards read as
-   cards instead of stretched-flat boxes on a wide screen. --- */
-/* min-width: 0 is the actual fix for the mobile overflow bug here - this
-   grid is a flex child of .emote-shelf (display: flex; flex-direction:
-   column), and a flex item's default min-width is `auto`, which lets its
-   own content's max-content size (an auto-fill grid asks "how wide would
-   I be with as many 180px+ columns side by side as fit my content," which
-   on 7 heroes is several hundred px) win over the flex container's actual
-   available width - confirmed this is the same class of bug .emote-tile's
-   own comment documents elsewhere in this file, just one level up (the
-   grid CONTAINER itself here, not a grid item). Without this, the grid
-   never actually shrinks to fewer columns on a narrow phone - it just
-   overflows the viewport sideways instead. */
-.emote-hero-picker {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  max-width: 640px;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  margin: 0 auto;
-  gap: 14px;
-  justify-content: center;
-}
-
-.emote-hero-pick {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 14px 8px 12px;
-  border-radius: 14px;
-  cursor: pointer;
-  background: var(--game-panel);
-  border: 2px solid var(--border-soft);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  transition:
-    transform 0.14s ease,
-    box-shadow 0.14s ease,
-    opacity 0.14s ease;
-}
-
-.emote-hero-pick:hover,
-.emote-hero-pick:focus-visible {
-  transform: translateY(-3px);
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--game-gold),
-    0 8px 16px rgba(0, 0, 0, 0.6);
-}
-
-.emote-hero-pick:active {
-  transform: translateY(-1px);
-}
-
-/* Owned cards glow a touch - locked ones dim instead (their badge/state
-   text stay full-opacity below, only the card body dims). */
-.emote-hero-pick.is-owned {
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 0 0 1px rgba(255, 193, 110, 0.35),
-    0 2px 10px rgba(255, 173, 92, 0.25);
-}
-
-.emote-hero-pick.is-locked {
-  opacity: 0.82;
-}
-
-/* Outer wrapper is NOT clipped (unlike the portrait circle inside it) -
-   the lock/check badge is a sibling of the clipped circle, not a child
-   of it, so it never gets cut off by the circle's own border-radius +
-   overflow:hidden (what made the old badge look clipped/half-missing in
-   its corner). */
-.emote-hero-pick-avatar-wrap {
-  position: relative;
-  width: 76px;
-  height: 76px;
-}
-
-.emote-hero-pick-portrait {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--row);
-  border: 2.5px solid var(--game-ink);
-  color: var(--game-cream);
-  font-weight: 900;
-  font-size: 26px;
-  /* The coloured ring - gold once owned, a dim ink ring while locked. */
-  box-shadow: 0 0 0 3px var(--emote-hero-ring-color, var(--game-stone));
-}
-
-.emote-hero-pick.is-owned .emote-hero-pick-portrait {
-  --emote-hero-ring-color: var(--game-gold);
-}
-
-.emote-hero-pick-portrait img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Lock/check badge - a real 22px circle (20px inline SVG inside it), high
-   contrast against both light and dark avatar art, positioned so it stays
-   fully inside the ring's own visible bounds instead of hanging off the
-   wrap's corner into the clipped circle below it. */
-.emote-hero-pick-badge {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 2.5px solid var(--game-ink);
-  z-index: 1;
-}
-
-.emote-hero-pick-badge svg {
-  width: 20px;
-  height: 20px;
-}
-
-.emote-hero-pick-badge.is-lock {
-  background: var(--game-wood);
-  color: var(--game-text);
-}
-
-.emote-hero-pick-badge.is-check {
-  background: var(--game-green);
-  color: #fff;
-}
-
-.emote-hero-pick-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 800;
-  font-size: 13px;
-  /* Dark now, not white+outline - this sits on the card's own off-white
-     background (var(--game-panel) on .emote-hero-pick), not a coloured
-     surface. */
-  color: var(--text-title);
-  text-align: center;
-}
-
-.emote-hero-pick-count {
-  display: inline-block;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  background: var(--row);
-  border: 1px solid var(--border-soft);
-}
-
-.emote-hero-pick-state {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.emote-hero-pick.is-owned .emote-hero-pick-state {
-  color: var(--game-green);
-}
-
-.emote-hero-pick.is-locked .emote-hero-pick-state {
-  color: var(--text-muted);
-}
-
-/* Sub-header once a hero is picked - back arrow + whose emotes these are. */
-.emote-shelf-subheader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.emote-shelf-back {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--game-text);
-  background: var(--game-panel);
-  border: 2px solid var(--game-ink);
-}
-
-.emote-shelf-back:hover,
-.emote-shelf-back:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--game-gold);
-}
-
-.emote-shelf-hero-portrait {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--game-ink);
-}
-
-.emote-shelf-subheader-name {
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--text-title);
-}
-
-/* 3-per-row card grid, Clash-Royale-style - large rounded cards with a
-   framed square preview near the top and the price underneath, in the
-   game's own wood/gold palette rather than the reference's blue cards.
-   minmax(0, 1fr), not a bare 1fr - a bare `1fr` track's minimum width is
-   `auto`, which lets its content's intrinsic size (here, .emote-tile-
-   preview's `aspect-ratio: 1` turning its own percentage width into a
-   height demand) push the track wider than its fair 1/3 share whenever a
-   row isn't fully populated - which, every hero having exactly one real
-   emote right now, is the common case, not an edge case. Confirmed live:
-   without this, a lone card inflated to ~600px square and the grid
-   overflowed the viewport width. minmax(0, 1fr) caps each track's minimum
-   at 0, so content can never force it past its fair share. */
-.emote-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.emote-tile {
-  all: unset;
-  box-sizing: border-box;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 6px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  background: var(--game-panel);
-  border: 2px solid var(--border-soft);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  transition:
-    transform 0.14s ease,
-    box-shadow 0.14s ease;
-  /* minmax(0, 1fr) on the grid's own tracks (see .emote-grid) only bounds
-     a track's MINIMUM - a grid container that isn't itself sized against a
-     hard/definite ancestor width still asks each item for its max-content
-     contribution when computing its own shrink-to-fit size, and
-     .emote-tile-preview's `aspect-ratio: 1` turns its percentage WIDTH
-     into an unbounded height demand that counts toward that. min-width: 0
-     here plus the explicit max-width on .emote-tile-preview below are
-     what actually break that feedback loop, confirmed live - the grid
-     track fix alone measured no different (still inflated to ~600px)
-     until both of these were added too. */
-  min-width: 0;
-}
-
-.emote-tile:hover,
-.emote-tile:focus-visible {
-  transform: translateY(-2px);
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--game-gold),
-    0 6px 14px rgba(0, 0, 0, 0.6);
-}
-
-.emote-tile:active {
-  transform: translateY(0);
-}
-
-.emote-tile.is-equipped {
-  box-shadow:
-    inset 0 0 0 2px var(--game-gold),
-    0 0 10px rgba(255, 122, 41, 0.6);
-}
-
-.emote-tile.is-locked {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.emote-tile.is-locked:hover,
-.emote-tile.is-locked:focus-visible {
-  transform: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-
-.emote-tile-preview {
-  width: 100%;
-  /* Caps the card image at a sane size regardless of how wide the grid
-     cell ends up computing - see .emote-tile's own comment on why width:
-     100% + aspect-ratio: 1 alone could runaway. */
-  max-width: 160px;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: var(--row);
-  color: var(--game-cream);
-  overflow: hidden;
-}
-
-.emote-tile-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.emote-tile-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 800;
-  font-size: 13px;
-  color: var(--text-title);
-  text-align: center;
-}
-
-.emote-tile-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 3px;
-  border-radius: 999px;
-  border: 2px solid var(--game-ink);
-  font-size: 12px;
-  line-height: 1.3;
-  color: #fff;
-  background: var(--game-ink);
-}
-
-.emote-tile.is-owned .emote-tile-chip,
-.emote-tile.is-equipped .emote-tile-chip {
-  padding-left: 8px;
-  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
-}
-
-.emote-tile-chip svg {
-  width: 11px;
-  height: 11px;
-}
-
 /* --- Medal grid (MedalGrid.jsx, Me tab) - same framed-card language as
-   the Shop's emote cards, but non-interactive (medals aren't bought or
-   equipped, only earned) and locked ones read as silhouettes instead of
-   a buy prompt. --- */
+   the rest of /game's card grids, but non-interactive (medals aren't
+   bought or equipped, only earned) and locked ones read as silhouettes
+   instead of a buy prompt. --- */
 .medal-season-list {
   list-style: none;
   margin: 0 0 10px;
@@ -4076,8 +3731,10 @@
 
 .medal-grid {
   display: grid;
-  /* minmax(0, 1fr) - see .emote-grid's comment above, same aspect-ratio
-     card content, same bug otherwise whenever there are fewer than 3
+  /* minmax(0, 1fr), not a bare 1fr - an auto-fill/fixed-column grid's
+     tracks default to a minimum size matching their content, so a wide
+     child (aspect-ratio-driven tile content counts) can force every
+     column wider than the grid itself whenever there are fewer than 3
      medals (or a non-multiple-of-3 count leaves a short last row). */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
@@ -4097,8 +3754,8 @@
   background: var(--game-panel);
   border: 2px solid var(--border-soft);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  /* See .emote-tile's comment - same aspect-ratio-driven grid blow-up risk
-     whenever there are fewer than 3 medals. */
+  /* See .medal-grid's comment above - same aspect-ratio-driven grid
+     blow-up risk whenever there are fewer than 3 medals. */
   min-width: 0;
 }
 
@@ -4302,6 +3959,8 @@
     0 18px 40px rgba(0, 0, 0, 0.3);
 }
 
+/* Slate, not red - this is an invite, not a danger state; PvP keeps red
+   for close/forfeit/danger buttons only now. */
 .challenge-prompt-emblem {
   position: absolute;
   top: -28px;
@@ -4314,16 +3973,16 @@
   border: 3px solid var(--game-ink);
   background: linear-gradient(
     180deg,
-    var(--game-red-light),
-    var(--game-red) 50%,
-    var(--game-red-dark)
+    var(--pvp-accent-light),
+    var(--pvp-accent) 50%,
+    var(--pvp-accent-dark)
   );
   color: #fff;
   font-size: 26px;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.4),
     0 3px 0 var(--game-ink),
-    0 0 18px rgba(255, 90, 77, 0.6);
+    0 0 18px rgba(var(--pvp-accent-rgb), 0.6);
   animation: challenge-pulse 1.2s ease-in-out infinite;
 }
 
@@ -4338,10 +3997,9 @@
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  /* --red-text, not --game-red-light - this sits directly on the card's
-     off-white body now, not a dark surface (1.46:1 there, fails AA badly;
-     --red-text clears 5.8:1). */
-  color: var(--red-text);
+  /* Slate (--pvp-accent, #4E5B73) - AA on this card's off-white body;
+     not red, PvP keeps that for close/forfeit/danger buttons only now. */
+  color: var(--pvp-accent);
 }
 
 .challenge-prompt-title {
@@ -4572,6 +4230,25 @@
   transition: transform 0.08s ease;
 }
 
+/* The base .game-menu-subtab rule's colour (var(--text-title), white) was
+   invisible here - these icons are plain SVGs (stroke="currentColor"), not
+   text, so they never got the global white-stroke/-shadow rule's black
+   outline that keeps white TEXT legible over a light background (that rule
+   only ever touches text glyphs). Same bug class as the Settings row
+   icons/shared Avatar fallback found earlier - this row just wasn't
+   covered by that audit.
+   :not(.active), not a bare .game-shop-tabs .game-menu-subtab rule - the
+   active state (green/slate, see .game-menu-subtab.active /
+   .game-leaderboard-mode's own override) already sits on a dark enough
+   fill for white to read fine there, and a bare rule here would tie that
+   one's specificity (two classes each) and - coming later in the file -
+   win over it, turning the ACTIVE tab's icon dark too. */
+.game-shop-tabs .game-menu-subtab:not(.active) {
+  color: var(--text-title-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
 .game-shop-tabs .game-menu-subtab::before {
   content: '';
   position: absolute;
@@ -4594,6 +4271,92 @@
 
 .game-shop-tabs .game-menu-subtab:active {
   transform: translateY(2px);
+}
+
+/* Leaderboard's Top Players/Top Clubs tabs get their label text back next
+   to the icon - every other .game-shop-tabs consumer (Shop's Heroes/
+   Territory/Trail/Map section tabs) stays icon-only, so this only touches
+   .game-leaderboard-mode's own two buttons via the extra class on the
+   ancestor div (see GamePage.jsx), not the shared rules above. Same
+   specificity as those (one ancestor class + .game-menu-subtab), so
+   coming later in the file is what makes this win instead of the fixed
+   54x54 icon-only squircle sizing - no !important needed. Height stays in
+   the 40-44px tap-target range the icon-only squircle used to guarantee
+   via its fixed 54x54 box; width now grows to fit the label instead of
+   staying fixed. */
+.game-leaderboard-mode .game-menu-subtab {
+  width: auto;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  font-size: 19px;
+  gap: 9px;
+}
+
+/* Plain solid text, no stroke/no shadow by default - the inactive
+   (light wood/off-white) tab gets neither (matches the dark colour rule
+   right below); the active (slate-filled) tab is the only one that gets
+   a shadow, added back by the rule further down scoped to .active only.
+   Previously this inherited the global webkit-stroke rule (tokens.css's
+   .game-text/:where() rule) AND stacked its own always-on text-shadow on
+   top even on the inactive tab, which read as heavy/low-contrast dark-on-
+   dark instead of plain legible text - same double-stroke bug class as
+   the leaderboard scope tabs (see .game-menu-subtab-scope-label below for
+   the fuller writeup), just previously half-fixed here (stroke killed,
+   shadow left on unconditionally). font-weight 700, not the base button
+   rule's 900 - heavy weight was part of what made the stroke/shadow
+   combination read as "heavy" to begin with. */
+.game-menu-subtab-label {
+  position: relative;
+  z-index: 1;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+/* Dark, AA-contrast text (and icon - see IconUser/IconUsers in
+   GamePage.jsx, both plain stroke="currentColor" SVGs that inherit
+   whatever colour this sets) on the light inactive tab - scoped to this
+   leaderboard row specifically (.game-leaderboard-mode), not the shared
+   .game-shop-tabs rule every Shop section tab also uses, which this
+   deliberately doesn't match exactly (#1f1e1a here vs that rule's
+   var(--text-title-dark)/#2b2a24) so it isn't a silent, untested change
+   to the Shop tabs too. */
+.game-leaderboard-mode .game-menu-subtab:not(.active) {
+  color: #1f1e1a;
+}
+
+/* The one place a shadow is wanted - white text needs it for contrast on
+   the coloured (slate) active fill; the inactive light tab doesn't. */
+.game-leaderboard-mode .game-menu-subtab.active .game-menu-subtab-label {
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* "Players"/"Clubs" only shows under 360px (see the media query below) -
+   full "Top Players"/"Top Clubs" is the default everywhere else. */
+.game-menu-subtab-label .label-short {
+  display: none;
+}
+
+@media (max-width: 359px) {
+  .game-leaderboard-mode .game-menu-subtab {
+    padding: 0 8px;
+    gap: 5px;
+    font-size: 17px;
+  }
+  .game-menu-subtab-label {
+    font-size: 13px;
+  }
+  .game-menu-subtab-label .label-full {
+    display: none;
+  }
+  .game-menu-subtab-label .label-short {
+    display: inline;
+  }
 }
 
 /* The hero roster sits straight on the panel (no card box). */
@@ -4645,7 +4408,7 @@
 .nickname-card-sub,
 .nickname-card-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -4748,17 +4511,15 @@
   --hype-glow: rgba(255, 180, 0, 0.55);
 }
 
-/* Territory / Trail / Emote shelves sit straight on the Shop panel - no
-   card box and no dark tray behind the tiles. */
-.game-menu-shop > .color-shelf,
-.game-menu-shop > .emote-shelf {
+/* Territory / Trail shelves sit straight on the Shop panel - no card box
+   and no dark tray behind the tiles. */
+.game-menu-shop > .color-shelf {
   align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: 100%;
-  /* Defensive, matching the fix on .emote-hero-picker/.emote-select-body
-     below - this is itself a flex child of .game-menu-shop (also
+  /* Defensive - this is itself a flex child of .game-menu-shop (also
      flex-direction: column), so without this an auto-fill grid anywhere
      inside it can still force this whole shelf (and everything above it
      up the flex chain) wider than the viewport, width: 100% here

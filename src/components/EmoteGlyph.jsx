@@ -7,9 +7,9 @@ import './EmoteGlyph.css'
 
 // The one way any screen turns an EMOTE StoreItem into a picture - see
 // utils/emotes.js for why item.assetUrl alone is never enough. Falls back
-// to the same lock-icon placeholder HeroItemShelf already used for a
-// locked (hero-not-owned) card - a missing-asset gap and a locked item
-// read the same way on purpose (both mean "nothing to show yet"); see
+// to the same lock-icon placeholder HeroGallery already uses for a locked
+// (not-owned) hero card - a missing-asset gap and a locked item read the
+// same way on purpose (both mean "nothing to show yet"); see
 // warnMissingEmoteAssets for surfacing the gap itself in dev tools.
 //
 // Animates only when `active` - every other instance sits frozen on its

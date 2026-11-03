@@ -9,6 +9,8 @@ import {
   IconMegaphone,
   IconUsers,
 } from './GameIcons'
+import mailInboxIcon from '../assets/ui/mail_inbox.png'
+import mailNewsIcon from '../assets/ui/mail_news.png'
 import './MailPanel.css'
 import { playerName } from '../utils/playerName'
 
@@ -195,6 +197,14 @@ export default function MailPanel({ mailbox, onClaimed }) {
               className={`mail-tab ${view === 'inbox' ? 'active' : ''}`}
               onClick={() => setView('inbox')}
             >
+              <span
+                className="mail-tab-icon"
+                aria-hidden="true"
+                style={{
+                  WebkitMaskImage: `url(${mailInboxIcon})`,
+                  maskImage: `url(${mailInboxIcon})`,
+                }}
+              />
               Inbox
               {unreadInbox > 0 && (
                 <span className="mail-tab-badge">{unreadInbox}</span>
@@ -207,6 +217,14 @@ export default function MailPanel({ mailbox, onClaimed }) {
               className={`mail-tab ${view === 'news' ? 'active' : ''}`}
               onClick={() => setView('news')}
             >
+              <span
+                className="mail-tab-icon"
+                aria-hidden="true"
+                style={{
+                  WebkitMaskImage: `url(${mailNewsIcon})`,
+                  maskImage: `url(${mailNewsIcon})`,
+                }}
+              />
               News
               {unreadNews > 0 && (
                 <span className="mail-tab-badge">{unreadNews}</span>

@@ -3,16 +3,16 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   IconCheck,
   IconClose,
-  IconHelmet,
   IconLock,
   IconRunning,
   IconSwords,
 } from './GameIcons'
 import ClubTrophyIcon from './ClubTrophyIcon'
 import ClubBadge from './ClubBadge'
+import ClubWarMemberAvatar from './ClubWarMemberAvatar'
 import ClubWarHistory from './ClubWarHistory'
 import ClubWarHeroPicker from './ClubWarHeroPicker'
-import { ApiError, resolveFileUrl } from '../api/client'
+import { ApiError } from '../api/client'
 import {
   CLUB_WAR_BATTLE_HOURS,
   CLUB_WAR_ENTRY_FEE,
@@ -27,7 +27,7 @@ import {
   lockInClubWarHero,
   queueClubWar,
 } from '../api/clubWar'
-import { isPlaceholderHero, resolveHeroAsset } from '../utils/hero'
+import { isPlaceholderHero, resolveHeroAssetOrDefault } from '../utils/hero'
 import './GameCards.css'
 import './ClubPanel.css'
 import { playerNameOf } from '../utils/playerName'
@@ -282,21 +282,18 @@ export default function ClubWarPanel({
     return (
       <ClubWarHistory
         userId={userId}
-        storeCatalog={storeCatalog}
-        ownedItems={ownedItems}
         onClose={() => setHistoryOpen(false)}
         onViewProfile={onViewProfile}
       />
     )
   }
 
+  // resolveHeroAssetOrDefault, not resolveHeroAsset directly - every member
+  // row needs to show *a* hero (the real pick, or Comet's if there isn't
+  // one/it's missing), never a blank state or the backend's literal
+  // "Default Hero" placeholder name (see that function's own comment).
   const heroName = (storeItemId) =>
-    resolveHeroAsset(storeItemId, storeCatalog, ownedItems).name || 'Hero'
-
-  const heroAssetUrl = (storeItemId) => {
-    const { assetUrl } = resolveHeroAsset(storeItemId, storeCatalog, ownedItems)
-    return assetUrl ? resolveFileUrl(assetUrl) : null
-  }
+    resolveHeroAssetOrDefault(storeItemId, storeCatalog, ownedItems).name
 
   const rules = (
     <section className="game-card game-card-dark">
@@ -392,10 +389,6 @@ export default function ClubWarPanel({
       <ul className="game-rows club-war-roster">
         {squad.map((p, i) => {
           const isMe = p.userId === userId
-          const avatarUrl =
-            !masked && p.lockedHeroStoreItemId
-              ? heroAssetUrl(p.lockedHeroStoreItemId)
-              : null
           const openProfile = () =>
             onViewProfile?.({
               userId: p.userId,
@@ -419,32 +412,21 @@ export default function ClubWarPanel({
               >
                 <span className="club-war-rank">{i + 1}</span>
                 <span
-                  className={`club-war-avatar ${masked ? 'is-masked' : ''} ${!masked && !p.lockedHeroStoreItemId ? 'is-empty' : ''}`}
+                  className={`club-war-avatar ${masked ? 'is-masked' : ''}`}
                 >
-                  {avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt=""
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                      }}
-                    />
-                  ) : masked ? (
-                    <IconLock />
-                  ) : (
-                    <IconHelmet />
-                  )}
+                  {masked ? <IconLock /> : <ClubWarMemberAvatar />}
                 </span>
                 <span className="game-row-info">
                   <span className="game-row-name">
                     {isMe ? 'You' : playerNameOf(p)}
                   </span>
-                  {/* The avatar above already carries the hero (a portrait
-                      once locked in, a lock/helmet placeholder otherwise) -
-                      the two side-by-side columns don't have room for a
-                      second text line repeating the same thing, so this
-                      only appears where that avatar can't say it alone. */}
-                  {!masked && p.lockedHeroStoreItemId && (
+                  {/* Always shows now, even with no real pick - heroName
+                      already falls through to Comet's own name in that
+                      case (see resolveHeroAssetOrDefault), never the
+                      backend's literal "Default Hero" placeholder. Masked
+                      stays hidden along with the avatar - no partial
+                      reveal of an opposing squad's pick. */}
+                  {!masked && (
                     <span className="game-row-meta club-war-row-hero">
                       {heroName(p.lockedHeroStoreItemId)}
                     </span>

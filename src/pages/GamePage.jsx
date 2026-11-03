@@ -17,8 +17,8 @@ import {
   IconExpand,
   IconFlag,
   IconFlagCheckered,
+  IconFlagScope,
   IconHelmet,
-  IconLock,
   IconLogout,
   IconMap,
   IconMenuOrb,
@@ -26,7 +26,6 @@ import {
   IconPlay,
   IconRunning,
   IconSettings,
-  IconSkin,
   IconStore,
   IconSwords,
   IconTrophy,
@@ -70,7 +69,6 @@ import {
 } from '../api/territoryRollout'
 import { useRolloutStatus } from '../hooks/useRolloutStatus'
 import RolloutRequestModal from '../components/RolloutRequestModal'
-import RolloutRequestedChip from '../components/RolloutRequestedChip'
 import {
   resolveEmoteAsset,
   resolveEquippedEmoteItem,
@@ -140,6 +138,7 @@ import {
 import { isCometHero, isPlaceholderHero } from '../utils/hero'
 import { hasHero as hasHeroManifest } from '../utils/heroManifest'
 import HeroSprite from '../components/HeroSprite'
+import HeroStage from '../components/HeroStage'
 import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
 import MailPanel from '../components/MailPanel'
@@ -149,7 +148,6 @@ import ShadeFlag from '../components/ShadeFlag'
 import TrailPreview from '../components/TrailPreview'
 import ColorShelf from '../components/ColorShelf'
 import EmoteShowcase from '../components/EmoteShowcase'
-import SkinShelf from '../components/SkinShelf'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
@@ -157,6 +155,7 @@ import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
 import RunRewardAnimation from '../components/RunRewardAnimation'
 import RunScoreCard from '../components/RunScoreCard'
 import ClubBadge from '../components/ClubBadge'
+import ClubTrophyIcon from '../components/ClubTrophyIcon'
 import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
 import { formatCoins } from '../utils/format'
@@ -171,6 +170,7 @@ import RouteTurnIndicator from '../components/RouteTurnIndicator'
 import { getRouteGuidance } from '../utils/routeNav'
 import defaultAvatarImage from '../assets/avatars/blaze.png'
 import runConquestLogo from '../assets/images/run-conquest-logo.png'
+import globeScopeIcon from '../assets/ui/globe-scope.png'
 // TEMP: AVATARS / COMING_SOON_AVATARS / loadAvatarId return with the
 // Shop's Avatar picker (see avatarId below).
 import { getAvatarById, saveAvatarId } from '../constants/avatars'
@@ -345,7 +345,6 @@ function describeRunRejection(outcome) {
 // Shop sub-sections (tab row under the wallet).
 const SHOP_SECTIONS = [
   { id: 'heroes', label: 'Heroes', Icon: IconHelmet },
-  { id: 'skins', label: 'Skins', Icon: IconSkin },
   { id: 'territory', label: 'Territory', Icon: IconFlag },
   { id: 'trail', label: 'Trail', Icon: IconRunning },
   { id: 'map', label: 'Map', Icon: IconMap },
@@ -1655,8 +1654,14 @@ function GamePageInner() {
   async function loadStore() {
     setStoreError(null)
     try {
+      // 200, not 50 - same page size MailToolsPanel.jsx/EmoteAdminPanel.jsx
+      // already use. The catalog grew past 50 active items once every
+      // hero's numbered emote set was seeded (63 EMOTE rows alone), so a
+      // 50-record single page silently dropped whole categories instead of
+      // erroring - Territory/Trail (older rows, UUID-ordered with no
+      // explicit sort from this call) just happened to land past the cut.
       const [catalogPage, owned] = await Promise.all([
-        getStoreCatalog(1, 50),
+        getStoreCatalog(1, 200),
         getOwnedStoreItems(),
       ])
       setStoreCatalog(catalogPage?.content || [])
@@ -2493,10 +2498,9 @@ function GamePageInner() {
   // useCallback (empty deps - every function this touches, including
   // loadStore/loadHeroes, only closes over stable setState setters and
   // imported API calls, never per-render state, so there's nothing to go
-  // stale) so SkinShelf/ColorShelf below can actually be React.memo'd -
-  // passing a plain function here would hand them a new prop identity
-  // every render and defeat that memo regardless of how stable their
-  // other props are.
+  // stale) so ColorShelf below can actually be React.memo'd - passing a
+  // plain function here would hand it a new prop identity every render
+  // and defeat that memo regardless of how stable its other props are.
   const handleEquip = useCallback(async (item, isEquipped) => {
     setStoreActionError(null)
     try {
@@ -2523,36 +2527,33 @@ function GamePageInner() {
   // Memoized (not just filtered inline) because GamePage re-renders every
   // few seconds from the standing GPS watch above (liveLocation) whether
   // or not the Shop is even open - without this, every one of those ticks
-  // handed SkinShelf/ColorShelf a brand-new array, which not only re-ran
-  // this filter for nothing but also defeated any attempt to skip their
-  // own re-render (see those components' own React.memo), since a changed
-  // array reference looks like changed data even when none of the items
+  // handed ColorShelf a brand-new array, which not only re-ran this filter
+  // for nothing but also defeated any attempt to skip its own re-render
+  // (see that component's own React.memo), since a changed array
+  // reference looks like changed data even when none of the items
   // actually did.
   const galleryHeroes = useMemo(
     () => heroes.filter((h) => !isPlaceholderHero(h.name)),
     [heroes]
   )
-  // Shop shelves: heroes (and their skins) live in the hero gallery; the
-  // two colour categories get their own preview shelves (ColorShelf). The
-  // old catch-all Items list is gone - other categories (borders, profile
+  // Shop shelves: heroes live in the hero gallery; the two colour
+  // categories get their own preview shelves (ColorShelf). The old
+  // catch-all Items list is gone - other categories (borders, profile
   // backgrounds, phrases…) aren't sold in the Shop for now. Seeded default
-  // colours stay: they're real colours the player owns and can switch back to.
+  // colours stay: they're real colours the player owns and can switch back
+  // to. Emotes don't have a Shop shelf of their own either - they're
+  // browsed from inside each hero's own HeroDetailModal now (see
+  // HeroEmoteStage there) - but EMOTE StoreItems are still read straight
+  // off storeCatalog for that, no separate memo needed here. Skins removed
+  // (TEMP - see constants/avatars.js-era notes for the pattern this
+  // followed); the backend may still return SKIN items, they're just never
+  // requested/rendered here any more.
   const shadeItems = useMemo(
     () => storeCatalog.filter((i) => i.category === 'TERRITORY_SHADE'),
     [storeCatalog]
   )
   const trailItems = useMemo(
     () => storeCatalog.filter((i) => i.category === 'TRAIL_COLOR'),
-    [storeCatalog]
-  )
-  // Skins (see SkinShelf) - every item belongs to a hero (heroId), so it
-  // gets its own per-hero shelf instead of folding into the color shops
-  // above. Emotes no longer have a Shop shelf of their own - they're
-  // browsed from inside each hero's own HeroDetailModal now (see
-  // HeroEmoteStage there) - but EMOTE StoreItems are still read straight
-  // off storeCatalog for that, no separate memo needed here.
-  const skinItems = useMemo(
-    () => storeCatalog.filter((i) => i.category === 'SKIN'),
     [storeCatalog]
   )
   // One-time dev-tools check that every real backend EMOTE row has a local
@@ -2584,19 +2585,6 @@ function GamePageInner() {
   const activeHeroId = equippedHero
     ? equippedHero.storeItem.heroId
     : heroes.find((h) => isCometHero(h.name))?.id
-  // Equipping a skin (StoreItem category SKIN, same per-hero equip scoping
-  // as emotes) swaps the active hero's art wherever a flat image is shown
-  // - see avatarSrc below. It can't currently change Blaze/Comet's
-  // ANIMATED run-view sprite or Me-tab turntable (those are hardcoded
-  // local sprite sheets keyed by hero name only, with no skin dimension -
-  // see TerritoryMap.jsx's HERO_MAP_SHEETS/src/utils/heroSprites.js), only
-  // the static avatar path - see SkinShelf.jsx's own note on this.
-  const equippedSkin = ownedItems.find(
-    (o) =>
-      o.equipped &&
-      o.storeItem.category === 'SKIN' &&
-      o.storeItem.heroId === activeHeroId
-  )
   const selectedHero = selectedHeroId
     ? heroes.find((h) => h.id === selectedHeroId) || null
     : null
@@ -2665,17 +2653,7 @@ function GamePageInner() {
     },
     { id: 'me', label: 'Me', Icon: IconUser, tone: 'green' },
     { id: 'shop', label: 'Shop', Icon: IconStore, tone: 'wood' },
-    // Icon-only (no visible label, unlike every other tab here) - its own
-    // short intro screen (menuTab === 'training' below) already says what
-    // it is, so the tab itself just needs to be found and named for
-    // screen readers.
-    {
-      id: 'training',
-      label: 'Training',
-      Icon: IconRunning,
-      tone: 'green',
-      iconOnly: true,
-    },
+    { id: 'training', label: 'Training', Icon: IconRunning, tone: 'green' },
     { id: 'settings', label: 'Settings', Icon: IconSettings, tone: 'stone' },
   ]
   const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
@@ -2725,7 +2703,6 @@ function GamePageInner() {
   const currentAvatar = getAvatarById(avatarId)
   const currentMapStyle = getMapStyleById(mapStyleId)
   const avatarSrc =
-    (equippedSkin && resolveFileUrl(equippedSkin.storeItem.assetUrl)) ||
     (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
     currentAvatar?.src ||
     resolveFileUrl(user?.profilePictureUrl) ||
@@ -2762,10 +2739,10 @@ function GamePageInner() {
   // is equipped" screen uses (also HeroDetailModal.jsx's HeroEmoteStage and
   // AthleteTerritoryProfilePanel.jsx), so there's exactly one definition of
   // "equipped" instead of three separate .find()s that could drift. Scoped
-  // to the active hero's own heroId - equip is per-hero server-side (see
-  // HeroItemShelf.jsx's own comment), so a player could have a different
-  // emote equipped for a hero they aren't currently playing as; this is
-  // specifically the one that'll actually play right now. Memoized so
+  // to the active hero's own heroId - equip is per-hero server-side, so a
+  // player could have a different emote equipped for a hero they aren't
+  // currently playing as; this is specifically the one that'll actually
+  // play right now. Memoized so
   // GamePage's frequent unrelated re-renders (the standing GPS watch ticks
   // every few seconds) don't hand EmoteGlyph a new object identity and
   // force it to re-evaluate despite being memo()'d itself.
@@ -2773,9 +2750,10 @@ function GamePageInner() {
     () =>
       resolveEquippedEmoteItem(
         ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
-        activeHeroId
+        activeHeroId,
+        activeHeroName
       ),
-    [ownedItems, activeHeroId]
+    [ownedItems, activeHeroId, activeHeroName]
   )
   const equippedEmoteAsset = equippedEmoteItem
     ? resolveEmoteAsset(activeHeroName, equippedEmoteItem.name)
@@ -4224,20 +4202,23 @@ function GamePageInner() {
                     role="tablist"
                     aria-label="Leaderboard"
                   >
-                    {/* Icon-only, per the brief - IconUser/IconUsers reused
-                        exactly as-is from the Me/Club nav tabs and radial
-                        menu buttons (RADIAL_ITEMS above) rather than
-                        inventing a separate icon language just for this
-                        tab row. IconTrophy (this tab's old icon) was
-                        dropped for Players specifically - it already means
-                        "score/rank" elsewhere on this same screen (the
-                        podium medals, the stat chips), so reusing it here
-                        too for "this is the Players section" read as the
-                        wrong concept once the label text was gone.
-                        game-shop-tabs reused as-is for sizing/spacing (same
-                        small squircle buttons as the Shop's section menu) -
+                    {/* IconUser/IconUsers reused exactly as-is from the Me/
+                        Club nav tabs and radial menu buttons (RADIAL_ITEMS
+                        above) rather than inventing a separate icon
+                        language just for this tab row. IconTrophy (this
+                        tab's old icon) stays dropped for Players
+                        specifically - it already means "score/rank"
+                        elsewhere on this same screen (the podium medals,
+                        the stat chips), so reusing it here too for "this
+                        is the Players section" reads as the wrong concept.
+                        Label text is back next to the icon (short "Players"/
+                        "Clubs" swapped in under 360px via CSS, see
+                        .game-leaderboard-mode .game-menu-subtab-label in
+                        GamePage.css) - game-shop-tabs' icon-only squircle
+                        sizing is overridden just for this row there too, so
+                        Shop's section tabs stay icon-only.
                         game-leaderboard-mode only still exists to keep this
-                        row's active state gold instead of the shop's
+                        row's active state slate instead of the shop's
                         green, see GamePage.css. */}
                     <button
                       type="button"
@@ -4249,6 +4230,10 @@ function GamePageInner() {
                       onClick={() => switchLeaderboardMode('individual')}
                     >
                       <IconUser />
+                      <span className="game-menu-subtab-label">
+                        <span className="label-full">Top Players</span>
+                        <span className="label-short">Players</span>
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -4260,6 +4245,10 @@ function GamePageInner() {
                       onClick={() => switchLeaderboardMode('club')}
                     >
                       <IconUsers />
+                      <span className="game-menu-subtab-label">
+                        <span className="label-full">Top Clubs</span>
+                        <span className="label-short">Clubs</span>
+                      </span>
                     </button>
                   </div>
 
@@ -4276,7 +4265,14 @@ function GamePageInner() {
                         className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
                         onClick={() => switchIndividualScope('global')}
                       >
-                        Global
+                        <img
+                          src={globeScopeIcon}
+                          alt=""
+                          className="game-menu-subtab-scope-icon"
+                        />
+                        <span className="game-menu-subtab-scope-label">
+                          Global
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -4285,9 +4281,12 @@ function GamePageInner() {
                         className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
                         onClick={() => switchIndividualScope('city')}
                       >
-                        {(individualScope === 'city' &&
-                          leaderboard[0]?.cityName) ||
-                          'District'}
+                        <IconFlagScope className="game-menu-subtab-scope-icon" />
+                        <span className="game-menu-subtab-scope-label">
+                          {(individualScope === 'city' &&
+                            leaderboard[0]?.cityName) ||
+                            'District'}
+                        </span>
                       </button>
                     </div>
                   ) : (
@@ -4303,7 +4302,14 @@ function GamePageInner() {
                         className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
                         onClick={() => switchClubScope('global')}
                       >
-                        Global
+                        <img
+                          src={globeScopeIcon}
+                          alt=""
+                          className="game-menu-subtab-scope-icon"
+                        />
+                        <span className="game-menu-subtab-scope-label">
+                          Global
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -4312,9 +4318,12 @@ function GamePageInner() {
                         className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
                         onClick={() => switchClubScope('national')}
                       >
-                        {(clubScope === 'national' &&
-                          clubLeaderboard[0]?.countryName) ||
-                          'Country'}
+                        <IconFlagScope className="game-menu-subtab-scope-icon" />
+                        <span className="game-menu-subtab-scope-label">
+                          {(clubScope === 'national' &&
+                            clubLeaderboard[0]?.countryName) ||
+                            'Country'}
+                        </span>
                       </button>
                     </div>
                   )}
@@ -4350,7 +4359,7 @@ function GamePageInner() {
                         entries={leaderboard.map((entry) => ({
                           key: entry.userId,
                           rank: entry.rank,
-                          name: isMyEntry(entry) ? 'You' : playerNameOf(entry),
+                          name: playerNameOf(entry),
                           // Same "icon + stat" treatment as the Club board's
                           // trophy count below - territory is this board's
                           // equivalent score.
@@ -4360,16 +4369,19 @@ function GamePageInner() {
                               {formatArea(entry.areaSqMeters)}
                             </span>
                           ),
-                          // Your own row uses the exact same avatar everywhere
-                          // else in the game (hero skin > profile picture >
-                          // default), so changing it anywhere picks it up here
-                          // too instead of re-deriving a different value.
-                          // Other rows fall back to resolveFileUrl(null) = null
-                          // (colored initials) until the leaderboard API
-                          // starts returning a picture for other players.
-                          avatarSrc: isMyEntry(entry)
-                            ? avatarSrc
-                            : resolveFileUrl(entry.profilePictureUrl),
+                          // Same default (colored initials) as everyone
+                          // else - the leaderboard API has no profile
+                          // pictures for anyone yet (see
+                          // resolveFileUrl(entry.profilePictureUrl) below,
+                          // always null today), and the player's own row
+                          // used to special-case in their real equipped-
+                          // hero avatarSrc here, which made it visually
+                          // stand out as a different, bigger "card" rather
+                          // than reading as the same row as everyone
+                          // else's - a small "You" tag (see
+                          // LeaderboardPodium.jsx's isPlayer handling)
+                          // marks it instead.
+                          avatarSrc: resolveFileUrl(entry.profilePictureUrl),
                           isPlayer: isMyEntry(entry),
                           onClick: () => setViewingProfile(entry),
                         }))}
@@ -4396,7 +4408,7 @@ function GamePageInner() {
                         badge: <ClubBadge name={entry.clubName} size={40} />,
                         area: (
                           <span className="lb-trophy-stat">
-                            <IconTrophy />
+                            <ClubTrophyIcon size={26} />
                             {formatCoins(entry.trophies ?? 0)}
                           </span>
                         ),
@@ -4520,16 +4532,26 @@ function GamePageInner() {
                     // sprite/pace (EmoteGlyph's own 20fps, tuned for emote
                     // content, not HeroSprite's slower idle pace). Falls
                     // back to the idle turntable otherwise, same as before.
-                    equippedEmoteItem && equippedEmoteAsset ? (
-                      <EmoteGlyph
-                        heroName={activeHeroName}
-                        emoteName={equippedEmoteItem.name}
-                        size={260}
-                        active
-                      />
-                    ) : (
-                      <HeroSprite size={260} hero={activeHeroName} />
-                    )
+                    // No stage behind the flat avatar-picture fallback below
+                    // - that's not a hero playing anything, just a profile
+                    // photo/local avatar icon.
+                    <HeroStage
+                      hero={activeHeroName}
+                      className="game-menu-hero-stage"
+                    >
+                      {(h) =>
+                        equippedEmoteItem && equippedEmoteAsset ? (
+                          <EmoteGlyph
+                            heroName={activeHeroName}
+                            emoteName={equippedEmoteItem.name}
+                            size={h || 260}
+                            active
+                          />
+                        ) : (
+                          <HeroSprite size={h || 260} hero={activeHeroName} />
+                        )
+                      }
+                    </HeroStage>
                   ) : (
                     <img
                       className="game-menu-hero-img"
@@ -4792,7 +4814,14 @@ function GamePageInner() {
                   onClick={toggleMusicMuted}
                 >
                   <span className="game-settings-row-label">
-                    {musicMuted ? <IconVolumeMute /> : <IconVolumeUp />}
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        {musicMuted ? <IconVolumeMute /> : <IconVolumeUp />}
+                      </span>
+                    </span>
                     <span className="game-settings-row-text">
                       Sound
                       <span className="game-settings-row-sub">
@@ -4829,7 +4858,14 @@ function GamePageInner() {
                   disabled={pvp.busy === 'discoverable'}
                 >
                   <span className="game-settings-row-label">
-                    <IconCrosshairs />
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        <IconCrosshairs />
+                      </span>
+                    </span>
                     <span className="game-settings-row-text">
                       Visibility
                       <span className="game-settings-row-sub">
@@ -4858,7 +4894,14 @@ function GamePageInner() {
                   onClick={() => navigate('/profile/edit')}
                 >
                   <span className="game-settings-row-label">
-                    <IconUser />
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        <IconUser />
+                      </span>
+                    </span>
                     <span className="game-settings-row-text">
                       Edit Profile
                       <span className="game-settings-row-sub">
@@ -4866,7 +4909,10 @@ function GamePageInner() {
                       </span>
                     </span>
                   </span>
-                  <IconChevronRight />
+                  <IconChevronRight
+                    className="game-settings-row-chevron"
+                    aria-hidden="true"
+                  />
                 </button>
 
                 <button
@@ -4875,7 +4921,14 @@ function GamePageInner() {
                   onClick={handleLogout}
                 >
                   <span className="game-settings-row-label">
-                    <IconLogout />
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        <IconLogout />
+                      </span>
+                    </span>
                     <span className="game-settings-row-text">
                       Log Out
                       <span className="game-settings-row-sub">
@@ -4884,59 +4937,6 @@ function GamePageInner() {
                     </span>
                   </span>
                 </button>
-
-                {/* Once useRolloutStatus.js positively knows the player
-                    already requested their region (see api/
-                    territoryRollout.js's GET .../status), swap the standing
-                    row below for the non-blocking chip instead - there's
-                    nothing left to request. Until then (or while it's still
-                    loading), this always-available row is the fallback: it
-                    doesn't know in advance whether the player needs it, so
-                    tapping it either requests (not rolled out yet) or comes
-                    back ALREADY_ROLLED_OUT (good news, told as such, not an
-                    error). */}
-                {rolloutStatus.showChip ? (
-                  <RolloutRequestedChip
-                    cityName={rolloutStatus.state.cityName}
-                    countryName={rolloutStatus.state.countryName}
-                  />
-                ) : (
-                  <>
-                    <div className="game-settings-row game-settings-row-static">
-                      <span className="game-settings-row-label">
-                        <IconLock />
-                        <span className="game-settings-row-text">
-                          Territory Capture Here
-                          <span className="game-settings-row-sub">
-                            Not live everywhere yet - PvP and Club Wars always
-                            are. Ask for your area below.
-                          </span>
-                        </span>
-                      </span>
-                      {rolloutRequestResult ? (
-                        <span className="game-settings-row-requested">
-                          {rolloutRequestResult.alreadyRolledOut
-                            ? 'Already live here!'
-                            : 'Requested'}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={handleRequestRollout}
-                          disabled={rolloutRequestBusy}
-                        >
-                          {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
-                        </button>
-                      )}
-                    </div>
-                    {rolloutRequestError && (
-                      <p className="game-controls-hint game-controls-hint-error">
-                        {rolloutRequestError}
-                      </p>
-                    )}
-                  </>
-                )}
               </div>
             )}
 
@@ -4986,16 +4986,6 @@ function GamePageInner() {
                       setStoreActionError(null)
                       setSelectedHeroId(hero.id)
                     }}
-                    onEquip={handleEquip}
-                  />
-                )}
-
-                {shopSection === 'skins' && (
-                  <SkinShelf
-                    skins={skinItems}
-                    heroes={heroes}
-                    ownedItems={ownedItems}
-                    onBuy={setStoreChoice}
                     onEquip={handleEquip}
                   />
                 )}
@@ -5086,6 +5076,17 @@ function GamePageInner() {
             }
             onInvite={handleInviteToClub}
             actions={viewingProfile.clubActions}
+            // See AthleteTerritoryProfilePanel's own comment on these -
+            // viewing your own profile (e.g. tapping your row on the
+            // leaderboard) reuses the exact same hero/emote selectors the
+            // Me tab already trusts instead of this panel's own
+            // getTerritoryProfileByUserId fetch, which used to come back
+            // with no usable hero/emote for a player on a local avatar
+            // pick rather than a real equipped HERO item.
+            isSelf={isMyEntry(viewingProfile)}
+            selfHeroName={activeHeroName}
+            selfEmoteName={equippedEmoteItem?.name ?? null}
+            selfShowsTurntable={showHeroTurntable}
           />
         )}
       </AnimatePresence>
@@ -5429,16 +5430,17 @@ function GamePageInner() {
             error={storeActionError}
             onClose={closeHeroModal}
             onEquip={handleEquip}
-            onBuy={(skin) => {
+            // Buying the hero itself (the only onBuy case left here now
+            // that Skins is gone) closes this modal first.
+            onBuy={(heroItem) => {
               setSelectedHeroId(null)
-              setStoreChoice(skin)
+              setStoreChoice(heroItem)
             }}
-            // Emote slides stay open behind the buy/showcase popup (unlike
-            // Skins' onBuy above, which closes this modal first) - the
-            // point is browsing the hero's whole emote slider in place;
-            // closing storeChoice afterwards just returns to it, and a
-            // freshly-bought emote unlocks on its own slide immediately
-            // since ownedItems is the same prop driving both.
+            // Emote slides stay open behind the buy/showcase popup, unlike
+            // onBuy above - the point is browsing the hero's whole emote
+            // slider in place; closing storeChoice afterwards just returns
+            // to it, and a freshly-bought emote unlocks on its own slide
+            // immediately since ownedItems is the same prop driving both.
             onShowcase={setStoreChoice}
           />
         )}
@@ -5451,17 +5453,41 @@ function GamePageInner() {
             const price = storeChoice.priceFahhcoin || 0
             const balance = profile?.fahhcoinBalance ?? 0
             const short = price > balance
-            // EMOTE tiles open this same showcase popup whether owned or
-            // not (see HeroItemShelf's onShowcase) - an owned one shows
-            // Equip/Unequip below instead of the buy flow, since there's
-            // nothing left to purchase.
-            const ownedEmote = ownedItems.find(
-              (o) => o.storeItem.id === storeChoice.id
+            // EMOTE slides open this same showcase popup whether owned or
+            // not (see HeroDetailModal's HeroEmoteStage onShowcase) - an
+            // owned one shows Equip/Unequip below instead of the buy flow,
+            // since there's nothing left to purchase.
+            //
+            // storeChoice.id is null for the hero slider's idle slide
+            // specifically (see HeroDetailModal.jsx's HeroEmoteStage) - no
+            // hero actually has a real "emote1" StoreItem row to equip
+            // (the 4 newest heroes never got one created, it's free; an
+            // older hero's "Classic" row, if it still exists, can't be
+            // name-matched to the renamed manifest keys any more). Idle is
+            // the implicit default, not a purchasable row, so "equipped"
+            // for it just means nothing ELSE is currently equipped for
+            // this hero, and "Equip" means unequipping whatever else is,
+            // not calling the API with a fake id.
+            const storeChoiceHeroName = heroes.find(
+              (h) => h.id === storeChoice.heroId
+            )?.name
+            const currentlyEquipped = resolveEquippedEmoteItem(
+              ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
+              storeChoice.heroId,
+              storeChoiceHeroName
             )
+            const ownedEmote = storeChoice.id
+              ? ownedItems.find((o) => o.storeItem.id === storeChoice.id) ||
+                // A free emote (price 0) counts as owned even with no real
+                // ownedItems record for it - nothing to buy either way.
+                (price <= 0
+                  ? { equipped: currentlyEquipped?.id === storeChoice.id }
+                  : null)
+              : { equipped: !currentlyEquipped }
             return (
               <EmoteShowcase
                 item={storeChoice}
-                heroName={heroes.find((h) => h.id === storeChoice.heroId)?.name}
+                heroName={storeChoiceHeroName}
                 owned={ownedEmote}
                 price={price}
                 balance={balance}
@@ -5472,6 +5498,13 @@ function GamePageInner() {
                 onClose={closeStoreChoice}
                 onBuy={() => handlePurchase(storeChoice)}
                 onEquip={async () => {
+                  if (!storeChoice.id) {
+                    if (currentlyEquipped) {
+                      await handleEquip({ id: currentlyEquipped.id }, true)
+                    }
+                    closeStoreChoice()
+                    return
+                  }
                   await handleEquip(storeChoice, ownedEmote.equipped)
                   closeStoreChoice()
                 }}
@@ -5526,22 +5559,14 @@ function GamePageInner() {
                       color={storeChoice.colorValue}
                     />
                   )}
-                  {storeChoice.category === 'SKIN' && storeChoice.assetUrl && (
-                    <img
-                      className="game-confirm-emote-preview"
-                      src={resolveFileUrl(storeChoice.assetUrl)}
-                      alt=""
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                      }}
-                    />
-                  )}
-                  {/* SKIN/TERRITORY_SHADE/TRAIL_COLOR only ever reach this
-                      modal unowned - an owned tile equips/unequips directly
-                      on tap (see SkinShelf.jsx/ColorShelf.jsx), without ever
-                      calling onBuy/setStoreChoice - so there's no "already
-                      owned" branch to handle here (EMOTE's own owned-vs-buy
-                      split now lives in EmoteShowcase.jsx). */}
+                  {/* TERRITORY_SHADE/TRAIL_COLOR only ever reach this modal
+                      unowned - an owned tile equips/unequips directly on tap
+                      (see ColorShelf.jsx), without ever calling onBuy/
+                      setStoreChoice - so there's no "already owned" branch
+                      to handle here (EMOTE's own owned-vs-buy split now
+                      lives in EmoteShowcase.jsx). HERO (the hero-unlock
+                      item) reaches it the same unowned-only way, from
+                      HeroDetailModal's own onBuy. */}
                   <p className="game-buy-title">
                     {price > 0 ? (
                       <>

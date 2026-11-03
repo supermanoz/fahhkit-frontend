@@ -378,8 +378,9 @@
     0 -1px 0 var(--game-ink);
 }
 
+/* Slate, not red - Club War keeps red for close/danger buttons only. */
 .club-war-phase.phase-battle {
-  background: var(--game-red);
+  background: var(--slate-accent);
 }
 
 .club-war-phase.phase-completed {
@@ -820,7 +821,11 @@
   justify-content: center;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--game-text);
+  /* var(--text-body-dark), not --game-text (white) - was white-on-off-white
+     (var(--row)), same bug class as the Settings row icons. */
+  color: var(--text-body-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
   background: var(--row);
 }
 
@@ -871,8 +876,9 @@
   color: #fff;
 }
 
+/* Slate, not red - Club War keeps red for close/danger buttons only. */
 .club-war-history-result.is-lost {
-  background: var(--game-red);
+  background: var(--slate-accent);
   color: #fff;
 }
 
@@ -889,13 +895,12 @@
   gap: 10px;
 }
 
-/* Hero portrait (or IconHelmet placeholder when no hero was picked - a
-   silhouette reads as "no hero" on its own, no "No hero" text needed next
-   to it per the brief). */
+/* Same 40px/light-fill/2px-border recipe as the live roster's
+   .club-war-avatar. */
 .club-war-history-avatar {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   overflow: hidden;
   display: flex;
@@ -910,6 +915,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
 }
 
 /* Members who didn't run sink to the bottom of the sorted list and read
@@ -966,8 +972,9 @@
   color: #fff;
 }
 
+/* Slate, not red - Club War keeps red for close/danger buttons only. */
 .club-war-run-badge.is-missed {
-  background: var(--game-red-dark);
+  background: var(--slate-accent);
   color: #fff;
 }
 
@@ -1008,12 +1015,14 @@
 
 /* Final score split under the VS row (completed wars only) - a COC-style
    "momentum bar" rather than just the two numbers. */
+/* Slate track, not red - Club War keeps red for close/danger buttons
+   only; the gold fill (our side's progress) is unchanged. */
 .club-war-score-bar {
   width: 100%;
   height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  background: var(--game-red);
+  background: var(--slate-accent);
   border: 2px solid var(--game-ink);
 }
 
@@ -1027,6 +1036,26 @@
    other .game-row but clickable through to the player's profile. */
 .club-war-row {
   cursor: pointer;
+}
+
+/* Plain solid text for the member name + hero label next to the avatar -
+   the base .game-row-name/.game-row-meta pick up a heavy stroke/shadow
+   from other call sites; neither reads cleanly against this row's light
+   fill, so both are overridden flat here. Font sizes are left to the base
+   rules (already 14px/13px, including the matchup preview's own 13px
+   name override) - only color and the stroke/shadow are reset. */
+.club-war-row .game-row-name,
+.club-war-history-participant .game-row-name {
+  color: #1f1e1a;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.club-war-row-hero,
+.club-war-history-participant .game-row-meta {
+  color: #5a574b;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 .club-war-rank {
@@ -1045,15 +1074,23 @@
 
 .club-war-avatar {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   border: 2px solid var(--game-ink);
-  background: var(--game-wood);
-  color: var(--game-cream);
+  /* Light fill - the icon image covers it edge to edge anyway (see
+     .club-war-avatar img below); this is what shows through behind the
+     lock icon's own colour override just below. */
+  background: var(--row);
+  /* var(--text-body-dark), not --game-cream (white) - the lock icon was
+     invisible on the light fill above, same bug class as the Settings row
+     icons. */
+  color: var(--text-body-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
   overflow: hidden;
 }
 
@@ -1061,16 +1098,13 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
 }
 
-/* Enemy hero still under wraps - a lock badge standing in for it. */
+/* Enemy hero still under wraps - a lock badge standing in for it. Slate,
+   not red - Club War keeps red for close/danger buttons only. */
 .club-war-avatar.is-masked {
-  background: var(--game-red-dark);
-}
-
-/* Own/allied squad member who hasn't picked a hero yet. */
-.club-war-avatar.is-empty {
-  background: var(--game-stone-dark);
+  background: var(--slate-accent);
 }
 
 /* The "Lock In Your Hero" picker's animated card (Blaze) - a taller stage

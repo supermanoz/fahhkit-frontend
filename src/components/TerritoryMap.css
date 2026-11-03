@@ -99,6 +99,24 @@
   text-decoration: underline;
 }
 
+/* The sky/vignette layers below render into this pane now (see
+   WeatherLayer in TerritoryMap.jsx), not as plain siblings of
+   .territory-map-tilt the way they used to. A custom Leaflet pane shares
+   the SAME local stacking context Leaflet's own panes do, so an explicit
+   z-index here actually means something: above the tile/territory-
+   polygon layers it's meant to tint (.leaflet-tile-pane/.leaflet-overlay-
+   pane, 200/400), below the marker pane (.leaflet-marker-pane, 600) so
+   the player's own avatar/sprite - and anyone else's marker - always
+   renders on top of it, never tinted or dimmed along with the ground
+   underneath. A plain viewport-fixed sibling of .territory-map-tilt
+   can't land "in between" like this - it only ever paints fully above or
+   fully below the whole map, regardless of its own z-index number,
+   because nothing on either side of that boundary shares a stacking
+   context with the Leaflet panes on the other side. */
+.leaflet-ambience-pane {
+  z-index: 550;
+}
+
 /* Darkens toward the edges of the screen so the limited view radius reads
    as "the fog outside your reach", not just an arbitrary pan limit —
    purely decorative, pointer-events stay off so it never blocks taps. */
@@ -115,8 +133,9 @@
 }
 
 /* Real-world sky layer (see utils/mapAmbience.js) - a light tint for the
-   time of day plus a weather effect on top. Sits under the vignette and,
-   like it, never takes taps. Kept subtle so territory colours still read. */
+   time of day plus a weather effect on top. Sits under the vignette (both
+   z-indexed relative to each other only, same pane) and, like it, never
+   takes taps. Kept subtle so territory colours still read. */
 .territory-map-sky,
 .territory-map-sky-weather {
   position: absolute;

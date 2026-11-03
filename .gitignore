@@ -15,6 +15,12 @@ dist-ssr
 # copied from node_modules/maplibre-gl at build/dev start — see vite.config.js
 public/mlgl
 
+# Playwright (npm run test:e2e) generated output
+e2e-report
+test-results
+playwright-report
+blob-report
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

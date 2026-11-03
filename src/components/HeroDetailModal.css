@@ -5,6 +5,15 @@
   max-height: calc(100dvh - 40px);
   display: flex;
   flex-direction: column;
+  /* Left as a full overflow: hidden (not just overflow-x) - the lore body
+     below the stage relies on this card's own max-height + this clipping
+     to force its overflow-y: auto to actually engage (see
+     .hero-modal-body further down), so loosening this would risk the card
+     growing past the viewport instead of the lore scrolling internally.
+     The stage itself got the real fix instead (its own overflow: visible
+     on .hero-stage, see HeroStage.css, plus .hero-modal-stage below) -
+     this clips only because the stage's own content is now sized to
+     always fit inside it, not the other way around. */
   overflow: hidden;
   background: var(--game-panel);
   border: 3px solid var(--game-ink);
@@ -33,15 +42,16 @@
   z-index: 3;
 }
 
-/* Glassy white stage (not the dark wood/orange glow the rest of the modal
-   uses) so the hero's own idle art - painted for a light backdrop -
-   actually reads clearly instead of fighting a busy dark glow behind it.
+/* No fill/border/shadow of its own any more - the hero and its HeroStage
+   background now sit directly on .hero-modal's own panel colour instead of
+   a separate white box (the one deliberately-transparent exception to
+   HeroStage's usual "solid panel behind it" rule - see HeroStage.css).
    Sized to be the focal point of the card (~34-36% of the modal's own
    height - dialed down twice from an initial 58-60vh pass that read too
    big, close to the old fixed 250px again but still responsive/centred).
-   Lore/Skins below are deliberately demoted to make room (see
-   .hero-modal-lore/.hero-modal-collapse). Centred both axes (not the old
-   bottom-anchored crop) so the figure doesn't crowd either edge -
+   Lore below is deliberately demoted to make room (see .hero-modal-lore).
+   Centred both axes (not the old bottom-anchored crop) so the figure
+   doesn't crowd either edge -
    HeroDetailModal.jsx measures this box's real height via ResizeObserver
    and sizes the sprite to ~87.5% of it. */
 .hero-modal-stage {
@@ -51,15 +61,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-top: 16px;
   border-radius: 17px 17px 0 0;
-  overflow: hidden;
-  background: var(--white);
-  border-bottom: 3px solid var(--game-ink);
+  /* overflow-x only (was overflow: hidden) - the emote slider still needs
+     to clip a dragged-past-the-edge slide horizontally, but hiding the
+     vertical axis too was what clipped the hero's own head here whenever
+     it (or its emote pose) read taller than this box - the real fix is
+     sizing the hero off this box's own measured height so that stops
+     happening (see HeroStage.jsx), with the 16px top padding above and
+     this left as a visible fallback, not a relied-on one. */
+  overflow-x: clip;
+  overflow-y: visible;
+  background: transparent;
 }
 
 .hero-modal-stage.is-flat {
   padding: 0;
   align-items: stretch;
+}
+
+/* HeroStage.css's own .hero-stage defaults to sizing itself off its own
+   width via aspect-ratio - here it instead needs to fill the fixed-height
+   box .hero-modal-stage above already sets (clamp(200px, 34vh, 36vh), not
+   a 1000:778 ratio), so the aspect-ratio box would either leave a gap or
+   get clipped by this parent. Filling the box and letting the <img>'s own
+   object-fit: contain handle any mismatch avoids both. */
+.hero-modal-stage-bg.hero-stage {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: inherit;
 }
 
 .hero-modal-stage.is-flat .hero-figure-initial {
@@ -210,9 +241,9 @@
   color: var(--gold-text);
 }
 
-/* Buy/Equip for the hero itself (not a skin) - the one action the gallery
-   card's "Unlock" label promises but this modal used to have no button
-   for at all, see HeroDetailModal.jsx's own heroItem comment. */
+/* Buy/Equip for the hero itself - the one action the gallery card's
+   "Unlock" label promises but this modal used to have no button for at
+   all, see HeroDetailModal.jsx's own heroItem comment. */
 .hero-modal-unlock {
   margin: 12px 0 0;
 }
@@ -221,13 +252,17 @@
   width: 100%;
 }
 
+/* Explicit dark colour + stroke off - same inherited-white issue as
+   .hero-modal-lore/.hero-modal-stat-label above. */
 .hero-modal-heading {
   margin: 16px 0 8px;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-muted-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 .hero-modal-stats {
@@ -246,12 +281,20 @@
   font-size: 13px;
 }
 
+/* Explicit dark colour + stroke off, same reasoning as .hero-modal-lore
+   above - this inherited white text + the global black-stroke/-shadow
+   rule from .hero-modal's own `color: var(--game-cream)` (white), which
+   reads as a heavy outlined label rather than plain readable text on this
+   light panel. */
 .hero-modal-stat-label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-weight: 700;
   text-transform: capitalize;
+  color: var(--text-title-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 .hero-modal-stat-label svg {
@@ -286,13 +329,29 @@
 /* Clamped to ~3 lines by default (1.5 line-height * 3 + a hair of slack) -
    HeroDetailModal.jsx only shows the Read more/Show less toggle when the
    text actually overflows this, and .is-expanded lifts the cap so the
-   height change animates instead of snapping. */
+   height change animates instead of snapping.
+   An off-white block of its own (var(--row), the same #f6f5ef token every
+   other inset surface in /game uses), not sitting straight on the modal's
+   own panel - and text-shadow/stroke explicitly off: this is real body
+   copy, not a button label, and the global white-stroke rule stacking a
+   black outline behind text that's ALREADY var(--text-title-dark)
+   (#2b2a24) is what was reading as a dark, heavy smudge instead of plain
+   readable text (same failure mode as .game-card-title's own comment
+   elsewhere in this app). 60ch caps the line length so it doesn't run the
+   modal's full width edge to edge. */
 .hero-modal-lore {
   margin: 0;
-  font-size: 14px;
+  max-width: 60ch;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--row);
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.5;
   white-space: pre-line;
-  color: var(--text-body-dark);
+  color: var(--text-title-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
   max-height: 4.6em;
   overflow: hidden;
   transition: max-height 0.3s ease;
@@ -316,93 +375,15 @@
   text-decoration: underline;
 }
 
+/* Explicit dark colour + stroke off - same inherited-white issue as
+   .hero-modal-lore/.hero-modal-stat-label above (--text-muted defaults
+   white too, meant for dark panels, not this one). */
 .hero-modal-muted {
   margin: 0;
   font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Skins is a full collapsed-by-default accordion (not a text clamp like
-   Lore - a swatch list has no natural "3 lines") - same "give the hero
-   figure the room, not the lists below it" goal. The grid-rows 0fr/1fr
-   trick animates open/closed without having to measure the list's height
-   in JS (it varies with however many skins a hero has). */
-.hero-modal-section-toggle {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  cursor: pointer;
-}
-
-.hero-modal-section-toggle .hero-modal-heading {
-  margin: 16px 0 8px;
-}
-
-.hero-modal-section-toggle svg {
-  width: 14px;
-  height: 14px;
-  color: var(--text-muted);
-  transition: transform 0.2s ease;
-}
-
-.hero-modal-section-toggle.is-open svg {
-  transform: rotate(180deg);
-}
-
-.hero-modal-collapse {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s ease;
-}
-
-.hero-modal-collapse.is-open {
-  grid-template-rows: 1fr;
-}
-
-.hero-modal-collapse > div {
-  overflow: hidden;
-  min-height: 0;
-}
-
-.hero-modal-skins {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.hero-modal-skins li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.hero-modal-skin-swatch {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  border: 2px solid var(--game-ink);
-  background: linear-gradient(180deg, var(--game-wood-light), var(--game-wood));
-  overflow: hidden;
-}
-
-.hero-modal-skin-swatch img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.hero-modal-skin-name {
-  flex: 1;
-  min-width: 0;
-  font-weight: 800;
-  font-size: 14px;
+  color: var(--text-muted-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 .hero-modal-error {

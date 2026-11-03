@@ -1,16 +1,11 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useCallback, useEffect, useState } from 'react'
-import { ApiError, resolveFileUrl } from '../api/client'
+import { ApiError } from '../api/client'
 import { getClubWarHistory, getClubWarHistoryDetail } from '../api/clubWar'
-import { resolveHeroAsset } from '../utils/hero'
+import { DEFAULT_HERO_NAME, isPlaceholderHero } from '../utils/hero'
 import ClubBadge from './ClubBadge'
-import {
-  IconCheck,
-  IconChevronLeft,
-  IconClose,
-  IconHelmet,
-  IconTrophy,
-} from './GameIcons'
+import ClubWarMemberAvatar from './ClubWarMemberAvatar'
+import { IconCheck, IconChevronLeft, IconClose, IconTrophy } from './GameIcons'
 import { playerNameOf } from '../utils/playerName'
 
 // 10 per page - matches the backend's own default noOfRecords for this
@@ -110,23 +105,12 @@ function sortByContribution(list) {
 // full-screen takeover of ClubWarPanel (see its historyOpen state) rather
 // than a route, same pattern the rest of the game's in-menu screens use.
 //
-// storeCatalog/ownedItems are needed to turn a participant's
-// heroStoreItemId into a real hero portrait (see resolveHeroAsset) - same
-// lookup ClubWarPanel's own live-war roster uses, so a member's hero
-// looks the same whether the war is live or in the history.
-//
 // NOTE: the backend's ClubWarParticipantScoreResponse has no distance
 // field (confirmed by reading it directly) - only pace/effort score
 // components and the final contributedScore. There's nothing to show for
 // "distance run" per member without a backend change; this shows
 // contributed score instead, which IS real.
-export default function ClubWarHistory({
-  userId,
-  storeCatalog,
-  ownedItems,
-  onClose,
-  onViewProfile,
-}) {
+export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [wars, setWars] = useState([])
@@ -187,12 +171,17 @@ export default function ClubWarHistory({
       <ul className="club-war-history-participants">
         {sorted.map((p) => {
           const ran = Boolean(p.runId)
-          const { assetUrl } = resolveHeroAsset(
-            p.heroStoreItemId,
-            storeCatalog,
-            ownedItems
-          )
-          const avatarUrl = assetUrl ? resolveFileUrl(assetUrl) : null
+          // The backend's own heroName field reads straight off the
+          // StoreItem's name column (ClubWarServiceImpl#toParticipantScores
+          // - checked directly), which for this item is still literally
+          // "Default Hero" (see isPlaceholderHero) even though the
+          // underlying hero itself was renamed to Comet - never shown
+          // as-is, same substitution ClubWarPanel's live roster applies.
+          const heroName = p.heroName
+            ? isPlaceholderHero(p.heroName)
+              ? DEFAULT_HERO_NAME
+              : p.heroName
+            : DEFAULT_HERO_NAME
           return (
             <li key={p.userId}>
               <button
@@ -207,17 +196,7 @@ export default function ClubWarHistory({
                 }
               >
                 <span className="club-war-history-avatar">
-                  {avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt=""
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                      }}
-                    />
-                  ) : (
-                    <IconHelmet />
-                  )}
+                  <ClubWarMemberAvatar />
                 </span>
                 <span className="game-row-info">
                   <span className="game-row-name">
@@ -231,9 +210,7 @@ export default function ClubWarHistory({
                       </span>
                     )}
                   </span>
-                  <span className="game-row-meta">
-                    {p.heroName || 'No hero picked'}
-                  </span>
+                  <span className="game-row-meta">{heroName}</span>
                 </span>
                 <span
                   className={`club-war-run-badge ${ran ? 'is-done' : 'is-missed'}`}

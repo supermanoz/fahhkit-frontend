@@ -89,7 +89,10 @@ export default function ShareRunCarousel({ run }) {
         mimeType: slide.mime,
         quality: slide.quality,
       })
-      downloadBlob(blob, `fahhkit-run-${run.id}-${slide.variant}.${slide.ext}`)
+      downloadBlob(
+        blob,
+        `run-conquest-run-${run.id}-${slide.variant}.${slide.ext}`
+      )
     } finally {
       setDownloadingVariant(null)
     }

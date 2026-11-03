@@ -205,6 +205,41 @@ export function IconFlag(props) {
   )
 }
 
+// Fixed-colour flag icon for the Leaderboard's District/Country tabs (see
+// GamePage.jsx, and src/assets/ui/globe-scope.png for the matching Global
+// tab's globe, a provided raster asset rather than a hand-drawn SVG) -
+// unlike every other icon in this file, this deliberately doesn't use
+// currentColor/GameIcon: the brief wants it red on both the active
+// (slate-filled) and inactive (light wood) tab, never tinted white or
+// slate the way an icon riding the button's text colour would be.
+export function IconFlagScope({ className, ...props }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      aria-hidden="true"
+      focusable="false"
+      className={className ? `game-icon ${className}` : 'game-icon'}
+      {...props}
+    >
+      <path
+        d="M6 3v18"
+        stroke="#2B2420"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6 4.5h12l-3 4 3 4H6z"
+        fill="#D32F2F"
+        stroke="#7A1512"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function IconFlagCheckered(props) {
   return (
     <GameIcon {...props}>
@@ -415,29 +450,6 @@ export function IconEmote(props) {
       <circle cx="9" cy="10" r="1" {...SOLID} />
       <circle cx="15" cy="10" r="1" {...SOLID} />
       <path d="M8 14.5c1 1.3 2.4 2 4 2s3-.7 4-2" />
-    </GameIcon>
-  )
-}
-
-// A t-shirt - skins are a hero's outfit, so a garment reads more clearly
-// than anything hero-shaped (which would be confused with the Heroes tab
-// right next to it).
-export function IconSkin(props) {
-  return (
-    <GameIcon {...props}>
-      <path d="M9 4 5 6l2.5 3v10h9V9L19 6l-4-2a3.5 3.5 0 0 1-6 0z" {...TINT} />
-      <path d="M9 4 5 6l2.5 3v10h9V9L19 6l-4-2a3.5 3.5 0 0 1-6 0z" />
-    </GameIcon>
-  )
-}
-
-export function IconInfo(props) {
-  return (
-    <GameIcon {...props}>
-      <circle cx="12" cy="12" r="9.5" {...TINT} />
-      <circle cx="12" cy="12" r="9.5" />
-      <circle cx="12" cy="8" r="1.1" {...SOLID} />
-      <path d="M12 11.5v5.5" />
     </GameIcon>
   )
 }

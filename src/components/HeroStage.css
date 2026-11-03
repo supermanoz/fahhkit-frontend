@@ -1,0 +1,100 @@
+/* HeroStage.jsx - hero-coloured platform background behind a hero sprite/
+   emote. Fixed aspect ratio (matches stage.webp's own 1000x778), so every
+   call site gets the same proportions regardless of its own width - set
+   width (or max-width) on .hero-stage from the call site, height follows.
+   No background of its own (see git history for the version that had one) -
+   stage.webp's own transparent corners are meant to show whatever panel
+   colour already sits behind HeroStage in a given screen, not a white box
+   of its own; every call site that used to have a separate white wrapper
+   had that stripped too (see each one's own CSS for the specific rule). */
+.hero-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1000 / 778;
+  border-radius: 16px;
+  /* visible, not hidden - a hero sized off this box's own measured height
+     (see HeroStage.jsx) can still, briefly or on an unusual viewport, end
+     up taller than the box; overflow: hidden there clipped it at the top
+     (see git history - that was the bug this version was rewritten to
+     fix), and nothing here needs clipping any more since every parent of
+     the stage was also opened up (see each call site's own CSS). */
+  overflow: visible;
+  isolation: isolate;
+}
+
+.hero-stage-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Subtle idle pulse on the stage's own glow, opacity-only (no filter/blur,
+   nothing animated that would cost more than a cheap opacity tween) - the
+   hero sprite itself is the only thing that "moves" on this stage. */
+.hero-stage-glow {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: 72%;
+  height: 48%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  opacity: 0.5;
+  animation: hero-stage-glow-pulse 3.4s ease-in-out infinite;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+@keyframes hero-stage-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-stage-glow {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
+/* Bottom-anchored and horizontally centred, not flex-filled - the hero now
+   brings its own correct height (HeroStage.jsx sizes it off the stage's
+   own measured box, see there), so this just needs to plant its bottom
+   edge near the platform's surface. 12% up from the stage's own bottom
+   edge (not flush - every hero's idle frame already has a few percent of
+   empty margin below the feet) - checked by compositing a hero frame onto
+   stage.webp and eyeballing it against the Nova reference the brief was
+   built from. */
+.hero-stage-figure {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+}
+
+/* HeroDetailModal's own slide content (see its call site) fills this box
+   itself instead of being a hero-sized child positioned within it - full
+   coverage, not bottom-anchored, so its own badges/drag target still read
+   off the whole stage area the way they did before HeroStage existed. */
+.hero-stage-figure.is-full {
+  inset: 0;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  align-items: stretch;
+}

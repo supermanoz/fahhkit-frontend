@@ -2,12 +2,13 @@
 import { motion } from 'framer-motion'
 import { IconCheck, IconClose } from './GameIcons'
 import EmoteGlyph from './EmoteGlyph'
+import HeroStage from './HeroStage'
 import './EmoteShowcase.css'
 
 // Full-screen "first screen shown after clicking an emote" - replaces the
 // old shared buy-confirm card for EMOTE specifically (see GamePage.jsx's
-// storeChoice modal, which still renders the old card for
-// SKIN/TERRITORY_SHADE/TRAIL_COLOR - only EMOTE gets this treatment).
+// storeChoice modal, which still renders the old card for HERO/
+// TERRITORY_SHADE/TRAIL_COLOR - only EMOTE gets this treatment).
 // Esc and the backdrop click both close through the same `storeChoice`
 // state GamePage already had - its own Esc effect keys off storeChoice
 // itself, not this component, so no separate listener is needed here.
@@ -68,12 +69,16 @@ export default function EmoteShowcase({
           role="img"
           aria-label={`${item.name} emote`}
         >
-          <EmoteGlyph
-            heroName={heroName}
-            emoteName={item.name}
-            size={220}
-            active
-          />
+          <HeroStage hero={heroName}>
+            {(h) => (
+              <EmoteGlyph
+                heroName={heroName}
+                emoteName={item.name}
+                size={h || 220}
+                active
+              />
+            )}
+          </HeroStage>
         </div>
 
         {(purchaseError || storeActionError) && (

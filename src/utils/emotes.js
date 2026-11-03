@@ -1,5 +1,47 @@
 import { getHero, hasHero } from './heroManifest'
 
+// Emotes pulled from view everywhere in /game (Shop's hero emote slider,
+// the emote popup, the Me tab, any other list) without touching the
+// backend row or deleting the built asset - see isHiddenEmote/
+// filterVisibleEmotes below for where this actually takes effect. Keyed by
+// hero name, values are manifest emote keys (see heroManifest.js /
+// scripts/build_<hero>_stretch_strips.py) - both sides matched through
+// normalizeEmoteKey so "Emote 5"/"emote_5"/"emote5" all hit the same entry
+// regardless of which spacing a given backend StoreItem.name row uses.
+const HIDDEN_EMOTES = {
+  nova: ['emote5'],
+  comet: ['emote2', 'emote4'],
+  blaze: ['emote4'],
+  phantom: ['emote4'],
+  bolt: ['emote3'],
+  cyclone: ['emote6'],
+  pulse: ['emote6'],
+}
+
+function normalizeEmoteKey(value) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
+}
+
+// True if this hero+emote (matched case/space/underscore/hyphen-
+// insensitively) is on the HIDDEN_EMOTES list above.
+export function isHiddenEmote(heroName, emoteName) {
+  const heroKey = normalizeEmoteKey(heroName)
+  const emoteKey = normalizeEmoteKey(emoteName)
+  if (!heroKey || !emoteKey) return false
+  return Boolean(HIDDEN_EMOTES[heroKey]?.includes(emoteKey))
+}
+
+// The one place every screen that lists a hero's emotes (right now just
+// HeroDetailModal.jsx's HeroEmoteStage slider) should filter through, so a
+// hidden emote never gets a slide/dot/count of its own instead of showing
+// up dimmed or locked.
+export function filterVisibleEmotes(heroName, items) {
+  return (items || []).filter((item) => !isHiddenEmote(heroName, item?.name))
+}
+
 // Emote names every real hero is expected to have - used only to decide
 // whether an UNKNOWN hero's request should fall back to Blaze's. A
 // genuinely hero-specific emote further down a hero's numbering (which
@@ -83,11 +125,20 @@ export function knownEmoteNames(heroName) {
 // to equipped-only server-side) are shaped differently - each caller
 // normalizes its own shape into this flat list first (map to `.storeItem`,
 // filtering by `.equipped` first if that flag exists on its shape).
-export function resolveEquippedEmoteItem(equippedStoreItems, heroId) {
+//
+// heroName is optional but should be passed whenever the caller has it -
+// a hidden emote (see HIDDEN_EMOTES above) that's still equipped server-
+// side is treated as "nothing equipped" here so every caller falls back to
+// idle on its own, with no unequip call needed (the backend's equipped
+// row is left alone, it just stops being shown).
+export function resolveEquippedEmoteItem(equippedStoreItems, heroId, heroName) {
   if (!heroId) return null
   return (
     (equippedStoreItems || []).find(
-      (item) => item?.category === 'EMOTE' && item?.heroId === heroId
+      (item) =>
+        item?.category === 'EMOTE' &&
+        item?.heroId === heroId &&
+        !isHiddenEmote(heroName, item?.name)
     ) || null
   )
 }
@@ -104,6 +155,10 @@ export function warnMissingEmoteAssets(emoteItems, heroes) {
       heroName: heroes?.find((h) => h.id === item.heroId)?.name,
     }))
     .filter(({ heroName }) => heroName)
+    // Hidden emotes are deliberately kept out of every list - they're not
+    // a "missing asset" gap worth warning about, even if one happens to
+    // have no local art either.
+    .filter(({ item, heroName }) => !isHiddenEmote(heroName, item.name))
     .filter(({ item, heroName }) => !resolveEmoteAsset(heroName, item.name))
   if (missing.length === 0) return
   console.warn(

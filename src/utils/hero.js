@@ -43,6 +43,38 @@ export function isPlaceholderHero(name) {
   )
 }
 
+// resolveHeroAsset, but never null and never the literal placeholder name -
+// for anywhere a hero pick is optional and still needs *something* sane to
+// show (Club War's member rows: a row with no hero locked in yet, or one
+// locked into this placeholder item itself, both read the same way). Checked
+// directly against the backend: V1_39__hero_comet_nova_setup.sql renamed the
+// underlying `hero` row from "Default Hero" to "Comet", but never touched
+// the matching `store_item` row's own name column - so a StoreItem lookup by
+// id can still come back literally named "Default Hero" even though it's
+// Comet's own hero-unlock item in every other respect (same asset, same
+// hero_id). Falls back to whichever StoreItem in storeCatalog/ownedItems IS
+// that placeholder row, rather than hard-coding Comet's id (which isn't
+// stable - it's a generated uuid, not seeded with a fixed value).
+export function resolveHeroAssetOrDefault(
+  storeItemId,
+  storeCatalog,
+  ownedItems
+) {
+  const picked = resolveHeroAsset(storeItemId, storeCatalog, ownedItems)
+  if (picked.assetUrl && picked.name && !isPlaceholderHero(picked.name)) {
+    return picked
+  }
+  const defaultItem =
+    storeCatalog?.find(
+      (i) => i.category === 'HERO' && isPlaceholderHero(i.name)
+    ) ||
+    ownedItems?.find(
+      (o) =>
+        o.storeItem.category === 'HERO' && isPlaceholderHero(o.storeItem.name)
+    )?.storeItem
+  return { name: DEFAULT_HERO_NAME, assetUrl: defaultItem?.assetUrl || null }
+}
+
 // ScoreComponentTypeConstant → what the boost actually does, in player
 // terms. RACE_TIME is the one where lower is better (a 0.95 multiplier
 // shaves 5% off your PvP race time), so it reads as a minus. Exported too -

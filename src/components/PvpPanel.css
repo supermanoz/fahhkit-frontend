@@ -16,15 +16,16 @@
   background: var(--game-stone);
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-race-status.status-IN_PROGRESS {
-  background: var(--game-red);
+  background: var(--pvp-accent);
   color: var(--game-cream);
   animation: pvp-live-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes pvp-live-pulse {
   50% {
-    box-shadow: 0 0 10px rgba(255, 90, 77, 0.8);
+    box-shadow: 0 0 10px rgba(var(--pvp-accent-rgb), 0.8);
   }
 }
 
@@ -34,7 +35,7 @@
 }
 
 .pvp-lost {
-  color: var(--game-red-light);
+  color: var(--pvp-accent-light);
 }
 
 /* Live race strip over the map while a race run is being tracked. Above
@@ -69,7 +70,11 @@
 .pvp-race-hud-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--game-red-light), var(--game-red));
+  background: linear-gradient(
+    90deg,
+    var(--pvp-accent-light),
+    var(--pvp-accent)
+  );
   transition: width 0.3s ease;
 }
 
@@ -107,27 +112,34 @@
   gap: 10px;
 }
 
+/* 44px, not a 36px circle with extra invisible tap padding - simpler, and
+   there's no sibling content here that a bigger circle would crowd. */
 .pvp-back {
   all: unset;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   border: 3px solid var(--game-ink);
   background: linear-gradient(180deg, var(--game-wood-light), var(--game-wood));
-  color: var(--game-text);
   box-shadow:
     inset 0 -4px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
   cursor: pointer;
 }
 
+/* --icon-dark, not the button's own (unset) colour - a plain SVG arrow
+   never picks up the global white-stroke rule the way text does (that's
+   text-shadow, which doesn't touch an SVG path's stroke/fill), so the old
+   var(--game-text) (white) read invisible on this light wood fill. */
 .pvp-back svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  color: var(--icon-dark);
+  stroke-width: 2.5;
 }
 
 .pvp-back:active {
@@ -161,12 +173,14 @@
   background: var(--game-green);
 }
 
+/* Slate, not the old brown-red (--gold-text) - PvP keeps that colour for
+   the coin icon only now. */
 .pvp-section-label {
   margin: 4px 0 0;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--gold-text);
+  color: var(--pvp-accent);
 }
 
 .pvp-big-line {
@@ -211,6 +225,7 @@
   box-shadow: 0 4px 0 var(--game-ink);
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-hero-emblem {
   width: 64px;
   height: 64px;
@@ -221,16 +236,16 @@
   border: 3px solid var(--game-ink);
   background: linear-gradient(
     180deg,
-    var(--game-red-light),
-    var(--game-red) 50%,
-    var(--game-red-dark)
+    var(--pvp-accent-light),
+    var(--pvp-accent) 50%,
+    var(--pvp-accent-dark)
   );
   color: #fff;
   font-size: 30px;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.4),
     0 3px 0 var(--game-ink),
-    0 0 20px rgba(255, 90, 77, 0.5);
+    0 0 20px rgba(var(--pvp-accent-rgb), 0.5);
 }
 
 .pvp-hero-title {
@@ -252,7 +267,7 @@
   gap: 4px;
   padding: 6px 10px;
   font-size: 14px;
-  color: var(--game-gold-light);
+  color: var(--pvp-accent);
   cursor: pointer;
 }
 
@@ -293,7 +308,7 @@
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--gold-text);
+  color: var(--pvp-accent);
 }
 
 .pvp-section-card {
@@ -360,7 +375,7 @@
   flex-shrink: 0;
   width: 18px;
   height: 18px;
-  color: var(--gold-text);
+  color: var(--pvp-accent);
 }
 
 .pvp-choice-big {
@@ -382,8 +397,14 @@
   background: linear-gradient(180deg, #a8f07a, #4fc85e 55%, #268a3a);
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-mode-FIVE_KM .pvp-choice-big {
-  background: linear-gradient(180deg, #ffab9e, #ff5a4d 55%, #c72a20);
+  background: linear-gradient(
+    180deg,
+    var(--pvp-accent-light),
+    var(--pvp-accent) 55%,
+    var(--pvp-accent-dark)
+  );
 }
 
 .pvp-choice-icon {
@@ -400,21 +421,24 @@
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
 
+/* Slate, not gold - the Quick Match icon badge used the orange gold
+   gradient; PvP keeps gold for the coin icon only now. */
 .pvp-choice-icon.tone-gold {
   background: linear-gradient(
     180deg,
-    var(--game-gold-light),
-    var(--game-gold) 55%,
-    var(--game-gold-dark)
+    var(--pvp-accent-light),
+    var(--pvp-accent) 55%,
+    var(--pvp-accent-dark)
   );
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-choice-icon.tone-red {
   background: linear-gradient(
     180deg,
-    var(--game-red-light),
-    var(--game-red) 55%,
-    var(--game-red-dark)
+    var(--pvp-accent-light),
+    var(--pvp-accent) 55%,
+    var(--pvp-accent-dark)
   );
 }
 
@@ -442,7 +466,7 @@
   align-items: center;
   gap: 3px;
   font-size: 12px;
-  color: var(--gold-text);
+  color: var(--pvp-accent);
 }
 
 .pvp-picked {
@@ -454,14 +478,15 @@
   color: var(--text-muted);
 }
 
+/* Slate, not gold - this chip (the picked distance, e.g. "500 M") used the
+   orange gold fill; PvP keeps gold for the coin icon only now. Inherits
+   .pvp-picked's 14px (under 16px) so no stroke, per the slate-text rule. */
 .pvp-picked-chip {
   padding: 2px 10px;
   border-radius: 999px;
   border: 2px solid var(--game-ink);
-  background: var(--game-gold);
+  background: var(--pvp-accent);
   color: #fff;
-  -webkit-text-stroke: 1px var(--game-ink);
-  paint-order: stroke fill;
 }
 
 /* --- Searching radar --- */
@@ -513,6 +538,7 @@
   inset: 12%;
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-radar-core {
   position: absolute;
   left: 50%;
@@ -527,9 +553,9 @@
   border: 3px solid var(--game-ink);
   background: linear-gradient(
     180deg,
-    var(--game-red-light),
-    var(--game-red) 50%,
-    var(--game-red-dark)
+    var(--pvp-accent-light),
+    var(--pvp-accent) 50%,
+    var(--pvp-accent-dark)
   );
   color: #fff;
   font-size: 22px;
@@ -575,16 +601,34 @@
   background: var(--white);
 }
 
+/* Slate, not gold - PvP keeps gold for the coin icon only now. */
 .pvp-runner.needs-me {
-  border-color: var(--game-gold);
-  background: var(--gold-tint);
+  border-color: var(--pvp-accent);
+  background: var(--pvp-accent-tint);
 }
 
 .pvp-runner > svg {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  color: var(--gold-text);
+  color: var(--pvp-accent);
+}
+
+/* "Challenge" isn't a close/danger action (it starts a new race) - the
+   shared .game-btn-red it's built from is for actual danger buttons
+   elsewhere (Cancel Search, Forfeit), so this scoped override keeps those
+   red while this one goes slate, instead of recolouring .game-btn-red
+   itself and changing buttons outside PvP. */
+.pvp-runner .game-btn-red {
+  background: linear-gradient(
+    180deg,
+    var(--pvp-accent-light) 0%,
+    var(--pvp-accent) 45%,
+    var(--pvp-accent-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--pvp-accent-dark),
+    0 3px 0 var(--game-ink);
 }
 
 .pvp-runner-info {
@@ -616,11 +660,14 @@
   color: var(--green-text);
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-runner-meta.pvp-lost {
-  color: var(--red-text);
+  color: var(--pvp-accent);
 }
 
 /* --- Race screen --- */
+/* Slate wash on "their" side, not red - PvP keeps red for close/danger
+   states only. */
 .pvp-versus {
   display: flex;
   align-items: center;
@@ -634,7 +681,7 @@
     #d9ebfa 0%,
     var(--row) 45%,
     var(--row) 55%,
-    var(--red-tint) 100%
+    var(--pvp-accent-tint) 100%
   );
   box-shadow: 0 4px 0 var(--game-ink);
 }
@@ -654,6 +701,8 @@
   text-overflow: ellipsis;
 }
 
+/* Slate, not gold - PvP keeps gold for the coin icon only now. 16px text,
+   so the thin stroke stays per the slate-text rule. */
 .pvp-versus-vs {
   flex-shrink: 0;
   width: 44px;
@@ -665,9 +714,9 @@
   border: 3px solid var(--game-ink);
   background: linear-gradient(
     180deg,
-    var(--game-gold-light),
-    var(--game-gold) 55%,
-    var(--game-gold-dark)
+    var(--pvp-accent-light),
+    var(--pvp-accent) 55%,
+    var(--pvp-accent-dark)
   );
   color: #fff;
   font-size: 16px;
@@ -758,9 +807,10 @@
   color: var(--text-title);
 }
 
+/* Slate, not gold - PvP keeps gold for the coin icon only now. */
 .pvp-timeline li.is-now .pvp-timeline-dot {
-  background: var(--game-gold);
-  box-shadow: 0 0 10px rgba(255, 122, 41, 0.8);
+  background: var(--pvp-accent);
+  box-shadow: 0 0 10px rgba(var(--pvp-accent-rgb), 0.8);
 }
 
 .pvp-result {
@@ -783,8 +833,13 @@
   text-shadow: 0 2px 0 var(--game-ink);
 }
 
+/* Slate, not red - PvP keeps red for close/danger states only. */
 .pvp-result.is-lost {
-  background: linear-gradient(180deg, #ff7a6d, var(--game-red-dark));
+  background: linear-gradient(
+    180deg,
+    var(--pvp-accent-light),
+    var(--pvp-accent-dark)
+  );
   color: #fff;
   text-shadow: 0 2px 0 var(--game-ink);
 }
@@ -836,11 +891,12 @@
   }
 }
 
-/* Match found: radar stops and flashes gold. */
+/* Match found: radar stops and flashes slate, not gold - PvP keeps gold
+   for the coin icon only now. */
 .pvp-radar.is-found {
   box-shadow:
-    0 0 0 4px rgba(255, 180, 0, 0.5),
-    0 0 24px rgba(255, 180, 0, 0.6),
+    0 0 0 4px rgba(var(--pvp-accent-rgb), 0.5),
+    0 0 24px rgba(var(--pvp-accent-rgb), 0.6),
     0 4px 0 var(--game-ink);
 }
 
