@@ -90,11 +90,15 @@
 /* HeroDetailModal's own slide content (see its call site) fills this box
    itself instead of being a hero-sized child positioned within it - full
    coverage, not bottom-anchored, so its own badges/drag target still read
-   off the whole stage area the way they did before HeroStage existed. */
+   off the whole stage area the way they did before HeroStage existed.
+   `inset: 0` alone overrides the base rule's left/bottom/transform (this
+   selector is more specific) - it must NOT be followed by `left: auto`/
+   `bottom: auto`, which would cancel that stretch right back out and leave
+   the box sized to its own content, pinned by top+right only (the bug this
+   was fixed for: the hero rendered jammed against the stage's right edge,
+   overlapping the next arrow, with the platform empty in the middle). */
 .hero-stage-figure.is-full {
   inset: 0;
-  left: auto;
-  bottom: auto;
   transform: none;
   align-items: stretch;
 }

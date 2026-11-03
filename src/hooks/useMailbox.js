@@ -3,6 +3,7 @@ import { ApiError } from '../api/client'
 import {
   claimMail,
   declineMail,
+  deleteAllReadMail,
   deleteMail,
   findBroadcastMail,
   findMyMail,
@@ -175,7 +176,16 @@ export function useMailbox() {
     if (updated) replace(updated)
   }
 
+  // Optimistic - the row disappears immediately (not after the request
+  // resolves, unlike every other action above), so a confirmed delete reads
+  // as instant instead of waiting a round trip; a failed one restores the
+  // exact previous list. busyId is still set/cleared around the request
+  // (MailPanel.jsx doesn't currently use it for this row - the row's
+  // already gone, so there's nothing left to disable - but actionError
+  // still needs `run`'s try/catch to populate on failure).
   async function remove(item) {
+    const prevMail = mail
+    setMail((prev) => prev.filter((m) => m.id !== item.id))
     const ok = await run(
       item.id,
       async () => {
@@ -184,7 +194,33 @@ export function useMailbox() {
       },
       'Could not delete that mail.'
     )
-    if (ok) setMail((prev) => prev.filter((m) => m.id !== item.id))
+    if (!ok) setMail(prevMail)
+    return Boolean(ok)
+  }
+
+  // Bulk delete of every READ/CLAIMED/DECLINED mail (UNREAD is never
+  // touched server-side, so the unread badge can't be affected by this).
+  // Not optimistic the way `remove` is: the backend op is scoped to the
+  // caller's WHOLE inbox, not just this page (see deleteAllReadMail's own
+  // comment in api/mail.js), so there's no correct way to locally patch
+  // just the current page's list and have mailTotalPages/mailPage still be
+  // right afterward - reloading the current page from the server (same
+  // call goToMailPage already makes) is what actually stays correct.
+  // Resolves to the real deleted count on success (for the toast), null on
+  // failure (nothing local changes to roll back, since nothing was mutated
+  // optimistically).
+  async function removeAllRead() {
+    setActionError(null)
+    try {
+      const count = await deleteAllReadMail()
+      await goToMailPage(mailPage)
+      return count
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : 'Could not delete read mail.'
+      )
+      return null
+    }
   }
 
   async function openBroadcast(item) {
@@ -218,6 +254,7 @@ export function useMailbox() {
     claim,
     decline,
     remove,
+    removeAllRead,
     openBroadcast,
     mailPage,
     mailTotalPages,

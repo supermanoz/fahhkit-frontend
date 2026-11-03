@@ -21,11 +21,12 @@
 }
 
 /* Inbox/News (below) now carry the section title - this row just gives
-   "Mark all read" a place to sit, so it collapses to nothing instead of
-   a stray gap when there's no unread mail to clear. */
-.mail-panel-header:has(.mail-mark-all-btn) {
+   "Mark all read"/"Delete read" a place to sit, so it collapses to nothing
+   instead of a stray gap when there's nothing for either to act on. */
+.mail-panel-header:has(.mail-mark-all-btn, .mail-delete-read-btn) {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding-bottom: 10px;
 }
 
@@ -43,6 +44,36 @@
 }
 
 .mail-mark-all-btn:hover {
+  background: var(--white);
+}
+
+/* "Delete read" bulk action - same size/shape as Mark all read next to it,
+   red-tinted since this one's destructive. Only ever removes READ/CLAIMED/
+   DECLINED mail (see useMailbox.js's removeAllRead/deleteAllReadMail in
+   api/mail.js) - the backend scopes it to the caller's whole inbox, not
+   just the page this button's count is drawn from, which the confirm
+   popup itself spells out rather than implying an exact count. */
+.mail-delete-read-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--red-text);
+  background: var(--red-tint);
+  border: 1.5px solid var(--game-red);
+  cursor: pointer;
+}
+
+.mail-delete-read-btn svg {
+  font-size: 13px;
+}
+
+.mail-delete-read-btn:hover {
   background: var(--white);
 }
 
@@ -311,6 +342,74 @@
 .mail-item-actions .btn {
   padding: 7px 14px;
   font-size: 12px;
+}
+
+/* Delete - red secondary style (not the .btn family above - this is
+   destructive, so it reads distinctly from Join Club/Decline/Claim Gift
+   next to it), a real 44px tap target per the brief even though the row's
+   other action buttons are shorter. Disabled (not hidden) with its own
+   title tooltip while the mail's still UNREAD - see MailPanel.jsx's own
+   comment on why that's the backend's actual rule, not a special case for
+   claimable mail specifically. */
+.mail-delete-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--game-red);
+  background: var(--red-tint);
+  color: var(--red-text);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mail-delete-btn svg {
+  font-size: 15px;
+}
+
+.mail-delete-btn:hover:not(:disabled) {
+  background: var(--white);
+}
+
+.mail-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Confirm popup's own Delete button - pill-shaped like the shared
+   .btn/.btn-primary every other /game confirm dialog uses for its
+   confirm action (see GamePage.jsx's own game-confirm-actions call
+   sites), just red instead of that family's brand gradient - there's no
+   shared red variant of .btn to reuse site-wide without risking the
+   website's own pages, which also read .btn/.btn-primary/.btn-outline
+   from index.css, so this stays its own scoped class instead. */
+.mail-confirm-delete-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: var(--game-red);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mail-confirm-delete-btn:hover {
+  background: var(--game-red-dark);
+}
+
+.mail-confirm-delete-btn:active {
+  transform: translateY(1px);
 }
 
 /* News (broadcasts) - event-card treatment (thumbnail + gold header strip)

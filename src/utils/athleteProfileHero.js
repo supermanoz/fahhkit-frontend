@@ -88,10 +88,39 @@ export function resolveAthleteProfileHero({
       ) || null
   }
   // Same asset-validation gap as the isSelf branch above.
+  const resolvedAsset = equippedItem
+    ? resolveEmoteAsset(heroName, equippedItem.name)
+    : null
   const equippedEmoteName =
-    equippedItem && resolveEmoteAsset(heroName, equippedItem.name)
-      ? equippedItem.name
-      : null
+    equippedItem && resolvedAsset ? equippedItem.name : null
+
+  // Dev-only step-by-step trace - stripped from production builds (Vite
+  // replaces import.meta.env.DEV with a literal false there, so this whole
+  // block dead-code-eliminates). The point: when "shows hero but not
+  // emote" gets reported again, open devtools on the real failing profile
+  // and this prints exactly which step produced null, instead of needing
+  // to re-derive it from the network tab's raw JSON by hand.
+  if (import.meta.env.DEV) {
+    console.debug('[athleteProfileHero] other-player resolve', {
+      heroName,
+      heroId: cosmeticsHero?.storeItem.heroId ?? null,
+      cosmetics: equippedStoreItems.map((item) => ({
+        name: item?.name,
+        category: item?.category,
+        heroId: item?.heroId,
+      })),
+      equippedItemAfterHeroIdMatch: cosmeticsHero
+        ? (resolveEquippedEmoteItem(
+            equippedStoreItems,
+            cosmeticsHero.storeItem.heroId,
+            cosmeticsHero.storeItem.name
+          )?.name ?? null)
+        : null,
+      equippedItemFinal: equippedItem?.name ?? null,
+      resolvedAsset: Boolean(resolvedAsset),
+      equippedEmoteName,
+    })
+  }
 
   return {
     heroName,

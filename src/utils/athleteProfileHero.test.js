@@ -235,4 +235,66 @@ describe('resolveAthleteProfileHero', () => {
     })
     expect(result.equippedEmoteName).toBeNull()
   })
+
+  // THE actual real-world cause (checked directly against
+  // db/migration/V1_64__hero_skin_emote_store_items.sql +
+  // HeroItemOwnershipSupport.java): every hero's StoreItem.name for its
+  // free default emote is the literal string "Classic", not "Emote1", and
+  // it's auto-equipped for every player the moment they unlock a hero -
+  // still live today, not a one-time migration artifact. No manifest.json
+  // has a "classic" key, so before emotes.js's CLASSIC_ALIAS_TARGET fix
+  // this resolved to no local art for every untouched hero - the dominant
+  // real case, not an edge case, which is why "viewing another player's
+  // profile never shows their emote" kept reproducing against the real
+  // backend even though the heroId-gap fallback above was already working
+  // correctly. Isolated from that gap here (heroId present) to prove this
+  // is its own, separate fix.
+  it('another player with the real default "Classic" emote equipped resolves to this hero\'s idle art', () => {
+    const hero = cosmeticHero()
+    const classic = emoteCosmetic({ name: 'Classic' })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, classic],
+    })
+    expect(result.equippedEmoteName).toBe('Classic')
+  })
+
+  // The two real bugs stacked, exactly as the live backend actually sends
+  // them today: no heroId on any cosmetic (the TerritoryServiceImpl gap)
+  // AND the equipped emote named "Classic" (the common case, not a rare
+  // one). Both fixes have to hold at once for this to pass.
+  it('another player with "Classic" equipped and no heroId at all (the real production shape) still resolves', () => {
+    const hero = cosmeticHero({ heroId: undefined })
+    const classic = emoteCosmetic({ name: 'Classic', heroId: undefined })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, classic],
+    })
+    expect(result.heroName).toBe('Nova')
+    expect(result.equippedEmoteName).toBe('Classic')
+  })
+
+  // Same registry fix, the isSelf path (GamePage's own Me tab) - shares
+  // resolveEmoteAsset with the other-player branch above, so a player who
+  // still has their own hero's free default equipped must see it too, not
+  // just another player's.
+  it('self with the real default "Classic" emote equipped resolves it too', () => {
+    const result = resolveAthleteProfileHero({
+      isSelf: true,
+      selfHeroName: 'Nova',
+      selfEmoteName: 'Classic',
+      selfShowsTurntable: true,
+      cosmeticsHero: null,
+      cosmetics: [],
+    })
+    expect(result.equippedEmoteName).toBe('Classic')
+  })
 })

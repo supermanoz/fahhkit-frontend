@@ -329,7 +329,7 @@
 }
 
 .game-auth-terms a {
-  color: var(--green-text);
+  color: var(--auth-link);
   text-decoration: underline;
 }
 
@@ -361,26 +361,39 @@
   margin-top: 4px;
 }
 
-/* Chunky primary button matching the site's .btn-primary gradient feel but
-   sized/radius'd like the rest of the in-game UI. */
+/* Chunky primary button - orange (--auth-primary), not the old gold, with
+   the same dark-outline/inset-highlight/hard-drop-shadow/press-state
+   recipe every other game button (.game-btn & co) uses, rather than the
+   flat border:none + single drop-shadow this had before. Label stays
+   white with the thin dark stroke/shadow every /game text gets by default
+   (not reset here) - unchanged from the gold version. */
 .game-auth-submit {
   width: 100%;
   min-height: 48px;
   border-radius: 14px;
-  border: none;
+  border: 3px solid var(--ink);
   background: linear-gradient(
     180deg,
-    var(--game-gold-light),
-    var(--game-gold) 60%,
-    var(--game-gold-dark)
+    var(--auth-primary-light),
+    var(--auth-primary) 60%,
+    var(--auth-primary-dark)
   );
   color: var(--game-text);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 18px;
   letter-spacing: 0.02em;
-  box-shadow: 0 3px 0 var(--ink);
+  box-shadow:
+    inset 0 -4px 0 var(--auth-primary-dark),
+    0 3px 0 var(--ink);
   cursor: pointer;
+}
+
+.game-auth-submit:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -4px 0 var(--auth-primary-dark),
+    0 1px 0 var(--ink);
 }
 
 .game-auth-submit:disabled {
@@ -402,17 +415,31 @@
   cursor: pointer;
 }
 
+/* --auth-link (#710913), not the old --green-text - every text link on
+   these screens (Forgot password?, Didn't get it?/Resend, Already got
+   your login email?). Stroke/shadow explicitly off: this is small text,
+   and the global thin-stroke-plus-shadow every /game element gets by
+   default is what made it read as garbled on a plain underline before,
+   not a problem solid colour alone has. Bumped to 15px/700 (from 13px/
+   unset) for legibility at that weight, and to a real 44px tap target
+   (from 32px) - the same floor every other control in this flow uses. */
 .game-auth-link {
   background: none;
   border: none;
   padding: 2px;
-  color: var(--green-text);
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  color: var(--auth-link);
+  font-size: 15px;
+  font-weight: 700;
   font-family: var(--font-body);
   text-decoration: underline;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
   cursor: pointer;
   align-self: center;
-  min-height: 32px;
 }
 
 .game-auth-link:disabled {

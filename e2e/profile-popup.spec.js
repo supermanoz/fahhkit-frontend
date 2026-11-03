@@ -116,4 +116,103 @@ test.describe('Profile popup - cross-user correctness', () => {
       page.locator('.game-menu-hero .emote-glyph-sprite')
     ).toHaveCount(0)
   })
+
+  // The bug report that found this spec's own mocked personas weren't
+  // trustworthy: every persona above sets storeItem.heroId on its
+  // cosmetics, which the real backend never does (checked directly against
+  // TerritoryServiceImpl#toUserStoreItemResponse - it's missing that one
+  // setter, still unfixed, see athleteProfileHero.js's own comment) - so
+  // this spec kept passing while the real app kept failing. This override
+  // mirrors the real shape instead: no heroId anywhere, and the equipped
+  // emote named "Classic" - the backend's own literal name for every
+  // hero's free default emote (db/migration/
+  // V1_64__hero_skin_emote_store_items.sql, still auto-granted today via
+  // HeroItemOwnershipSupport.java), which emotes.js had no mapping for at
+  // all until this fix. This is the actual dominant real-world case, not
+  // an edge case - most players never buy a different emote.
+  test('another player\'s real-shape response (no heroId, default "Classic" emote) still shows their emote', async ({
+    mockedPage: page,
+  }) => {
+    const REAL_SHAPE_PROFILE = {
+      userId: VETERAN.id,
+      totalAreaSqMeters: 125_000,
+      parcelCount: 12,
+      level: 14,
+      xp: 3400,
+      medals: [],
+      equippedCosmetics: [
+        {
+          id: 'owned-nova',
+          storeItem: {
+            id: 'storeitem-hero-nova',
+            category: 'HERO',
+            name: 'Nova',
+            // heroId intentionally omitted - the real response never sends it.
+            assetUrl: null,
+            priceFahhcoin: 0,
+          },
+          equipped: true,
+        },
+        {
+          id: 'owned-nova-classic',
+          storeItem: {
+            id: 'storeitem-emote-classic',
+            category: 'EMOTE',
+            name: 'Classic',
+            assetUrl: null,
+            priceFahhcoin: 0,
+          },
+          equipped: true,
+        },
+      ],
+      showcasedMedals: [],
+      clubName: null,
+      clubRole: null,
+    }
+
+    await page.route('**/v1/user/find/logged-in', (route) =>
+      route.fulfill(ok(CAPTAIN.user))
+    )
+    await page.route('**/v1/territory/profile', (route) =>
+      route.fulfill(ok(CAPTAIN.territoryProfile))
+    )
+    await page.route('**/v1/leaderboard/individual/find', (route) =>
+      route.fulfill(
+        ok({
+          content: INDIVIDUAL_LEADERBOARD,
+          totalElements: INDIVIDUAL_LEADERBOARD.length,
+        })
+      )
+    )
+    await page.route(`**/v1/territory/profile/${VETERAN.id}`, (route) =>
+      route.fulfill(ok(REAL_SHAPE_PROFILE))
+    )
+
+    await page.goto('/game')
+    await expect(page.locator('.game-loading-overlay')).toBeHidden({
+      timeout: 30_000,
+    })
+    await page.locator('.game-menu-btn').click()
+    await page.getByRole('button', { name: 'Leaderboard' }).click()
+    await expect(page.locator('.lb-row, .lb-podium-spot').first()).toBeVisible({
+      timeout: 10_000,
+    })
+
+    await page
+      .locator('.lb')
+      .getByText(firstWord(VETERAN.fullName))
+      .first()
+      .click()
+    await expect(page.locator('.game-menu-player-name')).toHaveText(
+      firstWord(VETERAN.fullName)
+    )
+    await expect(page.locator('.hero-stage-bg')).toHaveAttribute(
+      'src',
+      /heroes\/nova\//,
+      { timeout: 10_000 }
+    )
+    await expect(
+      page.locator('.game-menu-hero .emote-glyph-sprite')
+    ).toBeVisible()
+  })
 })

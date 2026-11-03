@@ -27,6 +27,16 @@ export function deleteMail(id) {
   return deleteJson(`/v1/mail/${id}`)
 }
 
+// Bulk analog - every one of the caller's own READ/CLAIMED/DECLINED mail at
+// once (UNREAD is never touched, same eligibility rule as deleteMail).
+// Resolves to the number actually deleted. Scoped to the whole inbox
+// server-side, not just the current page - see useMailbox.js's
+// removeAllRead, which reloads the current page afterward rather than
+// trying to patch local state for pages it never fetched.
+export function deleteAllReadMail() {
+  return deleteJson('/v1/mail/read')
+}
+
 export function findBroadcastMail(pageNumber = 1, noOfRecords = 20) {
   return postJson('/v1/mail/broadcast/find', { pageNumber, noOfRecords })
 }

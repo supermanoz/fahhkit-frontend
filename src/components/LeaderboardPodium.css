@@ -2,10 +2,6 @@
 .lb {
   --lb-gold: var(--game-gold, #ff7a29);
   --lb-gold-light: var(--game-gold-light, #ffb15c);
-  --lb-silver: #c9ced6;
-  --lb-silver-dark: #8a929e;
-  --lb-bronze: #d98b4a;
-  --lb-bronze-dark: #9a5a27;
   --lb-cream: var(--game-cream, #fff6e6);
   display: flex;
   flex-direction: column;
@@ -67,7 +63,7 @@
   padding-top: 48px;
 }
 
-/* Faint warm gold edge around the #1 spot, to go with the Inferno badge -
+/* Faint warm gold edge around the #1 spot, to go with its rank badge -
    static (no animation), so it doesn't add to that badge's own animated-
    element budget. */
 .lb-podium-spot.place-1 {
@@ -77,177 +73,72 @@
     0 0 16px rgba(255, 147, 41, 0.22);
 }
 
-.lb-podium-frame {
-  position: relative;
-  display: block;
-  margin-bottom: 8px;
+/* The badge image IS the podium spot's content now - no avatar/club-badge/
+   crown/rays/frame behind it any more (see git history for that version;
+   PodiumSpot in LeaderboardPodium.jsx no longer renders any of them).
+   Sizing/fill/animation otherwise live on RankBadge itself (RankBadge.css);
+   this just sets how big that art reads at this one call site - height-
+   constrained (not width) since each badge's own aspect ratio differs
+   slightly, same reasoning as RankBadge.css's own default sizing, just
+   bigger: this IS the podium spot's main visual now, not a small corner
+   medal next to one. `.rank-badge` in the selector (not just the class
+   this component passes in) beats RankBadge.css's own same-specificity
+   .rank-badge-2/.rank-badge-3 default-size rules regardless of CSS import
+   order. */
+/* clamp(), not a fixed px or a breakpoint step - phones from 360-430px
+   (the brief's own stated range) get a size that tapers smoothly across
+   that whole span instead of jumping at one width, and the vw coefficient
+   is picked so the clamp's min/max bounds are actually what's visible at
+   360/430px (verified, not just asserted - see the min/max comments
+   below) rather than both ends sitting outside the real 360-430 viewport
+   range and the badge just rendering at one flat size the whole time. */
+.rank-badge.lb-podium-badge-img {
+  /* 64px at <=360px (17vw=61.2, clamped up to the 64px floor), ~68px at
+     400px, 72px at >=430px (17vw=73.1, clamped down to the 72px ceiling). */
+  height: clamp(64px, 17vw, 72px);
+  max-width: 100%;
+  margin-bottom: 4px;
 }
 
-/* Crown above the #1 spot - the CoC "top of the leaderboard" marker. */
-.lb-podium-crown {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 22px;
-  color: var(--lb-gold-light);
-  filter: drop-shadow(0 2px 0 var(--game-ink));
-  z-index: 2;
+.place-1 .rank-badge.lb-podium-badge-img {
+  /* 84px at <=360px (21.5vw=77.4, clamped up to the 84px floor), ~89px at
+     400px, 92px at >=430px (21.5vw=92.5, clamped down to the 92px ceiling). */
+  height: clamp(84px, 21.5vw, 92px);
 }
 
-/* The coloured border is a slightly larger copy of the avatar's shape
-   behind it - clip-path eats real borders. drop-shadow (not box-shadow,
-   which ignores clip-path) traces the clipped medal/shield outline itself
-   for a chunky bevelled edge - the CoC "thick plate" look. */
-.lb-podium-border {
-  display: block;
-  padding: 4px;
-  filter: drop-shadow(0 3px 0 var(--game-ink));
-}
-
-.lb-podium-border,
-.lb-podium-avatar {
-  clip-path: polygon(
-    10% 0%,
-    90% 0%,
-    100% 9%,
-    100% 68%,
-    50% 100%,
-    0% 68%,
-    0% 9%
-  );
-}
-
-.place-1 .lb-podium-border {
-  width: 92px;
-  height: 104px;
-  background: linear-gradient(180deg, var(--lb-gold-light), var(--lb-gold));
-}
-
-.place-2 .lb-podium-border {
-  width: 70px;
-  height: 80px;
-  background: linear-gradient(180deg, var(--lb-silver), var(--lb-silver-dark));
-}
-
-/* #3 is a circle, like the reference podium. */
-.place-3 .lb-podium-border,
-.place-3 .lb-podium-avatar {
-  clip-path: none;
-  border-radius: 50%;
-}
-
-.place-3 .lb-podium-border {
-  width: 74px;
-  height: 74px;
-  background: linear-gradient(180deg, var(--lb-bronze), var(--lb-bronze-dark));
-}
-
-.lb-podium-avatar {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* Shield clip, not the shared Avatar's round bordered default (#3's
-     own .place-3 rule puts the circle back). */
-  border: 0;
-  border-radius: 0;
-}
-
-.lb-podium-avatar.g-avatar-fallback {
-  font-size: 22px;
-}
-
-/* Club badge sits inside the medal-coloured frame instead of being clipped
-   to it - the shield shape is the frame already. */
-.lb-podium-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.lb-podium-badge .club-badge {
-  width: 82%;
-  height: auto;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
-}
-
-.place-1 .lb-podium-avatar.g-avatar-fallback {
-  font-size: 30px;
-}
-
-/* Sizing/fill/animation all live on RankBadge itself (RankBadge.css) -
-   this just anchors it to the frame's bottom-right corner, same spot the
-   old flat medal chip sat in. */
-.lb-podium-medal {
-  position: absolute;
-  right: -10px;
-  bottom: 4px;
-}
-
-.place-1 .lb-podium-medal {
-  right: -14px;
-  bottom: 10px;
-}
-
-/* Gold glow around the current player/club's own podium spot - same
-   "you're in this picture" highlight the row list uses below. A second
-   filter (not box-shadow, which clip-path would cut off at the medal's
-   edge) stacked onto the existing bevel one, since filter traces the
-   already-clipped shape rather than the box underneath it. */
-.lb-podium-spot.is-player .lb-podium-border {
-  filter: drop-shadow(0 3px 0 var(--game-ink))
-    drop-shadow(0 0 6px var(--lb-gold-light));
-}
-
-/* Light rays fanned out either side of #1. */
-.lb-podium-ray {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--ray-len);
-  height: 6px;
-  margin-top: -3px;
-  border-radius: 2px;
-  background: var(--lb-gold-light);
-  transform-origin: 0 50%;
-  transform: rotate(var(--ray-angle)) translateX(60px);
-  animation: lb-ray-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes lb-ray-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
+@media (min-width: 768px) {
+  .rank-badge.lb-podium-badge-img {
+    height: 125px;
   }
-  50% {
-    opacity: 1;
+
+  .place-1 .rank-badge.lb-podium-badge-img {
+    height: 150px;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .lb-podium-ray {
-    animation: none;
-  }
-}
-
+/* Wraps to 2 lines (word-break so one long unbroken word still fits
+   inside the column instead of overflowing it) and ellipsizes only past
+   that - no fixed height, so the button just grows the little extra it
+   needs for a second line instead of clipping a long name to one.
+   Plain solid dark ink, stroke/shadow both explicitly off: the global
+   white-fill+black-outline treatment every other /game label gets reads
+   as a muddy, garbled smear at this size/weight on this light card - the
+   same failure mode already fixed on .lb-trophy-stat above, now also
+   fixed here (previously this inherited the outline unchanged). */
 .lb-podium-name {
   max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--lb-cream);
-  font-size: 16px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  color: var(--game-ink);
+  font-size: 14px;
   font-weight: 700;
-  /* Room inside the clip box for the text stroke + drop shadow. */
-  line-height: 1.3;
-  padding: 1px 1px 2px;
-}
-
-.place-1 .lb-podium-name {
-  font-size: 18px;
+  line-height: 1.2;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 .lb-podium-area {
@@ -256,8 +147,14 @@
   font-weight: 800;
 }
 
+/* --gold-text (#A83D00), not --lb-gold-light - that one's a bright pastel
+   tuned for dark panels/strokeed text; plain and unstroked (as above) on
+   this light card it's under 3:1, nearly as hard to read as the white it
+   replaced. --gold-text is the same AA-safe amber --lb-trophy-stat/
+   --gold-text pairs already use site-wide for exactly this light-panel
+   case. */
 .lb-podium-spot.is-player .lb-podium-name {
-  color: var(--lb-gold-light);
+  color: var(--gold-text);
 }
 
 /* Small "You" tag next to the real name (podium spot and list row both) -
@@ -457,22 +354,19 @@
   animation: lb-skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
+/* Roughly matches the real rank badge's own footprint (see
+   .lb-podium-badge-img above) so the skeleton-to-real swap doesn't jump in
+   size once data loads. */
 .lb-skeleton-podium {
-  width: 70px;
-  height: 80px;
+  width: 85px;
+  height: 100px;
   border-radius: 14px;
   margin: 0 auto;
 }
 
 .place-1 .lb-skeleton-podium {
-  width: 92px;
-  height: 104px;
-}
-
-.place-3 .lb-skeleton-podium {
-  border-radius: 50%;
-  width: 74px;
-  height: 74px;
+  width: 102px;
+  height: 120px;
 }
 
 .lb-skeleton-row {
@@ -516,32 +410,6 @@
    medals and the rank/avatar/name/stat grid both keep breathing room
    instead of crowding or wrapping. */
 @media (max-width: 360px) {
-  .place-1 .lb-podium-border {
-    width: 80px;
-    height: 90px;
-  }
-
-  .place-2 .lb-podium-border {
-    width: 62px;
-    height: 70px;
-  }
-
-  .place-3 .lb-podium-border,
-  .place-3 .lb-podium-avatar {
-    width: 64px;
-    height: 64px;
-  }
-
-  .lb-podium-crown {
-    font-size: 18px;
-    top: -16px;
-  }
-
-  .lb-podium-name,
-  .lb-podium-area {
-    font-size: 13px;
-  }
-
   .lb-row,
   .lb-list-head {
     grid-template-columns: 26px 34px 1fr auto;

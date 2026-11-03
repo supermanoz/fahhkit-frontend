@@ -81,6 +81,25 @@ const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 // admin tool), which creates those rows against the backend's existing
 // POST /v1/store/admin/items.
 
+// "Classic" is the backend's own literal name for every hero's free
+// default emote - checked directly against
+// db/migration/V1_64__hero_skin_emote_store_items.sql (every hero gets a
+// StoreItem row named exactly 'Classic', price 0, auto-equipped for every
+// existing owner at migration time) and HeroItemOwnershipSupport.java
+// (grants the same row, still equipped, every time a player unlocks a new
+// hero today - this is live, not legacy). No manifest.json has a "classic"
+// key (checked all 7) - it's always meant as this hero's idle-alias slot,
+// the same role "emote1" plays everywhere else in this registry, just
+// under the backend's own fixed name instead of the numbered scheme
+// scripts/build_<hero>_stretch_strips.py uses for every OTHER emote.
+// Without this, "Classic" resolves to nothing: this was the actual cause
+// of another player's profile showing their hero but never their equipped
+// emote (see athleteProfileHero.js) - "Classic" is what a player keeps
+// equipped until they buy something else, so for a large share of real
+// accounts this was never a locally-missing-art edge case, it was every
+// untouched hero.
+const CLASSIC_ALIAS_TARGET = 'emote1'
+
 // Returns {src, frames, frameWidth, frameHeight} for a given hero name +
 // backend StoreItem.name, or null if no manifest has art for it (the
 // caller shows its own placeholder - see EmoteGlyph.jsx). Deliberately NOT
@@ -90,8 +109,9 @@ const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 // above), since every real hero is expected to have both.
 export function resolveEmoteAsset(heroName, emoteName) {
   const heroKey = (heroName || '').trim().toLowerCase()
-  const emoteKey = (emoteName || '').trim().toLowerCase()
+  let emoteKey = (emoteName || '').trim().toLowerCase()
   if (!heroKey || !emoteKey) return null
+  if (emoteKey === 'classic') emoteKey = CLASSIC_ALIAS_TARGET
 
   if (hasHero(heroKey)) return getHero(heroKey).emotes[emoteKey] || null
   if (!ALIAS_EMOTE_NAMES.has(emoteKey)) return null

@@ -22,6 +22,7 @@ import {
   IconLogout,
   IconMap,
   IconMenuOrb,
+  IconMusicNote,
   IconPause,
   IconPlay,
   IconRunning,
@@ -131,9 +132,9 @@ import {
   exportShareCardBlob,
 } from '../utils/shareCanvas'
 import {
-  playClickSound,
-  playMenuSound,
-  playMilestoneChime,
+  isSfxMuted,
+  playSfx,
+  setSfxMuted as persistSfxMuted,
 } from '../utils/gameSound'
 import { isCometHero, isPlaceholderHero } from '../utils/hero'
 import { hasHero as hasHeroManifest } from '../utils/heroManifest'
@@ -680,6 +681,15 @@ function GamePageInner() {
     }
   })
   const musicRef = useRef(null)
+  // Sound effects mute (the Settings row below Music) - independent of
+  // musicMuted above, same "remembered across sessions" reasoning. Default
+  // unmuted (isSfxMuted() reads gameSound.js's own module-level flag,
+  // itself already synced from localStorage at import time - see that
+  // file's own comment on why that has to happen before any component
+  // mounts, not inside this initializer). React state only exists here so
+  // toggling the Settings row re-renders; gameSound.js's playSfx is what
+  // actually checks the flag on every play.
+  const [sfxMuted, setSfxMutedState] = useState(() => isSfxMuted())
   // The game starts itself (globe dive, then music) the instant gameReady
   // flips true - no "tap anywhere to begin" gesture to wait on. Browsers
   // can refuse audio.play() with sound without a real user gesture, so the
@@ -998,7 +1008,7 @@ function GamePageInner() {
   useEffect(() => {
     if (!warAlert) return
     navigator.vibrate?.([120, 60, 120])
-    playMilestoneChime()
+    playSfx('chime')
     refreshProfile()
     const hide = setTimeout(clearWarAlert, 9000)
     return () => clearTimeout(hide)
@@ -1059,7 +1069,7 @@ function GamePageInner() {
     if (!c || notifiedChallengeIdsRef.current.has(c.id)) return
     notifiedChallengeIdsRef.current.add(c.id)
     navigator.vibrate?.([120, 60, 120])
-    playMilestoneChime()
+    playSfx('chime')
     if (
       document.hidden &&
       typeof Notification !== 'undefined' &&
@@ -1187,8 +1197,11 @@ function GamePageInner() {
   useEffect(() => {
     if (!gameReady || introStarted) return
     setIntroStarted(true)
-    musicRef.current?.play().catch(() => {})
-  }, [gameReady, introStarted])
+    // Respect a saved "Music off" choice from the very first frame - a
+    // player who muted last session shouldn't hear a beat of it before the
+    // mute-aware effect above gets a chance to pause it back.
+    if (!musicMuted) musicRef.current?.play().catch(() => {})
+  }, [gameReady, introStarted, musicMuted])
 
   useEffect(() => {
     if (!gameReady || introPlaying || weatherHypeShownRef.current) return
@@ -1532,7 +1545,15 @@ function GamePageInner() {
     const audio = musicRef.current
     if (!audio) return
     audio.volume = 0.35
-    audio.muted = musicMuted
+
+    // Actually paused when muted (not just audio.muted = true) - a muted-
+    // but-still-playing element doesn't make sound either way, but the
+    // brief this was built against specifically wants the track stopped,
+    // not silently running in the background.
+    if (musicMuted) {
+      audio.pause()
+      return undefined
+    }
 
     function tryPlay() {
       audio.play().catch(() => {})
@@ -1555,6 +1576,18 @@ function GamePageInner() {
     })
   }
 
+  // Same shape as toggleMusicMuted above, just delegating the actual
+  // persistence (and cutting off any effect mid-play) to gameSound.js's
+  // setSfxMuted, which is also what playSfx itself reads - this is purely
+  // the React side of that one shared flag.
+  function toggleSfxMuted() {
+    setSfxMutedState((prev) => {
+      const next = !prev
+      persistSfxMuted(next)
+      return next
+    })
+  }
+
   // Plays a rising chime every time a tracked run crosses a new 1km
   // multiple — lastMilestoneRef resets to 0 whenever tracking (re)starts so
   // a second run in the same session alerts from km 1 again, not wherever
@@ -1567,7 +1600,7 @@ function GamePageInner() {
     const reached = Math.floor(tracker.distance / MILESTONE_METERS)
     if (reached > lastMilestoneRef.current) {
       lastMilestoneRef.current = reached
-      playMilestoneChime()
+      playSfx('chime')
     }
   }, [tracker.status, tracker.distance])
 
@@ -1579,9 +1612,9 @@ function GamePageInner() {
     const btn = e.target.closest('button')
     if (!btn || btn.disabled) return
     if (btn.classList.contains('game-menu-btn')) {
-      playMenuSound()
+      playSfx('menu')
     } else {
-      playClickSound()
+      playSfx('tap')
     }
   }
 
@@ -4819,18 +4852,59 @@ function GamePageInner() {
                         className="game-settings-row-icon-badge"
                         aria-hidden="true"
                       >
-                        {musicMuted ? <IconVolumeMute /> : <IconVolumeUp />}
+                        <IconMusicNote />
                       </span>
                     </span>
                     <span className="game-settings-row-text">
-                      Sound
+                      Music
                       <span className="game-settings-row-sub">
-                        {musicMuted ? 'Silent running' : 'Theme music on'}
+                        {musicMuted
+                          ? 'Background music off'
+                          : 'Background music on'}
                       </span>
                     </span>
                   </span>
                   <span
                     className={`game-switch ${musicMuted ? '' : 'is-on'}`}
+                    aria-hidden="true"
+                  >
+                    <span className="game-switch-knob" />
+                  </span>
+                </button>
+
+                {/* Sound effects - independent of Music above (own state,
+                    own localStorage key, see gameSound.js). Every tap/
+                    menu-pop/milestone-chime effect routes through that
+                    file's playSfx(), which is what actually checks this
+                    setting before playing - toggling it here is just
+                    gameSound.js's setSfxMuted plus this row's own
+                    re-render, same split toggleMusicMuted/the music effect
+                    above already has. */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!sfxMuted}
+                  className="game-settings-row"
+                  onClick={toggleSfxMuted}
+                >
+                  <span className="game-settings-row-label">
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        {sfxMuted ? <IconVolumeMute /> : <IconVolumeUp />}
+                      </span>
+                    </span>
+                    <span className="game-settings-row-text">
+                      Sound
+                      <span className="game-settings-row-sub">
+                        Popups and effects
+                      </span>
+                    </span>
+                  </span>
+                  <span
+                    className={`game-switch ${sfxMuted ? '' : 'is-on'}`}
                     aria-hidden="true"
                   >
                     <span className="game-switch-knob" />

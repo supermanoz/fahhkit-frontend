@@ -293,6 +293,26 @@ export function IconCheck(props) {
   )
 }
 
+export function IconMusicNote(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M9 18V5l11-2v13" />
+      <circle cx="6" cy="18" r="3" {...TINT} />
+      <circle cx="17" cy="16" r="3" {...TINT} />
+    </GameIcon>
+  )
+}
+
+export function IconTrash(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      <path d="M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
+      <path d="M10 11v6M14 11v6" />
+    </GameIcon>
+  )
+}
+
 export function IconChevronDown(props) {
   return (
     <GameIcon {...props}>

@@ -1,19 +1,19 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
-import { IconCrown } from './GameIcons'
 import Avatar from '../game/ui/Avatar'
 import RankBadge from './RankBadge'
 import './LeaderboardPodium.css'
 
-// Top-3 podium (2 · 1 · 3, winner raised with light rays) above a ranked
-// list for everyone else. Shared by the Solo and Club leaderboards, so it
-// takes pre-shaped rows: { key, rank, name, area, avatarSrc?, badge?,
-// isPlayer?, onClick? }. The leaderboard API has no profile pictures, so
-// anyone without an avatarSrc gets coloured initials instead (the caller
-// gives the player's own entry the exact same treatment now too - no
-// special real-avatar-image-for-me case, see GamePage.jsx); the Club
-// leaderboard passes `badge` (a <ClubBadge>) to show the same badge used
-// everywhere else a club appears, instead of an avatar.
+// Top-3 podium (2 · 1 · 3, winner raised) above a ranked list for everyone
+// else. Shared by the Solo and Club leaderboards, so it takes pre-shaped
+// rows: { key, rank, name, area, avatarSrc?, badge?, isPlayer?, onClick? }.
+// The podium spot IS the rank badge now (RankBadge - real art, see
+// scripts/slice-badges.mjs) - no avatar/club-badge/crown/rays/frame behind
+// it any more (see git history for that version); `entry.badge` (still set
+// by the Club leaderboard, a <ClubBadge>) is only read here for its
+// presence, to pick the player vs club badge art, never rendered itself.
+// Rank 4+ below keeps the plain numbered chip + real avatar/club-badge
+// treatment untouched - this replacement is the podium's top 3 only.
 
 const AVATAR_COLORS = [
   '#ff7a29',
@@ -31,9 +31,6 @@ function colorFor(name) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-// Ray angles (deg, 0 = pointing right) fanned out on both sides of #1.
-const RAYS = [-44, -22, 0, 22, 44].flatMap((a) => [a, 180 - a])
-
 function PodiumSpot({ entry, place, innerRef }) {
   if (!entry) return <div className={`lb-podium-spot place-${place}`} />
   return (
@@ -44,37 +41,11 @@ function PodiumSpot({ entry, place, innerRef }) {
       onClick={entry.onClick}
       disabled={!entry.onClick}
     >
-      <span className="lb-podium-frame">
-        {place === 1 && (
-          <IconCrown className="lb-podium-crown" aria-hidden="true" />
-        )}
-        {place === 1 &&
-          RAYS.map((angle, i) => (
-            <span
-              key={angle}
-              className="lb-podium-ray"
-              style={{
-                '--ray-angle': `${angle}deg`,
-                '--ray-len': `${i % 4 < 2 ? 26 : 18}px`,
-              }}
-            />
-          ))}
-        <span className="lb-podium-border">
-          {entry.badge ? (
-            <span className="lb-podium-badge">{entry.badge}</span>
-          ) : (
-            <Avatar
-              name={entry.name}
-              src={entry.avatarSrc}
-              size={place === 1 ? 84 : 66}
-              fallbackColor={colorFor(entry.name)}
-              initials={2}
-              className="lb-avatar lb-podium-avatar"
-            />
-          )}
-        </span>
-        <RankBadge rank={place} className="lb-podium-medal" />
-      </span>
+      <RankBadge
+        type={entry.badge ? 'club' : 'player'}
+        rank={place}
+        className="lb-podium-badge-img"
+      />
       <span className="lb-podium-name">
         {entry.name}
         {entry.isPlayer && <span className="lb-you-tag">You</span>}

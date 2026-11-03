@@ -7,8 +7,10 @@ import {
   IconEnvelopeOpen,
   IconGift,
   IconMegaphone,
+  IconTrash,
   IconUsers,
 } from './GameIcons'
+import { useToast } from '../game/ui/Toast'
 import mailInboxIcon from '../assets/ui/mail_inbox.png'
 import mailNewsIcon from '../assets/ui/mail_news.png'
 import './MailPanel.css'
@@ -101,6 +103,12 @@ function useLoadMoreSentinel(hasMore, onLoadMore) {
 export default function MailPanel({ mailbox, onClaimed }) {
   const [view, setView] = useState('inbox')
   const [openId, setOpenId] = useState(null)
+  // Pending confirm popup - { kind: 'single', item } or
+  // { kind: 'bulk', count }, null when no popup is showing. One piece of
+  // state covers both call sites (the per-row Delete button and the list
+  // header's Delete read button) since only one can ever be open at once.
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const { push: pushToast } = useToast()
   const {
     mail,
     broadcasts,
@@ -112,6 +120,7 @@ export default function MailPanel({ mailbox, onClaimed }) {
     claim,
     decline,
     remove,
+    removeAllRead,
     openBroadcast,
     mailPage,
     mailTotalPages,
@@ -124,6 +133,43 @@ export default function MailPanel({ mailbox, onClaimed }) {
 
   const unreadInbox = mail.filter((m) => m.status === 'UNREAD').length
   const unreadNews = broadcasts.filter((b) => !b.readAt).length
+  // How many of the CURRENT page's rows the bulk delete would touch - the
+  // real backend op is scoped to the whole inbox (every page), not just
+  // this one, so this is a floor, not the exact count; the confirm popup
+  // says so explicitly rather than implying it's exact.
+  const readOnPage = mail.filter((m) => m.status !== 'UNREAD').length
+
+  useEffect(() => {
+    if (!confirmDelete) return undefined
+    function onKey(e) {
+      if (e.key === 'Escape') setConfirmDelete(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [confirmDelete])
+
+  async function handleConfirmDelete() {
+    const pending = confirmDelete
+    setConfirmDelete(null)
+    if (pending.kind === 'single') {
+      const ok = await remove(pending.item)
+      if (ok) {
+        if (openId === pending.item.id) setOpenId(null)
+        pushToast('Mail deleted', { type: 'success' })
+      } else {
+        pushToast("Couldn't delete, try again", { type: 'error' })
+      }
+      return
+    }
+    const count = await removeAllRead()
+    if (count != null) {
+      pushToast(`Deleted ${count} read mail${count === 1 ? '' : 's'}`, {
+        type: 'success',
+      })
+    } else {
+      pushToast("Couldn't delete, try again", { type: 'error' })
+    }
+  }
 
   // Today/Yesterday/Earlier sections for the inbox list - only ever
   // grouping the current (server-paged) page, same scope "Mark all read"
@@ -178,6 +224,17 @@ export default function MailPanel({ mailbox, onClaimed }) {
             clips overflow. */}
         <div className="mail-panel-sticky-head">
           <div className="mail-panel-header">
+            {view === 'inbox' && readOnPage > 0 && (
+              <button
+                type="button"
+                className="mail-delete-read-btn"
+                onClick={() =>
+                  setConfirmDelete({ kind: 'bulk', count: readOnPage })
+                }
+              >
+                <IconTrash aria-hidden="true" /> Delete read
+              </button>
+            )}
             {view === 'inbox' && unreadInbox > 0 && (
               <button
                 type="button"
@@ -334,19 +391,32 @@ export default function MailPanel({ mailbox, onClaimed }) {
                                     Decline
                                   </button>
                                 )}
-                                {/* The backend only lets read/resolved mail be
-                                  deleted - an unclaimed gift has to be dealt with
-                                  first. */}
-                                {!claimable && item.status !== 'UNREAD' && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline"
-                                    onClick={() => remove(item)}
-                                    disabled={busy}
-                                  >
-                                    Delete
-                                  </button>
-                                )}
+                                {/* Always shown once resolvable - the backend's
+                                  own rule is purely "not UNREAD" (see
+                                  api/mail.js's deleteMail comment), with no
+                                  special case for an unclaimed club invite/
+                                  gift: deleting never claims or declines it,
+                                  so showing Delete alongside Join Club/
+                                  Decline once the invite's been read is
+                                  correct, not a shortcut around them.
+                                  Disabled (not hidden) with a tooltip while
+                                  still UNREAD - open it first. */}
+                                <button
+                                  type="button"
+                                  className="mail-delete-btn"
+                                  onClick={() =>
+                                    setConfirmDelete({ kind: 'single', item })
+                                  }
+                                  disabled={busy || item.status === 'UNREAD'}
+                                  title={
+                                    item.status === 'UNREAD'
+                                      ? 'Open this mail first'
+                                      : undefined
+                                  }
+                                  aria-label="Delete mail"
+                                >
+                                  <IconTrash aria-hidden="true" /> Delete
+                                </button>
                               </div>
                             </div>
                           )}
@@ -457,6 +527,68 @@ export default function MailPanel({ mailbox, onClaimed }) {
           </p>
         )}
       </section>
+
+      {/* Delete confirm - same shared overlay/card/actions recipe every
+          other confirm step in /game uses (see GamePage.jsx's own), just
+          without the motion.div entrance (this file doesn't otherwise use
+          framer-motion, and the brief only asked for "a small solid
+          popup"). Esc cancels (see the keydown effect above); clicking the
+          overlay itself also cancels, the card stops that click from
+          bubbling there. */}
+      {confirmDelete && (
+        <div
+          className="game-confirm-overlay"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            className="game-confirm-card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={
+              confirmDelete.kind === 'single'
+                ? 'Delete this mail?'
+                : 'Delete your read mail?'
+            }
+            onClick={(e) => e.stopPropagation()}
+          >
+            {confirmDelete.kind === 'single' ? (
+              <>
+                <p>
+                  <strong>Delete this mail?</strong>
+                </p>
+                <p>This can&apos;t be undone.</p>
+              </>
+            ) : (
+              <>
+                <p>
+                  <strong>Delete your read mail?</strong>
+                </p>
+                <p>
+                  Every read, claimed or declined mail in your inbox - not just
+                  this page (at least {confirmDelete.count} shown here). This
+                  can&apos;t be undone.
+                </p>
+              </>
+            )}
+            <div className="game-confirm-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="mail-confirm-delete-btn"
+                onClick={handleConfirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -125,14 +125,17 @@
   --coin-500: #ffc531;
   --coin-700: #c98a00;
 
-  /* Slate blue-grey - Leaderboard/Club War/PvP's shared red replacement
-     (see GamePage.css's --lb-accent, --slate-accent and --pvp-accent
-     tokens). Not used in the general --game-* palette above - every other
-     screen keeps its own colours, this is opted into per screen. The RGB
-     triplet is for glow/highlight box-shadows that need their own alpha
-     (rgba(var(--slate-500-rgb), 0.5)) - those can't go through a var() hex
-     colour directly, this is the one way to keep that out of hard-coded
-     hex too. */
+  /* Slate blue-grey - Leaderboard/Club War's shared red replacement (see
+     GamePage.css's --lb-accent and --slate-accent tokens). PvP used to
+     alias its own --pvp-accent to this too; it's since moved to its own
+     orange (--pvp-orange-* below) and only the 5 km distance chip in
+     PvpPanel.css still reads this scale directly, deliberately kept
+     grey-blue. Not used in the general --game-* palette above - every
+     other screen keeps its own colours, this is opted into per screen.
+     The RGB triplet is for glow/highlight box-shadows that need their own
+     alpha (rgba(var(--slate-500-rgb), 0.5)) - those can't go through a
+     var() hex colour directly, this is the one way to keep that out of
+     hard-coded hex too. */
   --slate-300: #6d7b95;
   --slate-500: #4e5b73;
   --slate-500-rgb: 78, 91, 115;
@@ -140,6 +143,59 @@
   /* Pale wash for decorative "us vs them" backgrounds, same role
      --red-tint/--gold-tint play elsewhere. */
   --slate-tint: #e6e9ee;
+
+  /* PvP-only orange - replaces --pvp-accent's old slate alias (see
+     GamePage.css's --pvp-accent tokens) on every PvP screen (distance
+     picker, quick match, active races, recent matches, battle start,
+     results, race screens). Scoped to PvP alone: --lb-accent (Leaderboard)
+     and --slate-accent (Club War) keep reading the slate scale above
+     untouched, and the 5 km distance chip is deliberately pinned back to
+     literal slate in PvpPanel.css (not this token) to stay grey-blue per
+     the brief - every other PvP accent spot picks this up automatically.
+     --pvp-orange-700 doubles as the AA-safe TEXT colour (see
+     --pvp-accent-text) - plain #DD571C orange text fails WCAG AA on this
+     theme's off-white panels at the small sizes PvP actually uses it at
+     (3.1-3.85:1 measured, needs 4.5:1), this darker stop clears every one
+     of them (4.55-5.63:1) - the brief's own prescribed fallback. */
+  --pvp-orange-300: #f27b43;
+  --pvp-orange-500: #dd571c;
+  --pvp-orange-500-rgb: 221, 87, 28;
+  --pvp-orange-700: #b4420f;
+  --pvp-orange-tint: #fae6dd;
+
+  /* Territory popup only (GamePage.jsx's highlightedEntry card - km² held,
+     run score, owner name, View Profile) - not used anywhere else, see
+     each GamePage.css selector that reads these for why. --territory-stat
+     reuses the PvP orange (same #DD571C) for the km²/run-score numbers and
+     trophy icon; --territory-name is its own wine-red for the owner name
+     and the View Profile button's fill, with light/dark gradient stops for
+     that button. */
+  --territory-stat: var(--pvp-orange-500);
+  --territory-name: #710913;
+  --territory-name-light: #8f1420;
+  --territory-name-dark: #52060e;
+
+  /* In-game auth screens only (GameAuth.css - welcome/Sign In/Sign Up/
+     forgot password) - never the website's own login pages, which keep
+     their own --brand/--gradient-brand tokens untouched. --auth-primary
+     reuses the same orange as --pvp-orange-500/-300/-700 (identical hex,
+     kept as its own token rather than reading the PvP one directly so the
+     two features' colours aren't accidentally coupled). --auth-link's
+     wine-red happens to match --territory-name's hex too, same reasoning -
+     independently named and scoped, not shared. */
+  --auth-primary: #dd571c;
+  --auth-primary-light: #f27b43;
+  --auth-primary-dark: #b4420f;
+  --auth-link: #710913;
+
+  /* Shop menu item only (GamePage.css's .tone-wood/.radial-wood badges and
+     .game-shop-tabs' active section button) - the 'wood' tone name is
+     legacy (every other tone still reads literally - gold/green/red/stone
+     - wood is the one that doesn't any more), scoped to Shop alone: no
+     other menu item (Leaderboard/Club/PvP/Mail/Me/Settings) reads these. */
+  --shop-accent: #be2ed6;
+  --shop-accent-light: #d75bea;
+  --shop-accent-dark: #8f1fa3;
 
   /* Text - every bit of /game text is white with a black stroke + drop
      shadow (see .game-text below), so the title/body/muted roles all

@@ -1,271 +1,58 @@
-/* RankBadge.jsx - the animated #1/#2/#3 medal. Every rule that animates
-   here touches only transform/opacity (no filter/blur, no animated
-   box-shadow), per the brief this was built against. */
-
+/* RankBadge.jsx - real art badges (see scripts/slice-badges.mjs), sized to
+   fit the exact slot the old generated-SVG medal used to occupy (see each
+   call site's own CSS, e.g. LeaderboardPodium.css's .lb-podium-medal) -
+   height-constrained with object-fit: contain + auto width so a badge
+   whose aspect ratio isn't perfectly square (unlike the old square medal)
+   still fits that slot without stretching or overflowing it. */
 .rank-badge {
-  position: relative;
-  display: inline-block;
-  flex-shrink: 0;
-  /* Its own stacking layer and no clipping, so the flame/sparkle/ember
-     layers (and the shine sweep) can extend past the plate's edges
-     without the row or a parent's overflow cutting them off. */
-  isolation: isolate;
-  overflow: visible;
-}
-
-.rank-badge-svg {
-  position: absolute;
-  inset: 0;
-  display: block;
-  overflow: visible;
-}
-
-/* --- Plate + crown (static) --- */
-.rank-badge-plate {
-  stroke: var(--game-ink, #2b2a24);
-  stroke-width: 2.5;
-  paint-order: stroke fill;
-  filter: drop-shadow(0 2px 0 var(--game-ink, #2b2a24));
-}
-
-.rank-badge-crown {
-  fill: #ffe3a3;
-  stroke: var(--game-ink, #2b2a24);
-  stroke-width: 1.4;
-  paint-order: stroke fill;
-}
-
-/* --- Rank number --- */
-.rank-badge-number {
-  position: absolute;
-  inset: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding-top: 6%;
-  font-weight: 900;
-  font-size: 18px;
-  color: #fff;
-  -webkit-text-stroke: 1.75px var(--game-ink, #2b2a24);
-  paint-order: stroke fill;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
-  pointer-events: none;
+  flex-shrink: 0;
+  height: 52px;
 }
 
-.rank-badge-inferno .rank-badge-number {
-  font-size: 20px;
+.rank-badge-2 {
+  height: 48px;
 }
 
-/* --- Glow pulse (shared shape/mechanism across all 3 tiers - opacity
-   only) --- */
-.rank-badge-glow {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: rb-glow-pulse 2.6s ease-in-out infinite;
-  will-change: opacity;
+.rank-badge-3 {
+  height: 44px;
 }
 
-@keyframes rb-glow-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.8;
-  }
+.rank-badge-img {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 
-/* --- Shine sweep (shared mechanism, every tier) --- */
+/* --- Optional rank-1 polish: a slow, gentle scale pulse (transform only,
+   no filter/blur) - paused off-screen/tab-hidden via .is-paused (see
+   RankBadge.jsx's IntersectionObserver/visibilitychange effect), off
+   entirely under reduced motion below. --- */
 .rank-badge-shine {
-  fill: rgba(255, 255, 255, 0.65);
-  transform-box: fill-box;
-  will-change: transform, opacity;
+  animation: rank-badge-pulse 3.2s ease-in-out infinite;
+  will-change: transform;
 }
 
-.rank-badge-inferno .rank-badge-shine {
-  animation: rb-shine-sweep 3s ease-in-out infinite;
-}
-
-.rank-badge-frost .rank-badge-shine {
-  fill: rgba(255, 255, 255, 0.8);
-  animation: rb-shine-sweep 2.4s ease-in-out infinite;
-}
-
-.rank-badge-ember .rank-badge-shine {
-  fill: rgba(255, 235, 210, 0.55);
-  animation: rb-shine-sweep 3.6s ease-in-out infinite;
-}
-
-@keyframes rb-shine-sweep {
-  0% {
-    transform: translateX(-10px) rotate(22deg);
-    opacity: 0;
-  }
-  18% {
-    opacity: 0.8;
-  }
-  50% {
-    transform: translateX(34px) rotate(22deg);
-    opacity: 0.8;
-  }
-  82% {
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(60px) rotate(22deg);
-    opacity: 0;
-  }
-}
-
-/* --- Inferno (#1): flame aura --- */
-.rank-badge-flame {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: rb-flame-flicker 1.5s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-.rank-badge-flame-1 {
-  fill: #ffb15c;
-  animation-delay: 0s;
-  animation-duration: 1.5s;
-}
-
-.rank-badge-flame-2 {
-  fill: #ff7a29;
-  animation-delay: 0.25s;
-  animation-duration: 1.7s;
-}
-
-.rank-badge-flame-3 {
-  fill: #ff5a1f;
-  animation-delay: 0.45s;
-  animation-duration: 1.6s;
-}
-
-@keyframes rb-flame-flicker {
+@keyframes rank-badge-pulse {
   0%,
   100% {
-    transform: scale(1) translateY(0);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.12) translateY(-2px);
-    opacity: 1;
-  }
-}
-
-/* --- Frost (#2): icy sparkles --- */
-.rank-badge-frost {
-  --rb-frost-light: #eaf6ff;
-  --rb-frost: #7fa8c9;
-}
-
-.rank-badge-sparkle {
-  fill: #fff;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: rb-sparkle-twinkle 1.8s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-.rank-badge-sparkle-1 {
-  animation-delay: 0s;
-}
-
-.rank-badge-sparkle-2 {
-  animation-delay: 0.6s;
-  animation-duration: 2.1s;
-}
-
-.rank-badge-sparkle-3 {
-  animation-delay: 1.1s;
-  animation-duration: 1.6s;
-}
-
-@keyframes rb-sparkle-twinkle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  50% {
-    opacity: 1;
     transform: scale(1);
   }
-}
-
-/* --- Ember (#3): rising embers --- */
-.rank-badge-ember {
-  fill: #ff9a4d;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: rb-ember-rise 2.2s ease-out infinite;
-  will-change: transform, opacity;
-}
-
-.rank-badge-ember-1 {
-  animation-delay: 0s;
-}
-
-.rank-badge-ember-2 {
-  animation-delay: 0.7s;
-  animation-duration: 2.5s;
-}
-
-.rank-badge-ember-3 {
-  animation-delay: 1.3s;
-  animation-duration: 2s;
-}
-
-/* In place, not rising - translating these in SVG user-unit space (16px
-   against a 48-unit viewBox) read as a hard jump-and-reset each loop
-   instead of a smooth float, so they just glow in place now, same
-   "pulse, don't travel" treatment the sparkles and flames use. */
-@keyframes rb-ember-rise {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: scale(0.85);
-  }
   50% {
-    opacity: 1;
-    transform: scale(1.05);
+    transform: scale(1.06);
   }
 }
 
-/* --- Pause when scrolled out of view or the tab is backgrounded (see
-   RankBadge.jsx's IntersectionObserver/visibilitychange effect) --- */
-.rank-badge.is-paused .rank-badge-glow,
-.rank-badge.is-paused .rank-badge-shine,
-.rank-badge.is-paused .rank-badge-flame,
-.rank-badge.is-paused .rank-badge-sparkle,
-.rank-badge.is-paused .rank-badge-ember {
+.rank-badge.is-paused.rank-badge-shine {
   animation-play-state: paused;
 }
 
-/* --- Reduced motion: static plate + glow, nothing moves --- */
 @media (prefers-reduced-motion: reduce) {
-  .rank-badge-glow,
-  .rank-badge-shine,
-  .rank-badge-flame,
-  .rank-badge-sparkle,
-  .rank-badge-ember {
-    animation: none;
-  }
-
-  .rank-badge-glow {
-    opacity: 0.55;
-  }
-
   .rank-badge-shine {
-    opacity: 0;
-  }
-
-  .rank-badge-flame,
-  .rank-badge-sparkle,
-  .rank-badge-ember {
-    opacity: 0.8;
-    transform: none;
+    animation: none;
   }
 }
