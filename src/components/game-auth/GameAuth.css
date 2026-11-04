@@ -95,6 +95,26 @@
   font-family: var(--font-body);
 }
 
+/* Native app path - the web GSI button script never runs inside the
+   WebView, so GoogleSignInButton renders a plain button here instead;
+   styled to match the "filled_black pill" look the web GSI button uses. */
+.google-signin-button--native {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: var(--ink);
+  color: var(--white);
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.google-signin-button--native:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* 16px font-size keeps iOS Safari from zooming the page on focus; 44px
    min-height matches the tap-target floor used elsewhere in the game
    (.google-signin-button). */

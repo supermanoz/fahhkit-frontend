@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-app
 *.local
 
 # copied from node_modules/maplibre-gl at build/dev start — see vite.config.js

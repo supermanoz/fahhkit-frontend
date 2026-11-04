@@ -1,4 +1,4 @@
-package com.fahhkit.app;
+package com.runconquest.game;
 
 import com.getcapacitor.BridgeActivity;
 

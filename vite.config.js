@@ -31,6 +31,10 @@ function copyMaplibreWorker() {
 // https://vite.dev/config/
 // Netlify serves from the domain root, GitHub Pages serves from /fahhkit/ —
 // only apply the GH Pages base when explicitly building for that deploy.
+// `npm run build:app` (the Capacitor/Android build - see App.jsx's
+// VITE_APP_SHELL check) sets its own --outDir so it never collides with the
+// website's own `dist`; base stays '/' since the app is served from a
+// bundled WebView root either way.
 export default defineConfig({
   base: process.env.GH_PAGES ? '/fahhkit/' : '/',
   // navigator.geolocation (used all over /game and run-tracking) only

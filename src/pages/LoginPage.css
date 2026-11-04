@@ -167,3 +167,23 @@
   justify-content: center;
   min-height: 44px;
 }
+
+/* Native app (WebView) path - Google's own button script never runs here
+   (the web GSI flow is blocked inside a WebView), so this is a plain button
+   styled to match the "filled_black pill" look the web GSI button uses. */
+.google-signin-button--native {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: #1f1f1f;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.google-signin-button--native:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

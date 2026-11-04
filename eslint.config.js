@@ -9,6 +9,7 @@ export default [
   {
     ignores: [
       'dist',
+      'dist-app',
       'android',
       'ios',
       // Playwright's own generated output (npm run test:e2e) - the HTML

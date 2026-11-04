@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { resolveFileUrl } from '../api/client'
 import { getCurrentSeasonPartners } from '../api/sponsorPartners'
+import { openExternal } from '../utils/externalLink'
 import './SponsorBannerCarousel.css'
 
 const ROTATE_MS = 5000
@@ -150,6 +151,7 @@ export default function SponsorBannerCarousel() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`View ${p.name}`}
+                    onClick={(e) => openExternal(p.socialLink1, e)}
                   >
                     {image}
                     <span className="sponsor-banner-scrim" aria-hidden="true" />

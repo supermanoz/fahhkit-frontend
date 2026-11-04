@@ -1,10 +1,24 @@
 apply plugin: 'com.android.application'
 
+// Release signing: read from android/app/keystore.properties (gitignored, never committed) if
+// present, else from env vars (CI-friendly). Neither is required for `assembleDebug` - only
+// `assembleRelease`/`bundleRelease` need a signing config, and the release build type below
+// falls back to unsigned if nothing is configured (see README's "Release build" section).
+def keystorePropertiesFile = file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def ksStoreFile = keystoreProperties['storeFile'] ?: System.getenv('RUNCONQUEST_KEYSTORE_FILE')
+def ksStorePassword = keystoreProperties['storePassword'] ?: System.getenv('RUNCONQUEST_KEYSTORE_PASSWORD')
+def ksKeyAlias = keystoreProperties['keyAlias'] ?: System.getenv('RUNCONQUEST_KEY_ALIAS')
+def ksKeyPassword = keystoreProperties['keyPassword'] ?: System.getenv('RUNCONQUEST_KEY_PASSWORD')
+
 android {
-    namespace "com.fahhkit.app"
+    namespace "com.runconquest.game"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.fahhkit.app"
+        applicationId "com.runconquest.game"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -16,10 +30,23 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (ksStoreFile) {
+                storeFile file(ksStoreFile)
+                storePassword ksStorePassword
+                keyAlias ksKeyAlias
+                keyPassword ksKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (ksStoreFile) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

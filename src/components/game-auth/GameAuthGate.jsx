@@ -28,11 +28,35 @@ import './GameAuth.css'
 // GamePage passes its useCurrentUser().replaceUser, which updates the shared
 // token/user cache and triggers GamePage's own re-render, at which point
 // useCurrentUser's `isAuthed` flips true and this gate stops rendering.
+// Where the hardware Back button goes from each screen (see
+// onBackStateChange below) - mirrors each screen's own "Back"
+// link/onBack prop exactly, so there's one answer either way.
+const BACK_TARGET = {
+  [SCREEN.SIGN_IN]: SCREEN.WELCOME,
+  [SCREEN.SIGN_UP]: SCREEN.WELCOME,
+  [SCREEN.FORGOT]: SCREEN.SIGN_IN,
+  [SCREEN.SET_PASSWORD]: SCREEN.SIGN_IN,
+}
+
 // eslint-disable-next-line react/prop-types -- no prop-types dependency in this project
-export default function GameAuthGate({ onAuthenticated }) {
+export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   const auth = useAuthFlow()
   const throttleRef = useRef(createAuthThrottle())
   const [state, dispatch] = useReducer(gameAuthReducer, initialGameAuthState)
+
+  // Reports "how to go back one step from here" up to GamePage's hardware
+  // Back button handler (null at WELCOME - nothing to go back to, so Back
+  // falls through to the usual exit-confirm there instead). A ref, not
+  // state, on GamePage's side - see useAndroidBackButton.
+  useEffect(() => {
+    const target = BACK_TARGET[state.screen]
+    onBackStateChange?.(
+      target ? () => dispatch({ type: 'GO_TO', screen: target }) : null
+    )
+    // Only GamePage needs the latest closure; it isn't meant to trigger
+    // this effect on its own identity changing between renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.screen])
 
   // Ticks both cooldown countdowns once a second while either is active -
   // both are cosmetic client-side throttles (see authThrottle.js), not a

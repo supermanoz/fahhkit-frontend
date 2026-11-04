@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand orange (src/game/styles/tokens.css, pvp-orange-500/-700 tokens) - keeps
+         the status bar, nav bar and notification accents matching the game's own palette. -->
+    <color name="colorPrimary">#DD571C</color>
+    <color name="colorPrimaryDark">#B4420F</color>
+    <color name="colorAccent">#DD571C</color>
+</resources>

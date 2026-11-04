@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 import {
+  IconBell,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -43,6 +44,12 @@ import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfileP
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { useAuthFlow } from '../hooks/useAuthFlow'
+import { useReminders } from '../hooks/useReminders'
+import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
+import {
+  isRemindersDebugEnabled,
+  scheduleTestReminderInOneMinute,
+} from '../utils/reminders'
 // Dynamically imported (not bundled with the rest of the game) - a logged-
 // in player never triggers this import at all, so it doesn't add to the
 // bundle they actually download. See the logged-out branch below.
@@ -409,11 +416,60 @@ function summarizeRunEvents(events) {
 // Wrapped below so ToastProvider is an ancestor of this component (and so
 // its own useToast() call below resolves) - the equip error toast is the
 // first thing in /game to need it.
+// Shared by both of GamePageInner's returns (logged-in and the GameAuthGate
+// early return below) - the hardware Back button can ask to exit from
+// either one, see useAndroidBackButton.
+/* eslint-disable react/prop-types -- no prop-types dependency in this project */
+function ExitConfirmOverlay({ backButton }) {
+  return (
+    <AnimatePresence>
+      {backButton.exitConfirmOpen && (
+        <motion.div
+          className="game-confirm-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={backButton.cancelExit}
+        >
+          <motion.div
+            className="game-confirm-card"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p>Exit Run Conquest?</p>
+            <div className="game-confirm-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={backButton.cancelExit}
+              >
+                Stay
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={backButton.confirmExit}
+              >
+                Exit
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+/* eslint-enable react/prop-types */
+
 function GamePageInner() {
   const toast = useToast()
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const auth = useAuthFlow()
+  const reminders = useReminders()
+  const [remindersDebug] = useState(isRemindersDebugEnabled)
   const tracker = useRunTracker()
   // A full reload (not just clearing the token + re-rendering) is
   // deliberate here - this page holds dozens of pieces of React state tied
@@ -642,6 +698,37 @@ function GamePageInner() {
   // boolean: the message itself names which threshold tripped.
   const [territoryRunWarning, setTerritoryRunWarning] = useState(null)
   const [viewingProfile, setViewingProfile] = useState(null)
+  // Hardware Back button (native app only) - closes whichever of these is
+  // open, topmost first; with nothing open it asks before exiting, and
+  // never exits (or does anything at all) mid-run. See
+  // useAndroidBackButton's own comment for why `blocked` matters here.
+  // Set by GameAuthGate (via onBackStateChange below) while logged out -
+  // null at its WELCOME screen, otherwise a function that steps it back one
+  // screen. A ref, not state: GameAuthGate updates it on its own render
+  // cycle, and the back-button layer below reads it fresh on every actual
+  // button press rather than whatever it was at GamePage's last render.
+  const authBackRef = useRef(null)
+  const backButton = useAndroidBackButton({
+    layers: [
+      { isOpen: () => reminders.showPrompt, close: reminders.declinePrompt },
+      {
+        isOpen: () => Boolean(authBackRef.current),
+        close: () => authBackRef.current?.(),
+      },
+      { isOpen: () => Boolean(viewingRun), close: () => setViewingRun(null) },
+      { isOpen: () => Boolean(viewingRoute), close: handleCloseViewingRoute },
+      {
+        isOpen: () => routeNamePromptOpen,
+        close: () => setRouteNamePromptOpen(false),
+      },
+      {
+        isOpen: () => Boolean(viewingProfile),
+        close: () => setViewingProfile(null),
+      },
+      { isOpen: () => menuOpen, close: () => setMenuOpen(false) },
+    ],
+    blocked: tracker.status === 'tracking',
+  })
   const [storeChoice, setStoreChoice] = useState(null)
   // TEMP: Comet for everyone for now (the default hero) - the Avatar picker
   // is hidden from the Shop (Heroes tab replaces it), so an old saved pick
@@ -2385,6 +2472,7 @@ function GamePageInner() {
         challengeId: pendingRun.challengeId || undefined,
         clubWarId: pendingRun.clubWarId || undefined,
       })
+      reminders.notifyRunSaved()
       if (pendingRun.challengeId) pvp.refreshChallenges()
       const isRace = Boolean(pendingRun.challengeId)
       const isWar = Boolean(pendingRun.clubWarId)
@@ -2865,8 +2953,17 @@ function GamePageInner() {
             </div>
           }
         >
-          <GameAuthGate onAuthenticated={replaceUser} />
+          <GameAuthGate
+            onAuthenticated={(nextUser) => {
+              replaceUser(nextUser)
+              reminders.notifyLoggedIn()
+            }}
+            onBackStateChange={(fn) => {
+              authBackRef.current = fn
+            }}
+          />
         </Suspense>
+        <ExitConfirmOverlay backButton={backButton} />
       </div>
     )
   }
@@ -4911,6 +5008,60 @@ function GamePageInner() {
                   </span>
                 </button>
 
+                {/* Native app only (see useReminders/isNative) - the 3 daily
+                    "let's run" local notifications. Renders nothing on the
+                    website. */}
+                {reminders.supported && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={reminders.enabled}
+                    className="game-settings-row"
+                    onClick={() => reminders.toggle(!reminders.enabled)}
+                  >
+                    <span className="game-settings-row-label">
+                      <span className="game-settings-row-icon">
+                        <span
+                          className="game-settings-row-icon-badge"
+                          aria-hidden="true"
+                        >
+                          <IconBell />
+                        </span>
+                      </span>
+                      <span className="game-settings-row-text">
+                        Reminders
+                        <span className="game-settings-row-sub">
+                          {reminders.enabled
+                            ? '3 daily nudges to go run'
+                            : 'Daily run reminders off'}
+                        </span>
+                      </span>
+                    </span>
+                    <span
+                      className={`game-switch ${reminders.enabled ? 'is-on' : ''}`}
+                      aria-hidden="true"
+                    >
+                      <span className="game-switch-knob" />
+                    </span>
+                  </button>
+                )}
+                {reminders.supported && remindersDebug && (
+                  <button
+                    type="button"
+                    className="game-settings-row"
+                    onClick={() => scheduleTestReminderInOneMinute()}
+                  >
+                    <span className="game-settings-row-label">
+                      <span className="game-settings-row-text">
+                        Send test reminder (1 min)
+                        <span className="game-settings-row-sub">
+                          Debug only - ?debug=reminders
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   role="switch"
@@ -5267,6 +5418,49 @@ function GamePageInner() {
                   }
                 >
                   {savingRoute ? 'Saving…' : 'Just Me'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ExitConfirmOverlay backButton={backButton} />
+
+      <AnimatePresence>
+        {reminders.showPrompt && (
+          <motion.div
+            className="game-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="game-confirm-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+            >
+              <p>Want a nudge to go run? 🏃</p>
+              <p className="game-controls-hint">
+                Three quick reminders a day — morning, lunch, evening — skipped
+                automatically on days you&apos;ve already run. You can turn
+                these off anytime in Settings.
+              </p>
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={reminders.declinePrompt}
+                >
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={reminders.acceptPrompt}
+                >
+                  Turn on reminders
                 </button>
               </div>
             </motion.div>

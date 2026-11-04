@@ -1,8 +1,11 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
+import { isNative } from '../utils/geo'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
+let googleAuthInitialized = false
 
 let gsiScriptPromise = null
 
@@ -30,7 +33,14 @@ function loadGsiScript() {
 // in, creating the account on first use. Renders nothing when no client id
 // is configured, so a build without VITE_GOOGLE_CLIENT_ID just shows the
 // normal password form.
-export default function GoogleSignInButton({ onCredential, onError }) {
+//
+// The web GSI flow (an iframe/popup to accounts.google.com) is blocked by
+// Google inside a WebView - see GoogleSignInButtonNative below for the
+// native-app path, which uses the OS account picker instead and produces an
+// ID token audienced the same way (serverClientId in capacitor.config.json
+// is set to this same GOOGLE_CLIENT_ID), so the backend's verification is
+// unchanged either way.
+function GoogleSignInButtonWeb({ onCredential, onError }) {
   const containerRef = useRef(null)
   const handlersRef = useRef({ onCredential, onError })
   handlersRef.current = { onCredential, onError }
@@ -70,4 +80,50 @@ export default function GoogleSignInButton({ onCredential, onError }) {
 
   if (!GOOGLE_CLIENT_ID || failed) return null
   return <div ref={containerRef} className="google-signin-button" />
+}
+
+function GoogleSignInButtonNative({ onCredential, onError }) {
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (googleAuthInitialized) return
+    googleAuthInitialized = true
+    GoogleAuth.initialize()
+  }, [])
+
+  async function handleClick() {
+    setBusy(true)
+    try {
+      const user = await GoogleAuth.signIn()
+      if (user?.authentication?.idToken) {
+        onCredential(user.authentication.idToken)
+      } else {
+        onError?.()
+      }
+    } catch {
+      // User cancelled the account picker - not an error worth surfacing.
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="google-signin-button google-signin-button--native"
+      onClick={handleClick}
+      disabled={busy}
+    >
+      Continue with Google
+    </button>
+  )
+}
+
+export default function GoogleSignInButton({ onCredential, onError }) {
+  if (!GOOGLE_CLIENT_ID) return null
+  return isNative ? (
+    <GoogleSignInButtonNative onCredential={onCredential} onError={onError} />
+  ) : (
+    <GoogleSignInButtonWeb onCredential={onCredential} onError={onError} />
+  )
 }

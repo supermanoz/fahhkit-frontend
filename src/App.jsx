@@ -31,6 +31,13 @@ import GamePage from './pages/GamePage'
 import GameMechanicsPage from './pages/GameMechanicsPage'
 import FraudFlagsPage from './pages/FraudFlagsPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
+import OfflineOverlay from './components/OfflineOverlay'
+
+// `npm run build:app` (the Capacitor/Android build) sets this so the native
+// shell opens straight into the game instead of the marketing homepage -
+// every other route (shop, profile, history, …) stays reachable exactly as
+// GamePage already links to them, this only changes what "/" resolves to.
+const APP_SHELL = import.meta.env.VITE_APP_SHELL === 'true'
 
 export default function App() {
   useEffect(() => {
@@ -40,8 +47,9 @@ export default function App() {
   return (
     <>
       <LiveEventRunPrompt />
+      <OfflineOverlay />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={APP_SHELL ? <GamePage /> : <LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -84,7 +92,10 @@ export default function App() {
         <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
         <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />
         <Route path="/payment-status" element={<PaymentStatusPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route
+          path="*"
+          element={<Navigate to={APP_SHELL ? '/game' : '/'} replace />}
+        />
       </Routes>
     </>
   )

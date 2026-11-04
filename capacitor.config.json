@@ -1,5 +1,24 @@
 {
-  "appId": "com.fahhkit.app",
-  "appName": "FahhKit",
-  "webDir": "dist"
+  "appId": "com.runconquest.game",
+  "appName": "Run Conquest",
+  "webDir": "dist-app",
+  "android": {
+    "allowMixedContent": false,
+    "useLegacyBridge": true
+  },
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["cafebizarre.com.np"]
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "797208432008-o19nbtt7bst014jm3i8efn9gv81n4prd.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_notify",
+      "iconColor": "#DD571C"
+    }
+  }
 }

@@ -1,7 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">FahhKit</string>
-    <string name="title_activity_main">FahhKit</string>
-    <string name="package_name">com.fahhkit.app</string>
-    <string name="custom_url_scheme">com.fahhkit.app</string>
+    <string name="app_name">Run Conquest</string>
+    <string name="title_activity_main">Run Conquest</string>
+    <string name="package_name">com.runconquest.game</string>
+    <string name="custom_url_scheme">com.runconquest.game</string>
+
+    <!-- @capacitor-community/background-geolocation's persistent "Run in progress"
+         notification while tracking continues with the screen locked - see
+         src/utils/geo.js's watchPosition(). -->
+    <string name="capacitor_background_geolocation_notification_channel_name">Run tracking</string>
+    <string name="capacitor_background_geolocation_notification_color">#DD571C</string>
 </resources>
