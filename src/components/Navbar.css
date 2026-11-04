@@ -23,6 +23,19 @@
   padding: 0 20px;
   display: flex;
   align-items: center;
+  /* The actual mobile bug this fixes: .navbar-links carries its own
+     flex: 1 + justify-content: space-between (below), which is what
+     visually spreads brand/links/actions apart - but only while
+     .navbar-links is a normal in-flow flex child. Under 1024px it becomes
+     position: fixed (its own rule below) to work as a full-screen drawer,
+     which takes it out of this row's flex layout entirely - at that point
+     .navbar-brand and .navbar-actions were the only two items actually
+     left in flow, with no space-between of their own, so they collapsed
+     together at the left edge instead of the hamburger landing at the
+     right. This one declaration is what both widths actually need (it's a
+     no-op on desktop, where .navbar-links' own flex: 1 already fills the
+     gap either way). */
+  justify-content: space-between;
   gap: 16px;
   position: relative;
 }
@@ -31,7 +44,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  /* min-width: 0 (not the old flex-shrink: 0) - a very long display name
+     scenario aside, this is what actually lets the brand text ellipsize
+     instead of forcing .navbar-actions off the right edge on a narrow
+     phone; .navbar-actions keeps its own flex-shrink: 0 below so the
+     hamburger's tap target never shrinks instead. */
+  min-width: 0;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -45,6 +63,10 @@
   letter-spacing: -0.01em;
   line-height: 1;
   color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .navbar-brand:hover {
@@ -270,6 +292,15 @@
   flex-shrink: 0;
 }
 
+/* The top-bar copy (.navbar-actions, always visible) vs. the drawer copy
+   (.navbar-links-side, only reachable once the drawer is open) - desktop
+   never collapses the links into a drawer at all, so only the original
+   .navbar-links-side one is ever relevant there; mobile is the reverse
+   (see the 1024px media query below), so the balance never shows twice. */
+.navbar-balance-pill-topbar {
+  display: none;
+}
+
 .navbar-user-menu {
   position: relative;
   flex-shrink: 0;
@@ -384,9 +415,12 @@
   display: none;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   gap: 5px;
-  width: 36px;
-  height: 36px;
+  /* 44x44 - the real tap target, not just the 18px glyph inside it (the
+     brief's own explicit floor, and iOS HIG's). */
+  width: 44px;
+  height: 44px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px) saturate(160%);
@@ -394,12 +428,23 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  padding: 0 8px;
+  padding: 0;
   flex-shrink: 0;
+  /* Stops iOS Safari's double-tap-to-zoom gesture from eating the first
+     tap on this button - the classic cause of "the menu button needs two
+     taps to open" on iPhone specifically. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navbar-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .navbar-toggle span {
   display: block;
+  width: 20px;
   height: 2px;
   background: var(--text);
   border-radius: 2px;
@@ -421,22 +466,52 @@
 /* Collapses earlier than the old 768px - at tablet widths the grown link
    count (Shop, the Admin group) still doesn't comfortably fit in one row. */
 @media (max-width: 1024px) {
+  .navbar-inner {
+    /* 16px, not the desktop 20px - the brief's own explicit side gutter -
+       plus the safe-area insets for a notch/home-indicator device in
+       landscape, where the bar's edges can otherwise sit under the notch. */
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
   .navbar-toggle {
     display: flex;
   }
 
+  .navbar-balance-pill-topbar {
+    display: inline-flex;
+  }
+
+  /* position: fixed, not absolute - anchored to the viewport instead of
+     this bar's own box, so it can't be clipped or mispositioned by an
+     ancestor's overflow/transform the way the old absolute version could,
+     and so 100dvh below is measured against the real viewport, not
+     whatever .navbar-inner happens to be at the moment. A full-viewport
+     drawer under the bar, not a dropdown - solid background (var(--card),
+     already opaque), scrolls internally if its content runs tall. */
   .navbar-links {
-    position: absolute;
-    top: 100%;
+    position: fixed;
+    top: var(--header-h);
     left: 0;
     right: 0;
+    /* max-height, not a fixed height - sized to its own content (the link
+       list is short enough that it never needs the full viewport), capped
+       so it scrolls internally instead of overflowing on a short phone.
+       A fixed full-viewport height here would leave no visible page
+       content below the drawer to actually tap as "outside" - the one
+       real content area shown through the gap IS what "closes on outside
+       tap" needs. 100dvh, not 100vh, for the cap itself - iOS Safari's
+       address bar changes the visual viewport height as it shows/hides, so
+       a vh-based cap is wrong by that much depending on scroll state; dvh
+       tracks the real visible height instead. */
+    max-height: calc(100dvh - var(--header-h));
     flex-direction: column;
     align-items: stretch;
     gap: 0;
     margin-left: 0;
-    padding: 8px 20px 20px;
-    max-height: calc(100vh - var(--header-h));
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background: var(--card);
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow-md);
@@ -462,8 +537,14 @@
     gap: 10px;
   }
 
+  /* 48px rows, 16px/600 - the brief's own explicit floor for both; the
+     desktop values (44px/15px) are untouched above 1024px. */
   .navbar-link {
     width: 100%;
+    height: 48px;
+    font-size: 16px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* The sliding underline reads oddly on a full-width stacked row - a
@@ -499,12 +580,58 @@
     box-shadow: none;
   }
 
-  .navbar-balance-pill {
-    align-self: flex-start;
+  .navbar-admin-dropdown a {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* The drawer's own copy would otherwise double up with the always-
+     visible top-bar one (.navbar-balance-pill-topbar, shown above) once
+     the drawer is open. */
+  .navbar-links-side .navbar-balance-pill {
+    display: none;
   }
 
   .navbar-links .btn {
     width: 100%;
     justify-content: center;
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  /* The profile row's own links/Sign out button - same 48px/16px floor as
+     the plain nav links above. */
+  .navbar-user-menu {
+    width: 100%;
+  }
+
+  .navbar-user-trigger {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 48px;
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+
+  .navbar-user-dropdown {
+    position: static;
+    width: 100%;
+    margin-top: 4px;
+    box-shadow: none;
+    border: none;
+    background: var(--brand-light);
+  }
+
+  .navbar-user-dropdown a,
+  .navbar-user-dropdown button {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    touch-action: manipulation;
   }
 }

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { FaChevronDown, FaUserCircle } from 'react-icons/fa'
 import {
   canManageEvents,
@@ -27,8 +27,15 @@ export default function Navbar() {
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
   const { user, isAuthed } = useCurrentUser()
   const navigate = useNavigate()
+  const location = useLocation()
   const userMenuRef = useRef(null)
   const adminMenuRef = useRef(null)
+  const menuPanelRef = useRef(null)
+  const toggleRef = useRef(null)
+  // Stable id (not a hardcoded string) so two Navbar instances - unlikely,
+  // but React.StrictMode in dev double-mounts everything once - never
+  // collide on the same aria-controls target.
+  const menuId = useId()
 
   // Fahhcoin balance for the pill next to the profile menu - same
   // /v1/territory/profile the game's own HUD reads, so it's never a second
@@ -81,6 +88,54 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [adminMenuOpen])
 
+  // The mobile drawer itself (distinct from the two dropdowns above, which
+  // already had their own outside-click handling) - tapping anywhere that
+  // isn't the panel or the hamburger that opened it closes it.
+  useEffect(() => {
+    if (!open) return undefined
+    function onClickOutside(e) {
+      if (
+        menuPanelRef.current &&
+        !menuPanelRef.current.contains(e.target) &&
+        !toggleRef.current?.contains(e.target)
+      ) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return undefined
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])
+
+  // Covers programmatic navigation too (handleSignOut's navigate('/'), the
+  // admin/user dropdown links' own onClick={close}) - every Link inside the
+  // drawer already calls close() on click, this is the belt-and-suspenders
+  // case for anything that changes the route without going through one.
+  useEffect(() => {
+    setOpen(false)
+  }, [location.pathname])
+
+  // The drawer covers the full viewport height while open (see .navbar-links
+  // under the mobile media query) - without this the page keeps scrolling
+  // underneath it, which both looks broken and lets a touch drag scroll the
+  // background through a translucent-looking gap at the panel's edges.
+  useEffect(() => {
+    if (!open) return undefined
+    const { overflow } = document.body.style
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = overflow
+    }
+  }, [open])
+
   function close() {
     setOpen(false)
     setUserMenuOpen(false)
@@ -114,19 +169,32 @@ export default function Navbar() {
         </Link>
 
         <div className="navbar-actions">
+          {isAuthed && balance != null && (
+            <span className="navbar-balance-pill navbar-balance-pill-topbar">
+              <CoinStack tier={0} size={18} />
+              {formatCoins(balance)}
+            </span>
+          )}
           <button
+            ref={toggleRef}
+            type="button"
             className={`navbar-toggle ${open ? 'open' : ''}`}
-            aria-label="Toggle menu"
+            aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
+            aria-controls={menuId}
             onClick={() => setOpen((v) => !v)}
           >
-            <span />
-            <span />
-            <span />
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
           </button>
         </div>
 
-        <nav className={`navbar-links ${open ? 'open' : ''}`}>
+        <nav
+          id={menuId}
+          ref={menuPanelRef}
+          className={`navbar-links ${open ? 'open' : ''}`}
+        >
           <div className="navbar-links-main">
             {isAdmin(user) && (
               <NavLink

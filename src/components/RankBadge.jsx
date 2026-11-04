@@ -22,14 +22,14 @@ import './RankBadge.css'
 // whatever CSS then sizes it down to for a given call site.
 const BADGES = {
   player: {
-    1: { src: players1, src2x: players1x2, width: 256, height: 293 },
-    2: { src: players2, src2x: players2x2, width: 256, height: 281 },
-    3: { src: players3, src2x: players3x2, width: 256, height: 291 },
+    1: { src: players1, src2x: players1x2, width: 256, height: 268 },
+    2: { src: players2, src2x: players2x2, width: 256, height: 291 },
+    3: { src: players3, src2x: players3x2, width: 256, height: 294 },
   },
   club: {
-    1: { src: clubs1, src2x: clubs1x2, width: 256, height: 248 },
-    2: { src: clubs2, src2x: clubs2x2, width: 256, height: 233 },
-    3: { src: clubs3, src2x: clubs3x2, width: 256, height: 259 },
+    1: { src: clubs1, src2x: clubs1x2, width: 256, height: 210 },
+    2: { src: clubs2, src2x: clubs2x2, width: 256, height: 228 },
+    3: { src: clubs3, src2x: clubs3x2, width: 256, height: 240 },
   },
 }
 
