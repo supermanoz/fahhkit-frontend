@@ -1910,6 +1910,12 @@
    stands in for while tracking. Bottom-right, the conventional spot for a
    map app's own locate control (not the bottom-center FAB spot, reserved
    for the main menu button). */
+/* Border/shadow brought in line with the game's standard carved-stone
+   control recipe (see TerritoryMap.css's .territory-map-locate, the button
+   this one visually stands in for) - a flat 4px #000 outline + a #000
+   shadow band read as a different, heavier control than every other HUD
+   button, which all use a 3px var(--game-ink) outline instead of literal
+   black. */
 .game-locate-btn {
   position: absolute;
   right: 16px;
@@ -1923,10 +1929,10 @@
   justify-content: center;
   background: var(--game-stone, #9a9d93);
   color: #fff;
-  border: 4px solid #000;
+  border: 3px solid var(--game-ink, #3d2b1a);
   box-shadow:
     inset 0 -9px 0 var(--game-stone-dark, #6e7166),
-    0 5px 0 #000;
+    0 3px 0 var(--game-ink, #3d2b1a);
   font-size: 22px;
   cursor: pointer;
   transition:
@@ -1935,10 +1941,10 @@
 }
 
 .game-locate-btn:active {
-  transform: translateY(4px);
+  transform: translateY(3px);
   box-shadow:
     inset 0 -9px 0 var(--game-stone-dark, #6e7166),
-    0 1px 0 #000;
+    0 1px 0 var(--game-ink, #3d2b1a);
 }
 
 /* "List" badge (per reference) with a bold near-black ring, but shaded

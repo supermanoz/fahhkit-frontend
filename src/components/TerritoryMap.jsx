@@ -364,6 +364,32 @@ function InvalidateSizeOnMount() {
   return null
 }
 
+// Phones lock mid-run constantly (that's the whole reason useWakeLock.js
+// exists), and Leaflet caches its own container size (`map._size`) rather
+// than re-measuring on every frame - the screen locking/backgrounding can
+// change the WebView's real viewport (status bar/address bar/safe-area
+// insets differ on resume, independent of any wake lock outcome), which
+// leaves that cache stale. Everything placed by it - tiles AND the marker
+// pane the player's own character lives in - then renders at the WRONG
+// on-screen position (often off the visible area entirely) until
+// something calls invalidateSize() to re-measure, which nothing
+// previously did past the one-shot InvalidateSizeOnMount above. This is
+// the "character vanishes after the phone was locked/backgrounded"
+// report: re-measuring on resume is the fix, not anything about the
+// marker/icon itself.
+function InvalidateSizeOnResume() {
+  const map = useMap()
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') map.invalidateSize()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () =>
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [map])
+  return null
+}
+
 // Floor for FocusHighlight's camera below - a large territory used to
 // fitBounds all the way out with no lower limit, so a big enough one could
 // zoom out past readable street level. 14 keeps roads/blocks legible (well
@@ -1398,6 +1424,31 @@ export default function TerritoryMap({
       setGlobeVisible(false)
     }
   }, [isFollowing, highlightOwnerId, highlightParcelId])
+
+  // `{playerLocation && <PlayerMarker/>}` below used to gate on
+  // playerLocation directly - GamePage.jsx's own playerLocation always
+  // falls back through liveLocation to a hardcoded DEFAULT_CENTER today,
+  // so in practice that's never actually hit null, but it stayed one
+  // dropped/null GPS fix away from unmounting (and therefore recreating
+  // from scratch - a fresh Leaflet marker, no previous position to tween
+  // from) the one marker instance every other hook in this file (see
+  // useSmoothMarkerPosition/Heading's own comments) was specifically
+  // built to keep alive and update in place. Holding the last real fix in
+  // a ref and falling back to it removes that path entirely regardless of
+  // what upstream ever does - the marker now only ever unmounts on this
+  // component's own unmount, never on a single bad fix.
+  const lastKnownLocationRef = useRef(playerLocation || null)
+  if (playerLocation) lastKnownLocationRef.current = playerLocation
+  const markerLocation = playerLocation || lastKnownLocationRef.current
+  // Dev-only: if this ever logs, a real gap got past the fallback above
+  // (the very first render, before any fix has ever arrived) - a fresh
+  // signal for the next time "the character vanished" gets reported,
+  // instead of needing to re-derive it from a user's description again.
+  if (import.meta.env.DEV && !markerLocation) {
+    console.debug(
+      '[TerritoryMap] player marker hidden - no position available yet (no fix, no center fallback upstream)'
+    )
+  }
   // The icon (and its CSS run-cycle animation) only needs rebuilding on an
   // idle<->running swap - which way he's actually FACING is applied
   // separately, imperatively, by useSmoothMarkerHeading inside
@@ -1515,9 +1566,9 @@ export default function TerritoryMap({
             />
           )}
 
-          {playerLocation && (
+          {markerLocation && (
             <PlayerMarker
-              playerLocation={playerLocation}
+              playerLocation={markerLocation}
               icon={playerMarkerIcon}
               heading={markerHeading}
             />
@@ -1617,6 +1668,7 @@ export default function TerritoryMap({
             playerLocation={playerLocation}
           />
           <InvalidateSizeOnMount />
+          <InvalidateSizeOnResume />
           <ZoomRangeLimiter />
           <GlobeHandoff
             isFollowing={isFollowing}
