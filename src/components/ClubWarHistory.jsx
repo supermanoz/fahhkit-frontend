@@ -5,7 +5,13 @@ import { getClubWarHistory, getClubWarHistoryDetail } from '../api/clubWar'
 import { DEFAULT_HERO_NAME, isPlaceholderHero } from '../utils/hero'
 import ClubBadge from './ClubBadge'
 import ClubWarMemberAvatar from './ClubWarMemberAvatar'
-import { IconCheck, IconChevronLeft, IconClose, IconTrophy } from './GameIcons'
+import {
+  IconCheck,
+  IconChevronLeft,
+  IconClose,
+  IconHelmet,
+  IconTrophy,
+} from './GameIcons'
 import { playerNameOf } from '../utils/playerName'
 
 // 10 per page - matches the backend's own default noOfRecords for this
@@ -87,6 +93,14 @@ function errorText(err, fallback) {
   return err instanceof ApiError ? err.message : fallback
 }
 
+// "10 members · 120 pts" under a club's header, points omitted if this
+// club's total score isn't there (e.g. a very old war record).
+function squadSummary(list, score) {
+  if (!list?.length) return null
+  const members = `${list.length} member${list.length === 1 ? '' : 's'}`
+  return score == null ? members : `${members} · ${formatScore(score)} pts`
+}
+
 // Highest contribution first; anyone who didn't run sinks to the bottom
 // regardless of score (a no-run is always worse than any real run) -
 // see the brief's "members who didn't run go at the bottom, greyed out."
@@ -163,14 +177,16 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
 
   const participantRows = (list) => {
     const sorted = sortByContribution(list)
-    // MVP = top contributor who actually ran, within this squad - not
-    // awarded if nobody on this side ran at all.
-    const mvpUserId = sorted.find((p) => p.runId)?.userId
+    const hasScores = sorted.some((p) => p.contributedScore != null)
+    // Top scorer, within this squad - not awarded if nobody on this side
+    // ran, or if there's nothing to actually rank them by.
+    const mvpUserId = hasScores ? sorted.find((p) => p.runId)?.userId : null
 
     return (
       <ul className="club-war-history-participants">
-        {sorted.map((p) => {
+        {sorted.map((p, i) => {
           const ran = Boolean(p.runId)
+          const isMe = p.userId === userId
           // The backend's own heroName field reads straight off the
           // StoreItem's name column (ClubWarServiceImpl#toParticipantScores
           // - checked directly), which for this item is still literally
@@ -186,7 +202,7 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
             <li key={p.userId}>
               <button
                 type="button"
-                className={`game-row game-row-clickable club-war-history-participant ${p.userId === userId ? 'is-me' : ''} ${!ran ? 'is-no-run' : ''}`}
+                className={`club-war-history-participant ${isMe ? 'is-me' : ''} ${!ran ? 'is-no-run' : ''}`}
                 onClick={() =>
                   onViewProfile?.({
                     userId: p.userId,
@@ -195,31 +211,51 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
                   })
                 }
               >
+                <span className="club-war-history-rank">{i + 1}</span>
                 <span className="club-war-history-avatar">
-                  <ClubWarMemberAvatar />
+                  {/* Same hero-slot icon as the live roster (squadList in
+                      ClubWarPanel.jsx) - a flat icon standing in for
+                      "has a hero locked in", not a per-hero portrait (see
+                      ClubWarMemberAvatar's own comment); the helmet is
+                      that same view's fallback for no hero data. */}
+                  {p.heroName ? <ClubWarMemberAvatar /> : <IconHelmet />}
                 </span>
-                <span className="game-row-info">
-                  <span className="game-row-name">
-                    {p.userId === userId ? 'You' : playerNameOf(p)}
+                <span className="club-war-history-info">
+                  <span className="club-war-history-name">
+                    {isMe ? 'You' : playerNameOf(p)}
+                    {isMe && <span className="club-war-you-tag">You</span>}
                     {p.userId === mvpUserId && (
                       <span
                         className="club-war-mvp-badge"
                         title="Top contributor"
                       >
-                        <IconTrophy /> MVP
+                        <IconTrophy />
                       </span>
                     )}
                   </span>
-                  <span className="game-row-meta">{heroName}</span>
+                  <span className="club-war-history-hero">{heroName}</span>
                 </span>
-                <span
-                  className={`club-war-run-badge ${ran ? 'is-done' : 'is-missed'}`}
-                  title={ran ? runOutcomeLabel(p.runOutcome) : 'Did not run'}
-                >
-                  {ran ? <IconCheck /> : <IconClose />}
-                </span>
-                <span className="club-war-points">
-                  {ran ? formatScore(p.contributedScore) : '—'}
+                <span className="club-war-history-result">
+                  <span
+                    className={`club-war-run-badge ${ran ? 'is-done' : 'is-missed'}`}
+                    title={ran ? runOutcomeLabel(p.runOutcome) : 'Did not run'}
+                  >
+                    {ran ? <IconCheck /> : <IconClose />}
+                  </span>
+                  {ran ? (
+                    <>
+                      <span className="club-war-history-score">
+                        {formatScore(p.contributedScore)}
+                      </span>
+                      <span className="club-war-history-result-label">
+                        {runOutcomeLabel(p.runOutcome)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="club-war-history-result-label">
+                      Missed
+                    </span>
+                  )}
                 </span>
               </button>
             </li>
@@ -338,7 +374,7 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
       ) : detailLoading || !detail ? (
         <p className="game-menu-empty">Loading war…</p>
       ) : (
-        <>
+        <div className="club-war-history-detail">
           <section className="game-card game-card-dark club-war-banner">
             <span className="club-war-phase phase-completed">
               {resultLabel(detail.result)}
@@ -368,20 +404,45 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
             </p>
           </section>
 
-          <section className="game-card game-card-dark">
-            <h3 className="game-card-title game-card-title-sm">
-              {detail.myClubName}
-            </h3>
-            {participantRows(detail.myParticipants)}
-          </section>
-
-          <section className="game-card game-card-dark">
-            <h3 className="game-card-title game-card-title-sm">
-              {detail.opponentClubName}
-            </h3>
-            {participantRows(detail.opponentParticipants)}
-          </section>
-        </>
+          <div className="club-war-history-squads">
+            {[
+              {
+                key: 'mine',
+                name: detail.myClubName,
+                score: detail.myScore,
+                list: detail.myParticipants,
+              },
+              {
+                key: 'opponent',
+                name: detail.opponentClubName,
+                score: detail.opponentScore,
+                list: detail.opponentParticipants,
+              },
+            ].map((squad) => {
+              const summary = squadSummary(squad.list, squad.score)
+              return (
+                <section
+                  key={squad.key}
+                  className="game-card game-card-dark club-war-history-squad"
+                >
+                  <div className="club-war-history-squad-head">
+                    <ClubBadge name={squad.name} size={28} />
+                    <span className="club-war-history-squad-name">
+                      {squad.name}
+                    </span>
+                    <span className="club-war-history-squad-score">
+                      {formatScore(squad.score)}
+                    </span>
+                  </div>
+                  {summary && (
+                    <p className="club-war-history-squad-summary">{summary}</p>
+                  )}
+                  {participantRows(squad.list)}
+                </section>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

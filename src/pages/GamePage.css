@@ -123,6 +123,13 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* The original loading-screen background, unchanged since before the
+     hero-artwork backdrop existed (same radial-gradient/#0a0806 pair as
+     far back as this file's git history goes). The artwork backdrop
+     (GameLoadingBackdrop, see .game-loading-backdrop-wrap below) is an
+     opaque layer painted on top of this during the progress-bar phase
+     only; once it exits for the globe phase, this is what's left
+     showing behind GameIntroGlobe. */
   background:
     radial-gradient(
       ellipse at 50% 42%,
@@ -130,6 +137,16 @@
       rgba(10, 8, 6, 0) 60%
     ),
     #0a0806;
+}
+
+/* Wraps GameLoadingBackdrop so AnimatePresence has a single element to
+   fade opacity on for the artwork -> globe-phase crossfade (see the
+   overlay's JSX in GamePage.jsx) - GameLoadingBackdrop's own root is
+   already position: absolute; inset: 0 and doesn't need this for layout,
+   only opacity inherits onto it from here. */
+.game-loading-backdrop-wrap {
+  position: absolute;
+  inset: 0;
 }
 
 /* Run Conquest logo front and centre while the map loads - moved here
@@ -1915,14 +1932,26 @@
    this one visually stands in for) - a flat 4px #000 outline + a #000
    shadow band read as a different, heavier control than every other HUD
    button, which all use a 3px var(--game-ink) outline instead of literal
-   black. */
+   black. Size and inset-shadow depth now match .territory-map-locate too
+   (46px, -5px band) - this one used to run 56px/-9px, a visibly heavier
+   control for what's the same button, just shown while tracking instead
+   of while idle.
+   bottom: anchored to --sheet-h (the run card's own measured height - see
+   controlsEl/ResizeObserver in GamePage.jsx) plus a fixed clearance, so
+   this always sits above the run card regardless of run mode, collapsed/
+   expanded state, or Paused vs. Running - never anchored to a guessed
+   fixed pixel value. env(safe-area-inset-bottom) is added on top even
+   though --sheet-h already bakes the inset into the run card's own
+   bottom padding (see .game-controls) - belt and braces so a notch/home-
+   indicator device never ends up tighter than intended, at the cost of a
+   few extra px of headroom there. */
 .game-locate-btn {
   position: absolute;
   right: 16px;
-  bottom: calc(var(--sheet-h, 90px) + 20px);
+  bottom: calc(var(--sheet-h, 90px) + 12px + env(safe-area-inset-bottom, 0px));
   z-index: 700;
-  width: 56px;
-  height: 56px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1931,9 +1960,9 @@
   color: #fff;
   border: 3px solid var(--game-ink, #3d2b1a);
   box-shadow:
-    inset 0 -9px 0 var(--game-stone-dark, #6e7166),
+    inset 0 -5px 0 var(--game-stone-dark, #6e7166),
     0 3px 0 var(--game-ink, #3d2b1a);
-  font-size: 22px;
+  font-size: 18px;
   cursor: pointer;
   transition:
     transform 0.1s ease,
@@ -1943,7 +1972,7 @@
 .game-locate-btn:active {
   transform: translateY(3px);
   box-shadow:
-    inset 0 -9px 0 var(--game-stone-dark, #6e7166),
+    inset 0 -5px 0 var(--game-stone-dark, #6e7166),
     0 1px 0 var(--game-ink, #3d2b1a);
 }
 
@@ -3134,86 +3163,6 @@
   margin: 6px 0 10px;
 }
 
-.game-menu-avatar-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.game-menu-avatar-card {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 6px;
-  background: linear-gradient(180deg, #fffaf0 0%, #f1e6d2 100%);
-  border: 3px solid var(--game-ink);
-  border-radius: 12px;
-  box-shadow: 0 3px 0 var(--game-ink);
-  cursor: pointer;
-  text-align: center;
-}
-
-.game-menu-avatar-card:hover {
-  filter: brightness(1.04);
-}
-
-/* Picked tile - gold ring, like a selected Clash card. */
-.game-menu-avatar-card.is-selected {
-  background: linear-gradient(180deg, #fff3cf 0%, #ffd98a 100%);
-  box-shadow:
-    0 0 0 3px var(--game-gold),
-    0 3px 0 var(--game-ink);
-  cursor: default;
-}
-
-.game-menu-avatar-card.is-locked {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.game-menu-avatar-card.is-locked img {
-  filter: grayscale(0.6);
-}
-
-.game-menu-avatar-card img {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-/* Plain bold UI face, not Passion One - reads cleanly at this size on the
-   card's near-white gradient without needing an outline. */
-.game-menu-avatar-name {
-  max-width: 100%;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  color: var(--game-text);
-  overflow-wrap: anywhere;
-}
-
-.game-menu-avatar-tag {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--game-green-dark);
-}
-
 .game-avatar-confirm-compare {
   display: flex;
   align-items: center;
@@ -3496,6 +3445,16 @@
    readable on this tab's off-white panel. */
 .game-settings-row-danger .game-settings-row-label {
   color: var(--red-text);
+}
+
+/* The Settings tab's own short "map data" credits line - no dedicated
+   About page exists in this app for it to live on instead. */
+.game-settings-credits {
+  margin: 16px 0 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted-dark);
 }
 
 /* Chunky on/off switch - stone track that turns green, cream knob with an
@@ -4470,6 +4429,151 @@
   flex-direction: column;
   gap: 10px;
   color: var(--game-cream);
+}
+
+/* Run History rows - own classes, not the shared .game-menu-list/-area/
+   -meta (used elsewhere too, e.g. Medals) - those inherit the global
+   white-stroke/shadow text treatment (tokens.css's :where() rule) with
+   nothing resetting it, which is what made this list's text garbled at
+   14px. Full width (box-sizing: border-box so the border never pushes it
+   past 100%), plain dark text, fixed-width-enough right column via
+   flex-shrink: 0 + its own max-width so a long relative date still
+   ellipses instead of overflowing at 360px. */
+.game-me-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.15s ease;
+}
+
+.game-me-history-list[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.game-me-history-row {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--border-soft);
+  background: var(--row);
+  cursor: pointer;
+}
+
+.game-me-history-row:hover {
+  background: var(--white);
+}
+
+.game-me-history-row:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.game-me-history-area {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f1e1a;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.game-me-history-meta {
+  flex-shrink: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a574b;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.game-me-history-skeleton {
+  height: 44px;
+  border-radius: 10px;
+  border: 2px solid var(--border-soft);
+  background: var(--row);
+  animation: game-me-history-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes game-me-history-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.game-me-history-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-me-history-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Secondary style per the brief - whitish solid, dark readable text, not
+   the shared .game-btn (white text + heavy ink stroke, meant for a
+   coloured fill, not this light one). */
+.game-me-history-pager-btn {
+  all: unset;
+  box-sizing: border-box;
+  min-width: 72px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 2px solid var(--game-ink);
+  background: var(--white);
+  color: #1f1e1a;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+}
+
+.game-me-history-pager-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.game-me-history-pager-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.game-me-history-pager-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a574b;
 }
 
 /* Me tab: club name with its (TEMP, generated) badge in front. */

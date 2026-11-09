@@ -1,20 +1,29 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
-import { IconChevronLeft, IconChevronRight, IconLock } from './GameIcons'
+import {
+  IconCheck,
+  IconChevronLeft,
+  IconChevronRight,
+  IconLock,
+} from './GameIcons'
 import HeroFigure from './HeroFigure'
 import { getHeroSprite } from '../utils/heroSprites'
 import { resolveFileUrl } from '../api/client'
+import { useToast } from '../game/ui/Toast'
 
 // Swipeable "pick your war hero" slider - CSS scroll-snap (real native
 // swipe/momentum, no drag-gesture library), one full-width card visible at
 // a time, with arrow buttons, dots and Left/Right keys all driving the same
 // `index`. Same shield-lock look as the Shop's own HeroGallery.jsx, but its
-// own component rather than that one reused directly: HeroGallery flips
-// between cards via a framer-motion drag gesture (no scroll-snap at all)
-// and equips immediately on tap, where this needs native scroll-snap plus
-// a two-step Select-then-"Lock In" confirm (so a swipe never locks anything
-// in by itself) - different enough mechanics that bolting both onto one
-// component would need more branching than just having two.
+// own component rather than that one reused directly - different enough
+// mechanics (native scroll-snap vs. a drag gesture) that bolting both onto
+// one component would need more branching than just having two.
+//
+// Whichever hero is centred (`index`) IS the selection now - there's no
+// separate tap-to-select step any more (that used to live here as its own
+// `selectedId` state + a per-card Select/Selected button). One "Lock In"
+// button at the bottom always reads off the centred hero directly, so
+// swiping to a new hero and tapping it locks THAT one, never a stale pick.
 export default function ClubWarHeroPicker({
   heroItems,
   ownedItems,
@@ -22,6 +31,7 @@ export default function ClubWarHeroPicker({
   onLockIn,
   busy,
 }) {
+  const toast = useToast()
   const trackRef = useRef(null)
   const scrollTimeoutRef = useRef(null)
   const startIndex = Math.max(
@@ -29,10 +39,30 @@ export default function ClubWarHeroPicker({
     heroItems.findIndex((h) => h.id === lockedHeroStoreItemId)
   )
   const [index, setIndex] = useState(startIndex)
-  const [selectedId, setSelectedId] = useState(lockedHeroStoreItemId || null)
 
   function goTo(nextIndex) {
     setIndex(Math.max(0, Math.min(heroItems.length - 1, nextIndex)))
+  }
+
+  // Which card is actually centred, independent of `index` driving a
+  // scrollIntoView - recomputed on scroll-end (swipe/arrow/dot) and on
+  // resize (an orientation change can leave a different card centred
+  // without ever firing a scroll event), so this never goes stale.
+  function syncIndexToScroll() {
+    const track = trackRef.current
+    if (!track) return
+    const center = track.getBoundingClientRect().left + track.clientWidth / 2
+    let closest = 0
+    let closestDist = Infinity
+    Array.from(track.children).forEach((child, i) => {
+      const rect = child.getBoundingClientRect()
+      const dist = Math.abs(rect.left + rect.width / 2 - center)
+      if (dist < closestDist) {
+        closestDist = dist
+        closest = i
+      }
+    })
+    setIndex(closest)
   }
 
   // Arrow/dot/keyboard navigation scrolls the track; a manual swipe is
@@ -48,7 +78,15 @@ export default function ClubWarHeroPicker({
   }, [index])
 
   useEffect(() => {
-    return () => clearTimeout(scrollTimeoutRef.current)
+    function onResize() {
+      clearTimeout(scrollTimeoutRef.current)
+      scrollTimeoutRef.current = setTimeout(syncIndexToScroll, 120)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      clearTimeout(scrollTimeoutRef.current)
+    }
   }, [])
 
   // Debounced, not computed on every scroll tick: each full-width card is a
@@ -59,22 +97,7 @@ export default function ClubWarHeroPicker({
   // avoids fighting the still-in-progress scrollIntoView from goTo() above.
   function handleScroll() {
     clearTimeout(scrollTimeoutRef.current)
-    scrollTimeoutRef.current = setTimeout(() => {
-      const track = trackRef.current
-      if (!track) return
-      const center = track.getBoundingClientRect().left + track.clientWidth / 2
-      let closest = 0
-      let closestDist = Infinity
-      Array.from(track.children).forEach((child, i) => {
-        const rect = child.getBoundingClientRect()
-        const dist = Math.abs(rect.left + rect.width / 2 - center)
-        if (dist < closestDist) {
-          closestDist = dist
-          closest = i
-        }
-      })
-      setIndex(closest)
-    }, 120)
+    scrollTimeoutRef.current = setTimeout(syncIndexToScroll, 120)
   }
 
   function handleKeyDown(e) {
@@ -87,8 +110,23 @@ export default function ClubWarHeroPicker({
     }
   }
 
-  const selectedItem = heroItems.find((h) => h.id === selectedId)
-  const alreadyLockedIn = selectedId && selectedId === lockedHeroStoreItemId
+  const currentItem = heroItems[index]
+  const currentOwned = currentItem
+    ? ownedItems.some((o) => o.storeItem.id === currentItem.id)
+    : false
+  const currentIsLockedIn = currentItem?.id === lockedHeroStoreItemId
+
+  async function handleLockIn() {
+    if (!currentItem) return
+    const ok = await onLockIn(currentItem)
+    if (ok) {
+      toast.push(`${currentItem.name} locked in`, { type: 'success' })
+    } else {
+      toast.push(`Couldn't lock in ${currentItem.name} - tap to try again.`, {
+        type: 'error',
+      })
+    }
+  }
 
   return (
     <div className="club-war-hero-picker">
@@ -115,7 +153,6 @@ export default function ClubWarHeroPicker({
           {heroItems.map((item, i) => {
             const owned = ownedItems.some((o) => o.storeItem.id === item.id)
             const isCentred = i === index
-            const isSelected = item.id === selectedId
             const isLockedIn = item.id === lockedHeroStoreItemId
             const animated = Boolean(getHeroSprite(item.name))
             return (
@@ -123,16 +160,12 @@ export default function ClubWarHeroPicker({
                 key={item.id}
                 className="club-war-hero-slide"
                 role="option"
-                aria-selected={isSelected}
+                aria-selected={isCentred}
               >
-                <button
-                  type="button"
-                  className={`club-war-hero-card ${isSelected ? 'is-selected' : ''} ${!owned ? 'is-locked' : ''}`}
-                  disabled={!owned}
-                  onClick={() => {
-                    goTo(i)
-                    setSelectedId(item.id)
-                  }}
+                {/* Display only now - swiping/arrows/dots change `index`,
+                    a card itself no longer does anything on tap. */}
+                <div
+                  className={`club-war-hero-card ${!owned ? 'is-locked' : ''}`}
                 >
                   <span className="club-war-hero-card-stage">
                     {/* Only the centred card actually animates - every
@@ -175,16 +208,12 @@ export default function ClubWarHeroPicker({
                     )}
                   </span>
                   <span className="club-war-hero-card-name">{item.name}</span>
-                  {isLockedIn ? (
+                  {isLockedIn && (
                     <span className="club-war-hero-card-cta is-locked-in">
-                      Locked In
+                      <IconCheck /> Locked In
                     </span>
-                  ) : owned ? (
-                    <span className="club-war-hero-card-cta">
-                      {isSelected ? 'Selected' : 'Select'}
-                    </span>
-                  ) : null}
-                </button>
+                  )}
+                </div>
               </li>
             )
           })}
@@ -215,19 +244,43 @@ export default function ClubWarHeroPicker({
         </div>
       )}
 
+      {/* Sticky so a tall card (long roster list above, small phone
+          viewport) never pushes this below the fold - it's the only way
+          to lock in a hero now, so it has to stay reachable without
+          scrolling. */}
       <button
         type="button"
-        className="game-btn game-btn-green game-btn-lg club-war-hero-lock-in-btn"
-        disabled={!selectedItem || alreadyLockedIn || busy}
-        onClick={() => onLockIn(selectedItem)}
+        className={`club-war-hero-lock-in-btn ${
+          busy
+            ? 'is-busy'
+            : !currentOwned
+              ? 'is-unowned'
+              : currentIsLockedIn
+                ? 'is-locked-in'
+                : ''
+        }`}
+        disabled={!currentItem || !currentOwned || currentIsLockedIn || busy}
+        onClick={handleLockIn}
       >
-        {busy
-          ? 'Locking in…'
-          : alreadyLockedIn
-            ? 'Locked In'
-            : selectedItem
-              ? `Lock In ${selectedItem.name}`
-              : 'Select a Hero'}
+        {busy ? (
+          <>
+            <span
+              className="club-war-hero-lock-in-spinner"
+              aria-hidden="true"
+            />
+            Locking in…
+          </>
+        ) : !currentOwned ? (
+          <>
+            <IconLock /> Hero locked
+          </>
+        ) : currentIsLockedIn ? (
+          <>
+            <IconCheck /> Locked In
+          </>
+        ) : (
+          `Lock In ${currentItem?.name || 'Hero'}`
+        )}
       </button>
     </div>
   )

@@ -139,12 +139,10 @@ describe('resolveAthleteProfileHero', () => {
     expect(result.equippedEmoteName).toBeNull()
   })
 
-  // resolveEquippedEmoteItem (emotes.js) already treats a hidden emote
-  // that's still equipped server-side as "nothing equipped" - this just
-  // confirms that filtering survives the trip through this resolver too,
-  // for a hero+emote-name pair this registry genuinely has no art for
-  // (standing in for both the HIDDEN_EMOTES case and a plain missing-asset
-  // gap, since both end up at the same "no local art" check).
+  // A hero+emote-name pair this registry genuinely has no art for (not a
+  // HIDDEN_EMOTES case - see the Comet emote2 tests below for that one,
+  // which must NOT fall back to idle) still falls back to idle, not a
+  // broken glyph.
   it('an equipped emote name with no local art falls back to idle (null), not a broken glyph', () => {
     const hero = cosmeticHero()
     const bogus = emoteCosmetic({ name: 'Not A Real Emote' })
@@ -157,6 +155,53 @@ describe('resolveAthleteProfileHero', () => {
       cosmetics: [hero, bogus],
     })
     expect(result.equippedEmoteName).toBeNull()
+  })
+
+  // THE ACTUAL BUG: Comet's emote2 (and emote4) are hidden from the
+  // shop/slider (see emotes.js's HIDDEN_EMOTES) but have real, working
+  // local art - resolveEquippedEmoteItem used to treat "hidden" and "no
+  // art" as the same thing, so a player with emote2 equipped silently fell
+  // back to idle everywhere, including on another viewer's screen. A
+  // hidden emote must only disappear from catalogs/pickers, never from an
+  // already-equipped display.
+  it('another viewer still sees a hidden-from-shop emote (Comet emote2) that is genuinely equipped', () => {
+    const hero = cosmeticHero({ name: 'Comet' })
+    const emote = emoteCosmetic({ name: 'Emote2' })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, emote],
+    })
+    expect(result.equippedEmoteName).toBe('Emote2')
+  })
+
+  it('a hidden emote (Comet emote2) also shows on your own profile, same as any other viewer', () => {
+    const result = resolveAthleteProfileHero({
+      isSelf: true,
+      selfHeroName: 'Comet',
+      selfEmoteName: 'Emote2',
+      selfShowsTurntable: true,
+      cosmeticsHero: null,
+      cosmetics: [],
+    })
+    expect(result.equippedEmoteName).toBe('Emote2')
+  })
+
+  it("Comet's other (non-hidden) emotes keep working for another viewer", () => {
+    const hero = cosmeticHero({ name: 'Comet' })
+    const emote = emoteCosmetic({ name: 'Emote3' })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, emote],
+    })
+    expect(result.equippedEmoteName).toBe('Emote3')
   })
 
   // Same asset-validation gap, but on the isSelf path - GamePage.jsx passes
@@ -296,5 +341,204 @@ describe('resolveAthleteProfileHero', () => {
       cosmetics: [],
     })
     expect(result.equippedEmoteName).toBe('Classic')
+  })
+})
+
+// THE BUG: GET /v1/territory/profile/{userId} never sets
+// StoreItemResponse.heroId (TerritoryServiceImpl#toUserStoreItemResponse) -
+// every real cosmetic comes back with heroId null, confirmed against real
+// captured profile data. Without a way to pair an equipped emote to the
+// hero it's actually for, the old fallback ("the first equipped EMOTE
+// cosmetic, whichever hero it's for") could pick a stale emote left
+// equipped on a hero the player has since switched away from (equip is
+// scoped per-hero server-side - switching your active hero never clears
+// the OLD hero's own equipped emote) instead of the one actually playing
+// on their Me tab. storeCatalog (GamePage's own Shop catalog, whose own
+// mapper DOES set heroId correctly) backfills it by StoreItem id instead.
+describe('resolveAthleteProfileHero - backend heroId gap, closed via storeCatalog backfill', () => {
+  const BLAZE_ID = 'blaze-hero-id'
+  const NOVA_ID = 'nova-hero-id'
+
+  it("another viewer sees the active hero's real emote5, not a stale emote left equipped on a hero switched away from", () => {
+    const hero = cosmeticHero({
+      id: 'blaze-store-item',
+      name: 'Blaze',
+      heroId: null, // the bug: this endpoint never sets it
+    })
+    const staleClassic = emoteCosmetic({
+      id: 'nova-classic-row',
+      name: 'Classic',
+      heroId: null, // leftover from a hero they've since switched away from
+    })
+    const emote5 = emoteCosmetic({
+      id: 'blaze-emote5-row',
+      name: 'emote5',
+      heroId: null,
+    })
+    const storeCatalog = [
+      { id: 'blaze-store-item', heroId: BLAZE_ID },
+      { id: 'nova-classic-row', heroId: NOVA_ID },
+      { id: 'blaze-emote5-row', heroId: BLAZE_ID },
+    ]
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, staleClassic, emote5],
+      storeCatalog,
+    })
+    expect(result.equippedEmoteName).toBe('emote5')
+  })
+
+  it('without storeCatalog, the same fixture falls back to "first equipped EMOTE, any hero" (reproduces the bug, not a regression target)', () => {
+    const hero = cosmeticHero({
+      id: 'blaze-store-item',
+      name: 'Blaze',
+      heroId: null,
+    })
+    const staleClassic = emoteCosmetic({
+      id: 'nova-classic-row',
+      name: 'Classic',
+      heroId: null,
+    })
+    const emote5 = emoteCosmetic({
+      id: 'blaze-emote5-row',
+      name: 'emote5',
+      heroId: null,
+    })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, staleClassic, emote5],
+    })
+    expect(result.equippedEmoteName).toBe('Classic')
+  })
+
+  it('only emote5 equipped (no stale row) resolves correctly with or without the catalog', () => {
+    const hero = cosmeticHero({
+      id: 'blaze-store-item',
+      name: 'Blaze',
+      heroId: null,
+    })
+    const emote5 = emoteCosmetic({
+      id: 'blaze-emote5-row',
+      name: 'emote5',
+      heroId: null,
+    })
+    const base = {
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, emote5],
+    }
+    const withoutCatalog = resolveAthleteProfileHero(base)
+    const withCatalog = resolveAthleteProfileHero({
+      ...base,
+      storeCatalog: [
+        { id: 'blaze-store-item', heroId: BLAZE_ID },
+        { id: 'blaze-emote5-row', heroId: BLAZE_ID },
+      ],
+    })
+    expect(withoutCatalog.equippedEmoteName).toBe('emote5')
+    expect(withCatalog.equippedEmoteName).toBe('emote5')
+  })
+
+  it('only Classic equipped resolves to the idle pose, not a bug', () => {
+    const hero = cosmeticHero({
+      id: 'blaze-store-item',
+      name: 'Blaze',
+      heroId: null,
+    })
+    const classic = emoteCosmetic({
+      id: 'blaze-classic-row',
+      name: 'Classic',
+      heroId: null,
+    })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, classic],
+      storeCatalog: [
+        { id: 'blaze-store-item', heroId: BLAZE_ID },
+        { id: 'blaze-classic-row', heroId: BLAZE_ID },
+      ],
+    })
+    expect(result.equippedEmoteName).toBe('Classic')
+  })
+
+  // Own entry opened from a leaderboard/Club War row - GamePage wires this
+  // to isSelf:true with the same selfHeroName/selfEmoteName the Me tab
+  // uses (see GamePage.jsx's AthleteTerritoryProfilePanel render), never
+  // storeCatalog/cosmetics at all, so the heroId gap above can't reach it.
+  it('own entry opened from a list row (isSelf) shows emote5 - unaffected by the heroId gap above', () => {
+    const result = resolveAthleteProfileHero({
+      isSelf: true,
+      selfHeroName: 'Blaze',
+      selfEmoteName: 'emote5',
+      selfShowsTurntable: true,
+      cosmeticsHero: null,
+      cosmetics: [],
+    })
+    expect(result.equippedEmoteName).toBe('emote5')
+  })
+
+  it.each([
+    ['Nova', 'emote2'],
+    ['Phantom', 'emote10'],
+  ])(
+    "%s's %s resolves for another viewer via the catalog backfill",
+    (heroName, emoteName) => {
+      const hero = cosmeticHero({ id: 'h-item', name: heroName, heroId: null })
+      const emote = emoteCosmetic({
+        id: 'e-item',
+        name: emoteName,
+        heroId: null,
+      })
+      const result = resolveAthleteProfileHero({
+        isSelf: false,
+        selfHeroName: null,
+        selfEmoteName: null,
+        selfShowsTurntable: false,
+        cosmeticsHero: hero,
+        cosmetics: [hero, emote],
+        storeCatalog: [
+          { id: 'h-item', heroId: 'some-hero-id' },
+          { id: 'e-item', heroId: 'some-hero-id' },
+        ],
+      })
+      expect(result.equippedEmoteName).toBe(emoteName)
+    }
+  )
+
+  it('Comet\'s "Jumping Jack" (no registry entry yet) falls back to idle gracefully, not a crash', () => {
+    const hero = cosmeticHero({ id: 'comet-item', name: 'Comet', heroId: null })
+    const emote = emoteCosmetic({
+      id: 'jj-item',
+      name: 'Jumping Jack',
+      heroId: null,
+    })
+    const result = resolveAthleteProfileHero({
+      isSelf: false,
+      selfHeroName: null,
+      selfEmoteName: null,
+      selfShowsTurntable: false,
+      cosmeticsHero: hero,
+      cosmetics: [hero, emote],
+      storeCatalog: [
+        { id: 'comet-item', heroId: 'comet-hero-id' },
+        { id: 'jj-item', heroId: 'comet-hero-id' },
+      ],
+    })
+    expect(result.equippedEmoteName).toBeNull()
   })
 })

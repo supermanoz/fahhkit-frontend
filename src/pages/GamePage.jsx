@@ -21,7 +21,6 @@ import {
   IconFlagScope,
   IconHelmet,
   IconLogout,
-  IconMap,
   IconMenuOrb,
   IconMusicNote,
   IconPause,
@@ -170,6 +169,9 @@ import { formatCoins } from '../utils/format'
 import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
+import GameLoadingBackdrop from '../components/GameLoadingBackdrop'
+import MailBadgeIcon from '../components/MailBadgeIcon'
+import MapStylePicker from '../components/MapStylePicker'
 import LeaderboardPodium, {
   LeaderboardSkeleton,
 } from '../components/LeaderboardPodium'
@@ -256,15 +258,15 @@ const RADIAL_ITEMS = [
 ]
 
 // What the red Play button opens into: the original start-a-run ("Conquer"
-// territory) or a PvP race - a choice between modes, shown in place of the
-// main layout.
+// territory), a PvP race, or Training - a choice between modes, shown in
+// place of the main layout.
 const PLAY_OPTIONS = [
   {
     tab: 'conquer',
     label: 'Conquer',
     Icon: IconFlag,
     tone: 'green',
-    x: -80,
+    x: -120,
     y: -170,
   },
   {
@@ -272,7 +274,15 @@ const PLAY_OPTIONS = [
     label: 'PvP',
     Icon: IconSwords,
     tone: 'red',
-    x: 80,
+    x: 0,
+    y: -170,
+  },
+  {
+    tab: 'training',
+    label: 'Training',
+    Icon: IconRunning,
+    tone: 'gold',
+    x: 120,
     y: -170,
   },
 ]
@@ -350,12 +360,13 @@ function describeRunRejection(outcome) {
   )
 }
 
-// Shop sub-sections (tab row under the wallet).
+// Shop sub-sections (tab row under the wallet). Map style used to live
+// here too - it's a Settings row now (see MapStylePicker), not tied to
+// the Shop's owned/equip model at all (it's free and local-only).
 const SHOP_SECTIONS = [
   { id: 'heroes', label: 'Heroes', Icon: IconHelmet },
   { id: 'territory', label: 'Territory', Icon: IconFlag },
   { id: 'trail', label: 'Trail', Icon: IconRunning },
-  { id: 'map', label: 'Map', Icon: IconMap },
 ]
 
 const PVP_ALERT_COPY = {
@@ -383,6 +394,7 @@ const IDLE_NUDGE_SNOOZE_MS = 3 * 60 * 1000
 const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
 const ROUTES_PAGE_SIZE = 5
+const MY_RUNS_PAGE_SIZE = 5
 // Minimum time the loading screen stays up, even on a fast load.
 const LOADING_MIN_MS = 4500
 
@@ -459,6 +471,27 @@ function ExitConfirmOverlay({ backButton }) {
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+/* eslint-enable react/prop-types */
+
+/* eslint-disable react/prop-types -- no prop-types dependency in this project */
+// Mail's own tab icon is the real mail_icon.png/.webp badge asset (see
+// MailBadgeIcon), shown plain - no .game-menu-picker-medal circle/border
+// behind it (it's already got its own round frame), unlike every other
+// tab here. Used for all three places that render a tab's icon (desktop
+// row, header "current" trigger, dropdown list) so none of them need
+// their own mail special-case.
+function TabMedal({ tab, medalClassName = '' }) {
+  if (tab.tone === 'mail') {
+    return <tab.Icon />
+  }
+  return (
+    <span
+      className={`game-menu-picker-medal ${medalClassName} tone-${tab.tone}`}
+    >
+      <tab.Icon />
+    </span>
   )
 }
 /* eslint-enable react/prop-types */
@@ -555,6 +588,16 @@ function GamePageInner() {
     }))
   }, [myParcels, user?.id])
   const [myRuns, setMyRuns] = useState([])
+  const [myRunsPage, setMyRunsPage] = useState(1)
+  const [myRunsTotalPages, setMyRunsTotalPages] = useState(1)
+  const [myRunsLoading, setMyRunsLoading] = useState(false)
+  const [myRunsError, setMyRunsError] = useState(null)
+  // Session-only page cache (page number -> { runs, totalPages }) so
+  // Prev/Next and reopening the tab on a page already seen this session
+  // don't re-fetch, and so a prefetched next page is just sitting there
+  // ready. Cleared whenever the list could have shifted (a new run saved).
+  const myRunsCacheRef = useRef(new Map())
+  const myRunsListRef = useRef(null)
   const [viewingRun, setViewingRun] = useState(null)
   const [loadingRunId, setLoadingRunId] = useState(null)
   const [nearbyParcels, setNearbyParcels] = useState([])
@@ -698,6 +741,15 @@ function GamePageInner() {
   // boolean: the message itself names which threshold tripped.
   const [territoryRunWarning, setTerritoryRunWarning] = useState(null)
   const [viewingProfile, setViewingProfile] = useState(null)
+  // A profile popup can open straight from the Leaderboard tab (which never
+  // itself needs storeCatalog) before the Shop/Club/Me tabs have lazily
+  // loaded it - same pattern as switchTab's own lazy loads below, so
+  // resolveAthleteProfileHero's heroId backfill (athleteProfileHero.js) has
+  // something to look up instead of falling back to its last-resort,
+  // no-heroId-filter match.
+  useEffect(() => {
+    if (viewingProfile && storeCatalog.length === 0) loadStore()
+  }, [viewingProfile, storeCatalog])
   // Hardware Back button (native app only) - closes whichever of these is
   // open, topmost first; with nothing open it asks before exiting, and
   // never exits (or does anything at all) mid-run. See
@@ -777,11 +829,9 @@ function GamePageInner() {
   // toggling the Settings row re-renders; gameSound.js's playSfx is what
   // actually checks the flag on every play.
   const [sfxMuted, setSfxMutedState] = useState(() => isSfxMuted())
-  // The game starts itself (globe dive, then music) the instant gameReady
-  // flips true - no "tap anywhere to begin" gesture to wait on. Browsers
-  // can refuse audio.play() with sound without a real user gesture, so the
-  // music start below is best-effort (caught, not guaranteed) rather than
-  // gated behind a tap the way it used to be.
+  // The game starts itself (globe dive, then music - see the music effect
+  // further down) the instant gameReady flips true - no "tap anywhere to
+  // begin" gesture to wait on.
   const [introStarted, setIntroStarted] = useState(false)
 
   // Real-world sky for the map (replaces the old manual dark/light
@@ -798,12 +848,23 @@ function GamePageInner() {
   const lastMilestoneRef = useRef(0)
 
   // The bottom action sheet's height changes with its content (idle vs.
-  // tracking vs. draft-run-with-stats) and with the device's own safe-area
-  // inset - measuring it directly instead of guessing a fixed pixel offset
-  // is what lets the floating action row (avatar/menu/locate) sit exactly
-  // N px above it on every device, rather than needing hand-tuned
+  // tracking vs. draft-run-with-stats, collapsed vs. expanded, Running vs.
+  // Paused) and with the device's own safe-area inset - measuring it
+  // directly instead of guessing a fixed pixel offset is what lets the
+  // floating locate button sit exactly N px above it on every device and
+  // every run mode (Conquer, Club War, PvP, Training, route-guided all
+  // share this one sheet/run-card), rather than needing hand-tuned
   // breakpoint values that were consistently wrong on real phones.
-  const controlsRef = useRef(null)
+  // controlsEl is state, not a plain useRef, so the ResizeObserver effect
+  // below re-runs the moment the node actually appears - a plain ref
+  // wouldn't: this component can first mount on the signed-out gate (see
+  // the early `!isAuthed` return further down), which never renders
+  // .game-controls at all, so a `useEffect(..., [])` reading a plain ref
+  // would see a null .current forever and never attach an observer, which
+  // is what let the locate button drift onto the run card in the first
+  // place - it was stuck at the 90px fallback below instead of the run
+  // card's real height.
+  const [controlsEl, setControlsEl] = useState(null)
   const [controlsHeight, setControlsHeight] = useState(90)
   // Collapsed by default while tracking - just distance/pace/time, with the
   // handle arrow revealing End/Cancel underneath. Reset to collapsed every
@@ -877,14 +938,19 @@ function GamePageInner() {
   }, [startCountdown])
 
   useEffect(() => {
-    const el = controlsRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
+    if (!controlsEl) return
+    // Sync immediately on attach rather than waiting for the first resize
+    // - the node can already be at its real (non-90px-fallback) height the
+    // moment this runs, and ResizeObserver only reports *changes* from
+    // here on.
+    setControlsHeight(controlsEl.offsetHeight)
+    if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(() => {
-      setControlsHeight(el.offsetHeight)
+      setControlsHeight(controlsEl.offsetHeight)
     })
-    observer.observe(el)
+    observer.observe(controlsEl)
     return () => observer.disconnect()
-  }, [])
+  }, [controlsEl])
 
   useEffect(() => {
     if (!isAuthed) {
@@ -1278,17 +1344,14 @@ function GamePageInner() {
   // render below.
   const [introPlaying, setIntroPlaying] = useState(true)
 
-  // Starts the dive (and tries to start the music on the same beat) the
-  // moment loading finishes, instead of waiting for a "tap anywhere" - see
-  // the overlay's render below.
+  // Starts the dive the moment loading finishes, instead of waiting for a
+  // "tap anywhere" - see the overlay's render below. Music itself starts
+  // from its own effect further down (keyed on gameReady, not this), so
+  // there's exactly one place trying to play it.
   useEffect(() => {
     if (!gameReady || introStarted) return
     setIntroStarted(true)
-    // Respect a saved "Music off" choice from the very first frame - a
-    // player who muted last session shouldn't hear a beat of it before the
-    // mute-aware effect above gets a chance to pause it back.
-    if (!musicMuted) musicRef.current?.play().catch(() => {})
-  }, [gameReady, introStarted, musicMuted])
+  }, [gameReady, introStarted])
 
   useEffect(() => {
     if (!gameReady || introPlaying || weatherHypeShownRef.current) return
@@ -1622,13 +1685,23 @@ function GamePageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locating, isAuthed])
 
-  // Background music, looped for as long as the game is open. Browsers block
-  // audio.play() before any user gesture on the page, so the first attempt
-  // here (on mount) commonly rejects silently — a one-time listener on the
-  // document retries it the moment the player taps/clicks anything at all,
-  // which is the earliest a real gesture could exist.
+  // Background music, looped for as long as the game is open - starts the
+  // instant loading finishes (gameReady), not on first user input, and
+  // never while the loading screen is still up (that's what gameReady,
+  // not isAuthed, gates on - isAuthed alone can be true well before the
+  // map/sky finish loading). The native app shells don't need any of the
+  // fallback below - Android's WebView has media-gesture blocking turned
+  // off in MainActivity.onCreate, and Capacitor's iOS bridge already ships
+  // with mediaTypesRequiringUserActionForPlayback = [] by default (checked
+  // node_modules/@capacitor/ios/.../CAPBridgeViewController.swift directly
+  // - nothing to configure there for this Capacitor version) - so the
+  // first play() below just succeeds in both. A plain browser tab (or a
+  // WebView that still blocks it) rejects that first call with
+  // NotAllowedError instead; the retry listeners below are what catch it
+  // the moment a real gesture exists, with no popup/prompt of any kind -
+  // the track just starts whenever the browser lets it.
   useEffect(() => {
-    if (!isAuthed) return
+    if (!gameReady) return
     const audio = musicRef.current
     if (!audio) return
     audio.volume = 0.35
@@ -1642,14 +1715,59 @@ function GamePageInner() {
       return undefined
     }
 
-    function tryPlay() {
-      audio.play().catch(() => {})
-    }
-    tryPlay()
+    let retrying = false
 
-    document.addEventListener('pointerdown', tryPlay, { once: true })
-    return () => document.removeEventListener('pointerdown', tryPlay)
-  }, [isAuthed, musicMuted])
+    function tryPlay() {
+      audio
+        .play()
+        .then(() => {
+          if (retrying) removeRetryListeners()
+        })
+        .catch(() => {
+          if (!retrying) {
+            retrying = true
+            addRetryListeners()
+          }
+        })
+    }
+
+    // once: true so each only ever fires once - tryPlay removes the other
+    // two itself on success, same as it would on its own. Calling play()
+    // again here is harmless even if it's already playing (a no-op
+    // resolved promise), so there's no "did this already fire" state to
+    // track beyond that.
+    function addRetryListeners() {
+      document.addEventListener('pointerdown', tryPlay, { once: true })
+      document.addEventListener('touchstart', tryPlay, { once: true })
+      document.addEventListener('keydown', tryPlay, { once: true })
+    }
+    function removeRetryListeners() {
+      document.removeEventListener('pointerdown', tryPlay)
+      document.removeEventListener('touchstart', tryPlay)
+      document.removeEventListener('keydown', tryPlay)
+    }
+
+    // Backgrounding the tab/app pauses it outright (not just silenced) -
+    // coming back tries again the same way the initial mount did, which
+    // just works without a fresh gesture once the very first play() this
+    // session has already succeeded (same browser-side "unlocked" state
+    // a click would grant, it doesn't reset on backgrounding).
+    function handleVisibility() {
+      if (document.hidden) {
+        audio.pause()
+      } else {
+        tryPlay()
+      }
+    }
+
+    tryPlay()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      removeRetryListeners()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [gameReady, musicMuted])
 
   function toggleMusicMuted() {
     setMusicMuted((prev) => {
@@ -1915,23 +2033,89 @@ function GamePageInner() {
     }
   }
 
-  // Territory runs are just runs with no eventId (see attemptSubmit below) —
-  // getRuns() returns every run type, so this filters down to the ones this
-  // game itself created rather than ones logged against an ENDURANCE event
-  // elsewhere in the app (see TrackRunPanel.jsx).
-  async function loadMyRuns() {
-    try {
-      // 30 comfortably covers filtering down to the 5 most recent territory runs even when
-      // several of the newest raw records are event-linked runs from elsewhere in the app.
-      const page = await getRuns(1, 30)
-      const territoryRuns = (page?.content || [])
-        .filter((r) => r.eventId == null)
-        .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
-        .slice(0, 5)
-      setMyRuns(territoryRuns)
-    } catch {
-      // Leave whatever's already loaded in place - same as refreshProfile.
+  // History list, 5 per page, straight off the backend's own pagination
+  // (POST /v1/run/find - already supports pageNumber/noOfRecords and
+  // returns totalPages, confirmed by reading RunController/DataPagination
+  // server-side rather than guessing) - sorted newest-first server-side
+  // too (RunServiceImpl orders by startedAt descending by default), so no
+  // client-side sort is needed any more.
+  //
+  // Territory runs are just runs with no eventId (see attemptSubmit below)
+  // - getRuns() returns every run type, so this still filters per page
+  // rather than trusting every row back is one this game itself created,
+  // not one logged against an ENDURANCE event elsewhere in the app (see
+  // TrackRunPanel.jsx). In practice that path isn't athlete-facing yet
+  // (still admin/moderator-only - see SESSION_NOTES.md), so every real
+  // player's pages come back untouched by this; it's just a safety net,
+  // not the normal case. The backend has no way to filter eventId=null
+  // itself (its generic search DTO has no IS-NULL operator), so a mixed
+  // page in the rare case it ever matters can come back with fewer than 5
+  // rows rather than silently wrong pagination math.
+  //
+  // silent: true fetches straight into the cache without touching visible
+  // state - used for prefetching the next page in the background.
+  const loadMyRunsPage = useCallback(async (pageNumber, { silent } = {}) => {
+    const cached = myRunsCacheRef.current.get(pageNumber)
+    if (cached) {
+      if (!silent) {
+        setMyRuns(cached.runs)
+        setMyRunsPage(pageNumber)
+        setMyRunsTotalPages(cached.totalPages)
+        setMyRunsError(null)
+      }
+      return cached
     }
+    if (!silent) {
+      setMyRunsLoading(true)
+      setMyRunsError(null)
+    }
+    try {
+      const page = await getRuns(pageNumber, MY_RUNS_PAGE_SIZE)
+      const entry = {
+        runs: (page?.content || []).filter((r) => r.eventId == null),
+        totalPages: Math.max(1, page?.totalPages || 1),
+      }
+      myRunsCacheRef.current.set(pageNumber, entry)
+      if (!silent) {
+        setMyRuns(entry.runs)
+        setMyRunsPage(pageNumber)
+        setMyRunsTotalPages(entry.totalPages)
+      }
+      return entry
+    } catch (err) {
+      if (!silent) {
+        setMyRunsError(
+          err instanceof ApiError ? err.message : 'Could not load your runs.'
+        )
+      }
+      return null
+    } finally {
+      if (!silent) setMyRunsLoading(false)
+    }
+  }, [])
+
+  // User-facing page change (Prev/Next/jump, or the tab reopening on page
+  // 1) - scrolls the list into view and prefetches the page after this one
+  // so a forward Next tap almost never has to wait.
+  async function goToMyRunsPage(pageNumber) {
+    const result = await loadMyRunsPage(pageNumber)
+    myRunsListRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+    if (result && pageNumber < result.totalPages) {
+      loadMyRunsPage(pageNumber + 1, { silent: true })
+    }
+  }
+
+  // A new run shifts every page's contents by one - the whole cache is
+  // stale, not just page 1.
+  function resetMyRunsPagination() {
+    myRunsCacheRef.current.clear()
+    setMyRuns([])
+    setMyRunsPage(1)
+    setMyRunsTotalPages(1)
+    setMyRunsError(null)
   }
 
   // Fetches the one field the runs list doesn't carry - points - so the
@@ -1956,7 +2140,7 @@ function GamePageInner() {
       setMyRoutesPage(pageNumber)
       setMyRoutesTotalPages(Math.max(1, page?.totalPages || 1))
     } catch {
-      // Leave whatever's already loaded in place - same as loadMyRuns.
+      // Leave whatever's already loaded in place.
     } finally {
       setMyRoutesLoaded(true)
     }
@@ -2143,7 +2327,9 @@ function GamePageInner() {
     if (tab === 'club' && storeCatalog.length === 0) loadStore()
     // Me tab's Medals grid needs the MEDAL catalog + owned items too.
     if (tab === 'me' && storeCatalog.length === 0) loadStore()
-    if (tab === 'me' && myRuns.length === 0) loadMyRuns()
+    // Always back to page 1 on reopening the tab - cheap when it's
+    // already cached (no fetch, no flash), a real fetch otherwise.
+    if (tab === 'me') goToMyRunsPage(1)
     if (tab === 'me' && !myRoutesLoaded) loadMyRoutes()
     if (tab === 'mail') mailbox.refresh()
     if (tab === 'race') pvp.refreshChallenges()
@@ -2443,14 +2629,14 @@ function GamePageInner() {
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
-        message: `Only ${formatMeters(pendingRun.distance)} covered — runs need at least ${MIN_VALID_RUN_DISTANCE_METERS}m to count. Say fk it and go again.`,
+        message: `Only ${formatMeters(pendingRun.distance)} covered — runs need at least ${MIN_VALID_RUN_DISTANCE_METERS}m to count. Shake it off and go again.`,
       })
       return
     }
     if (pendingRun.duration < MIN_VALID_RUN_DURATION_SECONDS) {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
-        message: `Only ${formatDuration(pendingRun.duration)} on the clock — runs need at least ${MIN_VALID_RUN_DURATION_SECONDS}s to count. Say fk it and go again.`,
+        message: `Only ${formatDuration(pendingRun.duration)} on the clock — runs need at least ${MIN_VALID_RUN_DURATION_SECONDS}s to count. Shake it off and go again.`,
       })
       return
     }
@@ -2473,6 +2659,10 @@ function GamePageInner() {
         clubWarId: pendingRun.clubWarId || undefined,
       })
       reminders.notifyRunSaved()
+      // The History list's every page shifts by one with a new run saved -
+      // next time the Me tab is open, it re-fetches from page 1 instead of
+      // showing the now-stale cache.
+      resetMyRunsPagination()
       if (pendingRun.challengeId) pvp.refreshChallenges()
       const isRace = Boolean(pendingRun.challengeId)
       const isWar = Boolean(pendingRun.clubWarId)
@@ -2763,8 +2953,12 @@ function GamePageInner() {
     {
       id: 'mail',
       label: 'Mail',
-      Icon: IconEnvelope,
-      tone: 'stone',
+      Icon: MailBadgeIcon,
+      // 'mail' tone now just marks "render bare, no medal circle" for
+      // TabMedal below - the real mail_icon.png/.webp badge asset already
+      // has its own circle built in, so there's nothing left for a badge to
+      // add.
+      tone: 'mail',
       badge:
         mailbox.unreadCount > 0
           ? mailbox.unreadCount > 9
@@ -2778,6 +2972,10 @@ function GamePageInner() {
     { id: 'settings', label: 'Settings', Icon: IconSettings, tone: 'stone' },
   ]
   const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
+  // Training is reached from the Play menu now, not this switcher - it
+  // stays in menuTabs (above) so activeMenuTab still resolves its
+  // icon/label/tone while its panel is open, it just isn't offered here.
+  const switcherTabs = menuTabs.filter((tab) => tab.id !== 'training')
   // Collapsed picker shows one dot summing what's waiting on other tabs.
   const otherTabsBadgeCount =
     (menuTab === 'race' ? 0 : pvp.actionCount) +
@@ -2869,10 +3067,17 @@ function GamePageInner() {
   // force it to re-evaluate despite being memo()'d itself.
   const equippedEmoteItem = useMemo(
     () =>
+      // ignoreHidden: true - this drives the Me tab's own hero display and
+      // (via selfEmoteName below) AthleteTerritoryProfilePanel's isSelf
+      // branch, both ALREADY-equipped displays, not a pick list - a hidden
+      // emote (see emotes.js's HIDDEN_EMOTES) that's genuinely equipped
+      // should still show here, same as it should for another player's
+      // profile.
       resolveEquippedEmoteItem(
         ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
         activeHeroId,
-        activeHeroName
+        activeHeroName,
+        { ignoreHidden: true }
       ),
     [ownedItems, activeHeroId, activeHeroName]
   )
@@ -2945,6 +3150,7 @@ function GamePageInner() {
         <Suspense
           fallback={
             <div className="game-loading-overlay">
+              <GameLoadingBackdrop />
               <img
                 src={runConquestLogo}
                 alt="Run Conquest"
@@ -3027,6 +3233,27 @@ function GamePageInner() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.7, ease: 'easeInOut' }}
           >
+            {/* Hero artwork is only for the progress-bar phase - the globe
+                phase (GameIntroGlobe below) reveals the loading overlay's
+                own plain background instead (see .game-loading-overlay in
+                GamePage.css), never the artwork. This exit fade is what
+                makes that swap a 300ms crossfade instead of a hard cut -
+                AnimatePresence unmounts the backdrop only once its exit
+                animation finishes, so there's no frame where the globe
+                phase starts with the artwork still (even briefly)
+                showing behind it. */}
+            <AnimatePresence>
+              {!(gameReady && introStarted && introPlaying) && (
+                <motion.div
+                  key="game-loading-backdrop"
+                  className="game-loading-backdrop-wrap"
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                >
+                  <GameLoadingBackdrop />
+                </motion.div>
+              )}
+            </AnimatePresence>
             {gameReady && introStarted && introPlaying ? (
               <GameIntroGlobe
                 center={center}
@@ -3034,28 +3261,21 @@ function GamePageInner() {
                 onDone={() => setIntroPlaying(false)}
               />
             ) : (
-              <>
-                <img
-                  src={runConquestLogo}
-                  alt="Run Conquest"
-                  className="game-loading-logo"
-                />
-                <div className="game-loading-footer">
-                  <p className="game-loading-text">
-                    {locating
-                      ? 'Finding your location…'
-                      : !skyLoaded
-                        ? 'Checking the sky…'
-                        : 'Preparing your run…'}
-                  </p>
-                  <div className="game-loading-bar">
-                    <div
-                      className="game-loading-bar-fill"
-                      style={{ width: `${loadPct}%` }}
-                    />
-                  </div>
+              <div className="game-loading-footer">
+                <p className="game-loading-text">
+                  {locating
+                    ? 'Finding your location…'
+                    : !skyLoaded
+                      ? 'Checking the sky…'
+                      : 'Preparing your run…'}
+                </p>
+                <div className="game-loading-bar">
+                  <div
+                    className="game-loading-bar-fill"
+                    style={{ width: `${loadPct}%` }}
+                  />
                 </div>
-              </>
+              </div>
             )}
           </motion.div>
         )}
@@ -3446,7 +3666,7 @@ function GamePageInner() {
             ? ''
             : ' game-controls-empty'
         }`}
-        ref={controlsRef}
+        ref={setControlsEl}
       >
         {tracker.status === 'tracking' && (
           <>
@@ -4200,20 +4420,15 @@ function GamePageInner() {
                 picker showing the current tab, which drops down the rest -
                 six tabs in a row/grid was too cramped on a narrow screen. */}
             <div className="game-menu-tabs">
-              {menuTabs.map((tab) => (
+              {switcherTabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}`}
                   onClick={() => switchTab(tab.id)}
-                  aria-label={tab.iconOnly ? tab.label : undefined}
                 >
-                  <span
-                    className={`game-menu-picker-medal game-menu-tab-medal tone-${tab.tone}`}
-                  >
-                    <tab.Icon />
-                  </span>
-                  {!tab.iconOnly && tab.label}
+                  <TabMedal tab={tab} medalClassName="game-menu-tab-medal" />
+                  {tab.label}
                   {tab.badge && (
                     <span className="game-menu-tab-badge">{tab.badge}</span>
                   )}
@@ -4234,22 +4449,10 @@ function GamePageInner() {
                 onClick={() => setTabPickerOpen((open) => !open)}
                 aria-haspopup="listbox"
                 aria-expanded={tabPickerOpen}
-                aria-label={
-                  activeMenuTab.id === 'mail' ? activeMenuTab.label : undefined
-                }
               >
-                <span
-                  className={`game-menu-picker-medal tone-${activeMenuTab.tone}`}
-                >
-                  <activeMenuTab.Icon />
-                </span>
-                {/* Mail's own Inbox/News tabs serve as the title once this
-                    opens, so the text here would just repeat "Mail" right
-                    above them - left empty for that one tab only (the span
-                    stays, as the flex-1 spacer that keeps the badge/knob
-                    pinned right), everything else still shows its name. */}
+                <TabMedal tab={activeMenuTab} />
                 <span className="game-menu-picker-label">
-                  {activeMenuTab.id !== 'mail' && activeMenuTab.label}
+                  {activeMenuTab.label}
                 </span>
                 {!tabPickerOpen && otherTabsBadgeCount > 0 && (
                   <span className="game-menu-tab-badge game-menu-picker-badge">
@@ -4272,7 +4475,7 @@ function GamePageInner() {
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                     transition={{ type: 'spring', stiffness: 460, damping: 26 }}
                   >
-                    {menuTabs.map((tab, i) => (
+                    {switcherTabs.map((tab, i) => (
                       <motion.li
                         key={tab.id}
                         initial={{ opacity: 0, x: -18 }}
@@ -4288,23 +4491,16 @@ function GamePageInner() {
                           type="button"
                           role="option"
                           aria-selected={menuTab === tab.id}
-                          aria-label={tab.iconOnly ? tab.label : undefined}
                           className={`game-menu-picker-option ${menuTab === tab.id ? 'active' : ''}`}
                           onClick={() => {
                             switchTab(tab.id)
                             setTabPickerOpen(false)
                           }}
                         >
-                          <span
-                            className={`game-menu-picker-medal tone-${tab.tone}`}
-                          >
-                            <tab.Icon />
+                          <TabMedal tab={tab} />
+                          <span className="game-menu-picker-label">
+                            {tab.label}
                           </span>
-                          {!tab.iconOnly && (
-                            <span className="game-menu-picker-label">
-                              {tab.label}
-                            </span>
-                          )}
                           {tab.badge && (
                             <span className="game-menu-tab-badge game-menu-picker-badge">
                               {tab.badge}
@@ -4895,35 +5091,91 @@ function GamePageInner() {
                     )}
                   </section>
 
-                  <section className="game-me-section">
+                  <section className="game-me-section" ref={myRunsListRef}>
                     <p className="game-menu-section-title">History</p>
-                    {myRuns.length === 0 ? (
+                    {myRunsError ? (
+                      <div className="game-me-history-error">
+                        <p className="game-controls-hint game-controls-hint-error">
+                          {myRunsError}
+                        </p>
+                        <button
+                          type="button"
+                          className="game-btn game-btn-wood game-btn-sm"
+                          onClick={() => loadMyRunsPage(myRunsPage)}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : myRunsLoading && myRuns.length === 0 ? (
+                      <ul className="game-me-history-list" aria-hidden="true">
+                        {Array.from({ length: MY_RUNS_PAGE_SIZE }).map(
+                          (_, i) => (
+                            <li
+                              key={i}
+                              className="game-me-history-row game-me-history-skeleton"
+                            />
+                          )
+                        )}
+                      </ul>
+                    ) : myRuns.length === 0 ? (
                       <p className="game-menu-empty">
                         Finish a GPS run to see its map here.
                       </p>
                     ) : (
-                      <ul className="game-menu-list">
-                        {myRuns.map((r) => (
-                          <li key={r.id}>
+                      <>
+                        <ul
+                          className="game-me-history-list"
+                          aria-busy={myRunsLoading}
+                        >
+                          {myRuns.map((r) => (
+                            <li key={r.id}>
+                              <button
+                                type="button"
+                                className="game-me-history-row"
+                                onClick={() => handleViewRun(r.id)}
+                                disabled={loadingRunId === r.id}
+                              >
+                                <span className="game-me-history-area">
+                                  {formatDistance(r.distance)} ·{' '}
+                                  {formatDuration(r.duration)}
+                                </span>
+                                <span className="game-me-history-meta">
+                                  {loadingRunId === r.id
+                                    ? 'Loading…'
+                                    : formatRunDate(r.startedAt)}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        {myRunsTotalPages > 1 && (
+                          <div className="game-me-history-pager">
                             <button
                               type="button"
-                              className="game-menu-list-row"
-                              onClick={() => handleViewRun(r.id)}
-                              disabled={loadingRunId === r.id}
+                              className="game-me-history-pager-btn"
+                              aria-label="Previous page"
+                              disabled={myRunsPage <= 1 || myRunsLoading}
+                              onClick={() => goToMyRunsPage(myRunsPage - 1)}
                             >
-                              <span className="game-menu-list-area">
-                                {formatDistance(r.distance)} ·{' '}
-                                {formatDuration(r.duration)}
-                              </span>
-                              <span className="game-menu-list-meta">
-                                {loadingRunId === r.id
-                                  ? 'Loading…'
-                                  : formatRunDate(r.startedAt)}
-                              </span>
+                              Prev
                             </button>
-                          </li>
-                        ))}
-                      </ul>
+                            <span className="game-me-history-pager-label">
+                              Page {myRunsPage} of {myRunsTotalPages}
+                            </span>
+                            <button
+                              type="button"
+                              className="game-me-history-pager-btn"
+                              aria-label="Next page"
+                              disabled={
+                                myRunsPage >= myRunsTotalPages || myRunsLoading
+                              }
+                              onClick={() => goToMyRunsPage(myRunsPage + 1)}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </section>
                 </div>
@@ -4935,7 +5187,7 @@ function GamePageInner() {
                 {/* TEMP: free Avatar picker hidden - it duplicated the Heroes
                     (now in the Shop tab). Its images back the matching heroes
                     instead (see HeroFigure). Restore from git to bring it
-                    back. Map style now lives in the Shop. */}
+                    back. */}
                 <button
                   type="button"
                   role="switch"
@@ -5007,6 +5259,12 @@ function GamePageInner() {
                     <span className="game-switch-knob" />
                   </span>
                 </button>
+
+                <MapStylePicker
+                  styles={MAP_STYLES}
+                  selectedId={mapStyleId}
+                  onSelect={handleChooseMapStyle}
+                />
 
                 {/* Native app only (see useReminders/isNative) - the 3 daily
                     "let's run" local notifications. Renders nothing on the
@@ -5162,6 +5420,14 @@ function GamePageInner() {
                     </span>
                   </span>
                 </button>
+
+                {/* No dedicated About page exists in this app - this is
+                    the closest real equivalent to the "Settings/About
+                    page" the map tile credits need to show up on. */}
+                <p className="game-settings-credits">
+                  Map data © OpenStreetMap contributors, OpenMapTiles,
+                  OpenFreeMap
+                </p>
               </div>
             )}
 
@@ -5240,42 +5506,6 @@ function GamePageInner() {
                     emptyText="Fresh trail colours are on their way - check back soon!"
                   />
                 )}
-
-                {/* Map style moved here from Settings - free, local-only. */}
-                {shopSection === 'map' && (
-                  <section className="game-card game-card-dark">
-                    <p className="game-menu-avatars-title game-menu-avatars-title-centered">
-                      <IconMap /> Map
-                    </p>
-                    <div className="game-menu-avatar-grid">
-                      {MAP_STYLES.map((style) => {
-                        const isSelected = style.id === mapStyleId
-                        return (
-                          <button
-                            key={style.id}
-                            type="button"
-                            className={`game-menu-avatar-card ${isSelected ? 'is-selected' : ''}`}
-                            onClick={() => handleChooseMapStyle(style)}
-                            disabled={isSelected}
-                          >
-                            <span className="game-menu-avatar-name">
-                              {style.name}
-                            </span>
-                            <span className="game-menu-avatar-tag">
-                              {isSelected ? (
-                                <>
-                                  <IconCheck /> Selected
-                                </>
-                              ) : (
-                                'Free'
-                              )}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </section>
-                )}
               </div>
             )}
           </motion.div>
@@ -5312,6 +5542,7 @@ function GamePageInner() {
             selfHeroName={activeHeroName}
             selfEmoteName={equippedEmoteItem?.name ?? null}
             selfShowsTurntable={showHeroTurntable}
+            storeCatalog={storeCatalog}
           />
         )}
       </AnimatePresence>

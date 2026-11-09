@@ -54,6 +54,10 @@ export default function AthleteTerritoryProfilePanel({
   selfHeroName = null,
   selfEmoteName = null,
   selfShowsTurntable = true,
+  // GamePage's Shop catalog - see resolveAthleteProfileHero's own comment
+  // on why this profile fetch's equippedCosmetics alone can't reliably
+  // pair an equipped emote to the right hero.
+  storeCatalog = [],
 }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState(null)
@@ -134,6 +138,7 @@ export default function AthleteTerritoryProfilePanel({
       selfShowsTurntable,
       cosmeticsHero,
       cosmetics,
+      storeCatalog,
     })
   const parcelCount = profile?.parcelCount ?? 0
   const flagCount = Math.min(Math.ceil(parcelCount / PARCELS_PER_FLAG), 8)
@@ -311,8 +316,11 @@ export default function AthleteTerritoryProfilePanel({
 
             {actions.length > 0 && (
               <div className="athlete-profile-club-actions">
-                <p className="game-menu-section-title">Club actions</p>
-                <div className="athlete-profile-club-actions-row">
+                <div
+                  className="athlete-profile-club-actions-row"
+                  role="group"
+                  aria-label="Club actions"
+                >
                   {actions.map((action) => (
                     <button
                       key={action.id}

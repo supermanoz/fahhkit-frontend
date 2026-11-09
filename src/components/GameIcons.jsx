@@ -116,11 +116,19 @@ export function IconSwords(props) {
   )
 }
 
+// Solid stroke only, no TINT fill - a 30%-opacity body (like every other
+// icon's "hierarchical" fill here) read as nearly invisible wherever this
+// sits in a pale badge. The Mail header badge, the section-switcher's Mail
+// row and the News tab now use the real mail_icon.png/.webp asset instead
+// (see MAIL_ICON_SRC in GamePage.jsx/MailPanel.jsx) - this stays in use
+// for the radial FAB menu's Mail icon and the inbox list's per-item
+// envelope glyphs, neither asked to change here.
 export function IconEnvelope(props) {
   return (
     <GameIcon {...props}>
-      <rect x="3" y="5" width="18" height="14" rx="2.5" {...TINT} />
-      <path d="m3.5 7.5 8.5 6 8.5-6" />
+      <rect x="2.5" y="5" width="19" height="14" rx="3" />
+      <polyline points="4.5,7 12,13.5 19.5,18" />
+      <polyline points="19.5,7 12,13.5 4.5,18" />
     </GameIcon>
   )
 }
@@ -342,6 +350,15 @@ export function IconChevronRight(props) {
   return (
     <GameIcon {...props}>
       <path d="m9 6 6 6-6 6" />
+    </GameIcon>
+  )
+}
+
+export function IconClock(props) {
+  return (
+    <GameIcon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
     </GameIcon>
   )
 }

@@ -1,9 +1,15 @@
 .run-map {
+  position: relative;
   width: 100%;
   height: 260px;
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow-md);
+}
+
+.run-map-attribution-anchor {
+  left: 8px;
+  bottom: 8px;
 }
 
 @media (max-width: 560px) {

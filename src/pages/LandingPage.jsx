@@ -132,13 +132,13 @@ const TEAM = [
     name: 'Raj Karki',
     role: 'Co-Founder & Events Coordinator',
     photo: rajPhoto,
-    bio: 'Turns "say fk it" into an actual race day — venues, logistics, and snacks all sorted.',
+    bio: 'Turns "say let\'s go" into an actual race day — venues, logistics, and snacks all sorted.',
   },
   {
     name: 'Jojan Rai',
     role: 'Co-Founder & Developer',
     photo: jojanRaiPhoto,
-    bio: 'Builds the app that powers the "say fk it" moment — from the run tracker to the sign-up flow.',
+    bio: 'Builds the app that powers the "say let\'s go" moment — from the run tracker to the sign-up flow.',
   },
   {
     name: 'Aryan Shah',
@@ -220,8 +220,8 @@ export default function LandingPage() {
             />
             <p className="milestones-text">
               FahhKit started as a small Sunday run and grew into a full-blown
-              fitness community — one race, one workout, and one &quot;say fk
-              it&quot; moment at a time.
+              fitness community — one race, one workout, and one &quot;say
+              let&apos;s go&quot; moment at a time.
             </p>
             <div className="milestones-stats">
               {milestones.map((m) => (

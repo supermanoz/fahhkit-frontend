@@ -1,8 +1,4 @@
-import {
-  isHiddenEmote,
-  resolveEmoteAsset,
-  resolveEquippedEmoteItem,
-} from './emotes'
+import { resolveEmoteAsset, resolveEquippedEmoteItem } from './emotes'
 import { DEFAULT_HERO_NAME } from './hero'
 import { hasHero } from './heroManifest'
 
@@ -23,6 +19,10 @@ export function resolveAthleteProfileHero({
   selfShowsTurntable,
   cosmeticsHero,
   cosmetics,
+  // The Shop's own catalog (GamePage's storeCatalog) - see the heroId
+  // backfill below. Harmless to omit (falls back to the old no-heroId
+  // behaviour), but every real caller should pass it.
+  storeCatalog,
 }) {
   if (isSelf) {
     const heroName = selfHeroName || DEFAULT_HERO_NAME
@@ -52,40 +52,52 @@ export function resolveAthleteProfileHero({
   // through to a flat StoreItem.assetUrl image instead of the animated
   // hero-coloured stage every hero actually supports now.
   const showsTurntable = !cosmeticsHero || hasHero(heroName)
-  const equippedStoreItems = (cosmetics || []).map((c) => c.storeItem)
-  let equippedItem = cosmeticsHero
-    ? resolveEquippedEmoteItem(
-        equippedStoreItems,
-        cosmeticsHero.storeItem.heroId,
-        cosmeticsHero.storeItem.name
-      )
-    : null
   // BACKEND GAP (read-only here, see this repo's own rule - filed instead
   // of patched): GET /v1/territory/profile/{userId} never sets
   // StoreItemResponse.heroId (TerritoryServiceImpl#toUserStoreItemResponse
   // - checked directly; the Store module's own equivalent mapper,
   // StoreServiceImpl, does set it correctly, so this is that one mapper's
-  // gap, not a missing column). resolveEquippedEmoteItem hard-requires a
-  // heroId match and returns null without one, which otherwise means NO
-  // other player's profile ever shows an equipped emote, regardless of
-  // whether one's actually equipped. Until that's fixed server-side, fall
-  // back to "the one equipped EMOTE cosmetic, whichever hero it's for" -
-  // safe in the common case (a player has exactly one hero equipped), only
-  // wrong if the backend left a stale equipped=true EMOTE row from a
-  // hero they've since switched away from without the equip flow clearing
-  // it - a real but narrow edge case, and still strictly better than the
-  // current "never shows anything" behaviour.
-  if (
-    !equippedItem &&
-    cosmeticsHero &&
-    cosmeticsHero.storeItem.heroId == null
-  ) {
+  // gap, not a missing column). Worked around here instead: storeCatalog
+  // (GamePage's own Shop catalog, fetched through that correctly-mapped
+  // endpoint) is a global product list - a StoreItem's id maps to the same
+  // heroId for every player - so a cosmetic missing its own heroId gets it
+  // backfilled by looking its id up in storeCatalog.
+  const catalogHeroId = new Map(
+    (storeCatalog || []).map((item) => [item?.id, item?.heroId ?? null])
+  )
+  const effectiveHeroId = (item) =>
+    item?.heroId ?? catalogHeroId.get(item?.id) ?? null
+
+  const heroId = effectiveHeroId(cosmeticsHero?.storeItem)
+  const equippedStoreItems = (cosmetics || []).map((c) => ({
+    ...c.storeItem,
+    heroId: effectiveHeroId(c.storeItem),
+  }))
+  // ignoreHidden: true - this profile is showing an ALREADY-equipped pick,
+  // not a pick list, so a hidden-but-real emote (Comet's emote2/emote4,
+  // see emotes.js) must still render for the viewer, same as it does on
+  // the player's own Me tab now.
+  let equippedItem = cosmeticsHero
+    ? resolveEquippedEmoteItem(
+        equippedStoreItems,
+        heroId,
+        cosmeticsHero.storeItem.name,
+        {
+          ignoreHidden: true,
+        }
+      )
+    : null
+  // Last-resort only: the catalog backfill above ALSO couldn't recover a
+  // heroId (e.g. a delisted/limited item no longer in storeCatalog, or no
+  // storeCatalog passed in at all) - fall back to "the one equipped EMOTE
+  // cosmetic, whichever hero it's for". Safe in the common case (a player
+  // has exactly one hero's emote equipped), only wrong if they also have a
+  // stale equipped=true EMOTE row for a hero they've since switched away
+  // from - a real but narrow edge case, and still strictly better than
+  // showing nothing.
+  if (!equippedItem && cosmeticsHero && heroId == null) {
     equippedItem =
-      equippedStoreItems.find(
-        (item) =>
-          item?.category === 'EMOTE' &&
-          !isHiddenEmote(cosmeticsHero.storeItem.name, item?.name)
-      ) || null
+      equippedStoreItems.find((item) => item?.category === 'EMOTE') || null
   }
   // Same asset-validation gap as the isSelf branch above.
   const resolvedAsset = equippedItem
@@ -103,17 +115,20 @@ export function resolveAthleteProfileHero({
   if (import.meta.env.DEV) {
     console.debug('[athleteProfileHero] other-player resolve', {
       heroName,
-      heroId: cosmeticsHero?.storeItem.heroId ?? null,
-      cosmetics: equippedStoreItems.map((item) => ({
-        name: item?.name,
-        category: item?.category,
-        heroId: item?.heroId,
+      rawHeroId: cosmeticsHero?.storeItem.heroId ?? null,
+      effectiveHeroId: heroId,
+      cosmetics: (cosmetics || []).map((c) => ({
+        name: c.storeItem?.name,
+        category: c.storeItem?.category,
+        rawHeroId: c.storeItem?.heroId ?? null,
+        catalogHeroId: catalogHeroId.get(c.storeItem?.id) ?? null,
       })),
       equippedItemAfterHeroIdMatch: cosmeticsHero
         ? (resolveEquippedEmoteItem(
             equippedStoreItems,
-            cosmeticsHero.storeItem.heroId,
-            cosmeticsHero.storeItem.name
+            heroId,
+            cosmeticsHero.storeItem.name,
+            { ignoreHidden: true }
           )?.name ?? null)
         : null,
       equippedItemFinal: equippedItem?.name ?? null,

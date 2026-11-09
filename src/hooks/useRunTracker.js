@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   MAX_ACCEPTABLE_ACCURACY_METERS,
+  MIN_DISTANCE_FOR_PACE_METERS,
   clearActiveRun,
   loadActiveRun,
   saveActiveRun,
   computeRunDurationSeconds,
+  calculatePaceMinPerKm,
 } from '../utils/run'
 import { VEHICLE_RUN_INVALID_RATIO } from '../constants/antiCheat'
 import {
@@ -17,6 +19,30 @@ import {
 import { isAccessibilityModeEnabled } from '../utils/antiCheatSettings'
 import { useWakeLock } from './useWakeLock'
 import { watchPosition, clearWatch } from '../utils/geo'
+import {
+  startRunNotification,
+  updateRunNotification,
+  pauseRunNotification,
+  stopRunNotification,
+} from '../utils/runNotification'
+
+// Bare "m:ss" (no " /km" suffix - the notification's own label already says
+// "Avg. pace (/km)"), gated exactly like GamePage.jsx's own run card
+// (movingSeconds < 30 || distance < MIN_DISTANCE_FOR_PACE_METERS -> "--") so
+// the notification's pace never shows something the in-game panel wouldn't.
+// movingSeconds, not elapsedSeconds, on purpose - see that panel's own
+// comment on why (pause-aware, doesn't count paused time as covered ground).
+function notificationPaceLabel(distanceMeters, movingSeconds) {
+  if (movingSeconds < 30 || distanceMeters < MIN_DISTANCE_FOR_PACE_METERS) {
+    return null
+  }
+  const minutesPerKm = calculatePaceMinPerKm(distanceMeters, movingSeconds)
+  if (!minutesPerKm || !Number.isFinite(minutesPerKm)) return null
+  const totalSeconds = Math.round(minutesPerKm * 60)
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 
 // Below this, a brief tab switch or notification check isn't worth warning about.
 const BACKGROUND_GAP_THRESHOLD_MS = 10000
@@ -126,6 +152,14 @@ export function useRunTracker() {
   // clearTimers() already ran before the id came back, so it's cleared
   // immediately on arrival instead of left dangling.
   const watchCancelledRef = useRef(false)
+  // Set right before calling beginWatch() from start()/resume()/the mount-
+  // reattach effect, consumed once watchPosition's promise resolves (see
+  // beginWatch) - the Android notification (RunNotificationPlugin) can only
+  // safely take over the BackgroundGeolocation plugin's own notification
+  // after that plugin's addWatcher has actually run, so it can't be kicked
+  // off any earlier than this regardless of which of the three call sites
+  // triggered it. null between runs/when nothing needs it.
+  const pendingNotifyRef = useRef(null)
   const statusRef = useRef(status)
   statusRef.current = status
   const wakeLock = useWakeLock()
@@ -386,6 +420,17 @@ export function useRunTracker() {
             }
           }
           applyVehicleState(result.state, result.reason)
+          updateRunNotification({
+            distanceMeters: distanceRef.current,
+            paceLabel: notificationPaceLabel(
+              distanceRef.current,
+              computeRunDurationSeconds(
+                startedAtRef.current.getTime(),
+                point.timestamp,
+                pausedMsRef.current
+              )
+            ),
+          })
         }
 
         saveActiveRun({
@@ -414,6 +459,10 @@ export function useRunTracker() {
         return
       }
       watchIdRef.current = id
+      if (pendingNotifyRef.current) {
+        startRunNotification(pendingNotifyRef.current)
+        pendingNotifyRef.current = null
+      }
     })
   }, [clearTimers, wakeLock, armMotionSensing, applyVehicleState])
 
@@ -521,6 +570,19 @@ export function useRunTracker() {
       setBackgroundGapSeconds(Math.round(goneMs / 1000))
     }
 
+    const reattachMovingSeconds = computeRunDurationSeconds(
+      startedAtRef.current.getTime(),
+      Date.now(),
+      pausedMsRef.current
+    )
+    pendingNotifyRef.current = {
+      elapsedMs: reattachMovingSeconds * 1000,
+      distanceMeters: distanceRef.current,
+      paceLabel: notificationPaceLabel(
+        distanceRef.current,
+        reattachMovingSeconds
+      ),
+    }
     beginWatch()
     // Runs once on mount only — beginWatch is stable across the run's lifetime via its own deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -579,6 +641,11 @@ export function useRunTracker() {
         points: [],
         distance: 0,
       })
+      pendingNotifyRef.current = {
+        elapsedMs: 0,
+        distanceMeters: 0,
+        paceLabel: null,
+      }
       beginWatch()
     },
     [beginWatch, applyVehicleState]
@@ -589,6 +656,8 @@ export function useRunTracker() {
     wakeLock.release()
     setStatus('idle')
     setBackgroundGapSeconds(null)
+    pendingNotifyRef.current = null
+    stopRunNotification()
 
     const endedAt = new Date()
     const startedAt = startedAtRef.current ?? endedAt
@@ -705,6 +774,7 @@ export function useRunTracker() {
       pausedAt: new Date(pausedAtRef.current).toISOString(),
       pausedMs: pausedMsRef.current,
     })
+    pauseRunNotification()
   }, [clearTimers])
 
   const resume = useCallback(() => {
@@ -721,6 +791,19 @@ export function useRunTracker() {
       hasMotionSensing: motionAvailableRef.current,
       accessibilityMode: isAccessibilityModeEnabled(),
     })
+    const resumeMovingSeconds = computeRunDurationSeconds(
+      startedAtRef.current.getTime(),
+      Date.now(),
+      pausedMsRef.current
+    )
+    pendingNotifyRef.current = {
+      elapsedMs: resumeMovingSeconds * 1000,
+      distanceMeters: distanceRef.current,
+      paceLabel: notificationPaceLabel(
+        distanceRef.current,
+        resumeMovingSeconds
+      ),
+    }
     beginWatch()
   }, [beginWatch])
 

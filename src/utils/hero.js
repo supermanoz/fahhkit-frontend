@@ -61,7 +61,12 @@ export function resolveHeroAssetOrDefault(
   ownedItems
 ) {
   const picked = resolveHeroAsset(storeItemId, storeCatalog, ownedItems)
-  if (picked.assetUrl && picked.name && !isPlaceholderHero(picked.name)) {
+  // Name alone is enough to trust the pick - most heroes' StoreItem rows
+  // have no assetUrl (see V1_39/V1_45 seeds), so gating on assetUrl here
+  // used to reject every real pick except Comet's and silently show Comet
+  // for everyone. assetUrl is only ever used for art, never to decide
+  // whether the name is real.
+  if (picked.name && !isPlaceholderHero(picked.name)) {
     return picked
   }
   const defaultItem =

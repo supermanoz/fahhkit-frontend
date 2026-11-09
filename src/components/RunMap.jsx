@@ -9,6 +9,7 @@ import {
 } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import MapAttribution from './MapAttribution'
 import './RunMap.css'
 
 // Plain CSS dots instead of leaflet's default marker images, which 404 under
@@ -48,7 +49,12 @@ export default function RunMap({ points }) {
 
   return (
     <div className="run-map">
-      <MapContainer center={positions[0]} zoom={15} scrollWheelZoom={false}>
+      <MapContainer
+        center={positions[0]}
+        zoom={15}
+        scrollWheelZoom={false}
+        attributionControl={false}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -61,6 +67,23 @@ export default function RunMap({ points }) {
         <Marker position={positions[positions.length - 1]} icon={endIcon} />
         <FitBounds positions={positions} />
       </MapContainer>
+      {/* Leaflet's own attribution control is disabled above (its "Leaflet"
+          prefix is this library's own credit, not a tile-provider
+          requirement - dropped the same way L.control.attribution({
+          prefix: false }) would) - this renders the TileLayer's actual
+          required credit instead, collapsed behind a small "i" rather
+          than a permanent text strip. */}
+      <MapAttribution className="run-map-attribution-anchor">
+        &copy;{' '}
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+        >
+          OpenStreetMap
+        </a>{' '}
+        contributors
+      </MapAttribution>
     </div>
   )
 }

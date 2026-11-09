@@ -87,14 +87,14 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     if (run.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
-        message: `Only ${formatDistance(run.distance)} covered — runs need at least ${MIN_VALID_RUN_DISTANCE_METERS}m to count. Say fk it and go again.`,
+        message: `Only ${formatDistance(run.distance)} covered — runs need at least ${MIN_VALID_RUN_DISTANCE_METERS}m to count. Shake it off and go again.`,
       })
       return
     }
     if (run.duration < MIN_VALID_RUN_DURATION_SECONDS) {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
-        message: `Only ${formatDuration(run.duration)} on the clock — runs need at least ${MIN_VALID_RUN_DURATION_SECONDS}s to count. Say fk it and go again.`,
+        message: `Only ${formatDuration(run.duration)} on the clock — runs need at least ${MIN_VALID_RUN_DURATION_SECONDS}s to count. Shake it off and go again.`,
       })
       return
     }

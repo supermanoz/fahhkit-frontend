@@ -22,8 +22,9 @@
    flat — no tilt flourish while scrolling/pinching through the rest of the
    range. This is the ONLY camera transform the map ever applies - it never
    rotates to follow heading (a past rotating "chase camera" run view was
-   removed; the player's character now rotates on its own instead - see
-   .territory-map-blaze-body's --hero-heading below). */
+   removed; the player's character mirrors left/right to face travel
+   direction instead, never rotating either - see
+   .territory-map-blaze-body's --hero-flip below). */
 .territory-map-tilt {
   position: absolute;
   inset: 0;
@@ -73,30 +74,17 @@
 }
 
 /* Leaflet's own attribution control is disabled (see TerritoryMap.jsx's
-   attributionControl={false}) since it lives inside the layer that rotates
-   while chasing - this is a plain static replacement outside that subtree
-   instead, so it never rotates. Same corner/sizing Leaflet's own default
-   control would use. */
-.territory-map-attribution {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  z-index: 400;
-  padding: 0 5px;
-  background: rgba(255, 255, 255, 0.75);
-  color: var(--game-text);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.territory-map-attribution a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.territory-map-attribution a:hover,
-.territory-map-attribution a:focus {
-  text-decoration: underline;
+   attributionControl={false}) since it lives inside the layer that
+   rotates while chasing - MapAttribution renders outside that subtree
+   instead, so it never rotates. Bottom-left (not the old bottom-right,
+   where it sat right under the locate button and overlapped the run
+   panel) - sheet-h-aware the same way the locate button's own bottom
+   offset is (see GamePage.css), so it stays clear of the panel at any
+   height/device, and left-of-everything so it's never near the locate
+   button on the right either. */
+.territory-map-attribution-anchor {
+  left: 10px;
+  bottom: calc(var(--sheet-h, 90px) + 10px);
 }
 
 /* The sky/vignette layers below render into this pane now (see
@@ -463,23 +451,31 @@
   height: 96px;
 }
 
-/* Rotates to face the direction of travel - set imperatively, straight onto
-   this marker's DOM element as a CSS custom property, by
-   useSmoothMarkerHeading in TerritoryMap.jsx (GPS-course-only, never the
-   device compass - see playerHeading in GamePage.jsx). That hook already
-   eases every step itself via requestAnimationFrame (see ROTATION_EASE_MS
-   there), so no CSS transition here - stacking a second easing curve on
-   top of an already-eased per-frame value would just add lag, not
-   smoothness. On this inner wrapper, not the icon itself - Leaflet
-   positions the icon element with its own transform, so rotating that
-   would swing the marker around the map pane instead of around his feet. */
+/* Mirrors left/right to face the direction of travel - never rotated (the
+   sprite is a back-view drawing, only ever correct face-on or mirrored,
+   not at an arbitrary compass angle - see buildAnimatedMarkerIcon's own
+   comment on why a rotated version of this used to look like the
+   character lying sideways). Set imperatively, straight onto this
+   marker's DOM element as a CSS custom property, by useSpriteFacing in
+   TerritoryMap.jsx (GPS-course-only, never the device compass - see
+   playerHeading in GamePage.jsx). That hook already eases every step
+   itself via requestAnimationFrame (see FLIP_EASE_MS there), so no CSS
+   transition here - stacking a second easing curve on top of an already-
+   eased per-frame value would just add lag, not smoothness. On this
+   inner wrapper, not the icon itself - Leaflet positions the icon
+   element with its own transform, so scaling that would resize/distort
+   the marker's own position handling instead of just mirroring his
+   sprite around his feet. */
 .territory-map-blaze-body {
   position: absolute;
   inset: 0;
-  rotate: var(--hero-heading, 0deg);
+  scale: var(--hero-flip, 1) 1;
   /* Same feet point buildAnimatedMarkerIcon anchors the icon at
      (BLAZE_ICON_ANCHOR_X/Y, scaled from 24/58) - scales via --s, set
-     inline on this element, which every descendant below reads too. */
+     inline on this element, which every descendant below reads too. This
+     is also the mirror axis: an X-anchor at his feet's own X keeps the
+     flip pivoting around him instead of sliding the whole sprite
+     sideways. */
   transform-origin: calc(24px * var(--s, 1)) calc(58px * var(--s, 1));
 }
 

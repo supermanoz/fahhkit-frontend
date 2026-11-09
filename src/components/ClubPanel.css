@@ -551,8 +551,9 @@
   justify-content: center;
 }
 
+/* Display only - the centred card IS the selection now (see
+   ClubWarHeroPicker.jsx), there's nothing left to tap here. */
 .club-war-hero-card {
-  all: unset;
   box-sizing: border-box;
   position: relative;
   width: 100%;
@@ -566,27 +567,12 @@
   border: 3px solid var(--game-panel-border);
   background: var(--white);
   box-shadow: 0 3px 0 var(--game-panel-border-dark);
-  cursor: pointer;
+  cursor: default;
   text-align: center;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.club-war-hero-card.is-selected {
-  border-color: var(--game-green);
-  box-shadow:
-    0 0 0 3px var(--game-green-light),
-    0 3px 0 var(--game-ink);
 }
 
 .club-war-hero-card.is-locked {
-  cursor: default;
   opacity: 0.55;
-}
-
-.club-war-hero-card:disabled {
-  cursor: default;
 }
 
 .club-war-hero-card-stage {
@@ -641,18 +627,23 @@
   padding: 1px 1px 2px;
 }
 
+/* Only ever the "Locked In" badge now (the roster's actual pick, not
+   whichever hero happens to be centred - see isLockedIn in
+   ClubWarHeroPicker.jsx) - Select/Selected are gone with the old
+   tap-to-select step. */
 .club-war-hero-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 12px;
   border-radius: 999px;
-  background: var(--row);
-  color: var(--text-muted);
   font-size: 12px;
   font-weight: 800;
 }
 
-.club-war-hero-card.is-selected .club-war-hero-card-cta {
-  background: var(--game-green);
-  color: #fff;
+.club-war-hero-card-cta svg {
+  width: 12px;
+  height: 12px;
 }
 
 .club-war-hero-card-cta.is-locked-in {
@@ -660,8 +651,104 @@
   color: var(--game-text);
 }
 
+/* The one action left in this picker - locks in whichever hero is
+   centred (see ClubWarHeroPicker.jsx's currentItem), full width, 52px,
+   sticky so a tall roster list above it can never push it below the
+   fold on a phone. Default/actionable state is the game's usual green
+   primary recipe; the other states (not owned, already locked in, busy)
+   each get their own flat fill below instead of the green gradient. */
 .club-war-hero-lock-in-btn {
+  position: sticky;
+  bottom: 8px;
+  z-index: 1;
   width: 100%;
+  min-height: 52px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 3px solid var(--game-ink);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow:
+    1px 0 0 var(--game-ink),
+    -1px 0 0 var(--game-ink),
+    0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink),
+    0 2px 0 var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-green-light) 0%,
+    var(--game-green) 45%,
+    var(--game-green-dark) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--game-green-dark),
+    0 3px 0 var(--game-ink);
+  transition: transform 0.08s ease;
+}
+
+.club-war-hero-lock-in-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.club-war-hero-lock-in-btn:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.club-war-hero-lock-in-btn:disabled {
+  cursor: default;
+}
+
+/* Not owned - grey, matches the card's own locked/dimmed look. */
+.club-war-hero-lock-in-btn.is-unowned {
+  background: var(--game-stone);
+  box-shadow:
+    inset 0 -4px 0 var(--game-stone-dark),
+    0 3px 0 var(--game-ink);
+}
+
+/* This war's actual locked-in pick, currently centred - a muted "done"
+   fill (not the active green) with a green check, so it reads as clearly
+   different from the actionable button rather than just a relabelled
+   copy of it. */
+.club-war-hero-lock-in-btn.is-locked-in {
+  background: var(--game-stone-light);
+  color: var(--text-title);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  box-shadow:
+    inset 0 -4px 0 var(--game-stone-dark),
+    0 3px 0 var(--game-ink);
+}
+
+.club-war-hero-lock-in-btn.is-locked-in svg {
+  color: var(--game-green);
+}
+
+.club-war-hero-lock-in-btn.is-busy {
+  opacity: 0.85;
+}
+
+.club-war-hero-lock-in-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  animation: club-war-hero-lock-in-spin 0.7s linear infinite;
+}
+
+@keyframes club-war-hero-lock-in-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* --- Head-to-head squad columns (ClubWarPanel.jsx) --- */
@@ -730,6 +817,49 @@
   margin-top: 8px;
 }
 
+/* Bottom-of-page link into War History (ClubWarPanel.jsx's historyButton)
+   - full width, secondary (white/dark-border, not a filled game-btn) so it
+   reads as a quieter, always-there utility rather than competing with
+   each state's own primary action. The surrounding .game-menu-sheet
+   already carries safe-area bottom padding (see GamePage.css), so this
+   only needs its own top clearance from whatever content came before it. */
+.club-war-history-btn {
+  width: 100%;
+  margin-top: 24px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 2px solid var(--game-ink);
+  background: var(--white);
+  cursor: pointer;
+}
+
+.club-war-history-btn-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--text-body-dark);
+}
+
+.club-war-history-btn-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-title-dark);
+}
+
+.club-war-history-btn-chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted-dark);
+}
+
 /* Narrower rows - no room for a second text line under the name (see
    squadList's own comment on when the hero-name line even renders), and
    the rank number drops to save a little more width. */
@@ -792,6 +922,76 @@
   height: 11px;
 }
 
+/* War-banner header placeholders (.club-war-vs/-side/-vs-badge/-sub, see
+   the real "war in progress" header further down this file) - sized to
+   match their real counterparts exactly (56px crest, 44px VS badge) so
+   the swap to real data never shifts the header's height. */
+.club-war-skeleton-crest {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.club-war-skeleton-side-name {
+  width: 64px;
+  height: 13px;
+}
+
+.club-war-skeleton-side-meta {
+  width: 44px;
+  height: 11px;
+}
+
+.club-war-skeleton-vs-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.club-war-skeleton-sub {
+  width: 190px;
+  height: 12px;
+  margin: 10px auto 0;
+}
+
+/* Roster column-head trophies line + each row's right-hand score/status
+   pill (.club-war-run-badge + .club-war-points in the real row) - new,
+   the old skeleton had nothing standing in for either. */
+.club-war-skeleton-trophies {
+  width: 40px;
+  height: 10px;
+  margin-top: 4px;
+}
+
+.club-war-skeleton-row-pill {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 26px;
+  height: 18px;
+  border-radius: 999px;
+}
+
+/* The small VS badge between the two roster columns (.club-war-matchup-vs
+   in the real grid) - same grid position (3rd child, "auto" column) so
+   this lands exactly where that one does. */
+.club-war-skeleton-matchup-vs {
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+/* Stands in for the bottom War History/Lock In Hero button - same
+   height/radius/margin as the real .club-war-history-btn so there's no
+   layout jump when the real button replaces it. */
+.club-war-skeleton-history-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 24px;
+  border-radius: 12px;
+}
+
 .club-war-points {
   flex-shrink: 0;
   font-weight: 900;
@@ -840,8 +1040,22 @@
   height: 16px;
 }
 
+/* width:100% + box-sizing so every row fills the list regardless of the
+   badge/title length that drove its old shrink-to-fit width (buttons don't
+   reliably stretch with flex alone); min-height + nowrap keep every row
+   the same height instead of growing only for a 2-line title. */
+.club-war-history-list,
+.club-war-history-list > li {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .club-war-history-row {
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
   gap: 12px;
+  min-height: 64px;
 }
 
 /* Two small badges (our club, then opponent) standing in for the single
@@ -859,9 +1073,42 @@
   filter: drop-shadow(-2px 0 0 var(--game-ink));
 }
 
+/* Flat, readable text on this row's light background - the global
+   white-fill/black-stroke game text treatment (tokens.css) is sized for
+   large text on dark art and reads as garbled at 13-14px here; same reset
+   the live roster's .club-war-row and the war-detail participant rows use
+   (further down this file). Also drops the shared single-line ellipsis
+   for a 2-line clamp so long matchups wrap instead of cutting off early. */
+.club-war-history-row .game-row-name {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  color: #2b2a24;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.club-war-history-row .game-row-meta {
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  color: #5a574b;
+  font-size: 13px;
+}
+
+/* Fixed-width column so DRAW/VICTORY/DEFEAT line up across every row
+   instead of each badge sizing to its own label. */
 .club-war-history-result {
-  flex-shrink: 0;
-  padding: 4px 10px;
+  flex: 0 0 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px 6px;
   border-radius: 999px;
   border: 2px solid var(--game-ink);
   background: var(--game-stone-dark);
@@ -876,31 +1123,164 @@
   color: #fff;
 }
 
-/* Slate, not red - Club War keeps red for close/danger buttons only. */
 .club-war-history-result.is-lost {
-  background: var(--slate-accent);
+  background: var(--game-red);
   color: #fff;
+}
+
+/* --- War History detail (ClubWarHistory.jsx) - a managed, game-style
+   layout: every row is the full width of its club card at a fixed height,
+   never sized to its own content (that was the actual bug - .game-row's
+   shared flex-wrap let a <button> with no explicit width shrink to fit,
+   scattering avatar/name/status across wrapped lines on anything narrower
+   than the longest row). Deliberately its own classes, not the shared
+   .game-row/.game-row-info/.game-row-name used elsewhere in Club War (the
+   live roster, the war list) - those stay exactly as they are. --- */
+.club-war-history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tidy-up for the shared .club-war-banner/.club-war-vs/.club-war-sub
+   markup (same classes the live war room's result banner uses) - scoped
+   to history only so the live room is untouched. The global stroke+shadow
+   every /game text element gets by default (tokens.css's :where() rule)
+   was never reset here, which is what made the club names and the small
+   date/duration line look heavy. */
+.club-war-history-detail .club-war-side .game-row-name,
+.club-war-history-detail .club-war-sub {
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.club-war-history-detail .club-war-side .game-row-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1f1e1a;
+}
+
+.club-war-history-detail .club-war-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5a574b;
+}
+
+/* Two clubs side by side on anything roomy enough, stacked on phones. */
+.club-war-history-squads {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .club-war-history-squads {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .club-war-history-squad {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.club-war-history-squad-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--divider);
+}
+
+.club-war-history-squad-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1f1e1a;
+}
+
+.club-war-history-squad-score {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 900;
+  color: #1f1e1a;
+}
+
+.club-war-history-squad-summary {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5a574b;
 }
 
 .club-war-history-participants {
   list-style: none;
-  margin: 0;
+  margin: 10px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
+/* The row itself - full width, fixed height, nothing sized to its own
+   content. box-sizing: border-box so the border doesn't push it past
+   100%; the "subtle 3px bottom edge" is a drop shadow, not a thicker
+   border, same bevel recipe as every other game-style card/button here. */
 .club-war-history-participant {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
   gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--border-soft);
+  background: var(--white);
+  box-shadow: 0 3px 0 var(--border-soft);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
 }
 
-/* Same 40px/light-fill/2px-border recipe as the live roster's
-   .club-war-avatar. */
+.club-war-history-participant:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--border-soft);
+}
+
+.club-war-history-participant.is-me {
+  background: var(--gold-tint);
+  border-color: var(--game-gold);
+  box-shadow: 0 3px 0 var(--game-gold-dark);
+}
+
+.club-war-history-participant.is-me:active {
+  box-shadow: 0 1px 0 var(--game-gold-dark);
+}
+
+.club-war-history-rank {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a574b;
+}
+
+/* Same 44px/light-fill/2px-border recipe as the live roster's
+   .club-war-avatar, just bigger - this is the row's hero-slot icon. */
 .club-war-history-avatar {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   overflow: hidden;
   display: flex;
@@ -918,8 +1298,48 @@
   object-position: top center;
 }
 
-/* Members who didn't run sink to the bottom of the sorted list and read
-   as inactive, not just "last" - per the brief. */
+.club-war-history-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.club-war-history-name {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f1e1a;
+}
+
+.club-war-history-hero {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a574b;
+}
+
+.club-war-you-tag {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1.5px solid var(--game-gold-dark);
+  background: var(--game-gold);
+  color: var(--game-ink);
+  font-size: 9.5px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+/* Members who didn't run read as inactive, not just last in the sorted
+   list - per the brief. */
 .club-war-history-participant.is-no-run {
   opacity: 0.5;
 }
@@ -928,23 +1348,44 @@
   filter: grayscale(1);
 }
 
+/* Fixed-width result column so every row's score/status lines up
+   regardless of how long a name or hero label runs. */
+.club-war-history-result {
+  flex: 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.club-war-history-score {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1f1e1a;
+}
+
+.club-war-history-result-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a574b;
+}
+
 /* Top contributor on a squad - a small gold chip next to their name, not
    a separate column, so it reads at a glance without pushing the row's
    layout around. */
 .club-war-mvp-badge {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   margin-left: 6px;
-  padding: 1px 7px 1px 4px;
-  border-radius: 999px;
+  border-radius: 50%;
   border: 1.5px solid var(--game-ink);
   background: linear-gradient(180deg, var(--game-gold-light), var(--game-gold));
   color: var(--game-text);
-  font-size: 9.5px;
-  font-weight: 900;
-  text-transform: uppercase;
-  vertical-align: middle;
 }
 
 .club-war-mvp-badge svg {
@@ -981,6 +1422,13 @@
 .club-war-run-badge.is-pending {
   background: var(--divider);
   color: var(--text-muted);
+}
+
+/* War History's own "✕ red if they missed" - scoped to this screen only,
+   the live roster above keeps its deliberate slate (see that rule's own
+   comment on why red stays reserved for close/danger buttons there). */
+.club-war-history-result .club-war-run-badge.is-missed {
+  background: var(--game-red);
 }
 
 .club-war-picker-head {
@@ -1039,20 +1487,20 @@
 }
 
 /* Plain solid text for the member name + hero label next to the avatar -
-   the base .game-row-name/.game-row-meta pick up a heavy stroke/shadow
-   from other call sites; neither reads cleanly against this row's light
-   fill, so both are overridden flat here. Font sizes are left to the base
-   rules (already 14px/13px, including the matchup preview's own 13px
-   name override) - only color and the stroke/shadow are reset. */
-.club-war-row .game-row-name,
-.club-war-history-participant .game-row-name {
+   the base .game-row-name picks up a heavy stroke/shadow from other call
+   sites, which doesn't read cleanly against this row's light fill,  so
+   it's overridden flat here. Font size is left to the base rule (already
+   14px, including the matchup preview's own 13px name override) - only
+   color and the stroke/shadow are reset. War History's own participant
+   rows have their own dedicated classes now (.club-war-history-name/
+   -hero, see further up this file), not these. */
+.club-war-row .game-row-name {
   color: #1f1e1a;
   text-shadow: none;
   -webkit-text-stroke-width: 0;
 }
 
-.club-war-row-hero,
-.club-war-history-participant .game-row-meta {
+.club-war-row-hero {
   color: #5a574b;
   text-shadow: none;
   -webkit-text-stroke-width: 0;
@@ -1107,6 +1555,18 @@
   background: var(--slate-accent);
 }
 
+/* This player hasn't locked a hero yet - dimmed helmet outline standing in
+   for the usual flat hero icon, so an empty pick reads as "pending", not
+   as a resolved (Comet) one. */
+.club-war-avatar.is-unlocked {
+  opacity: 0.5;
+}
+
+.club-war-row-hero.is-unlocked {
+  font-style: italic;
+  opacity: 0.75;
+}
+
 /* The "Lock In Your Hero" picker's animated card (Blaze) - a taller stage
    above the name instead of the flat 48x48 circular portrait. */
 .club-war-hero-figure {
@@ -1119,6 +1579,70 @@
 /* My Club / Club Wars switch at the top of the Club tab. */
 .club-section-tabs {
   margin-bottom: 0;
+}
+
+/* --- Shared Routes (ClubPanel.jsx) --- */
+/* Same shrink-to-fit bug as the old club-war-history-row: a <button> row
+   doesn't stretch from its own display:flex alone. width:100% + box-sizing
+   make every row fill the card regardless of route-name length. */
+.club-shared-route-list,
+.club-shared-route-list > li {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.club-shared-route-row {
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 2px solid var(--border-soft);
+}
+
+.club-shared-route-row:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Flat, readable text on this row's light background - the global
+   white-fill/black-stroke game text treatment (tokens.css) is sized for
+   large text on dark art and reads as garbled at 14-15px here. Also drops
+   the shared single-line ellipsis for a 2-line clamp so long route names
+   wrap instead of cutting off early. */
+.club-shared-route-row .game-row-name {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  color: #2b2a24;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* Fixed-width column so every distance lines up regardless of its own or
+   the route name's length. */
+.club-shared-route-distance {
+  flex: 0 0 72px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  color: #1f1e1a;
+}
+
+.club-shared-route-chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
 }
 
 /* Hint that tapping a member row opens their profile with club actions. */

@@ -1,0 +1,71 @@
+.map-style-picker {
+  width: 100%;
+}
+
+.map-style-picker-chevron {
+  transition: transform 0.18s ease;
+}
+
+.map-style-picker-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.map-style-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 10px;
+  overflow: hidden;
+}
+
+.map-style-picker-option {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px 6px 56px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-title);
+}
+
+.map-style-picker-option.is-selected {
+  cursor: default;
+}
+
+.map-style-picker-swatch {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 2px solid var(--game-ink);
+}
+
+.map-style-picker-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-title);
+}
+
+.map-style-picker-state {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted-dark);
+}
+
+.map-style-picker-option.is-selected .map-style-picker-state {
+  color: var(--green-text);
+}
+
+.map-style-picker-state svg {
+  width: 16px;
+  height: 16px;
+}

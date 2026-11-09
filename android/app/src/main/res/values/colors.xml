@@ -5,4 +5,18 @@
     <color name="colorPrimary">#DD571C</color>
     <color name="colorPrimaryDark">#B4420F</color>
     <color name="colorAccent">#DD571C</color>
+
+    <!-- Persistent run-tracking notification (RunNotificationPlugin) - the orange
+         header gradient matches the spec's exact hex values, distinct from the
+         app-wide colorPrimary token above. No existing "paused" purple token
+         exists elsewhere in the app, so these two are new. -->
+    <color name="runNotifHeaderStart">#F97316</color>
+    <color name="runNotifHeaderEnd">#C2410C</color>
+    <color name="runNotifHeaderPausedStart">#8B5CF6</color>
+    <color name="runNotifHeaderPausedEnd">#6D28D9</color>
+    <color name="runNotifBody">#FFFBF7</color>
+    <color name="runNotifValue">#2B2A24</color>
+    <!-- Matches the text-muted-dark token in src/game/styles/tokens.css. -->
+    <color name="runNotifLabel">#6B6759</color>
 </resources>
+

@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
+import MapAttribution from './MapAttribution'
+import { nextSpriteFacing } from '../utils/spriteFacing'
 import {
   MapContainer,
   Polygon,
@@ -198,7 +200,7 @@ function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
 // ring's inset, the sprite's transform-origin/ground offset, the sheet's
 // background-size/position) reads it back via the `--s` custom property set
 // inline on each marker's own html below - the same pattern already used
-// for --hero-heading - so CSS can never drift out of sync with this value.
+// for --hero-flip - so CSS can never drift out of sync with this value.
 const PLAYER_MARKER_SCALE = 1.5
 
 // A pulsing GPS "radar" dot instead of a plain pin — the single most
@@ -237,27 +239,32 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
 // instead of the round avatar photo: idle when standing still, and a
 // single back-view run cycle while moving. There is only ever ONE sheet
 // per pose (no separate up/down/left/right sheets to switch between) - the
-// sprite always shows the character from behind/top-down, and faces the
-// right way by ROTATING via CSS (see .territory-map-blaze-body's
-// --hero-heading, driven imperatively by useSmoothMarkerHeading below),
-// the same way a real top-down game character would, instead of snapping
-// between four fixed-angle drawings. Each sheet is a horizontal strip
-// stepped through by CSS (see .territory-map-blaze) - idle is a slower
-// 48-frame stretch (shoulder, then arm), running is a finer 15-frame cycle
-// at 24fps (see the [data-frames] overrides in TerritoryMap.css), so frame
-// count travels with the sheet (see each hero's manifest.json, read via
-// heroManifest.js's getHero) instead of being hard-coded in one class -
-// that CSS keys purely off frame count, not which hero, so every hero's
-// sheet reuses it unchanged. See scripts/build_<hero>_stretch_strips.py.
-// Any hero with no manifest falls back to the flat avatar photo instead of
-// Blaze's sprite (see animatedMarkerHero in GamePage.jsx, which only ever
-// passes 'blaze'/'comet'/'bolt' here - any other hero never reaches
+// sprite always shows the character from behind, never rotated to face a
+// compass angle (that used to swing the body through arbitrary angles via
+// CSS rotate, which is exactly what made it look like it was "lying
+// sideways" on anything but a roughly N/S heading - a back-view drawing
+// only ever looks right face-on or mirrored, not rotated). Instead it's
+// just mirrored left/right via CSS `scale` (see .territory-map-blaze-
+// body's --hero-flip, driven imperatively by useSpriteFacing below) for
+// the east/west component of travel - the character stays upright no
+// matter which way he's actually facing on screen. Each sheet is a
+// horizontal strip stepped through by CSS (see .territory-map-blaze) -
+// idle is a slower 48-frame stretch (shoulder, then arm), running is a
+// finer 15-frame cycle at 24fps (see the [data-frames] overrides in
+// TerritoryMap.css), so frame count travels with the sheet (see each
+// hero's manifest.json, read via heroManifest.js's getHero) instead of
+// being hard-coded in one class - that CSS keys purely off frame count,
+// not which hero, so every hero's sheet reuses it unchanged. See
+// scripts/build_<hero>_stretch_strips.py. Any hero with no manifest falls
+// back to the flat avatar photo instead of Blaze's sprite (see
+// animatedMarkerHero in GamePage.jsx, which only ever passes
+// 'blaze'/'comet'/'bolt' here - any other hero never reaches
 // buildAnimatedMarkerIcon at all).
 
 // Anchored at his feet (not the icon's center) so he stands on the GPS
 // point; the sonar pulse sits flattened on the ground underneath him.
 // `moving` just picks idle vs. run - which way he's FACING is handled
-// separately, imperatively, by useSmoothMarkerHeading rotating
+// separately, imperatively, by useSpriteFacing mirroring
 // .territory-map-blaze-body, so this icon never needs rebuilding on a
 // heading change (only on an idle<->running swap).
 const BLAZE_ICON_WIDTH = 48 * PLAYER_MARKER_SCALE
@@ -763,70 +770,70 @@ function useSmoothMarkerPosition(markerRef, target) {
   )
 }
 
-// How long a heading change takes to visually settle on the character -
-// tweak here. Deliberately NOT tied to the position tween's own duration
-// above (which is matched to the GPS fix interval) - a heading flip should
-// always ease at the same, fairly quick pace regardless of how far apart
-// two fixes landed.
-const ROTATION_EASE_MS = 400
+// How long a facing flip takes to visually settle on the character - tweak
+// here. Deliberately NOT tied to the position tween's own duration above
+// (which is matched to the GPS fix interval) - a flip should always ease
+// at the same, fairly quick pace regardless of how far apart two fixes
+// landed.
+const FLIP_EASE_MS = 220
 
-// Shortest signed angle from `from` to `to`, in (-180, 180] - turning right
-// through 350deg->10deg is a +20 step, never a -340 one.
-function shortestAngleDelta(from, to) {
-  return ((to - from + 540) % 360) - 180
-}
-
-// Writes the character's facing direction straight to the marker's DOM
-// element as a CSS custom property (see .territory-map-blaze-body's
-// `rotate: var(--hero-heading, 0deg)`) - never through React state/props,
-// so a heading update never re-renders anything or touches the icon's
-// `html` (which would restart its run-cycle animation).
-function applyMarkerHeading(marker, deg) {
+// Writes the character's facing (1 = normal, -1 = mirrored) straight to
+// the marker's DOM element as a CSS custom property (see
+// .territory-map-blaze-body's `scale: var(--hero-flip, 1) 1`) - never
+// through React state/props, so a facing update never re-renders anything
+// or touches the icon's `html` (which would restart its run-cycle
+// animation).
+function applyMarkerFlip(marker, scaleX) {
   const el = marker.getElement?.()
-  if (el) el.style.setProperty('--hero-heading', `${deg}deg`)
+  if (el) el.style.setProperty('--hero-flip', scaleX)
 }
 
-// Eases the marker's on-screen facing direction toward `heading` (degrees,
-// 0-360, or null if no direction is known/applicable yet - see
-// animatedMarkerHero in GamePage.jsx) over ROTATION_EASE_MS, shortest path,
-// entirely via refs + requestAnimationFrame - heading changes arrive as a
-// plain number prop, so this effect only ever re-fires on a REAL change
-// (React skips re-running an effect whose dependency didn't change value),
-// and the tween itself never triggers a React re-render either. `heading`
-// is expected to already be GPS-course-only (see playerHeading in
-// GamePage.jsx) - this hook has no idea where it came from and doesn't
-// care, it just animates toward whatever number it's given.
-function useSmoothMarkerHeading(markerRef, heading, icon) {
-  const currentRef = useRef(null) // unwrapped running total, can exceed 0-360
-  const fromRef = useRef(0)
-  const toRef = useRef(0)
+// Decides (via nextSpriteFacing, see utils/spriteFacing.js for the actual
+// east/west/dead-zone/debounce logic - its own file, not inlined here, so
+// it's unit-testable without dragging in the whole Leaflet/MapLibre
+// stack) and eases the marker's on-screen
+// facing between -1 and 1 via requestAnimationFrame, entirely through
+// refs - heading changes arrive as a plain number prop, so this effect
+// only ever re-fires on a REAL change (React skips re-running an effect
+// whose dependency didn't change value), and the tween itself never
+// triggers a React re-render either.
+function useSpriteFacing(markerRef, heading, icon) {
+  const facingRef = useRef(1) // committed target: 1 or -1, never anything else
+  const currentRef = useRef(null) // eased on-screen value, can sit between -1 and 1 mid-tween
+  // -Infinity, not 0 - performance.now() is always positive, but an
+  // uptime that happens to be < MIN_FLIP_INTERVAL_MS (very early in the
+  // page's life) would otherwise make the genuinely-first flip decision
+  // look like it's still inside a debounce window from a flip that never
+  // actually happened.
+  const lastFlipAtRef = useRef(-Infinity)
+  const fromRef = useRef(1)
   const startRef = useRef(0)
   const rafRef = useRef(null)
 
   useEffect(() => {
     const marker = markerRef.current
     if (!marker) return
-    // null means no directional sprite, OR outside the run view (see
-    // markerHeading's isTracking gate) - eases back to upright (0) the
-    // same way it eases to any other heading, instead of bailing out and
-    // freezing the marker at whatever it was last facing mid-run. This
-    // was the other half of the "tilts on the HUD" bug: even after gating
-    // markerHeading to null outside a run, this hook previously did
-    // nothing at all when it received null, so the marker stayed rotated
-    // from the last run forever instead of straightening up.
-    const target = heading ?? 0
+
+    const { facing, lastFlipAt } = nextSpriteFacing(
+      facingRef.current,
+      heading,
+      performance.now(),
+      lastFlipAtRef.current
+    )
+    facingRef.current = facing
+    lastFlipAtRef.current = lastFlipAt
 
     if (currentRef.current == null) {
-      // First heading this marker instance has ever been given - snap,
+      // First facing this marker instance has ever been given - snap,
       // nothing to ease from yet.
-      currentRef.current = target
-      applyMarkerHeading(marker, target)
+      currentRef.current = facingRef.current
+      applyMarkerFlip(marker, facingRef.current)
       return
     }
 
+    if (currentRef.current === facingRef.current) return // nothing to tween
+
     fromRef.current = currentRef.current
-    toRef.current =
-      fromRef.current + shortestAngleDelta(fromRef.current, target)
     startRef.current = performance.now()
 
     if (rafRef.current != null) return // already mid-tween; refs above retarget it
@@ -839,11 +846,11 @@ function useSmoothMarkerHeading(markerRef, heading, icon) {
       }
       const t = Math.min(
         1,
-        (performance.now() - startRef.current) / ROTATION_EASE_MS
+        (performance.now() - startRef.current) / FLIP_EASE_MS
       )
-      const next = fromRef.current + (toRef.current - fromRef.current) * t
+      const next = fromRef.current + (facingRef.current - fromRef.current) * t
       currentRef.current = next
-      applyMarkerHeading(m, next)
+      applyMarkerFlip(m, next)
       rafRef.current = t < 1 ? requestAnimationFrame(tick) : null
     }
     rafRef.current = requestAnimationFrame(tick)
@@ -852,18 +859,18 @@ function useSmoothMarkerHeading(markerRef, heading, icon) {
   // An idle<->running swap gives this marker a brand new icon - Leaflet's
   // own setIcon() rebuilds the DOM element from scratch (same L.Marker
   // instance, see PlayerMarker's own comment, but a fresh element), which
-  // starts with no --hero-heading set on it at all. Without this, the
-  // character would visibly snap to facing north (CSS's
-  // var(--hero-heading, 0deg) fallback) for a moment after every
-  // idle<->running transition, not easing back to the real heading until
-  // the next genuine heading CHANGE happened to come in (the tween effect
-  // above only re-fires then, never on an icon-only swap). Re-stamps the
-  // already-known current angle straight onto the new element instead -
-  // no easing needed, it's the same value it already had.
+  // starts with no --hero-flip set on it at all. Without this, the
+  // character would visibly snap to CSS's var(--hero-flip, 1) fallback
+  // for a moment after every idle<->running transition, not catching up
+  // to the real facing until the next genuine heading CHANGE happened to
+  // come in (the tween effect above only re-fires then, never on an
+  // icon-only swap). Re-stamps the already-known current value straight
+  // onto the new element instead - no easing needed, it's the same value
+  // it already had.
   useEffect(() => {
     const marker = markerRef.current
     if (!marker || currentRef.current == null) return
-    applyMarkerHeading(marker, currentRef.current)
+    applyMarkerFlip(marker, currentRef.current)
   }, [markerRef, icon])
 
   useEffect(
@@ -992,7 +999,7 @@ function PlayerMarker({ playerLocation, icon, heading }) {
   const markerRef = useRef(null)
   const originRef = useRef(playerLocation)
   useSmoothMarkerPosition(markerRef, playerLocation)
-  useSmoothMarkerHeading(markerRef, heading, icon)
+  useSpriteFacing(markerRef, heading, icon)
   useWarnOnDuplicateCharacter()
   return (
     <Marker
@@ -1451,9 +1458,8 @@ export default function TerritoryMap({
   }
   // The icon (and its CSS run-cycle animation) only needs rebuilding on an
   // idle<->running swap - which way he's actually FACING is applied
-  // separately, imperatively, by useSmoothMarkerHeading inside
-  // PlayerMarker (see heading prop below), so a heading change never
-  // touches this at all.
+  // separately, imperatively, by useSpriteFacing inside PlayerMarker (see
+  // heading prop below), so a heading change never touches this at all.
   const playerMarkerIcon = useMemo(
     () =>
       animatedMarkerHero
@@ -1464,18 +1470,19 @@ export default function TerritoryMap({
           ),
     [animatedMarkerHero, playerMoving, avatarSrc]
   )
-  // Rotation only ever applies inside an actual tracked run - outside one
-  // (the home/HUD screen, where this same marker still renders at the
-  // player's live position) playerHeading keeps updating off passive GPS
-  // course the whole time the game is open, not just while running (see
-  // its own effect in GamePage.jsx), so without this isTracking gate the
-  // character would visibly tilt to match wherever the player happens to
-  // be physically walking/driving even when no run is in progress - this
-  // was the actual cause of the "tilts randomly on the HUD" bug, not a
-  // leftover compass listener (useDeviceHeading was already fully removed
-  // - see its own deletion). Also still null, same as before, for a hero
-  // with no real directional sprite - a flat round avatar photo has no
-  // "facing" to show (see useSmoothMarkerHeading's own null guard).
+  // The facing mirror only ever applies inside an actual tracked run -
+  // outside one (the home/HUD screen, where this same marker still
+  // renders at the player's live position) playerHeading keeps updating
+  // off passive GPS course the whole time the game is open, not just
+  // while running (see its own effect in GamePage.jsx), so without this
+  // isTracking gate the character would visibly flip to match wherever
+  // the player happens to be physically walking/driving even when no run
+  // is in progress - this was the actual cause of the "tilts randomly on
+  // the HUD" bug, not a leftover compass listener (useDeviceHeading was
+  // already fully removed - see its own deletion). Also still null, same
+  // as before, for a hero with no real directional sprite - a flat round
+  // avatar photo has no "facing" to show (see useSpriteFacing's own null
+  // guard).
   const markerHeading = animatedMarkerHero && isTracking ? playerHeading : null
 
   // Warm the cache so switching idle -> running never shows a blank frame.
@@ -1714,19 +1721,15 @@ export default function TerritoryMap({
         <LocateButton map={mapInstance} onLocated={() => exitGlobe()} />
       )}
       {/* Leaflet's own attribution control lives inside .territory-map-tilt
-          (attributionControl={false} above), reproduced here as a plain
-          static element outside it instead - a straight copy of what
-          Leaflet renders there by default. Hidden while the globe is up
-          since TerritoryGlobe carries its own (compact) one. */}
+          (attributionControl={false} above) - this renders instead of it,
+          outside that subtree so it never rotates while chasing. No
+          "Leaflet" credit (that was this library's own prefix text, not
+          a tile-provider requirement - dropped the same way
+          L.control.attribution({ prefix: false }) would). Hidden while
+          the globe is up since TerritoryGlobe carries its own (MapLibre's
+          native compact attribution control) one. */}
       {!globeVisible && (
-        <div className="territory-map-attribution">
-          <a
-            href="https://leafletjs.com"
-            title="A JavaScript library for interactive maps"
-          >
-            Leaflet
-          </a>
-          {' | '}
+        <MapAttribution className="territory-map-attribution-anchor">
           <a href="https://openfreemap.org" target="_blank" rel="noreferrer">
             OpenFreeMap
           </a>{' '}
@@ -1745,7 +1748,7 @@ export default function TerritoryMap({
           >
             OpenStreetMap
           </a>
-        </div>
+        </MapAttribution>
       )}
     </div>
   )

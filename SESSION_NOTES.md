@@ -608,3 +608,76 @@ worth a moderator seeing):
    to loosen the server-side thresholds the same way the client raises its own - but doing so changes
    the _server's_ trust boundary (a malicious client could otherwise just always claim accessibility
    mode), so this needs real per-user state, not a request field.
+
+## Season banner live countdown (2026-11-09)
+
+Replaced the old practice of baking "N NOVEMBER YYYY SEASON" text straight into the exported
+banner art (a fresh export every rotation) with a live DOM pill overlaid on the banner image,
+reading the real season end date from the backend. New: `src/utils/seasonCountdown.js` (pure
+date-math/formatting, see `seasonCountdown.test.js` for the day/last-day/under-24h/ended/
+unknown-fetch/clock-skew cases), `src/hooks/useSeasonCountdown.js` (fetch-once-per-leaderboard-
+open + session cache + self-rescheduling tick), `src/api/season.js`, `src/components/
+SeasonBanner.jsx` + `.css`, `src/components/SeasonPrizeModal.jsx`. `SponsorBannerCarousel.jsx`
+now always renders the season slide first, partner slides after (previously it rendered nothing
+at all until partners loaded); `SponsorBannerCarousel.css`'s `.sponsor-banner-card` and
+`SeasonBanner.css`'s `.season-banner-card` now share one fixed aspect ratio (`1983/793`, the
+season art's own native ratio) instead of the old 16/5 desktop · 16/7 mobile split, so the season
+pill/ribbon/logo are never cropped at any slide width.
+
+The pill's position (`.season-banner-pill` in `SeasonBanner.css`: `left:68%; top:80.7%; width:48%;
+height:7.5%`) was measured directly off the source art - the ribbon's own purple body spans
+roughly x:[41.6%,95.1%] of the 1983px-wide image, and the old baked text line sat centred under it
+at roughly y:[77.9%,81.8%] - then re-checked by rendering the pill as a rect over the clean export
+at native res and eyeballing it against the ribbon/logo before landing (no live browser available
+this session - see `feedback_no_claude_in_chrome` memory - so this stood in for an actual 360/768/
+1440 screenshot check; the percentages are scale-invariant since the slide box is locked to the
+image's own ratio, so one check at native res covers every rendered width).
+
+### Backend spec (NOT implemented — backend is the sibling repo `~/Documents/FahhKit`, never edited
+
+or compiled from this session; this is the exact handoff)
+
+`GET /v1/season/current` already exists (`SeasonController` → `SeasonServiceImpl#getCurrentSeason`)
+and already returns a real `endDate` - no new endpoint needed. Two gaps the frontend currently
+works around rather than blocking on:
+
+1. **Timezone**: `SeasonResponse.startDate`/`endDate` are `LocalDateTime`, which Jackson serializes
+   naive (no `Z`/offset) - e.g. `"2026-11-21T00:00:00"`. `spring.jackson.time-zone=Asia/Kathmandu`
+   (`application.properties`) doesn't add a zone to that JSON, it just means that naive string
+   _is_ Kathmandu wall-clock time, not UTC. `parseSeasonDateTime()` in `seasonCountdown.js` already
+   assumes a fixed +5:45 offset for any date string with no zone suffix, so this works today, but
+   the honest fix is for `SeasonResponse` to serialize these as proper UTC ISO-8601 (`Instant`/
+   `OffsetDateTime`, or keep `LocalDateTime` but add `@JsonFormat` forcing `Z`) - the parser already
+   prefers a zoned string over its Kathmandu-guess the moment one shows up, no frontend change
+   needed when this ships.
+2. **Clock-skew correction**: the brief asks the countdown to correct for the _device's_ clock being
+   wrong, using "the server's Date header or a server time field". Neither exists today -
+   `CorsConfig.java`'s `addCorsMappings` doesn't call `.exposedHeaders(...)`, so the browser can't
+   read the `Date` response header cross-origin even though `allowedOrigins("*")` lets the request
+   through, and `SeasonResponse` has no `serverTime` field. `computeClockOffsetMs()` already reads
+   an optional `serverTime` field and returns `0` (no correction, i.e. trusts the device clock) when
+   it's absent - that's the current, documented fallback, not a bug. Smallest fix: add
+   `private OffsetDateTime serverTime = OffsetDateTime.now(ZoneOffset.UTC);` (or equivalent) to
+   `SeasonResponse` / set it in `SeasonServiceImpl#getCurrentSeason` - the frontend picks it up
+   automatically the moment it's present, no frontend change needed.
+
+### Pill text prefix + fit check (2026-11-09, follow-up)
+
+Pill text now carries a "SEASON ENDS:" prefix on every non-ended state (`SEASON ENDS: 14 DAYS
+LEFT`, `SEASON ENDS: LAST DAY`, `SEASON ENDS: 02:05:09` - note under-24h dropped its old " LEFT"
+suffix once the prefix made it redundant; `SEASON ENDED` alone keeps no prefix). The longest real
+string is `SEASON ENDS: 14 DAYS LEFT` (`SeasonProperties.lengthDays` defaults to 14, so single- or
+low-double-digit days is the realistic ceiling) at ~25 characters including spaces.
+
+Image/pill geometry (position, width, aspect ratio) was left untouched per that request - only
+typography changed to keep the longer string on one line without wrapping or an ellipsis actually
+firing: `.season-banner-pill` in `SeasonBanner.css` now sizes its font-size via `cqw` (container
+query units scoped to `.season-banner-card`, which got `container-type: inline-size`) instead of
+`vw`, since `vw` was only ever an approximation of the card's real rendered width (the card sits
+centred under page gutters whose exact size wasn't worth chasing down - `cqw` is exact regardless).
+Letter-spacing dropped from `0.08em` to `0.05em` (still `em`-based, so it keeps scaling with
+font-size). Fit check (worst case, 25-char string, pill = 48% of card width): at a deliberately
+pessimistic 320px card width, font-size lands at `2.8cqw ≈ 9px` (the clamp floor) with
+letter-spacing `0.05em`, giving an estimated text width around 128px against a ~146px budget inside
+the pill - roughly 12% headroom, not a knife's-edge fit. `overflow:hidden`/`text-overflow:ellipsis`
+stay on the pill as a safety net only (not expected to ever actually trigger).

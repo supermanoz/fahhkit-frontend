@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   IconCheck,
+  IconChevronRight,
+  IconClock,
   IconClose,
+  IconHelmet,
   IconLock,
   IconRunning,
   IconSwords,
@@ -36,6 +39,10 @@ import { playerNameOf } from '../utils/playerName'
 // changes happen server-side on a schedule, with no push event for them.
 const POLL_MS = 20000
 const FAST_POLL_MS = 5000
+// Loading-skeleton row count per roster column - squads run 10-50 real
+// members, but 6 placeholder rows reads as "a roster" without needing to
+// guess the real squad size before any data has loaded.
+const SKELETON_ROSTER_ROWS = [0, 1, 2, 3, 4, 5]
 const NEAR_FLIP_WINDOW_MS = 60 * 1000
 
 // The backend only exposes the *current* war, so the last war seen is
@@ -247,31 +254,78 @@ export default function ClubWarPanel({
   }
 
   if (loading) {
+    // Mirrors the "war in progress" screen exactly (war-banner header +
+    // two-column roster + the bottom Lock In/War History button - see the
+    // real `if (war)` return further down, same section/class names
+    // throughout) rather than a generic placeholder - this used to skip
+    // the header and bottom button entirely and only show 4 rows, which
+    // read as unrecognizable (stray badges/bars with nothing tying them
+    // together) rather than a preview of the actual layout.
     return (
       <div className="game-cards" aria-hidden="true">
-        <section className="game-card game-card-dark club-war-matchup">
+        <section className="game-card game-card-dark club-war-banner">
           <span className="g-skeleton club-war-skeleton-phase" />
+          <div className="club-war-vs">
+            <div className="club-war-side">
+              <span className="g-skeleton club-war-skeleton-crest" />
+              <span className="g-skeleton club-war-skeleton-side-name" />
+              <span className="g-skeleton club-war-skeleton-side-meta" />
+            </div>
+            <span className="g-skeleton club-war-skeleton-vs-badge" />
+            <div className="club-war-side">
+              <span className="g-skeleton club-war-skeleton-crest" />
+              <span className="g-skeleton club-war-skeleton-side-name" />
+              <span className="g-skeleton club-war-skeleton-side-meta" />
+            </div>
+          </div>
+          <span className="g-skeleton club-war-skeleton-sub" />
+        </section>
+
+        <section className="game-card game-card-dark club-war-matchup">
           <div className="club-war-matchup-grid">
-            {[0, 1].map((side) => (
-              <div className="club-war-matchup-col" key={side}>
-                <div className="club-war-matchup-col-head">
-                  <span className="g-skeleton club-war-skeleton-badge" />
-                  <span className="g-skeleton club-war-skeleton-name" />
-                </div>
-                <ul className="game-rows club-war-roster">
-                  {[0, 1, 2, 3].map((row) => (
-                    <li key={row}>
-                      <div className="game-row club-war-row">
-                        <span className="g-skeleton club-war-skeleton-avatar" />
-                        <span className="g-skeleton club-war-skeleton-row-name" />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+            <div className="club-war-matchup-col">
+              <div className="club-war-matchup-col-head">
+                <span className="g-skeleton club-war-skeleton-badge" />
+                <span className="g-skeleton club-war-skeleton-name" />
+                <span className="g-skeleton club-war-skeleton-trophies" />
               </div>
-            ))}
+              <ul className="game-rows club-war-roster">
+                {SKELETON_ROSTER_ROWS.map((row) => (
+                  <li key={row}>
+                    <div className="game-row club-war-row">
+                      <span className="g-skeleton club-war-skeleton-avatar" />
+                      <span className="g-skeleton club-war-skeleton-row-name" />
+                      <span className="g-skeleton club-war-skeleton-row-pill" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <span className="g-skeleton club-war-skeleton-matchup-vs" />
+
+            <div className="club-war-matchup-col">
+              <div className="club-war-matchup-col-head">
+                <span className="g-skeleton club-war-skeleton-badge" />
+                <span className="g-skeleton club-war-skeleton-name" />
+                <span className="g-skeleton club-war-skeleton-trophies" />
+              </div>
+              <ul className="game-rows club-war-roster">
+                {SKELETON_ROSTER_ROWS.map((row) => (
+                  <li key={row}>
+                    <div className="game-row club-war-row">
+                      <span className="g-skeleton club-war-skeleton-avatar" />
+                      <span className="g-skeleton club-war-skeleton-row-name" />
+                      <span className="g-skeleton club-war-skeleton-row-pill" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
+
+        <span className="g-skeleton club-war-skeleton-history-btn" />
       </div>
     )
   }
@@ -327,14 +381,29 @@ export default function ClubWarPanel({
           {CLUB_WAR_REWARDS.winCoins} Fahhcoin for everyone who ran.
         </li>
       </ul>
-      <button
-        type="button"
-        className="game-btn game-btn-wood"
-        onClick={() => setHistoryOpen(true)}
-      >
-        View War History
-      </button>
     </section>
+  )
+
+  // Bottom-of-page link into War History - every state below renders this
+  // last (after the roster/war content), so it's reachable no matter what
+  // the club's war is doing, not just from the no-war/completed screens.
+  // historyOpen is a plain boolean on *this* component, not a route or a
+  // remount, so opening it never tears down the war/queue polling above -
+  // the live war keeps ticking in the background and is exactly where it
+  // was when the player comes back (see the historyOpen branch up top).
+  const historyButton = (
+    <button
+      type="button"
+      className="club-war-history-btn"
+      onClick={() => setHistoryOpen(true)}
+    >
+      <IconClock className="club-war-history-btn-icon" aria-hidden="true" />
+      <span className="club-war-history-btn-label">War History</span>
+      <IconChevronRight
+        className="club-war-history-btn-chevron"
+        aria-hidden="true"
+      />
+    </button>
   )
 
   // --- A war is on (or just finished) ---
@@ -389,6 +458,7 @@ export default function ClubWarPanel({
       <ul className="game-rows club-war-roster">
         {squad.map((p, i) => {
           const isMe = p.userId === userId
+          const locked = Boolean(p.lockedHeroStoreItemId)
           const openProfile = () =>
             onViewProfile?.({
               userId: p.userId,
@@ -412,23 +482,33 @@ export default function ClubWarPanel({
               >
                 <span className="club-war-rank">{i + 1}</span>
                 <span
-                  className={`club-war-avatar ${masked ? 'is-masked' : ''}`}
+                  className={`club-war-avatar ${masked ? 'is-masked' : ''} ${!masked && !locked ? 'is-unlocked' : ''}`}
                 >
-                  {masked ? <IconLock /> : <ClubWarMemberAvatar />}
+                  {masked ? (
+                    <IconLock />
+                  ) : locked ? (
+                    <ClubWarMemberAvatar />
+                  ) : (
+                    <IconHelmet />
+                  )}
                 </span>
                 <span className="game-row-info">
                   <span className="game-row-name">
                     {isMe ? 'You' : playerNameOf(p)}
                   </span>
-                  {/* Always shows now, even with no real pick - heroName
-                      already falls through to Comet's own name in that
-                      case (see resolveHeroAssetOrDefault), never the
-                      backend's literal "Default Hero" placeholder. Masked
-                      stays hidden along with the avatar - no partial
-                      reveal of an opposing squad's pick. */}
+                  {/* A genuinely unlocked player shows a neutral "Not
+                      locked" label instead of heroName's Comet fallback -
+                      that fallback is only for a locked pick whose
+                      StoreItem can't be resolved, never for "hasn't picked
+                      yet". Masked stays hidden along with the avatar - no
+                      partial reveal of an opposing squad's pick. */}
                   {!masked && (
-                    <span className="game-row-meta club-war-row-hero">
-                      {heroName(p.lockedHeroStoreItemId)}
+                    <span
+                      className={`game-row-meta club-war-row-hero ${!locked ? 'is-unlocked' : ''}`}
+                    >
+                      {locked
+                        ? heroName(p.lockedHeroStoreItemId)
+                        : 'Not locked'}
                     </span>
                   )}
                 </span>
@@ -676,6 +756,11 @@ export default function ClubWarPanel({
             </div>
           </div>
         </section>
+        {/* Completed already has its own War History button in the result
+            banner above (see club-war-result-actions) - not duplicating it
+            here, same view. PREPARING/BATTLE never had one at all until
+            now, which was the actual bug. */}
+        {!completed && historyButton}
       </div>
     )
   }
@@ -713,6 +798,7 @@ export default function ClubWarPanel({
           )}
         </section>
         {rules}
+        {historyButton}
       </div>
     )
   }
@@ -746,6 +832,7 @@ export default function ClubWarPanel({
           </button>
         </section>
         {rules}
+        {historyButton}
       </div>
     )
   }
@@ -867,6 +954,7 @@ export default function ClubWarPanel({
         </section>
       )}
       {rules}
+      {historyButton}
     </div>
   )
 }

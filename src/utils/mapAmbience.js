@@ -142,37 +142,41 @@ export function describeAmbience(conditions, now = Date.now()) {
 // sky, since "it's -3°" is the more useful thing to hear.
 const WEATHER_HYPE = {
   freezing: [
-    ['🥶', 'Freezing out there', 'Fk the cold. Your legs make their own heat.'],
+    [
+      '🥶',
+      'Freezing out there',
+      'Ignore the cold. Your legs make their own heat.',
+    ],
     ['🧤', 'Winter mode: ON', 'Gloves on, excuses off. Go claim something.'],
   ],
   scorching: [
     [
       '🔥',
       "It's scorching",
-      'Hot run, hotter territory. Bring water, fk the heat.',
+      'Hot run, hotter territory. Bring water, beat the heat.',
     ],
     ['🥵', 'Sweat season', 'Sun wants a fight. Outrun it.'],
   ],
   clear: [
     ['☀️', "Sun's out, legs out", 'Perfect weather. Zero excuses. Go.'],
-    ['😎', 'Blue skies', 'Too nice to sit inside. Fk it, run.'],
+    ['😎', 'Blue skies', 'Too nice to sit inside. Just run.'],
   ],
   partly: [
-    ['⛅', 'Bit of cloud', 'Not too hot, not too cold. Just run, fk it.'],
+    ['⛅', 'Bit of cloud', 'Not too hot, not too cold. Just run.'],
     ['🌤️', 'Solid running weather', 'The sky did its part. Your turn.'],
   ],
   overcast: [
-    ['☁️', 'Gloomy out', 'Grey skies, bright territory. Fk the gloom.'],
+    ['☁️', 'Gloomy out', 'Grey skies, bright territory. Outrun the gloom.'],
     ['🌥️', 'Moody weather', "Sky's sulking. You don't have to."],
   ],
   fog: [
     ['🌫️', 'Foggy out', "Can't see far? Nobody can see you steal their land."],
   ],
   rain: [
-    ['🌧️', "It's raining", 'Run even in the rain, fk it. Wet socks, big wins.'],
-    ['☔', 'Rain check? Nah', "You're waterproof. Fk the rain, go claim."],
+    ['🌧️', "It's raining", 'Run even in the rain. Wet socks, big wins.'],
+    ['☔', 'Rain check? Nah', "You're waterproof. Rain or not, go claim."],
   ],
-  snow: [['❄️', "It's snowing", 'Snow run = legend status. Fk it, go.']],
+  snow: [['❄️', "It's snowing", 'Snow run = legend status. Just go.']],
   storm: [
     [
       '⛈️',
@@ -180,9 +184,7 @@ const WEATHER_HYPE = {
       'Lightning is real - maybe wait this one out, legend.',
     ],
   ],
-  night: [
-    ['🌙', 'Night run', 'Streets are empty. Territory is waiting. Fk it.'],
-  ],
+  night: [['🌙', 'Night run', 'Streets are empty. Territory is waiting.']],
   dawn: [
     ['🌅', 'Sunrise run', "Up before the rest? They'll wake up to your flag."],
   ],

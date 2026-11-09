@@ -1,4 +1,5 @@
 import { formatDistance, formatDuration, formatPace } from './run'
+import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
 
 // Fixed logical card size (9:16, matches an Instagram Story frame so the
 // download drops straight into a story with no cropping/letterboxing).
@@ -8,12 +9,6 @@ import { formatDistance, formatDuration, formatPace } from './run'
 export const CARD_W = 432
 export const CARD_H = 768
 export const EXPORT_SCALE = 2.5 // -> 1080x1920 export resolution
-
-// The one place the share card's brand wordmark text is set - every
-// drawWordmark call (all 3 variants below, preview canvas and export
-// canvas alike, since they run the exact same drawShareCard) reads from
-// here, so renaming the brand only ever means touching this one line.
-export const BRAND_NAME = 'RUN CONQUEST'
 
 export const SHARE_VARIANTS = {
   TRANSPARENT: 'transparent',
@@ -86,30 +81,61 @@ export async function ensureWordmarkFontLoaded() {
   }
 }
 
-// maxWidth shrinks fontSize (down to a 10px floor) to keep BRAND_NAME from
-// clipping past the card edge - "RUN CONQUEST" is ~1.7x longer than the
-// old "FAHHKIT", and each variant anchors this at a different x/align, so
-// this can't just be eyeballed per call site the way the single old short
-// word could.
-export function drawWordmark(
-  ctx,
-  { x, y, fontSize = 22, fillStyle, align = 'left', maxWidth }
-) {
-  ctx.save()
-  let size = fontSize
-  ctx.font = `800 ${size}px 'Poppins', sans-serif`
-  if (maxWidth) {
-    const width = ctx.measureText(BRAND_NAME).width
-    if (width > maxWidth) {
-      size = Math.max(10, Math.floor(fontSize * (maxWidth / width)))
-      ctx.font = `800 ${size}px 'Poppins', sans-serif`
-    }
+// The brand mark is the logo image now (white lettering + black outline,
+// flag on top), not a drawn "RUN CONQUEST" wordmark - drawBrandLogo below
+// replaces every old drawWordmark call. Loaded once and cached as a
+// resolved <img> (module-level, not per-render) - the 1200w export keeps
+// it sharp at the high-res EXPORT_SCALE canvas, scaled down for the 1x
+// on-screen preview. It's a bundled same-origin asset (import, not a
+// remote URL), so there's no CORS/tainted-canvas concern and no
+// crossOrigin attribute to set.
+let brandLogoPromise = null
+export function loadBrandLogo() {
+  if (!brandLogoPromise) {
+    brandLogoPromise = (async () => {
+      const img = new Image()
+      img.src = brandLogoSrc
+      // Decoded, not just loaded - a canvas drawImage() on an undecoded
+      // image can paint a blank frame the first time it's drawn, which is
+      // exactly the "blank where the brand should be" bug this guards
+      // against (see exportShareCardBlob/drawShareCard, both await this
+      // before drawing anything).
+      await img.decode()
+      return img
+    })()
   }
-  ctx.textAlign = align
-  ctx.textBaseline = 'alphabetic'
-  ctx.fillStyle = fillStyle
-  ctx.fillText(BRAND_NAME, x, y)
+  return brandLogoPromise
+}
+
+// width is the logo's on-canvas width; height follows from its own
+// aspect ratio (never stretched). align/valign anchor x/y the same way
+// ctx.textAlign/textBaseline would for text, so call sites read the same
+// as the old drawWordmark ones did.
+export function drawBrandLogo(
+  ctx,
+  image,
+  { x, y, width, align = 'left', valign = 'alphabetic', shadow = false }
+) {
+  const h = width * (image.naturalHeight / image.naturalWidth)
+  const dx =
+    align === 'center' ? x - width / 2 : align === 'right' ? x - width : x
+  const dy = valign === 'middle' ? y - h / 2 : valign === 'bottom' ? y - h : y
+  ctx.save()
+  if (shadow) {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'
+    ctx.shadowBlur = 10
+    ctx.shadowOffsetY = 2
+  }
+  ctx.drawImage(image, dx, dy, width, h)
   ctx.restore()
+  return h
+}
+
+// 28-32% of the card width, capped at 220px (never relevant at this
+// card's fixed 432 logical width, but keeps this correct if CARD_W ever
+// changes) - about 30% split the difference.
+function brandLogoWidth(cardWidth) {
+  return Math.min(cardWidth * 0.3, 220)
 }
 
 export function drawStatsRow(
@@ -280,17 +306,24 @@ export async function drawShareCard(
   ctx,
   { width, height, points, distance, duration, pace, variant }
 ) {
-  await ensureWordmarkFontLoaded()
+  const [, logo] = await Promise.all([
+    ensureWordmarkFontLoaded(),
+    loadBrandLogo(),
+  ])
   ctx.clearRect(0, 0, width, height)
 
   const padding = 40
+  const logoW = brandLogoWidth(width)
 
   if (variant === SHARE_VARIANTS.TRANSPARENT) {
-    // Strava-style stacked layout: route up top, wordmark centered below
-    // it, then a plain (no chip) stats row - rather than the route filling
-    // the card with the wordmark pinned in a corner.
+    // Strava-style stacked layout: route up top, logo centered below it,
+    // then a plain (no chip) stats row - rather than the route filling
+    // the card with the logo pinned in a corner. routeHeight is a touch
+    // shorter than the old text-only layout needed, so the logo (taller
+    // than a single line of text) still gets a clean gap on both sides
+    // instead of crowding the route or the stats.
     const routeTop = 36
-    const routeHeight = height * 0.56
+    const routeHeight = height * 0.52
     const projected = projectRoute(points, {
       width,
       height: routeHeight,
@@ -298,14 +331,17 @@ export async function drawShareCard(
     }).map((p) => ({ ...p, y: p.y + routeTop }))
     drawRoutePath(ctx, projected, { strokeStyle: '#e8590c' })
 
-    const wordmarkY = routeTop + routeHeight + 46
-    drawWordmark(ctx, {
+    const logoCenterY =
+      routeTop +
+      routeHeight +
+      18 +
+      (logoW * (logo.naturalHeight / logo.naturalWidth)) / 2
+    const logoH = drawBrandLogo(ctx, logo, {
       x: width / 2,
-      y: wordmarkY,
-      fontSize: 26,
-      fillStyle: '#ffffff',
+      y: logoCenterY,
+      width: logoW,
       align: 'center',
-      maxWidth: width - padding * 2,
+      valign: 'middle',
     })
 
     drawStatsStack(ctx, {
@@ -313,18 +349,20 @@ export async function drawShareCard(
       duration,
       pace,
       x: width / 2,
-      y: wordmarkY + 54,
+      y: logoCenterY + logoH / 2 + 44,
       color: '#ffffff',
     })
   } else if (variant === SHARE_VARIANTS.GRADIENT) {
     ctx.fillStyle = makeBrandGradient(ctx, 0, 0, width, height)
     ctx.fillRect(0, 0, width, height)
 
-    // Route up top, wordmark below it (not pinned above the route) - shrunk
-    // a little from full-bleed so there's room underneath, but not as
-    // compact as the transparent card's route.
+    // Route up top, logo below it (not pinned above the route) - shrunk a
+    // little further than the transparent card's route since this card's
+    // stats row (drawStatsRow, a single line) needs less vertical room
+    // than that one's stacked stats do, leaving the saved space for the
+    // logo instead.
     const routeTop = 36
-    const routeHeight = height * 0.65
+    const routeHeight = height * 0.6
     const projected = projectRoute(points, {
       width,
       height: routeHeight,
@@ -332,20 +370,24 @@ export async function drawShareCard(
     }).map((p) => ({ ...p, y: p.y + routeTop }))
     drawRoutePath(ctx, projected, { strokeStyle: '#ffffff' })
 
-    const wordmarkY = routeTop + routeHeight + 46
-    drawWordmark(ctx, {
+    const logoCenterY =
+      routeTop +
+      routeHeight +
+      18 +
+      (logoW * (logo.naturalHeight / logo.naturalWidth)) / 2
+    const logoH = drawBrandLogo(ctx, logo, {
       x: width / 2,
-      y: wordmarkY,
-      fillStyle: '#ffffff',
+      y: logoCenterY,
+      width: logoW,
       align: 'center',
-      maxWidth: width - padding * 2,
+      valign: 'middle',
     })
     drawStatsRow(ctx, {
       distance,
       duration,
       pace,
       x: padding,
-      y: wordmarkY + 56,
+      y: logoCenterY + logoH / 2 + 48,
       width: width - padding * 2,
       color: '#ffffff',
       chipBg: 'rgba(255,255,255,0.18)',
@@ -356,30 +398,38 @@ export async function drawShareCard(
     drawRoutePath(ctx, projected, { strokeStyle: '#e8590c', lineWidth: 5 })
     drawStartEndMarkers(ctx, projected)
 
-    // Strava-style info panel: wordmark, a title, then a Distance/Time row
-    // with Pace on its own row below - anchored over a dark gradient so it
-    // stays legible over any part of the route.
-    const barHeight = 220
+    // Strava-style info panel: logo, a title, then a Distance/Time row
+    // with Pace on its own row below - anchored over a dark gradient so
+    // it stays legible over any part of the route, which (unlike the
+    // other two variants) is projected across the FULL card height, not
+    // shrunk to leave room above this bar - the bar's own gradient is
+    // what keeps whatever's underneath it readable, same as before.
+    // barHeight grows to fit the logo (taller than the single line of
+    // text it replaces) instead of letting it crowd the title/stats
+    // below it - "reserve space, don't overlap" per the brief.
+    const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)
+    const creditRowHeight = 22
+    const barHeight = 220 + logoH + 24 + creditRowHeight
     const bar = ctx.createLinearGradient(0, height - barHeight, 0, height)
     bar.addColorStop(0, 'rgba(20,18,16,0)')
     bar.addColorStop(1, 'rgba(20,18,16,0.78)')
     ctx.fillStyle = bar
     ctx.fillRect(0, height - barHeight, width, barHeight)
 
-    drawWordmark(ctx, {
+    drawBrandLogo(ctx, logo, {
       x: width - padding,
-      y: height - 165,
-      fontSize: 16,
-      fillStyle: 'rgba(255,255,255,0.9)',
+      y: height - 165 - creditRowHeight,
+      width: logoW,
       align: 'right',
-      maxWidth: width - padding * 2,
+      valign: 'bottom',
+      shadow: true,
     })
 
     ctx.save()
     ctx.textAlign = 'left'
     ctx.fillStyle = '#ffffff'
     ctx.font = "700 24px 'Poppins', sans-serif"
-    ctx.fillText('Run', padding, height - 124)
+    ctx.fillText('Run', padding, height - 124 - creditRowHeight)
     ctx.restore()
 
     const rightColX = width / 2 + 10
@@ -387,20 +437,38 @@ export async function drawShareCard(
       label: 'Distance',
       value: formatDistance(distance),
       x: padding,
-      y: height - 84,
+      y: height - 84 - creditRowHeight,
     })
     drawStatLabelValue(ctx, {
       label: 'Time',
       value: formatDuration(duration),
       x: rightColX,
-      y: height - 84,
+      y: height - 84 - creditRowHeight,
     })
     drawStatLabelValue(ctx, {
       label: 'Pace',
       value: formatPace(pace),
       x: padding,
-      y: height - 32,
+      y: height - 32 - creditRowHeight,
     })
+
+    // Required tile-provider credit - its own dedicated row at the very
+    // bottom of the bar (barHeight already grew by creditRowHeight to fit
+    // it), not squeezed next to a stat where a long string risks
+    // overlapping the value text. Clear of the logo (top of this bar),
+    // the route (well above the bar entirely) and every stat (all pushed
+    // up by creditRowHeight above this row).
+    ctx.save()
+    ctx.textAlign = 'left'
+    ctx.globalAlpha = 0.7
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '600 9px -apple-system, sans-serif'
+    ctx.fillText(
+      '© OpenStreetMap contributors · OpenMapTiles · OpenFreeMap',
+      padding,
+      height - 14
+    )
+    ctx.restore()
   }
 }
 

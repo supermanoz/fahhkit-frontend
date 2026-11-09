@@ -10,20 +10,20 @@ import './IdleNudge.css'
 const NUDGE_LINES = [
   {
     shout: 'Come on…',
-    line: "Don't you wanna run? Fk it, let's do it! 🏃",
-    cta: "Fk it, let's go!",
+    line: "Don't you wanna run? Let's do it! 🏃",
+    cta: "Let's go!",
     action: 'run',
   },
   {
     shout: 'Hellooo? 👀',
-    line: 'That territory isn’t gonna claim itself. Fk it, let’s go!',
-    cta: "Fk it, let's go!",
+    line: 'That territory isn’t gonna claim itself. Let’s go!',
+    cta: "Let's go!",
     action: 'run',
   },
   {
     shout: 'Legs asleep?',
-    line: 'One loop. Just one. Fk it, let’s do it! 🔥',
-    cta: "Fk it, let's go!",
+    line: 'One loop. Just one. Let’s do it! 🔥',
+    cta: "Let's go!",
     action: 'run',
   },
   {
@@ -34,7 +34,7 @@ const NUDGE_LINES = [
   },
   {
     shout: 'Fight me! 🥊',
-    line: 'Race a real runner, winner takes the coins. Fk it, let’s battle!',
+    line: 'Race a real runner, winner takes the coins. Let’s battle!',
     cta: "Let's battle!",
     action: 'battle',
   },

@@ -12,7 +12,7 @@ import {
 } from './GameIcons'
 import { useToast } from '../game/ui/Toast'
 import mailInboxIcon from '../assets/ui/mail_inbox.png'
-import mailNewsIcon from '../assets/ui/mail_news.png'
+import MailBadgeIcon from './MailBadgeIcon'
 import './MailPanel.css'
 import { playerName } from '../utils/playerName'
 
@@ -274,14 +274,7 @@ export default function MailPanel({ mailbox, onClaimed }) {
               className={`mail-tab ${view === 'news' ? 'active' : ''}`}
               onClick={() => setView('news')}
             >
-              <span
-                className="mail-tab-icon"
-                aria-hidden="true"
-                style={{
-                  WebkitMaskImage: `url(${mailNewsIcon})`,
-                  maskImage: `url(${mailNewsIcon})`,
-                }}
-              />
+              <MailBadgeIcon size={22} className="mail-tab-icon-img" />
               News
               {unreadNews > 0 && (
                 <span className="mail-tab-badge">{unreadNews}</span>

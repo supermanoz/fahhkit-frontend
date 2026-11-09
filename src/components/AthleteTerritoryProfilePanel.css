@@ -24,11 +24,17 @@
   margin: 4px 0 8px;
 }
 
+/* No heading here any more (see .athlete-profile-club-actions-row's own
+   aria-label, which replaces it for screen readers) - just the button
+   row (+ an error line, if the action fails), centred under the club
+   card with its own top margin instead of a heading's margin+line-height
+   leaving a gap above it. */
 .athlete-profile-club-actions {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 18px;
 }
 
 .athlete-profile-club-actions-row {

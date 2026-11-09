@@ -25,11 +25,42 @@ function normalizeEmoteKey(value) {
     .replace(/[\s_-]+/g, '')
 }
 
+// A few emotes have a real backend StoreItem.name instead of the numbered
+// "emoteN" convention almost every row actually uses (confirmed directly
+// against real captured profile data: every hero's catalog is "Classic"
+// (seeded, price 0) plus plain lowercase "emote2".."emote10/11" - NOT
+// "Emote 5"-style display names). "classic" is the one confirmed, load-
+// bearing exception - the backend's own fixed name for every hero's free
+// default (see resolveEmoteAsset's own comment below) - every manifest's
+// "emote1" slot under a different, non-numbered name.
+//
+// CORRECTION: an earlier session guessed Comet's slot 2 was named "Hip
+// Hop" and added a 'hiphop' entry here - real captured data shows every
+// slot is plainly "emoteN", so that guess was wrong and has been removed.
+// Comet DOES have one other real exception, a StoreItem literally named
+// "Jumping Jack" with no corresponding manifest key - but which numbered
+// slot it should alias onto isn't known yet (ask before guessing again);
+// until an entry's added for it, it correctly falls back to idle, same as
+// any other name with no local art (see resolveEmoteAsset).
+const EMOTE_NAME_ALIASES = {
+  classic: 'emote1',
+}
+
+// The one normalized, alias-resolved key every lookup below should match
+// against - normalizeEmoteKey alone handles any stray spacing/casing a
+// StoreItem.name might carry; EMOTE_NAME_ALIASES on top of that handles a
+// real-word display name ("Classic") standing in for a numbered slot.
+function canonicalEmoteKey(value) {
+  const key = normalizeEmoteKey(value)
+  return EMOTE_NAME_ALIASES[key] || key
+}
+
 // True if this hero+emote (matched case/space/underscore/hyphen-
-// insensitively) is on the HIDDEN_EMOTES list above.
+// insensitively, and through EMOTE_NAME_ALIASES) is on the HIDDEN_EMOTES
+// list above.
 export function isHiddenEmote(heroName, emoteName) {
   const heroKey = normalizeEmoteKey(heroName)
-  const emoteKey = normalizeEmoteKey(emoteName)
+  const emoteKey = canonicalEmoteKey(emoteName)
   if (!heroKey || !emoteKey) return false
   return Boolean(HIDDEN_EMOTES[heroKey]?.includes(emoteKey))
 }
@@ -92,14 +123,13 @@ const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 // the same role "emote1" plays everywhere else in this registry, just
 // under the backend's own fixed name instead of the numbered scheme
 // scripts/build_<hero>_stretch_strips.py uses for every OTHER emote.
-// Without this, "Classic" resolves to nothing: this was the actual cause
-// of another player's profile showing their hero but never their equipped
-// emote (see athleteProfileHero.js) - "Classic" is what a player keeps
-// equipped until they buy something else, so for a large share of real
-// accounts this was never a locally-missing-art edge case, it was every
-// untouched hero.
-const CLASSIC_ALIAS_TARGET = 'emote1'
-
+// Without this (EMOTE_NAME_ALIASES, above), "Classic" resolves to nothing:
+// this was the actual cause of another player's profile showing their
+// hero but never their equipped emote (see athleteProfileHero.js) -
+// "Classic" is what a player keeps equipped until they buy something
+// else, so for a large share of real accounts this was never a locally-
+// missing-art edge case, it was every untouched hero.
+//
 // Returns {src, frames, frameWidth, frameHeight} for a given hero name +
 // backend StoreItem.name, or null if no manifest has art for it (the
 // caller shows its own placeholder - see EmoteGlyph.jsx). Deliberately NOT
@@ -109,9 +139,8 @@ const CLASSIC_ALIAS_TARGET = 'emote1'
 // above), since every real hero is expected to have both.
 export function resolveEmoteAsset(heroName, emoteName) {
   const heroKey = (heroName || '').trim().toLowerCase()
-  let emoteKey = (emoteName || '').trim().toLowerCase()
+  const emoteKey = canonicalEmoteKey(emoteName)
   if (!heroKey || !emoteKey) return null
-  if (emoteKey === 'classic') emoteKey = CLASSIC_ALIAS_TARGET
 
   if (hasHero(heroKey)) return getHero(heroKey).emotes[emoteKey] || null
   if (!ALIAS_EMOTE_NAMES.has(emoteKey)) return null
@@ -147,19 +176,44 @@ export function knownEmoteNames(heroName) {
 // filtering by `.equipped` first if that flag exists on its shape).
 //
 // heroName is optional but should be passed whenever the caller has it -
-// a hidden emote (see HIDDEN_EMOTES above) that's still equipped server-
-// side is treated as "nothing equipped" here so every caller falls back to
-// idle on its own, with no unequip call needed (the backend's equipped
-// row is left alone, it just stops being shown).
-export function resolveEquippedEmoteItem(equippedStoreItems, heroId, heroName) {
+// it's only used for the HIDDEN_EMOTES check below, which callers that
+// list/pick from a hero's emotes (HeroDetailModal's HeroEmoteStage, the
+// Shop's EmoteShowcase equip-state) want: a hidden emote that's still
+// equipped server-side resolves to "nothing equipped" there, since the
+// slide/card for it was never shown in the first place.
+//
+// Pass { ignoreHidden: true } instead wherever an ALREADY-equipped emote
+// is being displayed rather than offered for selection - the Me tab and
+// both branches of athleteProfileHero.js's other-player resolve. Comet's
+// emote2/emote4 are hidden from the shop but have real, working local art
+// (see heroes/comet/manifest.json) - without ignoreHidden, a player who
+// has one equipped would see it vanish from their own profile and everyone
+// else's, falling back to idle, even though nothing is actually missing.
+export function resolveEquippedEmoteItem(
+  equippedStoreItems,
+  heroId,
+  heroName,
+  { ignoreHidden = false } = {}
+) {
   if (!heroId) return null
+  const candidates = (equippedStoreItems || []).filter(
+    (item) =>
+      item?.category === 'EMOTE' &&
+      item?.heroId === heroId &&
+      (ignoreHidden || !isHiddenEmote(heroName, item?.name))
+  )
+  if (candidates.length <= 1) return candidates[0] || null
+  // Equipping one emote unequips any other for that hero server-side (see
+  // StoreServiceImpl#equip) - this shouldn't be more than one candidate in
+  // practice - but if it ever is, never let a stray Classic/idle-alias row
+  // mask a genuine pick: prefer whichever candidate is both a real,
+  // resolvable emote and NOT the idle alias.
   return (
-    (equippedStoreItems || []).find(
+    candidates.find(
       (item) =>
-        item?.category === 'EMOTE' &&
-        item?.heroId === heroId &&
-        !isHiddenEmote(heroName, item?.name)
-    ) || null
+        canonicalEmoteKey(item?.name) !== 'emote1' &&
+        resolveEmoteAsset(heroName, item?.name)
+    ) || candidates[0]
   )
 }
 

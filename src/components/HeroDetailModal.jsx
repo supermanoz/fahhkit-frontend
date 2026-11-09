@@ -75,16 +75,17 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
   )
   const isIdleAlias = (item) =>
     resolveEmoteAsset(hero.name, item.name)?.src === idleSrc
-  // The one shared selector every "which emote is equipped" screen uses
-  // (also GamePage.jsx's Me tab and AthleteTerritoryProfilePanel.jsx) -
+  // The one shared selector every "which emote is equipped" screen uses -
   // reads straight off ownedItems (refreshed by GamePage's loadStore after
   // every equip/unequip, and reloaded fresh from the backend on every app
   // start), so each slide's badge below updates the moment an equip call
   // resolves, with nothing extra to wire up, and is still correct after a
   // refresh since there's no separate local "equipped" state to go stale.
-  // Passing hero.name makes a hidden-but-still-equipped emote resolve to
-  // null here too, so this slider's idle slide falls back to "equipped"
-  // on its own.
+  // No ignoreHidden here (unlike GamePage.jsx's Me tab and
+  // AthleteTerritoryProfilePanel.jsx, which display an already-equipped
+  // pick) - this slider never shows a hidden emote's own slide, so a
+  // hidden-but-still-equipped one should resolve to null here, falling
+  // the idle slide back to "equipped" on its own.
   const equippedItem = resolveEquippedEmoteItem(
     ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
     hero.id,

@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useState } from 'react'
 import {
+  IconChevronRight,
   IconCoins,
   IconEnvelope,
   IconFlag,
@@ -602,21 +603,27 @@ export default function ClubPanel({
                 No one&apos;s shared a route with the club yet.
               </p>
             ) : (
-              <ul className="game-rows">
+              <ul className="game-rows club-shared-route-list">
                 {sharedRoutes.map((route) => (
                   <li key={route.id}>
                     <button
                       type="button"
-                      className="game-row game-row-clickable"
+                      className="game-row game-row-clickable club-shared-route-row"
                       disabled={loadingRouteId === route.id}
                       onClick={() => handleViewSharedRoute(route.id)}
                     >
-                      <span className="game-row-name">{route.name}</span>
-                      <span className="game-row-meta">
+                      <span className="game-row-info">
+                        <span className="game-row-name">{route.name}</span>
+                      </span>
+                      <span className="club-shared-route-distance">
                         {loadingRouteId === route.id
-                          ? 'Loading…'
+                          ? '…'
                           : formatDistance(route.distanceMeters)}
                       </span>
+                      <IconChevronRight
+                        className="club-shared-route-chevron"
+                        aria-hidden="true"
+                      />
                     </button>
                   </li>
                 ))}

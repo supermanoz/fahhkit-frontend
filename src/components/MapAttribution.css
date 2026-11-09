@@ -1,0 +1,65 @@
+/* Positioned per call site (see .territory-map-attribution-anchor in
+   TerritoryMap.css, .run-map-attribution-anchor in RunMap.css) - this
+   file only owns the button/panel's own look, not where on the map it
+   sits. */
+.map-attribution {
+  position: absolute;
+  z-index: 500;
+}
+
+/* 20px, off-white, solid (no transparency) - same border recipe as every
+   other small round control in /game. */
+/* var(--game-ink, …)/var(--white, …) with literal fallbacks, not bare
+   tokens - this renders both inside /game (TerritoryMap, --game-root
+   scoped) and in the plain app theme (RunMap, used from RunDetailPage/
+   FraudFlagsPage/HistoryList - none of them under .game-root, where
+   --game-ink et al are never defined at all). */
+.map-attribution-toggle {
+  all: unset;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink, #2b2a24);
+  background: var(--white, #ffffff);
+  color: var(--game-ink, #2b2a24);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Opens upward from the button, not downward - every anchor point this
+   sits at is near the bottom of its map, so a downward panel would run
+   off the edge. */
+.map-attribution-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  min-width: 190px;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--game-ink, #2b2a24);
+  background: var(--white, #ffffff);
+  box-shadow: 0 3px 0 var(--game-ink, #2b2a24);
+  color: #1f1e1a;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.map-attribution-panel a {
+  color: #1f1e1a;
+  text-decoration: underline;
+}
+
+.map-attribution-panel a:hover,
+.map-attribution-panel a:focus {
+  text-decoration: none;
+}

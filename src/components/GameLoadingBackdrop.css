@@ -1,0 +1,56 @@
+/* Sits as the first child inside .game-loading-overlay (see GamePage.css) -
+   painted behind the logo/progress bar/status text by DOM order, not
+   z-index (see the stacking comment in GameLoadingBackdrop.jsx). */
+.game-loading-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  /* Dark navy letterbox - shows at the sides once the capped media box
+     below stops growing, so an ultra-wide viewport doesn't smear a
+     portrait photo edge-to-edge. */
+  background: #0b0b1f;
+}
+
+.game-loading-bg picture {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  /* Portrait source (~0.8 ratio) capped to its own natural proportions
+     against the viewport height, centered - this is what actually
+     produces the navy fill on wide screens; object-fit: cover below never
+     would on its own, since cover never leaves empty space. */
+  max-width: calc(100dvh * 0.82);
+}
+
+.game-loading-bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 55%;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.game-loading-bg-img.is-loaded {
+  opacity: 1;
+}
+
+/* Subtle gradient pooling toward the bottom, where the status text and
+   progress bar sit, so they stay readable over whatever part of the photo
+   lands underneath them. */
+.game-loading-bg-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 11, 31, 0) 0%,
+    rgba(11, 11, 31, 0) 50%,
+    rgba(11, 11, 31, 0.55) 78%,
+    rgba(11, 11, 31, 0.88) 100%
+  );
+  pointer-events: none;
+}
