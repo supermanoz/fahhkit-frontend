@@ -8,14 +8,4 @@
 
 .emote-glyph-sprite {
   margin: 0 auto;
-  /* Starts paused (never advances past its first keyframe, so this is a
-     genuine static frame) - only the active/hovered/focused instance
-     plays. See EmoteGlyph.jsx's own comment for why: every tile in a grid
-     animating at once, continuously, was a real cause of the Me/Emotes
-     lag this was built to fix. */
-  animation-play-state: paused;
-}
-
-.emote-glyph-sprite.is-active {
-  animation-play-state: running;
 }

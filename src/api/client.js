@@ -233,6 +233,24 @@ export async function getJson(path) {
   return parseResponse(response, hadToken)
 }
 
+export async function putJson(path, payload) {
+  const hadToken = Boolean(getToken())
+  let response
+  try {
+    response = await fetchWithFallback(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new ApiError(
+      'Could not reach the server. Please try again in a moment.',
+      0
+    )
+  }
+  return parseResponse(response, hadToken)
+}
+
 export async function deleteJson(path) {
   const hadToken = Boolean(getToken())
   let response

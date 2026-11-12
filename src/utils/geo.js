@@ -9,6 +9,12 @@ import { Geolocation } from '@capacitor/geolocation'
 // here falls through to navigator.geolocation, unchanged from before.
 export const isNative = Capacitor.isNativePlatform()
 
+// 'ios' | 'android' | 'web' - used sparingly, only where a behaviour has to
+// differ from plain isNative (see utils/siteUrl.js's iOS App Store purchase
+// gating - Android has no equivalent restriction, so isNative alone isn't
+// specific enough there).
+export const platform = Capacitor.getPlatform()
+
 // Only watchPosition (the continuous run-tracking stream useRunTracker
 // drives) goes through this - getCurrentPosition is one-shot and used for
 // map-centering elsewhere, where the screen is by definition on and the app

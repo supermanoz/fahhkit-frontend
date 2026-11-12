@@ -1,4 +1,4 @@
-"""Builds Bolt's sprite pack straight into src/assets/heroes/bolt/ - see
+"""Builds Bolt's MAP MARKER pack only (see build_blaze_stretch_strips.py's docstring - profile/emotes moved to build_emote_sheets.py) straight into src/assets/heroes/bolt/ - see
 build_blaze_stretch_strips.py's docstring for the shared mechanics/
 rationale (unified source drop, WebP-width-capped frame sampling,
 numbered-emote scheme, and the backend StoreItem rename this implies for

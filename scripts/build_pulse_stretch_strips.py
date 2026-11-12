@@ -1,4 +1,4 @@
-"""Builds Pulse's sprite pack straight into src/assets/heroes/pulse/ - a
+"""Builds Pulse's MAP MARKER pack only (see build_blaze_stretch_strips.py's docstring - profile/emotes moved to build_emote_sheets.py) straight into src/assets/heroes/pulse/ - a
 brand new manifest (Pulse had no bundled art before this), so no backend
 rename is needed for this one. See build_blaze_stretch_strips.py's
 docstring for the shared mechanics (unified source drop, WebP-width-capped

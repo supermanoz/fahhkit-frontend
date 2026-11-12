@@ -1,0 +1,122 @@
+{
+  "mode": "before",
+  "generatedAt": "2026-11-10T02:57:11.718Z",
+  "emoteNameAliases": {
+    "classic": "emote1"
+  },
+  "heroes": {
+    "blaze": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9",
+        "emote10"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote4"]
+    },
+    "bolt": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9",
+        "emote10",
+        "emote11"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote3"]
+    },
+    "comet": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote2", "emote4"]
+    },
+    "cyclone": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9",
+        "emote10",
+        "emote11"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote6"]
+    },
+    "nova": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9",
+        "emote10"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote5"]
+    },
+    "phantom": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9",
+        "emote10"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote4"]
+    },
+    "pulse": {
+      "emoteKeys": [
+        "emote1",
+        "emote2",
+        "emote3",
+        "emote4",
+        "emote5",
+        "emote6",
+        "emote7",
+        "emote8",
+        "emote9",
+        "emote10"
+      ],
+      "idleAliasKey": "emote1",
+      "hiddenFromShop": ["emote6"]
+    }
+  }
+}

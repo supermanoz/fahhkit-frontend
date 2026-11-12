@@ -18,6 +18,7 @@ def capacitor_pods
   pod 'CapacitorGeolocation', :path => '../../node_modules/@capacitor/geolocation'
   pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
   pod 'CapacitorLocalNotifications', :path => '../../node_modules/@capacitor/local-notifications'
+  pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
   pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
   pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
   pod 'CodetrixStudioCapacitorGoogleAuth', :path => '../../node_modules/@codetrix-studio/capacitor-google-auth'
@@ -26,6 +27,9 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
+  # FCM push: the backend sends through FCM, so the app registers the FCM token
+  # (not the raw APNs one) - see AppDelegate.swift.
+  pod 'FirebaseMessaging'
 end
 
 post_install do |installer|

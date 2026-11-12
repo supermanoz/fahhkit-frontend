@@ -44,6 +44,9 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { useAuthFlow } from '../hooks/useAuthFlow'
 import { useReminders } from '../hooks/useReminders'
+import { usePushNotifications } from '../hooks/usePushNotifications'
+import { unregisterPushToken } from '../utils/push'
+import NotificationSettingsRows from '../components/NotificationSettingsRows'
 import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
 import {
   isRemindersDebugEnabled,
@@ -94,7 +97,7 @@ import {
   purchaseStoreItem,
   unequipStoreItem,
 } from '../api/store'
-import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
+import { getFahhcoinBundles } from '../api/coinPurchase'
 import {
   createRoute,
   findMyRoutes,
@@ -159,13 +162,15 @@ import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
 import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
-import RunRewardAnimation from '../components/RunRewardAnimation'
-import RunScoreCard from '../components/RunScoreCard'
+import RunRewardsModal from '../components/RunRewardsModal'
 import ClubBadge from '../components/ClubBadge'
 import ClubTrophyIcon from '../components/ClubTrophyIcon'
 import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
 import { formatCoins } from '../utils/format'
+import { iosShopRedirectBlocked, openShopPack } from '../utils/siteUrl'
+import { App as CapacitorApp } from '@capacitor/app'
+import { isNative } from '../utils/geo'
 import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
@@ -510,7 +515,10 @@ function GamePageInner() {
   // have no single "reset to signed-out" path; reloading guarantees none of
   // it leaks into whatever the next GameAuthGate session does, at the cost
   // of a logout being the one action in the game that isn't instant.
-  function handleLogout() {
+  async function handleLogout() {
+    // Stop pushes for this player on this phone first (needs the token still
+    // valid; bounded to ~1.5s and never throws).
+    await unregisterPushToken()
     auth.signOut()
     window.location.reload()
   }
@@ -700,8 +708,12 @@ function GamePageInner() {
   const [coinShopOpen, setCoinShopOpen] = useState(false)
   const [coinBundles, setCoinBundles] = useState([])
   const [coinBundlesError, setCoinBundlesError] = useState(null)
-  const [buyingBundleAmount, setBuyingBundleAmount] = useState(null)
-  const [coinBuyError, setCoinBuyError] = useState(null)
+  // The bundle a Buy tap picked, driving the "Open the Shop" redirect
+  // confirmation popup below (not a direct purchase any more - see
+  // handleContinueToShop's own comment for why).
+  const [buyRedirectBundle, setBuyRedirectBundle] = useState(null)
+  const [buyRedirecting, setBuyRedirecting] = useState(false)
+  const [buyRedirectError, setBuyRedirectError] = useState(null)
   const [heroes, setHeroes] = useState([])
   const [heroesLoading, setHeroesLoading] = useState(false)
   // Id, not the object, so the modal picks up the refreshed hero after an
@@ -804,7 +816,7 @@ function GamePageInner() {
   // The score breakdown the backend already pushes over the socket for
   // every scored run (RunScoreBreakdownResponse, see onRunProcessed below)
   // - previously only read to pick a rejection message, never to show the
-  // actual numbers (see RunScoreCard.jsx). null for a cheat-flagged run
+  // actual numbers (see RunRewardsModal.jsx). null for a cheat-flagged run
   // (never scored at all) or a PvP race (scored entirely separately, no
   // push at all for that mode - see TerritoryProcessingServiceImpl).
   const [runScoreBreakdown, setRunScoreBreakdown] = useState(null)
@@ -1104,7 +1116,7 @@ function GamePageInner() {
       if (outcome.runId !== watchedRunIdRef.current) return
       // Captured for every outcome, not just a rejection - a successful
       // (or Club War/Boss Fight) run's score numbers live on this same
-      // payload, just previously never read (see RunScoreCard.jsx).
+      // payload, just previously never read (see RunRewardsModal.jsx).
       setRunScoreBreakdown(outcome)
       showRunOutcome(outcome)
     },
@@ -1339,6 +1351,24 @@ function GamePageInner() {
     return () => clearTimeout(done)
   }, [loadPct, loadingDone])
   const gameReady = introReady && loadingDone
+  // FCM push: token registration + permission ask (never mid-run), and tap
+  // routing - a cold-start tap is held until login + game load are done.
+  // Foreground pushes use the in-app toast instead of an OS banner.
+  const push = usePushNotifications({
+    userId: isAuthed ? user?.id : null,
+    gameReady,
+    canPrompt:
+      gameReady && tracker.status !== 'tracking' && !tracker.pendingRun,
+    onRoute: (route) => {
+      if (route.tab) {
+        openMenu(route.tab)
+      } else if (route.map) {
+        setMenuOpen(false)
+        setRadialOpen(false)
+      }
+    },
+    onForeground: (text) => toast.push(text, { type: 'info', duration: 6000 }),
+  })
   // Plays the globe rotate-and-dive reveal (GameIntroGlobe) once gameReady
   // flips true, right before the loading overlay lifts - see the overlay's
   // render below.
@@ -1618,6 +1648,48 @@ function GamePageInner() {
     }
   }
 
+  // Set the moment handleContinueToShop actually sends the player out
+  // (not on every Buy tap - only once they've committed), cleared the
+  // first time they come back. A ref, not state: nothing here should
+  // re-render anything, it only gates the one-shot refreshProfile() call
+  // below.
+  const pendingCoinShopReturnRef = useRef(false)
+
+  // "After returning to the game ..., refresh the player's Fahhcoin
+  // balance so the new coins show up with no restart" - the purchase
+  // itself happens on the website/external browser (handleContinueToShop),
+  // entirely outside this app's own control, so coming back is the only
+  // moment this app can know to check again. Scoped to the
+  // pendingCoinShopReturnRef flag rather than refreshing on every ordinary
+  // tab-focus/app-resume, which would otherwise fire a profile fetch on
+  // every single backgrounding during normal play for no reason.
+  // visibilitychange covers the web (including inside an in-app browser
+  // tab that isn't a full OS context switch); appStateChange is the native
+  // equivalent Capacitor fires when the OS actually backgrounds/foregrounds
+  // the app (e.g. returning from the system browser/Custom Tabs on
+  // Android/iOS, where document.visibilityState alone isn't reliable).
+  useEffect(() => {
+    function maybeRefresh() {
+      if (!pendingCoinShopReturnRef.current) return
+      pendingCoinShopReturnRef.current = false
+      refreshProfile()
+    }
+    function handleVisibility() {
+      if (!document.hidden) maybeRefresh()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    let appStateHandle
+    if (isNative) {
+      appStateHandle = CapacitorApp.addListener('appStateChange', (state) => {
+        if (state.isActive) maybeRefresh()
+      })
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      appStateHandle?.then((h) => h.remove())
+    }
+  }, [])
+
   // Snapshot of level/xp taken right before a run is submitted (see
   // attemptSubmit) - compared against the fresh profile once the server has
   // actually finished processing that run (territory outcome known, or a
@@ -1672,6 +1744,48 @@ function GamePageInner() {
       // free local avatar/Blaze sprite until this succeeds.
     }
   }
+
+  // Catches up on mail/News/important notices published while the app was
+  // in the background or the screen was locked: the STOMP socket (see
+  // useGameSocket) is suspended by the OS there and the broker doesn't
+  // replay missed messages, so the only other time these load is a full game
+  // open. Throttled so flicking between apps doesn't hammer the API, and
+  // skipped while the Mail tab itself is open (refresh() resets its paging).
+  const lastForegroundSyncRef = useRef(0)
+  const foregroundSyncStateRef = useRef({})
+  foregroundSyncStateRef.current = {
+    isAuthed,
+    mailTabOpen: menuOpen && menuTab === 'mail',
+    refreshMail: mailbox.refresh,
+    recheckNotices: announcementNotices.recheck,
+  }
+  useEffect(() => {
+    function syncOnForeground() {
+      const { isAuthed, mailTabOpen, refreshMail, recheckNotices } =
+        foregroundSyncStateRef.current
+      if (!isAuthed) return
+      const now = Date.now()
+      if (now - lastForegroundSyncRef.current < FOREGROUND_SYNC_MIN_GAP_MS)
+        return
+      lastForegroundSyncRef.current = now
+      if (!mailTabOpen) refreshMail()
+      recheckNotices()
+    }
+    function handleVisibility() {
+      if (!document.hidden) syncOnForeground()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    let appStateHandle
+    if (isNative) {
+      appStateHandle = CapacitorApp.addListener('appStateChange', (state) => {
+        if (state.isActive) syncOnForeground()
+      })
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      appStateHandle?.then((h) => h.remove())
+    }
+  }, [])
 
   // Loads once we roughly know where the player is - re-running on every
   // liveLocation tick would hammer the API on every GPS fix.
@@ -2014,22 +2128,50 @@ function GamePageInner() {
   }
 
   function openCoinShop() {
-    setCoinBuyError(null)
     setCoinShopOpen(true)
     if (coinBundles.length === 0) loadCoinBundles()
   }
 
-  async function handleBuyCoins(bundle) {
-    setCoinBuyError(null)
-    setBuyingBundleAmount(bundle.fahhcoinAmount)
+  // A Buy tap no longer starts the purchase itself - it opens a
+  // confirmation popup first (the brief's own "don't start the purchase
+  // directly"), which on Continue hands off to the website's /shop page
+  // instead (handleContinueToShop below). Payment itself happens there,
+  // never inside the game.
+  function openBuyRedirectConfirm(bundle) {
+    setBuyRedirectError(null)
+    setBuyRedirectBundle(bundle)
+  }
+
+  function closeBuyRedirectConfirm() {
+    if (buyRedirecting) return
+    setBuyRedirectBundle(null)
+  }
+
+  // Routes the purchase itself to the public website's /shop page (same
+  // app, different route - see utils/siteUrl.js) instead of redirecting
+  // the game's own window/WebView straight to a payment URL, the way this
+  // used to work (see git history - initiateCoinPurchase/paymentUrl). Two
+  // reasons: a new tab/external browser never tears down the running
+  // game's own state (map, live GPS watch, an in-progress run) the way
+  // window.location.href = paymentUrl used to, and keeping actual payment
+  // for a virtual currency out of the native WebView sidesteps Apple's App
+  // Store guideline 3.1.1 risk entirely on iOS (still gated by
+  // iosShopRedirectBlocked as a second layer, in case this ever changes).
+  // buyRedirecting is the brief's own "double-tap guard" - set synchronously
+  // before the (possibly async, on native) Browser.open/window.open call,
+  // so a second tap before either resolves can't open a second tab/popup.
+  async function handleContinueToShop() {
+    if (!buyRedirectBundle || buyRedirecting) return
+    setBuyRedirecting(true)
+    setBuyRedirectError(null)
     try {
-      const payment = await initiateCoinPurchase(bundle.fahhcoinAmount)
-      window.location.href = payment.paymentUrl
-    } catch (err) {
-      setCoinBuyError(
-        err instanceof ApiError ? err.message : 'Could not start payment.'
-      )
-      setBuyingBundleAmount(null)
+      await openShopPack(buyRedirectBundle.fahhcoinAmount)
+      pendingCoinShopReturnRef.current = true
+      setBuyRedirectBundle(null)
+    } catch {
+      setBuyRedirectError('Could not open the shop - please try again.')
+    } finally {
+      setBuyRedirecting(false)
     }
   }
 
@@ -2565,44 +2707,33 @@ function GamePageInner() {
   // Distance/pace/time strip shown on every phase of the post-run toast —
   // the run's own stats, independent of whatever the territory-processing
   // phase (still checking / done / timed out) has to say.
+  // Distance/pace/time only - the score breakdown that used to render
+  // right under this (RunScoreCard) now lives in the unified post-run
+  // RunRewardsModal instead, shown once this toast is dismissed (see the
+  // AnimatePresence block near the end of this render).
   function renderCompletedRunStats() {
     if (!completedRun) return null
-    // Keyed on runId so RunScoreCard remounts fresh per run (its own
-    // "new best" check runs once per mount - see RunScoreCard.jsx) instead
-    // of reusing a stale instance across two different runs' results.
-    const scoreMode = completedRun.isWar
-      ? 'club_war'
-      : completedRun.isRace
-        ? 'pvp'
-        : 'territory'
     return (
-      <>
-        <div className="game-controls-stats game-claim-toast-stats">
-          <span className="game-stat">
-            <span className="game-stat-value">
-              {formatDistance(completedRun.distance)}
-            </span>
-            <span className="game-stat-label">Distance</span>
+      <div className="game-controls-stats game-claim-toast-stats">
+        <span className="game-stat">
+          <span className="game-stat-value">
+            {formatDistance(completedRun.distance)}
           </span>
-          <span className="game-stat">
-            <span className="game-stat-value">
-              {formatPace(completedRun.avgPace)}
-            </span>
-            <span className="game-stat-label">Pace</span>
+          <span className="game-stat-label">Distance</span>
+        </span>
+        <span className="game-stat">
+          <span className="game-stat-value">
+            {formatPace(completedRun.avgPace)}
           </span>
-          <span className="game-stat">
-            <span className="game-stat-value">
-              {formatDuration(completedRun.duration)}
-            </span>
-            <span className="game-stat-label">Time</span>
+          <span className="game-stat-label">Pace</span>
+        </span>
+        <span className="game-stat">
+          <span className="game-stat-value">
+            {formatDuration(completedRun.duration)}
           </span>
-        </div>
-        <RunScoreCard
-          key={completedRun.id}
-          breakdown={runScoreBreakdown}
-          mode={scoreMode}
-        />
-      </>
+          <span className="game-stat-label">Time</span>
+        </span>
+      </div>
     )
   }
 
@@ -2657,6 +2788,11 @@ function GamePageInner() {
         endedAt: toLocalDateTimeString(pendingRun.endedAt),
         challengeId: pendingRun.challengeId || undefined,
         clubWarId: pendingRun.clubWarId || undefined,
+        // Stable per recorded run (startedAt is persisted with the pending
+        // run), so "Retry Save" after a lost response - or after the app
+        // was closed - returns the run the server already created instead
+        // of counting it twice. The backend scopes this id per user.
+        clientRunId: `run-${new Date(pendingRun.startedAt).getTime()}`,
       })
       reminders.notifyRunSaved()
       // The History list's every page shifts by one with a new run saved -
@@ -2676,6 +2812,7 @@ function GamePageInner() {
         id: created.id,
         isRace,
         isWar,
+        isTraining: Boolean(pendingRun.isTraining),
         points: pendingRun.points,
         distance: pendingRun.distance,
         duration: pendingRun.duration,
@@ -2694,7 +2831,8 @@ function GamePageInner() {
         // only, no territory - see TerritoryProcessingServiceImpl); a PvP
         // race never does (scored entirely separately), so this just finds
         // nothing and runScoreBreakdown stays null for that mode, same as
-        // ever - RunScoreCard already renders nothing in that case.
+        // ever - RunRewardsModal already renders nothing score-related in
+        // that case.
         const early = runOutcomesRef.current[created.id]
         if (early) setRunScoreBreakdown(early)
         // A race/war run's XP is awarded by the same async processing a
@@ -2805,6 +2943,18 @@ function GamePageInner() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [viewingProfile])
+
+  // Esc closes the Buy-redirect confirmation, same as its own X or
+  // backdrop (closeBuyRedirectConfirm already no-ops while redirecting).
+  useEffect(() => {
+    if (!buyRedirectBundle) return
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') closeBuyRedirectConfirm()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buyRedirectBundle, buyRedirecting])
 
   // useCallback (empty deps - every function this touches, including
   // loadStore/loadHeroes, only closes over stable setState setters and
@@ -3536,17 +3686,27 @@ function GamePageInner() {
         {territoryEntryBanner && (
           <motion.div
             key={territoryEntryBanner.ownerName}
-            className="game-territory-entry-banner"
-            initial={{ opacity: 0, y: -40, scale: 0.85 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -24, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            className="game-popup-layer is-top"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <span className="game-territory-entry-banner-flag">🚩</span>
-            <span className="game-territory-entry-banner-text">
-              Entering <strong>{territoryEntryBanner.ownerName}</strong>
-              &apos;s territory!
-            </span>
+            {/* The layer owns the centring; the banner only animates its own
+                y/scale, so framer-motion's inline transform can no longer
+                overwrite a CSS translateX(-50%) and shove it off-centre. */}
+            <motion.div
+              className="game-territory-entry-banner"
+              initial={{ y: -40, scale: 0.85 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: -24, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            >
+              <span className="game-territory-entry-banner-flag">🚩</span>
+              <span className="game-territory-entry-banner-text">
+                Entering <strong>{territoryEntryBanner.ownerName}</strong>
+                &apos;s territory!
+              </span>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -4009,32 +4169,39 @@ function GamePageInner() {
       <AnimatePresence>
         {saveError && (
           <motion.div
-            className="game-claim-toast glass-card"
-            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
+            className="game-popup-layer is-bottom"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <h3>{saveError.title}</h3>
-            <p>{saveError.message}</p>
-            <div className="game-highlight-toast-actions">
-              {pendingRun && (
+            <motion.div
+              className="game-claim-toast glass-card"
+              initial={{ opacity: 0, y: 40, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            >
+              <h3>{saveError.title}</h3>
+              <p>{saveError.message}</p>
+              <div className="game-highlight-toast-actions">
+                {pendingRun && (
+                  <button
+                    type="button"
+                    className="game-btn game-btn-green"
+                    onClick={() => attemptSubmit(pendingRun)}
+                    disabled={saving}
+                  >
+                    Retry Save
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="game-btn game-btn-green"
-                  onClick={() => attemptSubmit(pendingRun)}
-                  disabled={saving}
+                  className="game-btn game-btn-wood"
+                  onClick={() => setSaveError(null)}
                 >
-                  Retry Save
+                  Dismiss
                 </button>
-              )}
-              <button
-                type="button"
-                className="game-btn game-btn-wood"
-                onClick={() => setSaveError(null)}
-              >
-                Dismiss
-              </button>
-            </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -4042,33 +4209,40 @@ function GamePageInner() {
       <AnimatePresence>
         {tracker.invalidMotion && (
           <motion.div
-            className="game-claim-toast glass-card"
-            initial={{ opacity: 0, x: '-50%', y: 40, scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: 20, scale: 0.9 }}
+            className="game-popup-layer is-bottom"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <h3>Whoa there, speedster 🛵</h3>
-            <p>
-              {tracker.invalidMotion.reason === 'no-gait'
-                ? "You're covering ground fast with no running stride detected. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."
-                : "This pace is faster than running allows. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."}
-            </p>
-            <div className="game-highlight-toast-actions">
-              <button
-                type="button"
-                className="game-btn game-btn-green"
-                onClick={() => tracker.stop()}
-              >
-                Stop Run
-              </button>
-              <button
-                type="button"
-                className="game-btn game-btn-wood"
-                onClick={tracker.dismissInvalidMotion}
-              >
-                Keep Going
-              </button>
-            </div>
+            <motion.div
+              className="game-claim-toast glass-card"
+              initial={{ opacity: 0, y: 40, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            >
+              <h3>Whoa there, speedster 🛵</h3>
+              <p>
+                {tracker.invalidMotion.reason === 'no-gait'
+                  ? "You're covering ground fast with no running stride detected. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."
+                  : "This pace is faster than running allows. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."}
+              </p>
+              <div className="game-highlight-toast-actions">
+                <button
+                  type="button"
+                  className="game-btn game-btn-green"
+                  onClick={() => tracker.stop()}
+                >
+                  Stop Run
+                </button>
+                <button
+                  type="button"
+                  className="game-btn game-btn-wood"
+                  onClick={tracker.dismissInvalidMotion}
+                >
+                  Keep Going
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -4076,166 +4250,199 @@ function GamePageInner() {
       <AnimatePresence>
         {runResult && (
           <motion.div
-            className="game-claim-toast game-claim-toast-center glass-card"
-            initial={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
+            className="game-popup-layer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            {/* By the time any phase below renders, attemptSubmit() has
-                already created the run server-side - whatever the
-                territory outcome turns out to be, the run itself is
-                already safely in the athlete's history. */}
-            {/* A PvP race or Club War entry never checks territory - it's
-                logged for its own scoring and done, so this is a single
-                terminal phase instead of a processing/done pair. */}
-            {runResult.phase === 'submitted' && (
-              <>
-                <h3>Run submitted!</h3>
-                {renderCompletedRunStats()}
-                {completedRun?.isRace && (
-                  <p className="game-controls-hint">
-                    🏁 Race time logged. Check the PvP tab once your rival runs
-                    too.
-                  </p>
-                )}
-                {completedRun?.isWar && (
-                  <p className="game-controls-hint">
-                    ⚔️ War run logged. Check Club Wars once the battle ends.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setRunResult(null)}
-                >
-                  Nice
-                </button>
-              </>
-            )}
-            {runResult.phase === 'processing' && (
-              <>
-                <h3>Run submitted!</h3>
-                {renderCompletedRunStats()}
-                <p>Checking your territory…</p>
-              </>
-            )}
-            {runResult.phase === 'rejected' && (
-              <>
-                <h3>{runResult.title}</h3>
-                {renderCompletedRunStats()}
-                <p>{runResult.message}</p>
-                {runResult.isRolloutRejection && (
-                  <>
-                    {rolloutRequestResult?.alreadyRolledOut && (
-                      <p className="game-settings-row-requested">
-                        Looks like it&apos;s already live here - try your next
-                        run!
-                      </p>
-                    )}
-                    {rolloutRequestResult &&
-                      !rolloutRequestResult.alreadyRolledOut && (
+            <motion.div
+              className="game-claim-toast game-claim-toast-center glass-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+            >
+              {/* By the time any phase below renders, attemptSubmit() has
+                  already created the run server-side - whatever the
+                  territory outcome turns out to be, the run itself is
+                  already safely in the athlete's history. */}
+              {/* A PvP race or Club War entry never checks territory - it's
+                  logged for its own scoring and done, so this is a single
+                  terminal phase instead of a processing/done pair. */}
+              {runResult.phase === 'submitted' && (
+                <>
+                  <h3>Run submitted!</h3>
+                  {renderCompletedRunStats()}
+                  {completedRun?.isRace && (
+                    <p className="game-controls-hint">
+                      🏁 Race time logged. Check the PvP tab once your rival
+                      runs too.
+                    </p>
+                  )}
+                  {completedRun?.isWar && (
+                    <p className="game-controls-hint">
+                      ⚔️ War run logged. Check Club Wars once the battle ends.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setRunResult(null)}
+                  >
+                    Nice
+                  </button>
+                </>
+              )}
+              {runResult.phase === 'processing' && (
+                <>
+                  <h3>Run submitted!</h3>
+                  {renderCompletedRunStats()}
+                  <p>Checking your territory…</p>
+                </>
+              )}
+              {runResult.phase === 'rejected' && (
+                <>
+                  <h3>{runResult.title}</h3>
+                  {renderCompletedRunStats()}
+                  <p>{runResult.message}</p>
+                  {runResult.isRolloutRejection && (
+                    <>
+                      {rolloutRequestResult?.alreadyRolledOut && (
                         <p className="game-settings-row-requested">
-                          Requested - thanks for letting us know!
+                          Looks like it&apos;s already live here - try your next
+                          run!
                         </p>
                       )}
-                    {rolloutRequestError && (
-                      <p className="game-controls-hint game-controls-hint-error">
-                        {rolloutRequestError}
-                      </p>
-                    )}
-                    {!rolloutRequestResult && (
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        disabled={rolloutRequestBusy}
-                        onClick={handleRequestRollout}
-                      >
-                        {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
-                      </button>
-                    )}
-                  </>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    setRunResult(null)
-                    setRolloutRequestResult(null)
-                    setRolloutRequestError(null)
-                  }}
-                >
-                  Got it
-                </button>
-              </>
-            )}
-            {runResult.phase === 'done' &&
-              (() => {
-                const { title, totalArea } = summarizeRunEvents(
-                  runResult.events
-                )
-                return (
-                  <>
-                    <h3>{title}</h3>
-                    {renderCompletedRunStats()}
-                    <p>
-                      {formatArea(totalArea)} affected across{' '}
-                      {runResult.events.length} update
-                      {runResult.events.length === 1 ? '' : 's'}
-                    </p>
-                    <div className="game-claim-toast-actions">
-                      {completedRun && (
+                      {rolloutRequestResult &&
+                        !rolloutRequestResult.alreadyRolledOut && (
+                          <p className="game-settings-row-requested">
+                            Requested - thanks for letting us know!
+                          </p>
+                        )}
+                      {rolloutRequestError && (
+                        <p className="game-controls-hint game-controls-hint-error">
+                          {rolloutRequestError}
+                        </p>
+                      )}
+                      {!rolloutRequestResult && (
                         <button
                           type="button"
-                          className="btn btn-primary"
-                          onClick={handleDownloadMap}
-                          disabled={downloadingMap}
+                          className="btn btn-outline"
+                          disabled={rolloutRequestBusy}
+                          onClick={handleRequestRollout}
                         >
-                          {downloadingMap ? 'Preparing...' : 'Download Map'}
+                          {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => setRunResult(null)}
-                      >
-                        Nice
-                      </button>
-                    </div>
-                  </>
-                )
-              })()}
-            {runResult.phase === 'timeout' && (
-              <>
-                <h3>Still checking your territory…</h3>
-                {renderCompletedRunStats()}
-                <p>
-                  Taking a bit longer than usual to confirm whether your loop
-                  closed — check back in a bit if it doesn’t show up here.
-                </p>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setRunResult(null)}
-                >
-                  OK
-                </button>
-              </>
-            )}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setRunResult(null)
+                      setRolloutRequestResult(null)
+                      setRolloutRequestError(null)
+                    }}
+                  >
+                    Got it
+                  </button>
+                </>
+              )}
+              {runResult.phase === 'done' &&
+                (() => {
+                  const { title, totalArea } = summarizeRunEvents(
+                    runResult.events
+                  )
+                  return (
+                    <>
+                      <h3>{title}</h3>
+                      {renderCompletedRunStats()}
+                      <p>
+                        {formatArea(totalArea)} affected across{' '}
+                        {runResult.events.length} update
+                        {runResult.events.length === 1 ? '' : 's'}
+                      </p>
+                      <div className="game-claim-toast-actions">
+                        {completedRun && (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleDownloadMap}
+                            disabled={downloadingMap}
+                          >
+                            {downloadingMap ? 'Preparing...' : 'Download Map'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => setRunResult(null)}
+                        >
+                          Nice
+                        </button>
+                      </div>
+                    </>
+                  )
+                })()}
+              {runResult.phase === 'timeout' && (
+                <>
+                  <h3>Still checking your territory…</h3>
+                  {renderCompletedRunStats()}
+                  <p>
+                    Taking a bit longer than usual to confirm whether your loop
+                    closed — check back in a bit if it doesn’t show up here.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setRunResult(null)}
+                  >
+                    OK
+                  </button>
+                </>
+              )}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {/* Shown right after the run-result toast above is dismissed, never
-            layered on top of it - a run's XP is a separate "reward" beat
-            from the territory outcome itself. */}
-        {!runResult && xpReward && (
-          <RunRewardAnimation
-            key={`${xpReward.beforeXp}-${xpReward.afterXp}`}
-            {...xpReward}
-            onDismiss={() => setXpReward(null)}
-          />
-        )}
+            layered on top of it - the reward beat (XP/score/hero perk) is
+            separate from the territory/race/war outcome itself. Gated on
+            either xpReward or a real score, not just xpReward alone - a
+            Club War/PvP run always gets a score push even on the rare
+            run that somehow grants zero XP. completedRun supplies the
+            stats row and the mode (training/club_war/pvp vs plain
+            territory); TrackRunPanel's Boss Fight flow is a separate,
+            admin-only staging surface this never touches. */}
+        {!runResult &&
+          completedRun &&
+          (xpReward || runScoreBreakdown?.totalScore != null) && (
+            <RunRewardsModal
+              key={completedRun.id}
+              mode={
+                completedRun.isWar
+                  ? 'club_war'
+                  : completedRun.isRace
+                    ? 'pvp'
+                    : completedRun.isTraining
+                      ? 'training'
+                      : 'territory'
+              }
+              stats={completedRun}
+              xpReward={xpReward}
+              scoreBreakdown={runScoreBreakdown}
+              onDismiss={() => {
+                // Both are checked in the gate above - dismissing must
+                // clear both, or a score-only run (no xpReward) would
+                // leave runScoreBreakdown truthy and the modal would just
+                // re-show itself on the very next render.
+                setXpReward(null)
+                setRunScoreBreakdown(null)
+              }}
+            />
+          )}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -4259,137 +4466,149 @@ function GamePageInner() {
               !pendingRun
             return (
               <motion.div
-                className="game-highlight-toast glass-card game-territory-popup"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
+                className="game-popup-layer"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
-                {/* --- Header: avatar + owner name + close --- */}
-                <div className="game-highlight-toast-header">
-                  <Avatar
-                    src={highlightedEntry.avatarSrc}
-                    name={playerNameOf(highlightedEntry)}
-                    ring={highlightedEntry.color || 'var(--game-gold)'}
-                    size={60}
-                    className="game-highlight-toast-avatar"
-                  />
-                  <div className="game-highlight-toast-owner">
-                    <p className="game-highlight-toast-owner-label">
-                      Territory owner
-                    </p>
-                    <h3>{isMine ? 'You' : playerNameOf(highlightedEntry)}</h3>
+                <motion.div
+                  className="game-highlight-toast glass-card game-territory-popup"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  {/* --- Header: avatar + owner name + close --- */}
+                  <div className="game-highlight-toast-header">
+                    <Avatar
+                      src={highlightedEntry.avatarSrc}
+                      name={playerNameOf(highlightedEntry)}
+                      ring={highlightedEntry.color || 'var(--game-gold)'}
+                      size={60}
+                      className="game-highlight-toast-avatar"
+                    />
+                    <div className="game-highlight-toast-owner">
+                      <p className="game-highlight-toast-owner-label">
+                        Territory owner
+                      </p>
+                      <h3>{isMine ? 'You' : playerNameOf(highlightedEntry)}</h3>
+                    </div>
+                    <button
+                      type="button"
+                      className="game-close-btn game-highlight-toast-close"
+                      aria-label="Close"
+                      onClick={() => {
+                        setHighlightedEntry(null)
+                        setTerritoryRunWarning(null)
+                      }}
+                    >
+                      <IconClose />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="game-close-btn game-highlight-toast-close"
-                    aria-label="Close"
-                    onClick={() => {
-                      setHighlightedEntry(null)
-                      setTerritoryRunWarning(null)
-                    }}
-                  >
-                    <IconClose />
-                  </button>
-                </div>
 
-                {/* --- Stats row: the two numbers that actually matter --- */}
-                <div className="game-territory-stats">
-                  <div className="game-territory-stat">
-                    <span className="game-territory-stat-value">
-                      {formatAreaStat(highlightedEntry.areaSqMeters)}
-                    </span>
-                    <span className="game-territory-stat-label">Held</span>
+                  {/* --- Stats row: the two numbers that actually matter --- */}
+                  <div className="game-territory-stats">
+                    <div className="game-territory-stat">
+                      <span className="game-territory-stat-value">
+                        {formatAreaStat(highlightedEntry.areaSqMeters)}
+                      </span>
+                      <span className="game-territory-stat-label">Held</span>
+                    </div>
+                    <div className="game-territory-stat">
+                      <span className="game-territory-stat-value">
+                        <IconTrophy />
+                        {Math.round(
+                          highlightedEntry.runScore || 0
+                        ).toLocaleString()}
+                      </span>
+                      <span className="game-territory-stat-label">
+                        Run score
+                      </span>
+                    </div>
                   </div>
-                  <div className="game-territory-stat">
-                    <span className="game-territory-stat-value">
-                      <IconTrophy />
-                      {Math.round(
-                        highlightedEntry.runScore || 0
-                      ).toLocaleString()}
-                    </span>
-                    <span className="game-territory-stat-label">Run score</span>
-                  </div>
-                </div>
 
-                {!highlightHasVisibleParcels && (
-                  <p className="game-controls-hint">
-                    Nothing of theirs is in view right now — try exploring the
-                    map.
-                  </p>
-                )}
-                {territoryRunWarning && (
-                  <>
-                    <p className="game-controls-hint game-controls-hint-error">
-                      {territoryRunWarning}
+                  {!highlightHasVisibleParcels && (
+                    <p className="game-controls-hint">
+                      Nothing of theirs is in view right now — try exploring the
+                      map.
                     </p>
-                    <div className="game-highlight-toast-actions">
+                  )}
+                  {territoryRunWarning && (
+                    <>
+                      <p className="game-controls-hint game-controls-hint-error">
+                        {territoryRunWarning}
+                      </p>
+                      <div className="game-highlight-toast-actions">
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => setTerritoryRunWarning(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() =>
+                            handleRunTerritory(highlightedEntry, {
+                              force: true,
+                            })
+                          }
+                        >
+                          Continue anyway
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {!territoryRunWarning && canRun && (
+                    <>
+                      {/* --- Secondary info line: distance to the route's
+                          start point, with the "guide will steer you there"
+                          detail kept as a smaller caption underneath rather
+                          than a hover-only tooltip (this is a touch-first
+                          game, nothing here is hoverable on mobile). --- */}
+                      {previewRoute?.startDistanceMeters >
+                        TERRITORY_RUN_FAR_START_METERS && (
+                        <p className="game-territory-distance">
+                          <IconCrosshairs />
+                          <span>
+                            Start point is{' '}
+                            {formatMeters(previewRoute.startDistanceMeters)}{' '}
+                            away
+                            <span className="game-territory-distance-caption">
+                              The guide will steer you there first.
+                            </span>
+                          </span>
+                        </p>
+                      )}
+                      <div className="game-highlight-toast-actions">
+                        <button
+                          type="button"
+                          className="game-route-run-btn"
+                          onClick={() => handleRunTerritory(highlightedEntry)}
+                        >
+                          🏃{' '}
+                          {isMine
+                            ? 'Defend This Territory'
+                            : 'Run This Territory'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {!territoryRunWarning && (
+                    <div className="game-highlight-toast-actions is-secondary">
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => setTerritoryRunWarning(null)}
+                        onClick={() => {
+                          setViewingProfile(highlightedEntry)
+                          setHighlightedEntry(null)
+                        }}
                       >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() =>
-                          handleRunTerritory(highlightedEntry, { force: true })
-                        }
-                      >
-                        Continue anyway
+                        View Profile
                       </button>
                     </div>
-                  </>
-                )}
-                {!territoryRunWarning && canRun && (
-                  <>
-                    {/* --- Secondary info line: distance to the route's
-                        start point, with the "guide will steer you there"
-                        detail kept as a smaller caption underneath rather
-                        than a hover-only tooltip (this is a touch-first
-                        game, nothing here is hoverable on mobile). --- */}
-                    {previewRoute?.startDistanceMeters >
-                      TERRITORY_RUN_FAR_START_METERS && (
-                      <p className="game-territory-distance">
-                        <IconCrosshairs />
-                        <span>
-                          Start point is{' '}
-                          {formatMeters(previewRoute.startDistanceMeters)} away
-                          <span className="game-territory-distance-caption">
-                            The guide will steer you there first.
-                          </span>
-                        </span>
-                      </p>
-                    )}
-                    <div className="game-highlight-toast-actions">
-                      <button
-                        type="button"
-                        className="game-route-run-btn"
-                        onClick={() => handleRunTerritory(highlightedEntry)}
-                      >
-                        🏃{' '}
-                        {isMine
-                          ? 'Defend This Territory'
-                          : 'Run This Territory'}
-                      </button>
-                    </div>
-                  </>
-                )}
-                {!territoryRunWarning && (
-                  <div className="game-highlight-toast-actions is-secondary">
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => {
-                        setViewingProfile(highlightedEntry)
-                        setHighlightedEntry(null)
-                      }}
-                    >
-                      View Profile
-                    </button>
-                  </div>
-                )}
+                  )}
+                </motion.div>
               </motion.div>
             )
           })()}
@@ -4855,8 +5074,9 @@ function GamePageInner() {
                     // turntable when one's equipped and its art actually
                     // resolves (see equippedEmoteItem/equippedEmoteAsset
                     // above) - same spot, same size, just a different
-                    // sprite/pace (EmoteGlyph's own 20fps, tuned for emote
-                    // content, not HeroSprite's slower idle pace). Falls
+                    // sprite/pace (EmoteGlyph plays through the same
+                    // shared pace as HeroSprite's idle turntable now - see
+                    // utils/spriteTiming.js). Falls
                     // back to the idle turntable otherwise, same as before.
                     // No stage behind the flat avatar-picture fallback below
                     // - that's not a hero playing anything, just a profile
@@ -5259,6 +5479,8 @@ function GamePageInner() {
                     <span className="game-switch-knob" />
                   </span>
                 </button>
+
+                <NotificationSettingsRows push={push} />
 
                 <MapStylePicker
                   styles={MAP_STYLES}
@@ -5702,70 +5924,77 @@ function GamePageInner() {
       <AnimatePresence>
         {viewingRoute && !followingRoute && (
           <motion.div
-            className="game-highlight-toast glass-card game-route-popup"
-            initial={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
-            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: '-40%', scale: 0.9 }}
+            className="game-popup-layer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <button
-              type="button"
-              className="game-close-btn game-highlight-toast-close"
-              aria-label="Close"
-              onClick={handleCloseViewingRoute}
+            <motion.div
+              className="game-highlight-toast glass-card game-route-popup"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
             >
-              <IconClose />
-            </button>
-            <h3>{viewingRoute.name}</h3>
-            <p>
-              {formatMeters(viewingRoute.distanceMeters)} ·{' '}
-              {viewingRoute.visibility === 'CLUB'
-                ? 'Shared with club'
-                : 'Private'}
-            </p>
-            {tracker.status === 'idle' &&
-              !pendingRun &&
-              (viewingRoute.points?.length || 0) >= 2 && (
+              <button
+                type="button"
+                className="game-close-btn game-highlight-toast-close"
+                aria-label="Close"
+                onClick={handleCloseViewingRoute}
+              >
+                <IconClose />
+              </button>
+              <h3>{viewingRoute.name}</h3>
+              <p>
+                {formatMeters(viewingRoute.distanceMeters)} ·{' '}
+                {viewingRoute.visibility === 'CLUB'
+                  ? 'Shared with club'
+                  : 'Private'}
+              </p>
+              {tracker.status === 'idle' &&
+                !pendingRun &&
+                (viewingRoute.points?.length || 0) >= 2 && (
+                  <div className="game-highlight-toast-actions">
+                    <button
+                      type="button"
+                      className="game-route-run-btn"
+                      onClick={handleRunViewedRoute}
+                    >
+                      🏃 Run This Route
+                    </button>
+                  </div>
+                )}
+              {viewingRoute.ownerId === user?.id && (
                 <div className="game-highlight-toast-actions">
                   <button
                     type="button"
-                    className="game-route-run-btn"
-                    onClick={handleRunViewedRoute}
+                    className={`game-route-visibility-btn ${
+                      viewingRoute.visibility === 'CLUB' ? 'is-shared' : ''
+                    }`}
+                    disabled={
+                      routeVisibilityBusyId === viewingRoute.id ||
+                      (viewingRoute.visibility !== 'CLUB' && !profile?.clubName)
+                    }
+                    title={
+                      viewingRoute.visibility !== 'CLUB' && !profile?.clubName
+                        ? 'Join a club to share routes with it'
+                        : undefined
+                    }
+                    onClick={() => handleToggleRouteVisibility(viewingRoute)}
                   >
-                    🏃 Run This Route
+                    {routeVisibilityBusyId === viewingRoute.id
+                      ? '…'
+                      : viewingRoute.visibility === 'CLUB'
+                        ? 'Make Private'
+                        : 'Share with Club'}
                   </button>
                 </div>
               )}
-            {viewingRoute.ownerId === user?.id && (
-              <div className="game-highlight-toast-actions">
-                <button
-                  type="button"
-                  className={`game-route-visibility-btn ${
-                    viewingRoute.visibility === 'CLUB' ? 'is-shared' : ''
-                  }`}
-                  disabled={
-                    routeVisibilityBusyId === viewingRoute.id ||
-                    (viewingRoute.visibility !== 'CLUB' && !profile?.clubName)
-                  }
-                  title={
-                    viewingRoute.visibility !== 'CLUB' && !profile?.clubName
-                      ? 'Join a club to share routes with it'
-                      : undefined
-                  }
-                  onClick={() => handleToggleRouteVisibility(viewingRoute)}
-                >
-                  {routeVisibilityBusyId === viewingRoute.id
-                    ? '…'
-                    : viewingRoute.visibility === 'CLUB'
-                      ? 'Make Private'
-                      : 'Share with Club'}
-                </button>
-              </div>
-            )}
-            {viewingRoute.ownerId === user?.id && myRoutesError && (
-              <p className="game-controls-hint game-controls-hint-error">
-                {myRoutesError}
-              </p>
-            )}
+              {viewingRoute.ownerId === user?.id && myRoutesError && (
+                <p className="game-controls-hint game-controls-hint-error">
+                  {myRoutesError}
+                </p>
+              )}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -5854,7 +6083,18 @@ function GamePageInner() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {coinShopOpen && (
+        {/* !buyRedirectBundle - while the redirect confirmation is open,
+            this list isn't just hidden behind it visually, it's unmounted
+            entirely. Both are .game-confirm-overlay popups with their own
+            semi-transparent scrim (by design - "no transparency" in the
+            brief means the CARD, not the scrim); leaving this one mounted
+            underneath stacked its scrim under the new one's and let its
+            larger, differently-sized card peek out around the smaller
+            confirmation's edges - caught in a screenshot, not by reading
+            the JSX. coinShopOpen itself stays true throughout (not reset
+            on Continue/Cancel), so dismissing the confirmation returns to
+            this exact list, not an empty/reloading one. */}
+        {coinShopOpen && !buyRedirectBundle && (
           <motion.div
             className="game-confirm-overlay game-coin-shop-overlay"
             initial={{ opacity: 0 }}
@@ -5897,22 +6137,81 @@ function GamePageInner() {
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => handleBuyCoins(bundle)}
-                        disabled={buyingBundleAmount === bundle.fahhcoinAmount}
+                        onClick={() => openBuyRedirectConfirm(bundle)}
                       >
-                        {buyingBundleAmount === bundle.fahhcoinAmount
-                          ? 'Redirecting…'
-                          : 'Buy'}
+                        Buy
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
-              {coinBuyError && (
-                <p className="game-controls-hint game-controls-hint-error">
-                  {coinBuyError}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {buyRedirectBundle && (
+          <motion.div
+            className="game-confirm-overlay game-buy-redirect-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeBuyRedirectConfirm}
+          >
+            <motion.div
+              className="game-confirm-card game-buy-redirect-card"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="game-close-btn game-run-viewer-close"
+                aria-label="Close"
+                onClick={closeBuyRedirectConfirm}
+              >
+                <IconClose />
+              </button>
+              <p className="game-buy-redirect-title">Open the Shop</p>
+              <p className="game-buy-redirect-pack">
+                {buyRedirectBundle.fahhcoinAmount} Fahhcoin · Rs.{' '}
+                {buyRedirectBundle.priceNpr}
+              </p>
+              <p className="game-buy-redirect-note">
+                You&apos;ll be taken to the Fahhcoin shop page to complete your
+                purchase. Your coins appear in your account after payment.
+              </p>
+              {iosShopRedirectBlocked && (
+                <p className="game-buy-redirect-ios-note">
+                  Fahhcoin purchases aren&apos;t available in the iOS app yet -
+                  please use the website instead.
                 </p>
               )}
+              {buyRedirectError && (
+                <p className="game-controls-hint game-controls-hint-error">
+                  {buyRedirectError}
+                </p>
+              )}
+              <div className="game-confirm-actions">
+                <button
+                  type="button"
+                  className="game-btn game-btn-wood"
+                  onClick={closeBuyRedirectConfirm}
+                  disabled={buyRedirecting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="game-btn game-btn-green"
+                  onClick={handleContinueToShop}
+                  disabled={buyRedirecting || iosShopRedirectBlocked}
+                >
+                  {buyRedirecting ? 'Opening…' : 'Continue to Shop'}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -6175,6 +6474,9 @@ function GamePageInner() {
     </div>
   )
 }
+
+// Minimum gap between foreground catch-up syncs (see syncOnForeground).
+const FOREGROUND_SYNC_MIN_GAP_MS = 20000
 
 export default function GamePage() {
   return (

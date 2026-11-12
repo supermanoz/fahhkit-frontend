@@ -65,7 +65,12 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
   }, [])
   const spriteHeight = stageHeight ? Math.round(stageHeight * 0.875) : 190
 
-  const idleSrc = sprite?.poses?.idle?.src
+  // heroManifest.js's resolveManifest sets emotes.emote1 to this exact
+  // same object (not a copy) as poses.idle, so comparing by reference
+  // here (rather than a `.src`/url field - sheets-pack assets have no
+  // single src, see utils/emotes.js) still works regardless of which
+  // naming scheme a given hero's backend rows use.
+  const idlePose = sprite?.poses?.idle
   // filterVisibleEmotes drops this hero's hidden emotes (see
   // HIDDEN_EMOTES in emotes.js) before any slide/dot/count is built, so
   // they never occupy a slot at all - not even a locked one.
@@ -74,7 +79,7 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
     (hero.skins || []).filter((item) => item.category === 'EMOTE')
   )
   const isIdleAlias = (item) =>
-    resolveEmoteAsset(hero.name, item.name)?.src === idleSrc
+    Boolean(idlePose) && resolveEmoteAsset(hero.name, item.name) === idlePose
   // The one shared selector every "which emote is equipped" screen uses -
   // reads straight off ownedItems (refreshed by GamePage's loadStore after
   // every equip/unequip, and reloaded fresh from the backend on every app

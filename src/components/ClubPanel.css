@@ -992,6 +992,66 @@
   border-radius: 12px;
 }
 
+/* --- War History's own skeletons (ClubWarHistory.jsx) --- */
+.club-war-history-skeleton-row {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--border-soft);
+  background: var(--white);
+}
+
+.club-war-history-skeleton-badges {
+  flex-shrink: 0;
+  width: 46px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.club-war-history-skeleton-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.club-war-history-skeleton-name {
+  width: 70%;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.club-war-history-skeleton-meta {
+  width: 45%;
+  height: 11px;
+  border-radius: 4px;
+}
+
+.club-war-history-skeleton-result {
+  flex-shrink: 0;
+  width: 56px;
+  height: 20px;
+  border-radius: 999px;
+}
+
+/* One per participant row - 84px, matching the real
+   .club-war-history-participant's own min-height exactly (the brief's own
+   "update the skeleton to match the new row height"), not the shorter
+   roster-row skeleton above it in this file. */
+.club-war-history-skeleton-participant {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  margin-top: 8px;
+  border-radius: 12px;
+}
+
 .club-war-points {
   flex-shrink: 0;
   font-weight: 900;
@@ -1211,11 +1271,44 @@
   color: #1f1e1a;
 }
 
+/* Now several short stats rather than one sentence (brief: "total points,
+   members who ran / total, total km, average points per runner") - a
+   wrapping flex row of pill-free spans, separated by a middle dot so it
+   still reads as one line of related facts rather than a grid. */
 .club-war-history-squad-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
   margin: 8px 0 0;
   font-size: 12px;
   font-weight: 600;
   color: #5a574b;
+}
+
+.club-war-history-squad-summary > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.club-war-history-squad-summary > span:not(:last-child)::after {
+  content: '·';
+  margin: 0 6px;
+  color: #c9c6b8;
+}
+
+.club-war-history-squad-summary strong {
+  color: #1f1e1a;
+  font-weight: 800;
+}
+
+/* Only ever shown when the member-point sum genuinely disagrees with the
+   club's own declared score (squadTotals' own float-tolerance check) -
+   invisible in the overwhelmingly common case where they match. */
+.club-war-history-mismatch {
+  margin-left: 4px;
+  color: var(--game-red-dark, #a3230f);
+  cursor: help;
 }
 
 .club-war-history-participants {
@@ -1227,15 +1320,19 @@
   gap: 8px;
 }
 
-/* The row itself - full width, fixed height, nothing sized to its own
+/* The row itself - full width, fixed min-height, nothing sized to its own
    content. box-sizing: border-box so the border doesn't push it past
    100%; the "subtle 3px bottom edge" is a drop shadow, not a thicker
-   border, same bevel recipe as every other game-style card/button here. */
+   border, same bevel recipe as every other game-style card/button here.
+   84px (was 64px) - the new compact stat line under the name needs the
+   extra ~20px; a row with no available stats still renders at this
+   height (nothing reflows between rows in the same list, which would
+   otherwise look broken) rather than shrinking back to 64px. */
 .club-war-history-participant {
   all: unset;
   box-sizing: border-box;
   width: 100%;
-  min-height: 64px;
+  min-height: 84px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1249,6 +1346,13 @@
   transition:
     transform 0.08s ease,
     box-shadow 0.08s ease;
+}
+
+/* Expanded row keeps its square bottom corners so the detail panel below
+   reads as physically attached to it, not a separate floating card. */
+.club-war-history-participant.is-open {
+  border-radius: 12px 12px 0 0;
+  box-shadow: none;
 }
 
 .club-war-history-participant:active {
@@ -1325,6 +1429,155 @@
   color: #5a574b;
 }
 
+/* Compact per-member stat line (brief: "distance km, time, pace, and XP,
+   only the ones available") - wraps rather than clipping at 390px, since
+   hiding a real stat to fit one line would be worse than a two-line row.
+   gap-row smaller than gap-column so a wrap doesn't look like a big jump. */
+.club-war-history-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 2px;
+  column-gap: 8px;
+  margin-top: 2px;
+}
+
+.club-war-history-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5a574b;
+  white-space: nowrap;
+}
+
+.club-war-history-stat svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.club-war-history-stat-xp {
+  color: var(--pvp-accent-text);
+}
+
+/* Expand/collapse affordance - rotates in place rather than swapping
+   glyphs, so the row's layout never shifts when a run has nothing to
+   expand into (see the JSX: omitted entirely for a missed row). */
+.club-war-history-expand-chevron {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: #8a8777;
+  transition: transform 0.15s ease;
+}
+
+.club-war-history-expand-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* The detail panel under an expanded row - visually fused to the row
+   above (see .club-war-history-participant.is-open's own squared-off
+   bottom corners) via a shared border/shadow instead of looking like an
+   unrelated card dropped in underneath. */
+.club-war-history-expanded {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px 12px;
+  border: 2px solid var(--border-soft);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  background: var(--row);
+  box-shadow: 0 3px 0 var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.club-war-history-expanded-runs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.club-war-history-expanded-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a574b;
+}
+
+.club-war-history-expanded-run-time {
+  color: #8a8777;
+  font-weight: 600;
+}
+
+.club-war-history-expanded-run-points {
+  margin-left: auto;
+  color: var(--pvp-accent-text);
+  font-weight: 900;
+}
+
+.club-war-history-perk-bonus {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--game-gold-dark, #8a6512);
+}
+
+.club-war-history-contribution {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.club-war-history-contribution-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8a8777;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* "thin progress bar" per the brief - deliberately not the heavier
+   g-progress/club-war-score-bar components elsewhere (20px/10px, both
+   built for a labelled stat or a team-split bar), this one's just a sliver
+   under a label that already says the percentage in words. */
+.club-war-history-contribution-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--divider);
+}
+
+.club-war-history-contribution-fill {
+  height: 100%;
+  background: var(--pvp-accent, #dd571c);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.club-war-history-view-profile {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--white);
+  color: #1f1e1a;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.club-war-history-view-profile:active {
+  transform: translateY(1px);
+}
+
 .club-war-you-tag {
   flex-shrink: 0;
   margin-left: 6px;
@@ -1349,9 +1602,18 @@
 }
 
 /* Fixed-width result column so every row's score/status lines up
-   regardless of how long a name or hero label runs. */
-.club-war-history-result {
-  flex: 0 0 76px;
+   regardless of how long a name or hero label runs. Widened from the old
+   76px (score + one label) to fit the new RAN/MISSED caption under the
+   points number too.
+   Deliberately NOT .club-war-history-result - that class already belongs
+   to the war-LIST row's own VICTORY/DEFEAT pill further up this file (a
+   solid pill badge: border-radius:999px, a dark/green/red fill, uppercase
+   text) - reusing it here let this column silently inherit that pill's
+   background/border/padding/uppercase (same selector, same specificity,
+   so whichever properties this rule didn't redeclare fell through to that
+   one), extra ambient styling this per-member column never asked for. */
+.club-war-history-participant-result {
+  flex: 0 0 84px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1359,16 +1621,28 @@
   text-align: center;
 }
 
-.club-war-history-score {
+/* "+N pts" - the brief's own #DD571C orange, but as --pvp-accent-text
+   (the same hex's darker, AA-safe stop - see tokens.css's own
+   --pvp-orange-700 comment: plain #DD571C text fails WCAG AA on this
+   theme's off-white panels, which this row's card background is one of).
+   Reuses the PvP accent token rather than a literal hex so it stays in
+   sync if that token is ever retuned. */
+.club-war-history-points {
   font-size: 15px;
-  font-weight: 800;
-  color: #1f1e1a;
+  font-weight: 900;
+  color: var(--pvp-accent-text);
+  white-space: nowrap;
+}
+
+.club-war-history-points.is-muted {
+  color: #8a8777;
 }
 
 .club-war-history-result-label {
   font-size: 10px;
   font-weight: 700;
   color: #5a574b;
+  letter-spacing: 0.02em;
 }
 
 /* Top contributor on a squad - a small gold chip next to their name, not
@@ -1427,7 +1701,7 @@
 /* War History's own "✕ red if they missed" - scoped to this screen only,
    the live roster above keeps its deliberate slate (see that rule's own
    comment on why red stays reserved for close/danger buttons there). */
-.club-war-history-result .club-war-run-badge.is-missed {
+.club-war-history-participant-result .club-war-run-badge.is-missed {
   background: var(--game-red);
 }
 

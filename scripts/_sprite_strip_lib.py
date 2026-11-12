@@ -28,14 +28,6 @@ import re
 from PIL import Image
 
 PAD = 12
-PROFILE_CELL_H = 320  # HeroFigure.jsx / HeroSprite.jsx cell height
-# Emote-only art never renders above ~140px on screen (EmoteGlyph's largest
-# caller is the buy/showcase popup) - see the original Blaze script's own
-# comment for why building it at full profile height was pure waste (a
-# decoded ~320px-tall RGBA strip for art always shown shrunk to a sixth of
-# that - a root cause of the Me/Emotes-section lag that change fixed).
-EMOTE_CELL_H = 190
-WEBP_QUALITY = 82  # visually lossless at these sizes, 2-3x smaller than PNG
 MAP_CELL = (128, 170)  # matches the map marker's native cell
 
 
@@ -109,30 +101,6 @@ def linspace_indices(n, count):
     return [round(i * (n - 1) / (count - 1)) for i in range(count)]
 
 
-def build_profile_strip(frame_paths, crop_box, out_path, cell_h=PROFILE_CELL_H):
-    x0, y0, x1, y1 = crop_box
-    crop_w, crop_h = x1 - x0, y1 - y0
-    scale = cell_h / crop_h
-    cell_w, out_h = round(crop_w * scale), cell_h
-
-    strip = Image.new("RGBA", (cell_w * len(frame_paths), out_h), (0, 0, 0, 0))
-    for i, path in enumerate(frame_paths):
-        im = Image.open(path).convert("RGBA").crop(crop_box)
-        resized = im.resize((cell_w, out_h), Image.LANCZOS)
-        strip.paste(resized, (i * cell_w, 0), resized)
-
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    if out_path.endswith(".webp"):
-        strip.save(out_path, "WEBP", quality=WEBP_QUALITY, method=6)
-    else:
-        strip.save(out_path, optimize=True)
-    print(
-        "saved", out_path, strip.size, "frames=", len(frame_paths),
-        "cell=", (cell_w, out_h), "bytes=", os.path.getsize(out_path),
-    )
-    return {"frames": len(frame_paths), "frameWidth": cell_w, "frameHeight": out_h}
-
-
 def build_map_strip(frame_paths, crop_box, out_path):
     x0, y0, x1, y1 = crop_box
     crop_w, crop_h = x1 - x0, y1 - y0
@@ -156,24 +124,25 @@ def build_map_strip(frame_paths, crop_box, out_path):
     return {"frames": len(frame_paths), "frameWidth": cell_w, "frameHeight": cell_h}
 
 
-WEBP_MAX_STRIP_PX = 16383  # hard format limit; AnimatedSprite.jsx steps one
-# single horizontal strip (no grid support), so a strip can never be wider
-# than this regardless of how many source frames exist - see build_bolt_
-# stretch_strips.py's "idle"/"hip_hop" sets (2026-10-30), which hand-picked
-# the largest frame count that still fit for each animation. This computes
-# that same cap automatically instead, per set, from the actual crop size.
+WEBP_MAX_STRIP_PX = 16383  # hard format limit; the map marker still steps
+# one single horizontal strip (no grid support - unlike sheets/, which is
+# what scripts/build_emote_sheets.py uses for everything that DOES need
+# one), so a strip can never be wider than this regardless of how many
+# source frames exist. This computes that cap automatically, from the
+# actual crop size.
 
 
-def build_set(src_root, folders, desired_frames, outputs):
+def build_set(src_root, folders, desired_frames, out_path):
     """folders: rel paths under src_root sampled+concatenated (one shared
     crop box across all of them, so a multi-folder set doesn't jump in
-    scale/position switching folders). outputs: list of (out_path, kind,
-    cell_h) where kind is "profile" or "map". desired_frames is sampled per
-    folder, then capped (see WEBP_MAX_STRIP_PX above) by whichever output
-    cell comes out widest - a set with a tall/wide crop or very high source
-    frame count gets fewer frames automatically rather than silently
-    producing an unloadable strip. Returns {kind: manifest entry dict}
-    (file path filled in by the caller)."""
+    scale/position switching folders). desired_frames is sampled down to
+    whatever fits under WEBP_MAX_STRIP_PX for the map marker's fixed cell
+    width - a very high source frame count gets fewer frames automatically
+    rather than silently producing an unloadable strip (map/ only - this
+    downsampling is deliberate and unchanged by the 2026-11 emote rebuild,
+    which only touches profile idle + emotes, built separately by
+    scripts/build_emote_sheets.py with no downsampling at all). Returns the
+    map manifest entry dict (file path filled in by the caller)."""
     all_files = {folder: list_frames(src_root, folder) for folder in folders}
     for folder, files in all_files.items():
         if not files:
@@ -199,12 +168,8 @@ def build_set(src_root, folders, desired_frames, outputs):
         min(canvas_w, x1 + PAD),
         min(canvas_h, y1 + PAD),
     )
-    crop_w, crop_h = crop_box[2] - crop_box[0], crop_box[3] - crop_box[1]
 
-    max_frames = desired_frames
-    for _out_path, kind, cell_h in outputs:
-        cell_w = MAP_CELL[0] if kind == "map" else round(crop_w * (cell_h / crop_h))
-        max_frames = min(max_frames, WEBP_MAX_STRIP_PX // cell_w)
+    max_frames = min(desired_frames, WEBP_MAX_STRIP_PX // MAP_CELL[0])
 
     frame_paths = []
     for folder in folders:
@@ -212,13 +177,7 @@ def build_set(src_root, folders, desired_frames, outputs):
         for i in linspace_indices(len(files), max_frames):
             frame_paths.append(files[i])
 
-    results = {}
-    for out_path, kind, cell_h in outputs:
-        if kind == "map":
-            results[kind] = build_map_strip(frame_paths, crop_box, out_path)
-        else:
-            results[kind] = build_profile_strip(frame_paths, crop_box, out_path, cell_h)
-    return results
+    return build_map_strip(frame_paths, crop_box, out_path)
 
 
 def write_manifest(out_dir, manifest):
@@ -229,21 +188,67 @@ def write_manifest(out_dir, manifest):
     print("saved", path)
 
 
-# --- Numbered-emote pack builder -------------------------------------
-#
+def verify_manifest_matches_strips(out_dir):
+    """Re-opens every strip this manifest.json names and recomputes its real
+    frame count from pixel width (strip width / frameWidth), asserting it
+    exactly matches the "frames" value just written - fails the build
+    (SystemExit) on any mismatch instead of letting a wrong number reach
+    the frontend silently.
+
+    Every strip here is built as Image.new(..., (cell_w * len(frame_paths),
+    ...)) (see build_profile_strip/build_map_strip) and "frames" is always
+    written as that same len(frame_paths), so within a single run these
+    can never actually disagree - what this guards against is manifest.json
+    drifting from the real asset afterward (a hand-edit, a stale manifest
+    left behind after an asset file was swapped some other way, or a
+    manifest committed from a different pipeline run than the strip next
+    to it). Also runnable standalone, read-only, via
+    scripts/audit_hero_sprite_frames.py - this function doesn't need the
+    raw source drop, only what's already in out_dir.
+    """
+    manifest_path = os.path.join(out_dir, "manifest.json")
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    problems = []
+
+    def check(label, entry):
+        path = os.path.join(out_dir, entry["file"])
+        if not os.path.exists(path):
+            problems.append(f"{label}: {entry['file']} missing on disk")
+            return
+        real = Image.open(path).width / entry["frameWidth"]
+        if abs(real - entry["frames"]) > 0.01:
+            problems.append(
+                f"{label}: manifest says {entry['frames']} frames, "
+                f"strip ({entry['file']}) is actually {real:.2f}"
+            )
+
+    for group in ("profile", "map"):
+        for key, entry in manifest.get(group, {}).items():
+            check(f"{group}.{key}", entry)
+    for key, entry in manifest.get("emotes", {}).items():
+        if "pose" in entry:
+            continue  # idle alias - already checked as profile.idle above
+        check(f"emotes.{key}", entry)
+
+    if problems:
+        raise SystemExit(
+            f"{manifest.get('hero', '?')}: manifest/strip frame-count "
+            "mismatch:\n" + "\n".join(f"  - {p}" for p in problems)
+        )
+
+
 # Every hero's drop uses different animation-folder names (and plenty of
 # typos - "Sqaud"/"Squasd"/"Air squat" all mean squat), so there is no
-# shared vocabulary to key emotes by name across all 7 characters. Instead
-# every hero's emotes are numbered densely (emote1, emote2, ...), always in
+# shared vocabulary to key emotes by name across all 7 characters - instead
+# every hero's idle + numbered emotes are resolved by keyword category, in
 # this same priority order, skipping whatever category that hero's drop
-# doesn't have - emote1 is always idle (it's an alias onto the idle pose,
-# not a separate file - same zero-extra-bytes mechanism the old "classic"
-# emote used). See each build_<hero>_stretch_strips.py call site for the
-# one-line rationale on why renumbering an already-named roster (Blaze/
-# Bolt/Comet) is still worth it here: a uniform scheme across all 7 beats
-# three different naming conventions, at the cost of a backend StoreItem
-# rename for whichever of their emotes are already purchased in production
-# (tracked separately, not part of this script).
+# doesn't have. Shared by scripts/build_emote_sheets.py (the current
+# profile/emote pipeline - lossless grid sheets, every source frame, no
+# resize) and this file's own build_hero_pack (map marker only - see its
+# own docstring for why that one stayed on the old single-row-strip
+# approach instead).
 CATEGORY_ORDER = [
     ("dance", (("hip", "hop"), ("danc",))),
     ("victory", (("victory",),)),
@@ -260,18 +265,19 @@ CATEGORY_ORDER = [
 
 IDLE_FRAMES = 48  # matches the map marker's existing idle cadence
 RUN_FRAMES = 15  # matches the map marker's existing run cadence
-EMOTE_FRAMES = 60  # desired; build_set auto-caps per animation to whatever
-# actually fits under WEBP_MAX_STRIP_PX for that crop
 
 
-def build_hero_pack(
-    hero,
-    src_root,
-    out_root,
-    idle_frames=IDLE_FRAMES,
-    run_frames=RUN_FRAMES,
-    emote_frames=EMOTE_FRAMES,
-):
+def build_hero_pack(hero, src_root, out_root, idle_frames=IDLE_FRAMES, run_frames=RUN_FRAMES):
+    """Builds ONLY this hero's map/ marker strips (idle + run - the
+    continuously-moving overlay on the live territory map, a different
+    rendering problem than a framed idle/emote display and not part of the
+    2026-11 emote rebuild - see heroManifest.js's own comment on why it
+    stayed on this older, resized/downsampled-on-purpose pipeline).
+    Profile idle + every numbered emote are built separately, by
+    scripts/build_emote_sheets.py, as lossless multi-sheet packs under
+    sheets/ - this function no longer touches that output at all (it used
+    to, before the 2026-11 rebuild - see git history for the old
+    profile/emote strip code this replaced)."""
     idle_folder = next(
         (e for e in list_subfolders(src_root) if normalize(e) == "idle"), None
     )
@@ -281,21 +287,15 @@ def build_hero_pack(
     if not idle_front:
         raise SystemExit(f"{hero}: no front-view angle under {idle_folder}")
 
-    manifest = {"hero": hero, "map": {}, "profile": {}, "emotes": {}}
+    manifest = {"hero": hero, "map": {}}
 
-    idle_outputs = [
-        (os.path.join(out_root, "profile", "idle.webp"), "profile", PROFILE_CELL_H),
-        (os.path.join(out_root, "map", "idle.png"), "map", None),
-    ]
-    idle_results = build_set(
-        src_root, [f"{idle_folder}/{idle_front}"], idle_frames, idle_outputs
+    idle_result = build_set(
+        src_root,
+        [f"{idle_folder}/{idle_front}"],
+        idle_frames,
+        os.path.join(out_root, "map", "idle.png"),
     )
-    manifest["profile"]["idle"] = {
-        "file": "profile/idle.webp",
-        **idle_results["profile"],
-    }
-    manifest["map"]["idle"] = {"file": "map/idle.png", **idle_results["map"]}
-    manifest["emotes"]["emote1"] = {"pose": "idle"}
+    manifest["map"]["idle"] = {"file": "map/idle.png", **idle_result}
 
     running_folder = find_category(src_root, ("running",))
     run_back = (
@@ -304,44 +304,17 @@ def build_hero_pack(
         else None
     )
     if run_back:
-        run_results = build_set(
+        run_result = build_set(
             src_root,
             [f"{running_folder}/{run_back}"],
             run_frames,
-            [(os.path.join(out_root, "map", "run.png"), "map", None)],
+            os.path.join(out_root, "map", "run.png"),
         )
-        manifest["map"]["run"] = {"file": "map/run.png", **run_results["map"]}
+        manifest["map"]["run"] = {"file": "map/run.png", **run_result}
     else:
         print(f"WARNING: {hero}: no 'Running' top-back angle found - map.run skipped")
 
-    next_n = 2
-    for key, groups in CATEGORY_ORDER:
-        folder = find_category(src_root, *groups)
-        if not folder:
-            continue
-        front = find_front_view(os.path.join(src_root, folder))
-        if not front:
-            print(f"WARNING: {hero}: '{folder}' has no front-view angle, skipped")
-            continue
-        if not list_frames(src_root, f"{folder}/{front}"):
-            print(
-                f"WARNING: {hero}: '{folder}/{front}' has 0 frames (empty "
-                "source folder), skipped"
-            )
-            continue
-        is_dance = key == "dance"
-        cell_h = PROFILE_CELL_H if is_dance else EMOTE_CELL_H
-        sub = "profile" if is_dance else "emotes"
-        emote_key = f"emote{next_n}"
-        out_name = f"{emote_key}.webp"
-        out_path = os.path.join(out_root, sub, out_name)
-        result = build_set(
-            src_root, [f"{folder}/{front}"], emote_frames,
-            [(out_path, "profile", cell_h)],
-        )
-        manifest["emotes"][emote_key] = {"file": f"{sub}/{out_name}", **result["profile"]}
-        next_n += 1
-
     os.makedirs(out_root, exist_ok=True)
     write_manifest(out_root, manifest)
+    verify_manifest_matches_strips(out_root)
     return manifest

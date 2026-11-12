@@ -4,8 +4,8 @@ import { getHero, hasHero } from './heroManifest'
 // the emote popup, the Me tab, any other list) without touching the
 // backend row or deleting the built asset - see isHiddenEmote/
 // filterVisibleEmotes below for where this actually takes effect. Keyed by
-// hero name, values are manifest emote keys (see heroManifest.js /
-// scripts/build_<hero>_stretch_strips.py) - both sides matched through
+// hero name, values are sheets-pack emote keys (see heroManifest.js /
+// scripts/build_emote_sheets.py) - both sides matched through
 // normalizeEmoteKey so "Emote 5"/"emote_5"/"emote5" all hit the same entry
 // regardless of which spacing a given backend StoreItem.name row uses.
 const HIDDEN_EMOTES = {
@@ -76,13 +76,13 @@ export function filterVisibleEmotes(heroName, items) {
 // Emote names every real hero is expected to have - used only to decide
 // whether an UNKNOWN hero's request should fall back to Blaze's. A
 // genuinely hero-specific emote further down a hero's numbering (which
-// varies hero to hero - see each manifest.json's "emotes", built by
-// scripts/build_<hero>_stretch_strips.py) has no such universal
-// expectation, so it stays null instead of silently showing Blaze's under
-// the wrong name - see resolveEmoteAsset below. "emote1" is a pose alias
-// onto idle (every hero has one, same mechanism "classic" used to be);
-// "emote2" is its own dedicated file (a dance/hip-hop-style pose, the one
-// other animation every hero's asset drop also happens to include).
+// varies hero to hero - see each hero's own sheets/ folder, built by
+// scripts/build_emote_sheets.py) has no such universal expectation, so it
+// stays null instead of silently showing Blaze's under the wrong name -
+// see resolveEmoteAsset below. "emote1" is an alias onto idle (every hero
+// has one, same mechanism "classic" used to be); "emote2" is its own
+// dedicated sheets pack (a dance/hip-hop-style pose, the one other
+// animation every hero's asset drop also happens to include).
 const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 
 // Central emote registry - the ONLY place in the app that turns an EMOTE
@@ -96,15 +96,14 @@ const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 // PvP, run view, ...) must go through resolveEmoteAsset below instead of
 // reading item.assetUrl itself, or it will always get a locked/blank card.
 //
-// Backed by each hero's own manifest.json (see heroManifest.js and
-// src/assets/heroes/<hero>/) - keyed by hero name, then by the backend
-// StoreItem.name, both lowercased and trimmed. A new hero's emotes need
-// only a matching "emotes" entry in its manifest.json plus the art itself
-// (built via scripts/build_<hero>_stretch_strips.py, which numbers every
-// hero's emotes densely as "emote1", "emote2", ... - idle is always
-// emote1 - since the artist's own animation-folder names/typos have no
-// shared vocabulary across heroes to key a descriptive name by), nothing
-// else in the app.
+// Backed by each hero's own sheets/ pack (see heroManifest.js and
+// src/assets/heroes/<hero>/sheets/) - keyed by hero name, then by the
+// backend StoreItem.name, both lowercased and trimmed. A new hero's
+// emotes need only a matching sheets/emoteN/ folder (built via
+// scripts/build_emote_sheets.py, which numbers every hero's emotes
+// densely as "emote1", "emote2", ... - idle is always emote1 - since the
+// artist's own animation-folder names/typos have no shared vocabulary
+// across heroes to key a descriptive name by), nothing else in the app.
 //
 // An entry here only lights up in the Shop once a matching EMOTE StoreItem
 // row exists with that exact name (case-insensitive) and the right heroId -
@@ -122,7 +121,7 @@ const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 // key (checked all 7) - it's always meant as this hero's idle-alias slot,
 // the same role "emote1" plays everywhere else in this registry, just
 // under the backend's own fixed name instead of the numbered scheme
-// scripts/build_<hero>_stretch_strips.py uses for every OTHER emote.
+// scripts/build_emote_sheets.py uses for every OTHER emote.
 // Without this (EMOTE_NAME_ALIASES, above), "Classic" resolves to nothing:
 // this was the actual cause of another player's profile showing their
 // hero but never their equipped emote (see athleteProfileHero.js) -
@@ -130,9 +129,12 @@ const ALIAS_EMOTE_NAMES = new Set(['emote1', 'emote2'])
 // else, so for a large share of real accounts this was never a locally-
 // missing-art edge case, it was every untouched hero.
 //
-// Returns {src, frames, frameWidth, frameHeight} for a given hero name +
-// backend StoreItem.name, or null if no manifest has art for it (the
-// caller shows its own placeholder - see EmoteGlyph.jsx). Deliberately NOT
+// Returns {frameCount, frameWidth, frameHeight, sheets} (see
+// heroManifest.js's resolveSheets - sheets is every lossless grid sheet
+// this sequence is packed across, each with its own lazy loadUrl) for a
+// given hero name + backend StoreItem.name, or null if no sheets pack has
+// art for it (the caller shows its own placeholder - see EmoteGlyph.jsx).
+// Deliberately NOT
 // coerced through getHero's Blaze fallback for hero-specific art (a
 // hero-specific emote isn't appropriate to show under an unrelated hero's
 // name) - "emote1"/"emote2" still resolve through it (ALIAS_EMOTE_NAMES
@@ -186,7 +188,7 @@ export function knownEmoteNames(heroName) {
 // is being displayed rather than offered for selection - the Me tab and
 // both branches of athleteProfileHero.js's other-player resolve. Comet's
 // emote2/emote4 are hidden from the shop but have real, working local art
-// (see heroes/comet/manifest.json) - without ignoreHidden, a player who
+// (see heroes/comet/sheets/) - without ignoreHidden, a player who
 // has one equipped would see it vanish from their own profile and everyone
 // else's, falling back to idle, even though nothing is actually missing.
 export function resolveEquippedEmoteItem(

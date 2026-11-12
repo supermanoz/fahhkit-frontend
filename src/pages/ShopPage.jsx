@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ApiError } from '../api/client'
 import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
@@ -24,6 +24,14 @@ const SKELETON_COUNT = 6
 export default function ShopPage() {
   const { isAuthed } = useCurrentUser()
   const navigate = useNavigate()
+  // ?pack=<fahhcoinAmount> - the in-game Buy-redirect popup's "Continue to
+  // Shop" (GamePage.jsx's handleContinueToShop/openShopPack) lands here
+  // with this set, so the pack they already picked in-game is highlighted/
+  // scrolled to rather than making them hunt for it again in the grid.
+  const [searchParams] = useSearchParams()
+  const highlightAmount = Number(searchParams.get('pack')) || null
+  const highlightedCardRef = useRef(null)
+  const [hasScrolledToHighlight, setHasScrolledToHighlight] = useState(false)
 
   const [bundles, setBundles] = useState(null)
   const [bundlesError, setBundlesError] = useState(null)
@@ -55,6 +63,19 @@ export default function ShopPage() {
       cancelled = true
     }
   }, [isAuthed])
+
+  // Fires once bundles actually load (the highlighted card's ref doesn't
+  // exist before then) - hasScrolledToHighlight guards against re-scrolling
+  // on some later, unrelated re-render (e.g. the balance pill updating).
+  useEffect(() => {
+    if (!highlightAmount || hasScrolledToHighlight) return
+    if (!highlightedCardRef.current) return
+    highlightedCardRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+    setHasScrolledToHighlight(true)
+  }, [bundles, highlightAmount, hasScrolledToHighlight])
 
   function loadBundles() {
     setBundlesError(null)
@@ -137,6 +158,12 @@ export default function ShopPage() {
                     bundle={bundle}
                     tier={index}
                     onSelect={() => handlePick(bundle)}
+                    isHighlighted={bundle.fahhcoinAmount === highlightAmount}
+                    cardRef={
+                      bundle.fahhcoinAmount === highlightAmount
+                        ? highlightedCardRef
+                        : undefined
+                    }
                   />
                 ))
               : Array.from({ length: SKELETON_COUNT }, (_, i) => (
@@ -204,9 +231,14 @@ export default function ShopPage() {
 }
 
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-function PackCard({ bundle, tier, onSelect }) {
+function PackCard({ bundle, tier, onSelect, isHighlighted, cardRef }) {
   return (
-    <button type="button" className="shop-pack-card" onClick={onSelect}>
+    <button
+      ref={cardRef}
+      type="button"
+      className={`shop-pack-card ${isHighlighted ? 'is-highlighted' : ''}`}
+      onClick={onSelect}
+    >
       {bundle.badge === 'BEST_VALUE' && (
         <span className="shop-pack-badge is-best">Best Value</span>
       )}

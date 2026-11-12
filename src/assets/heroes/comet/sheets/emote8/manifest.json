@@ -1,0 +1,13 @@
+{
+  "frameCount": 77,
+  "frameWidth": 233,
+  "frameHeight": 448,
+  "sheets": [
+    {
+      "file": "sheet0.webp",
+      "cols": 17,
+      "rows": 5,
+      "frames": 77
+    }
+  ]
+}

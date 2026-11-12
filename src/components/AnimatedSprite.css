@@ -1,26 +1,21 @@
 .animated-sprite {
+  position: relative;
   display: block;
-  background-repeat: no-repeat;
-  background-size: var(--hero-strip-width) 100%;
   filter: drop-shadow(0 6px 4px rgba(0, 0, 0, 0.5));
-  animation: animated-sprite-frames 1.4s steps(var(--hero-frames)) infinite;
 }
 
-.animated-sprite.is-fast {
-  animation-duration: 0.5s;
+/* The frame-0 preview and the canvas player occupy the exact same box,
+   cross-faded by opacity (see AnimatedSprite.jsx) - never both visibly "on"
+   at once, so there's no flash swapping between them once the canvas is
+   ready. */
+.animated-sprite-static,
+.animated-sprite-canvas {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.12s ease;
 }
 
-@keyframes animated-sprite-frames {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: calc(-1 * var(--hero-strip-width)) 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animated-sprite {
-    animation: none;
-  }
+.animated-sprite-static {
+  background-repeat: no-repeat;
+  background-position: 0 0;
 }

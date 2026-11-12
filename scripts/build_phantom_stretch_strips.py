@@ -1,4 +1,4 @@
-"""Builds Phantom's sprite pack straight into src/assets/heroes/phantom/ -
+"""Builds Phantom's MAP MARKER pack only (see build_blaze_stretch_strips.py's docstring - profile/emotes moved to build_emote_sheets.py) straight into src/assets/heroes/phantom/ -
 a brand new manifest (Phantom had no bundled art before this), so no
 backend rename is needed for this one. See build_blaze_stretch_strips.py's
 docstring for the shared mechanics (unified source drop, WebP-width-capped

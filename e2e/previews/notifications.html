@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Notification previews</title>
+<style>
+  /* Real asset + colours: android/app/src/main/res/font/passion_one_bold.ttf,
+     values/colors.xml (runNotif*, colorPrimary). */
+  @font-face {
+    font-family: 'PassionOne';
+    src: url('../../android/app/src/main/res/font/passion_one_bold.ttf');
+  }
+  :root {
+    --hdr-run-a: #F97316;  --hdr-run-b: #C2410C;      /* runNotifHeaderStart/End */
+    --hdr-pause-a: #8B5CF6; --hdr-pause-b: #6D28D9;   /* runNotifHeaderPausedStart/End */
+    --body: #FFFBF7; --value: #2B2A24; --label: #6B6759;
+    --brand: #DD571C;                                  /* colorPrimary / LocalNotifications iconColor */
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 40px; background: #1d1f24; color: #e8e8e8;
+         font-family: Roboto, 'Segoe UI', Arial, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .banner { font-size: 13px; color: #ffcf8a; margin: 0 0 20px; max-width: 420px; }
+  .grid { display: flex; flex-direction: column; gap: 22px; align-items: flex-start; }
+  .preview { width: 392px; padding: 12px; background: #2a2d34; border-radius: 14px; }
+  .caption { font-size: 12px; font-weight: 700; margin: 0 0 2px; color: #fff; }
+  .tag { font-size: 10.5px; color: #ffcf8a; margin: 0 0 8px; }
+  .note { font-size: 11.5px; color: #b9bcc4; margin: 8px 0 0; line-height: 1.4; }
+
+  /* Android shade card (Material-ish, dark shade). */
+  .notif { background: #3a3d45; border-radius: 22px; padding: 10px 14px 12px; }
+  .notif-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c9ccd3; margin-bottom: 6px; }
+  .small-icon { width: 18px; height: 18px; border-radius: 50%; background: var(--brand);
+                display: grid; place-items: center; }
+  .small-icon img { width: 12px; height: 12px; filter: brightness(0) invert(1); }
+  .app { font-weight: 600; } .dot { opacity: .6; }
+  .notif-title { color: #fff; font-size: 14px; font-weight: 600; }
+  .notif-text { color: #d6d8de; font-size: 13px; margin-top: 2px; line-height: 1.35; }
+
+  /* Custom RemoteViews content (notification_run_collapsed / _expanded). */
+  .run-hdr { color: #fff; text-align: center; font-weight: 700;
+             border-radius: 16px 16px 0 0; background: linear-gradient(90deg, var(--hdr-run-a), var(--hdr-run-b)); }
+  .run-hdr.paused { background: linear-gradient(90deg, var(--hdr-pause-a), var(--hdr-pause-b)); }
+  .run-body { display: flex; background: var(--body); border-radius: 0 0 16px 16px; }
+  .cell { flex: 1; text-align: center; }
+  .val { font-family: 'PassionOne', sans-serif; font-weight: 700; color: var(--value); }
+  .lbl { color: var(--label); }
+  .collapsed .run-hdr { font-size: 13px; padding: 6px 0; }
+  .collapsed .run-body { padding: 8px 0; }
+  .collapsed .val { font-size: 16px; } .collapsed .lbl { font-size: 9px; }
+  .expanded .run-hdr { font-size: 16px; padding: 12px 0; }
+  .expanded .run-body { padding: 16px 0; }
+  .expanded .val { font-size: 22px; } .expanded .lbl { font-size: 11px; margin-top: 2px; }
+  .size-label { font-size: 10.5px; color: #9aa0aa; margin: 8px 0 4px; }
+  .empty { background: #3a3d45; border-radius: 22px; padding: 18px 14px; color: #c9ccd3; font-size: 13px; }
+  .empty b { color: #fff; }
+</style>
+</head>
+<body>
+<h1>Run Conquest - notification previews</h1>
+<p class="banner">PREVIEWS, not device captures. Hand-built HTML using the strings, colours,
+font and layout sizes from the real code (RunNotificationPlugin.java, notification_run_*.xml,
+colors.xml, src/config/reminders.js, utils/geo.js). Real OS rendering (fonts, shade colours, Android
+version styling) will differ slightly.</p>
+<div class="grid">
+
+  <!-- 1. RUNNING -->
+  <section class="preview" data-id="running">
+    <p class="caption">1. Android - run in progress (Running)</p>
+    <p class="tag">PREVIEW - channel "Active run", IMPORTANCE_LOW, silent, ongoing, id 28351</p>
+    <p class="size-label">Collapsed</p>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span></div>
+      <div class="collapsed">
+        <div class="run-hdr">Running</div>
+        <div class="run-body">
+          <div class="cell"><div class="val">12:34</div><div class="lbl">Time</div></div>
+          <div class="cell"><div class="val">5:42</div><div class="lbl">Avg. pace (/km)</div></div>
+          <div class="cell"><div class="val">2.18</div><div class="lbl">Distance (km)</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="size-label">Expanded</p>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span></div>
+      <div class="expanded">
+        <div class="run-hdr">Running</div>
+        <div class="run-body">
+          <div class="cell"><div class="val">12:34</div><div class="lbl">Time</div></div>
+          <div class="cell"><div class="val">5:42</div><div class="lbl">Avg. pace (/km)</div></div>
+          <div class="cell"><div class="val">2.18</div><div class="lbl">Distance (km)</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Time is re-posted every 1 s by the plugin's own timer; distance and pace only change when an accepted GPS fix arrives (at most every 2.5 s). Tap anywhere returns to the app. No action buttons.</p>
+  </section>
+
+  <!-- 2. FIRST 30 s / pace placeholder -->
+  <section class="preview" data-id="running-start">
+    <p class="caption">2. Android - first seconds of a run (pace placeholder "--")</p>
+    <p class="tag">PREVIEW - pace stays "--" until 30 s moving AND the minimum distance (notificationPaceLabel)</p>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span></div>
+      <div class="collapsed">
+        <div class="run-hdr">Running</div>
+        <div class="run-body">
+          <div class="cell"><div class="val">0:07</div><div class="lbl">Time</div></div>
+          <div class="cell"><div class="val">--</div><div class="lbl">Avg. pace (/km)</div></div>
+          <div class="cell"><div class="val">0.00</div><div class="lbl">Distance (km)</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. PAUSED -->
+  <section class="preview" data-id="paused">
+    <p class="caption">3. Android - Training run paused</p>
+    <p class="tag">PREVIEW - purple "Paused" header, clock frozen (stopTicking), only Training runs can pause</p>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span></div>
+      <div class="collapsed">
+        <div class="run-hdr paused">Paused</div>
+        <div class="run-body">
+          <div class="cell"><div class="val">12:34</div><div class="lbl">Time</div></div>
+          <div class="cell"><div class="val">5:42</div><div class="lbl">Avg. pace (/km)</div></div>
+          <div class="cell"><div class="val">2.18</div><div class="lbl">Distance (km)</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">While paused the GPS watcher is removed, which ends the foreground service; this notification then stays as a plain ongoing notification until Resume or Stop.</p>
+  </section>
+
+  <!-- 4. GPS LOST -->
+  <section class="preview" data-id="gps-lost">
+    <p class="caption">4. Android - GPS lost mid-run (behaviour TODAY)</p>
+    <p class="tag">PREVIEW - there is no dedicated GPS-lost state in the code</p>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span></div>
+      <div class="collapsed">
+        <div class="run-hdr">Running</div>
+        <div class="run-body">
+          <div class="cell"><div class="val">18:05</div><div class="lbl">Time</div></div>
+          <div class="cell"><div class="val">5:42</div><div class="lbl">Avg. pace (/km)</div></div>
+          <div class="cell"><div class="val">2.18</div><div class="lbl">Distance (km)</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">What the runner sees: still "Running", the clock keeps counting, distance and pace stay frozen at the last good fix. Fixes worse than MAX_ACCEPTABLE_ACCURACY_METERS are silently dropped. A GPS-lost / low-accuracy state is in the proposals table.</p>
+  </section>
+
+  <!-- 5. PLUGIN DEFAULT -->
+  <section class="preview" data-id="service-default">
+    <p class="caption">5. Android - foreground-service default text</p>
+    <p class="tag">PREVIEW - strings from utils/geo.js (backgroundTitle / backgroundMessage)</p>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span></div>
+      <div class="notif-title">Run in progress</div>
+      <div class="notif-text">Tracking your territory run - tap to return.</div>
+    </div>
+    <p class="note">The background-geolocation plugin posts this first (id 28351); RunNotificationPlugin replaces it with the stats card above once the watcher is up. It is what shows if the custom view ever fails to take over.</p>
+  </section>
+
+  <!-- 6. RUN SAVED -->
+  <section class="preview" data-id="run-finished">
+    <p class="caption">6. Android - run finished / saved</p>
+    <p class="tag">PREVIEW - nothing is shown (not implemented)</p>
+    <div class="empty"><b>No notification.</b> stop() cancels notification 28351 and nothing replaces it; the result is only the in-app Run Rewards modal. No "run saved" / "territory claimed" notification exists.</div>
+  </section>
+
+  <!-- 7. DAILY REMINDERS -->
+  <section class="preview" data-id="reminders">
+    <p class="caption">7. Android - daily "Run Conquest" reminders (local notifications)</p>
+    <p class="tag">PREVIEW - channel "Run reminders" (HIGH, sound+vibration+lights); title and messages from src/config/reminders.js</p>
+    <div class="notif" style="margin-bottom:8px">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span><span class="dot">&bull;</span><span>7:30 AM</span></div>
+      <div class="notif-title">Run Conquest</div>
+      <div class="notif-text">Rise and run! 🌅 Claim some territory before the day starts.</div>
+    </div>
+    <div class="notif" style="margin-bottom:8px">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span><span class="dot">&bull;</span><span>1:00 PM</span></div>
+      <div class="notif-title">Run Conquest</div>
+      <div class="notif-text">Lunch break run? 🏃 Your streets are waiting.</div>
+    </div>
+    <div class="notif">
+      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
+        <span class="app">Run Conquest</span><span class="dot">&bull;</span><span>7:00 PM</span></div>
+      <div class="notif-title">Run Conquest</div>
+      <div class="notif-text">Evening run time! 🌙 Defend your territory, let’s go!</div>
+    </div>
+    <p class="note">3 slots a day, each rotating 3 messages by day-of-year, scheduled 14 days ahead. Today's remaining slots are cancelled after a run is saved. Tapping just opens the app (no deep link).</p>
+  </section>
+
+  <!-- 8. BROADCAST -->
+  <section class="preview" data-id="broadcast">
+    <p class="caption">8. Broadcast / news</p>
+    <p class="tag">PREVIEW - no OS notification exists</p>
+    <div class="empty"><b>Not in the notification bar.</b> Broadcasts arrive over the STOMP socket (/all/mail) while the app is open, or by fetch when it opens / returns to the foreground. They show as the in-app Announcement popup (important notices), the unread badge and the News tab - see broadcast-*.png.</div>
+  </section>
+
+  <!-- 9. iOS -->
+  <section class="preview" data-id="ios">
+    <p class="caption">9. iOS - run in progress</p>
+    <p class="tag">PREVIEW - nothing custom is built</p>
+    <div class="empty"><b>No lock-screen stats.</b> RunNotification is Android-only. On iOS the only indicator is the system's blue location pill / status-bar indicator while tracking in the background (showsBackgroundLocationIndicator). Live Activity is in the proposals table.</div>
+  </section>
+
+</div>
+</body>
+</html>

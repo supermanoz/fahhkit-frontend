@@ -692,18 +692,17 @@
 }
 
 .game-territory-entry-banner {
-  position: absolute;
-  top: 76px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 700;
+  /* Centred by its .game-popup-layer.is-top wrapper - no left:50% or CSS
+     transform here, since the entry animation sets its own transform. */
+  position: relative;
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: 8px;
   /* Long owner names must wrap instead of overflowing past the screen
      edge and getting sliced off by .game-page's overflow: hidden - same
      safe-width treatment as .game-weather-hype. */
-  width: min(360px, calc(100% - 32px));
+  width: min(360px, 100%);
   box-sizing: border-box;
   padding: 10px 18px;
   border-radius: 20px;
@@ -1461,14 +1460,51 @@
   font-family: 'Passion One', 'Trebuchet MS', sans-serif;
 }
 
-.game-claim-toast {
+/* Full-viewport flex layer every game popup/toast sits in. inset:0 pins it
+   to the real visible edges (not 100vw, not left:50%), so centring can't
+   drift or crop on iOS Safari / notches; the card inside is animated with
+   opacity+scale only, so the animation can never break the centring.
+   pointer-events:none keeps the map tappable around the card. */
+.game-popup-layer {
   position: fixed;
-  left: 50%;
-  bottom: calc(var(--sheet-h, 90px) + 26px);
+  inset: 0;
   z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+/* Banner variant: top-aligned, below the HUD, under menus/sheets (z 700). */
+.game-popup-layer.is-top {
+  z-index: 700;
+  align-items: flex-start;
+  padding-top: max(76px, calc(env(safe-area-inset-top) + 60px));
+}
+
+/* Run-in-progress toasts sit just above the bottom sheet instead. */
+.game-popup-layer.is-bottom {
+  align-items: flex-end;
+  padding-bottom: calc(var(--sheet-h, 90px) + 26px);
+}
+
+.game-claim-toast {
+  /* Positioned by .game-popup-layer (a full-viewport flex wrapper), never
+     by left:50% + a transform: that pattern shifts the card off-centre on
+     iOS Safari whenever the layout viewport and 100vw disagree. */
+  position: relative;
+  box-sizing: border-box;
+  width: min(92vw, 380px);
+  max-width: 100%;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  pointer-events: auto;
   padding: 20px 28px;
   text-align: center;
-  max-width: 90vw;
   background: var(--game-panel);
   border: 3px solid var(--game-ink);
   border-radius: 20px;
@@ -1503,10 +1539,7 @@
    anchored to the bottom sheet, and sized up so it reads as the main thing
    on screen right after a run instead of a small toast. */
 .game-claim-toast-center {
-  top: 50%;
-  bottom: auto;
-  width: 92vw;
-  max-width: 420px;
+  width: min(92vw, 420px);
   padding: 30px 32px;
 }
 
@@ -1533,13 +1566,16 @@
 }
 
 .game-highlight-toast {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 1200;
+  position: relative;
+  box-sizing: border-box;
+  width: min(92vw, 380px);
+  max-width: 100%;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  pointer-events: auto;
   padding: 20px 34px 16px 22px;
   text-align: center;
-  max-width: 90vw;
+  overflow-wrap: anywhere;
   background: var(--game-panel);
   border: 3px solid var(--game-ink);
   border-radius: 20px;
@@ -1601,20 +1637,18 @@
    motion used to - that's also why this popup's own motion props below
    only ever touch opacity/scale now, never x/y). */
 .game-territory-popup {
-  translate: -50% -50%;
-  width: min(360px, 90vw);
+  width: min(92vw, 380px);
   padding: 14px 16px 16px;
   text-align: left;
 }
 
-/* Phones: anchored to the bottom instead of dead-center, so the card
-   never sits directly on top of the territory that was just tapped. */
+/* Phones: anchored to the bottom instead of dead-centre, so the card
+   never sits directly on top of the territory that was just tapped. Only
+   the layer's vertical alignment changes - horizontal centring stays the
+   layer's job on every size. */
 @media (max-width: 640px) {
-  .game-territory-popup {
-    top: auto;
-    bottom: 16px;
-    translate: -50% 0;
-    width: calc(100vw - 32px);
+  .game-popup-layer:has(> .game-territory-popup) {
+    align-items: flex-end;
   }
 }
 
@@ -1877,6 +1911,93 @@
 .game-coin-bundle-list {
   max-height: 50vh;
   overflow-y: auto;
+}
+
+/* Buy-redirect confirmation (GamePage.jsx's buyRedirectBundle) - a Buy tap
+   in the list above opens this instead of starting a purchase directly.
+   340px (base .game-confirm-card is 320px) - just enough extra for
+   "Rs. 1,000" + a 3-digit amount on one line without the pack-price line
+   wrapping at typical bundle sizes, still comfortably inside the 390px
+   viewport with the overlay's own 20px side padding. */
+/* position: relative is load-bearing, not decorative - .game-close-btn
+   here is .game-run-viewer-close (GamePage.css, further down), whose own
+   `position: absolute; top:-14px; right:-14px` positions it against the
+   nearest POSITIONED ancestor. Without this, that ancestor is the
+   fixed/inset:0 .game-confirm-overlay behind it, not this card, so the
+   close button renders pinned to the browser viewport's own top-right
+   corner instead of the card's - caught in a screenshot (it landed right
+   on top of the HUD coin balance), not by reading the CSS; .game-coin-
+   shop-card and .game-run-viewer both already carry this same override
+   for the same reason, this one was just missed initially. */
+.game-buy-redirect-card {
+  position: relative;
+  max-width: 340px;
+}
+
+/* The "big title" the brief asked for - same look as .game-card-title
+   (22px/900) but its own scoped class rather than reusing that one
+   directly: .game-card-title is normally used on an <h3> elsewhere (e.g.
+   War History's header), never a <p>, and this title IS a <p> (so
+   .game-confirm-card's own generic `p` rule below would apply here too) -
+   scoping under .game-buy-redirect-card gives this the specificity
+   (0,2,0) it needs to beat that generic (0,1,1) rule's margin/font-weight/
+   color, the same fix as .game-buy-redirect-pack/-note just below. Keeps
+   its stroke (unlike those two) - this is the ONE element in the popup
+   the brief wants it on. */
+.game-buy-redirect-card .game-buy-redirect-title {
+  margin: 0;
+  text-align: center;
+  color: var(--text-title);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+
+/* "550 Fahhcoin · Rs. 750" and the explainer line below both go flat (no
+   stroke/shadow) - the brief's own "black text stroke only on the big
+   title" (.game-card-title keeps the global stroke every /game text gets
+   by default, see tokens.css's :where() rule - these two don't).
+   Deliberately `.game-buy-redirect-card .game-buy-redirect-pack`, not just
+   `.game-buy-redirect-pack` on its own - .game-confirm-card's own generic
+   `p` rule a few lines down is a class+element selector ((0,1,1)), which
+   beats a single-class selector ((0,1,0)) on specificity regardless of
+   source order, so a single-class override here would have silently lost
+   its margin/font-weight/color (not text-shadow/stroke, which that rule
+   never sets - see the earlier Club War History session's own near-miss
+   with exactly this class of bug, caught that time only by a screenshot). */
+.game-buy-redirect-card .game-buy-redirect-pack {
+  margin: 10px 0 6px;
+  text-align: center;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-title);
+}
+
+.game-buy-redirect-card .game-buy-redirect-note {
+  text-align: center;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.game-buy-redirect-card .game-buy-redirect-ios-note {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--game-red-dark);
+  background: var(--red-tint);
+  color: var(--red-text);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 .game-confirm-card p {
@@ -4735,13 +4856,24 @@
 }
 
 /* Buy confirm sits above the hero modal it's opened from; the coin shop
-   sits above everything so "Get Fahhcoin" is never hidden behind a modal. */
+   sits above everything else so "Get Fahhcoin" is never hidden behind a
+   modal - except the Buy-redirect confirmation below, which opens FROM the
+   coin shop's own bundle list (coinShopOpen stays true behind it, same
+   "leave the parent popup mounted" pattern .game-buy-overlay uses) and so
+   needs to sit one step above it, or every click/tap inside it is silently
+   swallowed by the coin-shop overlay's own now-higher stacking context -
+   found this exact way, via a screenshot showing the coin-shop list still
+   covering it, not by reading the two z-indexes side by side. */
 .game-confirm-overlay.game-buy-overlay {
   z-index: 1420;
 }
 
 .game-confirm-overlay.game-coin-shop-overlay {
   z-index: 1450;
+}
+
+.game-confirm-overlay.game-buy-redirect-overlay {
+  z-index: 1460;
 }
 
 .game-buy-title {

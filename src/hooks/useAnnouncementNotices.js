@@ -68,6 +68,12 @@ export function useAnnouncementNotices(userId) {
       })
     return () => {
       cancelled = true
+      // Without this, React StrictMode's mount -> cleanup -> mount (dev
+      // server, e2e) cancelled the first request and then skipped the
+      // second one via the guard above, leaving the hook stuck in LOADING
+      // forever - and RECEIVE no-ops until READY, so live notices never
+      // showed in dev either.
+      checkedForRef.current = null
     }
   }, [userId])
 
@@ -94,10 +100,32 @@ export function useAnnouncementNotices(userId) {
     [userId]
   )
 
+  // Re-asks the server for anything published while the game was in the
+  // background. A phone suspends the STOMP socket soon after the screen
+  // locks and the broker never replays what it missed, so without this a
+  // notice published mid-background would only show on the next full game
+  // open. Uses the reducer's RECEIVE (dedupes by id, no-ops until the first
+  // check finished) rather than CHECK_SUCCESS, so it can't wipe a notice
+  // the player is currently reading.
+  const recheck = useCallback(() => {
+    if (!userId) return
+    getPendingNotices()
+      .then((notices) => {
+        const seen = readSeenCache()
+        ;(notices || [])
+          .filter((n) => !seen.has(`${userId}:${n.id}`))
+          .forEach((notice) => dispatch({ type: 'RECEIVE', notice }))
+      })
+      .catch(() => {
+        // Best-effort - the next foreground tries again.
+      })
+  }, [userId])
+
   return {
     current: currentNotice(state),
     hasMore: hasMoreNotices(state),
     dismiss,
     receive,
+    recheck,
   }
 }

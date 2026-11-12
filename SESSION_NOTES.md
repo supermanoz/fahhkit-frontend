@@ -681,3 +681,175 @@ pessimistic 320px card width, font-size lands at `2.8cqw ≈ 9px` (the clamp flo
 letter-spacing `0.05em`, giving an estimated text width around 128px against a ~146px budget inside
 the pill - roughly 12% headroom, not a knife's-edge fit. `overflow:hidden`/`text-overflow:ellipsis`
 stay on the pill as a safety net only (not expected to ever actually trigger).
+
+## Emote animation rebuild - lossless multi-sheet packs, no downsampling (2026-11-10)
+
+Full rebuild of every hero's idle + emote animations, replacing the old single-row/resized/
+frame-dropped WebP strips (`profile/idle.webp`, `emotes/emoteN.webp` per hero - still on disk,
+unused, not yet deleted) with lossless grid-sheet packs under `src/assets/heroes/<hero>/sheets/
+<idle|emoteN>/` (`manifest.json` + `sheet0.webp`/`sheet1.webp`/...). Built by new
+`scripts/build_emote_sheets.py`: every source PNG plays, at native resolution, no resize/resample/
+frame-drop - only a shared crop box per emote (trims identical transparent padding across all its
+own frames). Long sequences (up to 405 frames) are packed across multiple sheets capped at 4096px/
+side rather than one long strip. `scripts/verify-emote-sheets.mjs` re-checks every manifest against
+its sheets and is wired into `npm run build`'s `prebuild`, so a bad rebuild fails the build instead
+of shipping silently.
+
+Playback: one shared `AnimatedSprite.jsx` (replacing `HeroSprite.jsx`'s own separate rAF loop) for
+every idle turntable and emote everywhere (Shop, Me, other-player profile, leaderboard, HUD, run
+view, Club War, results) - `requestAnimationFrame`, one global `SPRITE_FRAME_MS` (24fps, confirmed
+from the source PNGs' own embedded Blender timecode metadata, see `utils/spriteTiming.js`), real
+tab-hidden pause/resume (not a skip), `createImageBitmap` decode via a refcounted lazy cache
+(`utils/spriteSheetCache.js` - a sheet is only fetched/decoded once an emote is actually shown, and
+released the moment nothing's using it), `prefers-reduced-motion` respected.
+
+**Identity preservation** (same emoteN keys/order/hidden-list/aliases as before the rebuild, nothing
+renamed or renumbered): `scripts/snapshot-emote-mapping.mjs` + `scripts/diff-emote-mapping.mjs`,
+wired into `prebuild` too. `scripts/emote-mapping-before.json` is a frozen fixture (hero/emoteN keys,
+order, HIDDEN_EMOTES, "classic"->emote1 alias) snapshotted from git HEAD before this rebuild;
+`emote-mapping-after.json` regenerates from the live tree on every build and is diffed against it -
+the build fails if a hero/emote key, order, hidden status or alias ever drifts. Confirmed identical
+across all 7 heroes. This is possible because `build_emote_sheets.py` and the old per-hero stretch-
+strip scripts share the exact same `CATEGORY_ORDER`/`find_category` keyword-walk
+(`_sprite_strip_lib.py`), so emoteN numbering was never actually at risk.
+
+**Bug found by the identity check**: `HeroDetailModal.jsx`'s `HeroEmoteStage` slider used to detect
+its own idle-alias slide via `resolveEmoteAsset(...)?.src === idleSrc` - the new sheets-pack asset
+shape has no `.src` field at all, so both sides were silently `undefined === undefined`, which would
+have misclassified _every_ emote as the idle alias and emptied the slider down to just the idle
+slide. Fixed to compare object identity instead (`heroManifest.js`'s `resolveManifest` already hands
+back the exact same object for `poses.idle` and `emotes.emote1`) - more robust than the old string
+compare, not just a like-for-like fix.
+
+### Cleanup NOT done this session (left for a follow-up)
+
+- Old strip files (every hero's `profile/` and `emotes/` folders) are still on disk, now dead
+  (nothing reads them) but never deleted.
+- 6 of 7 heroes' `manifest.json` still carry the old, now-unused `profile`/`emotes` keys (only
+  Blaze's was trimmed to `{hero, map}`) - harmless (heroManifest.js never reads those keys any more),
+  just stale.
+- The original brief's step 5 (Playwright frame-accuracy/mobile-memory verification, contact-sheet
+  screenshots per hero to `./screenshots/emotes/`) never ran.
+
+## Club War History - per-member war stats (2026-11-10)
+
+Extended each War History participant row (`ClubWarHistory.jsx`) from rank/hero-icon/name/hero/one
+status pill to: a compact stat line under the name (distance/time/pace/XP - "only the ones
+available", see below), a prominent "+N pts" in the brief's own orange (`var(--pvp-accent-text)`,
+the AA-safe darker stop of the same `#DD571C` - see `tokens.css`'s own comment: plain `#DD571C` text
+fails WCAG AA on this theme's off-white panels), tap-to-expand (one row open at a time, shared
+across both squad columns) showing the run's time/distance/pace/points, a hero-perk-bonus line, and
+a thin contribution-% bar - plus a per-club summary row (total points, ran/total, avg pts/runner,
+total km) and a (normally invisible) mismatch flag if member points don't sum to the club's declared
+total.
+
+**Backend data audit** (read-only - `~/Documents/FahhKit`, never edited, per this repo's own rule):
+`ClubWarParticipantScoreResponse` today only has userId/fullName/nickname/heroName/runId/
+runSubmittedAt/runOutcome/paceComponent/baseEffortComponent/contributedScore/rewarded - no distance,
+duration, pace, or hero-perk-bonus fields, even though the data exists:
+
+- `distance`/`duration`/`avgPace` live on `Run` (already loaded via `participant.getRun()` in
+  `ClubWarServiceImpl#toParticipantScores` - just never copied onto the response).
+- The hero perk bonus is already computed elsewhere: `RunScoreBreakdownResponse.heroBonusFor()`
+  turns a `RunScoreBreakdown` into `{heroName, totalBonus}` - same `breakdown` object
+  `toParticipantScores` already fetches via `runScoreBreakdownRepository.findByRun(...)`.
+- **Smallest backend addition (not implemented here)**: add `Double distance`, `Integer duration`,
+  `Double avgPace`, `RunHeroBonusResponse heroBonus` to `ClubWarParticipantScoreResponse`; populate
+  the first three from `participant.getRun()` and the last by calling `heroBonusFor` (needs a
+  visibility bump from `private` to package-private/public, same file) inside the existing
+  `breakdown`-present branch of `toParticipantScores`. No migration, no new query - every value is
+  already in memory at that point.
+- XP needed NO backend change: it's a flat reward (`ClubWarProperties.winXpAmount`, 500 - confirmed
+  against `ClubWarServiceImpl#payoutRewards`, matches the frontend's own `CLUB_WAR_REWARDS.winXp`
+  mirror) paid only to a winning-side participant who ran, and the already-sent `rewarded` flag _is_
+  that settled outcome - so `p.rewarded ? CLUB_WAR_REWARDS.winXp : null` is correct with zero API
+  change.
+- Territory gained: not requested - club war runs are always `NON_TERRITORY_SCORED` by design (never
+  claim territory), not a backend gap.
+- Personal best: no tracking mechanism exists anywhere in the backend (not a missing DTO field, a
+  real absent feature) - left out rather than faked.
+
+Every optional field above (`p.distance`/`p.duration`/`p.avgPace`/`p.heroBonus`) is read defensively
+and simply renders nothing when absent, so this component needs no further change once the backend
+ships them.
+
+**Bug found while reading the CSS**: `.club-war-history-result` was already a class name, used by the
+war-LIST row's own VICTORY/DEFEAT pill (`border-radius:999px`, a solid dark/green/red fill,
+uppercase text). The new per-member result column reused that same class name for a completely
+different piece of UI - same selector/specificity, so every property the new rule didn't redeclare
+(background, border, padding, uppercase, font-size) silently fell through from the old pill rule,
+producing an unwanted tan oval behind the check-icon/pts/RAN-MISSED text. Caught visually in a
+Playwright screenshot, not by eye on the code. Fixed by renaming the new one to
+`.club-war-history-participant-result`.
+
+Verified via `e2e/club-war-history.spec.js` (new) - a won war, a lost war, a war with missed members
+(muted "0 pts", sunk to the bottom, no stats/no expand), and a long-name case (club + player names
+long enough to force real truncation/wrapping at 390px) - each at mobile-390 and desktop-1440,
+screenshots in `./screenshots/war-history/` (two per scenario/viewport: top-of-list and scrolled to
+the bottom of `.game-menu-sheet`'s own internal scroll, which `page.screenshot({fullPage:true})`
+doesn't reach). All 16 screenshots show the intended layout correctly; the only e2e failures are the
+pre-existing, unrelated `GameLoadingBackdrop.jsx` `fetchPriority` console warning (same one the
+emote-rebuild session's `profile-popup.spec.js` run hit - untouched by this change, not fixed here
+per instruction to only fix what a change actually broke).
+
+## Buy Fahhcoin redirect confirmation (2026-11-10)
+
+A Buy tap in the in-game "Buy Fahhcoin" popup (GamePage.jsx's coin-shop list) no longer starts a
+purchase directly - it opens a new "Open the Shop" confirmation first (`buyRedirectBundle` state),
+which on Continue hands off to the public `/shop` page (`?pack=<fahhcoinAmount>`) instead, in a new
+tab on the web or via `@capacitor/browser` natively - never inside the game's own WebView/tab. The
+old direct flow (`handleBuyCoins`/`initiateCoinPurchase` -> `window.location.href = payment.paymentUrl`)
+is gone from GamePage.jsx entirely; ShopPage.jsx still has its own (unchanged) version of that same
+flow for when someone buys straight from the website.
+
+New `src/utils/siteUrl.js`: `getSiteBaseUrl()` (web: `window.location.origin`/`VITE_SITE_URL`;
+native: `VITE_SITE_URL` or a hardcoded `https://cafebizarre.com.np` fallback, since
+`window.location.origin` inside Capacitor's own WebView is never a real public URL),
+`openShopPack()` (`window.open(..., '_blank', 'noopener')` on web, `Browser.open()` natively), and
+`iosShopRedirectBlocked`. `.env`/`.env.production` both got a `VITE_SITE_URL` + `VITE_IOS_IAP`
+pair (commented out, off by default) - see that file's own comments for why each matters where it's
+set/unset.
+
+**iOS App Store check (asked for explicitly)**: no `IOS_IAP` or any other feature-flag mechanism
+existed anywhere in this codebase before this session (checked directly - no `FEATURE_FLAG`/
+`featureFlag` hits anywhere). Apple App Store Review Guideline 3.1.1 is a real risk here - an app
+can't link out to an external purchase flow for a virtual currency like Fahhcoin without risking
+rejection - so `VITE_IOS_IAP` is a new env var, defaulting OFF, gating the "Continue to Shop" button
+specifically on `platform === 'ios'` (Android has no equivalent restriction). Until someone turns it
+on, the iOS build shows the popup but disables Continue with a short explanation instead of silently
+shipping the external-purchase link.
+
+**Shared-login check (also asked about)**: true on the web without any extra work - `/shop` and
+`/game` are the same React app/origin, so a new tab shares the same `localStorage` session (`
+fahhkit_token`) automatically. **Not true on native** - `@capacitor/browser`'s system/Custom-Tabs
+browser is a completely separate browsing context from the app's own WebView, with its own
+cookies/localStorage, so a native-app player who taps Continue may land on `/shop` logged out (it
+already redirects to `/login?from=/shop` in that case via ShopPage.jsx's existing `handlePick` -
+not a crash, just an extra login step). No SSO/token-handoff was built for this - out of scope for
+this task, flagging it as a known limitation rather than guessing at a fix.
+
+Two real bugs found via Playwright screenshots, not by reading the CSS:
+
+1. The new popup's overlay had no z-index of its own, so the coin-shop LIST popup underneath it
+   (which `coinShopOpen` keeps mounted, same pattern the existing hero-buy-confirm popup uses) sat
+   at a higher z-index and silently absorbed every click meant for Continue/Cancel/the scrim.
+   Compounded by a second, purely visual bug: leaving that list popup mounted stacked its own scrim
+   under the new popup's, and its larger card peeked out around the new, smaller one's edges - fixed
+   by unmounting it (`coinShopOpen && !buyRedirectBundle`) rather than just raising a z-index, since
+   "no transparency, scrim only" meant one clean popup, not two overlapping ones.
+2. The new popup's close button rendered pinned to the browser viewport's own top-right corner
+   (overlapping the HUD coin balance) instead of the card's own corner - `.game-close-btn.game-run-
+viewer-close` is `position: absolute` against the nearest _positioned_ ancestor, and the base
+   `.game-confirm-card` class has no `position: relative` of its own (by design - every popup using
+   this close-button variant is expected to add it, same as `.game-coin-shop-card`/`.game-run-viewer`
+   already do) - missed initially, fixed by adding it to `.game-buy-redirect-card`. Note for later:
+   `.game-buy-card` (the pre-existing hero/item buy-confirm popup) has no CSS rule of its own at all
+   and may have this exact same bug - not fixed here, out of scope for this task.
+
+Verified via new `e2e/buy-redirect.spec.js`: each of the 3 mocked bundles shows the matching pack
+text, Escape/the scrim/Cancel all close it (three separate tests, not one - the scrim/Esclate share
+a popup instance but Escape only closes the confirmation, not the coin-shop list still mounted
+behind it, so reusing one test for both fought itself), Continue opens `/shop?pack=550` in a real
+new tab and returning (a simulated `visibilitychange`) refreshes the HUD balance, and a rapid second
+tap on Continue never opens a second tab. Screenshots at mobile-390 and desktop-1440 in
+`./screenshots/buy-redirect/`.

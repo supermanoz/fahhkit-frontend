@@ -33,7 +33,10 @@ export default function GameLoadingBackdrop() {
           src={loadingBgFallback}
           alt=""
           className={`game-loading-bg-img${loaded ? ' is-loaded' : ''}`}
-          fetchPriority="high"
+          // React 18 only knows the lowercase DOM attribute (camelCase logs a
+          // console.error); drop this disable if the app moves to React 19.
+          // eslint-disable-next-line react/no-unknown-property
+          fetchpriority="high"
           decoding="async"
           onLoad={() => setLoaded(true)}
         />

@@ -22,6 +22,11 @@ test-results
 playwright-report
 blob-report
 
+# Regenerated every build by prebuild (scripts/snapshot-emote-mapping.mjs)
+# and diffed against the committed scripts/emote-mapping-before.json
+# baseline - not itself a fixture to keep in version control.
+scripts/emote-mapping-after.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -32,3 +37,9 @@ blob-report
 *.njsproj
 *.sln
 *.sw?
+
+# iOS push (FCM): GoogleService-Info.plist is not in the repo yet. Download it from the Firebase
+# console (iOS app, bundle id must match the Xcode target) into ios/App/App/ and add it to the
+# App target in Xcode. Unlike Android's google-services.json it is safe to commit if you prefer;
+# uncomment to keep it local instead:
+# ios/App/App/GoogleService-Info.plist
