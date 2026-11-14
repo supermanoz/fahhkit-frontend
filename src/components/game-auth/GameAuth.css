@@ -46,8 +46,16 @@
 
 .game-auth-logo {
   display: block;
-  width: 92px;
+  /* ~62% of the card's own width (the card has 22px side padding): about
+     205px at 360, 225px at 390, 242px on desktop, never over 300px. The
+     artwork is trimmed to its lettering, so there is no dead margin. */
+  width: 72%;
+  max-width: 300px;
+  height: auto;
   margin: 0 auto 4px;
+  /* The white lettering carries its own black outline; this just lifts it
+     off the off-white card (no background box). */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
 }
 
 .game-auth-header {

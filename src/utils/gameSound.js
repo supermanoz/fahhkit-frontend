@@ -79,6 +79,7 @@ function stopActiveSfx() {
   // The menu sample is a plain <audio>, not a Web Audio node - pause it
   // directly rather than trying to route it through the set above.
   menuAudio?.pause()
+  stopPops()
 }
 
 function tone({ freq, duration, startAt = 0, type = 'sine', peakGain = 0.1 }) {
@@ -155,6 +156,46 @@ function getMenuAudio() {
   return menuAudio
 }
 
+// Pop-up "pop": the same bubble sample as the menu button, cut short (the
+// file is ~0.9s, a pop-up opening should be a quick blip) and played from a
+// small pool of preloaded elements so two close pops don't cut each other
+// off and nothing is created at play time.
+const POP_PLAY_MS = 380
+const POP_POOL_SIZE = 2
+let popPool = null
+let popNext = 0
+function getPopAudio() {
+  if (typeof window === 'undefined') return null
+  if (!popPool) {
+    popPool = Array.from({ length: POP_POOL_SIZE }, () => {
+      const a = new Audio(MENU_SOUND_URL)
+      a.volume = 0.5
+      a.preload = 'auto'
+      return a
+    })
+  }
+  const audio = popPool[popNext]
+  popNext = (popNext + 1) % popPool.length
+  return audio
+}
+
+// Creates the preloaded elements up front (call once the game screen is up)
+// so the first tap/pop doesn't wait on a fetch + decode.
+export function preloadSfx() {
+  getMenuAudio()?.load?.()
+  if (!popPool) {
+    getPopAudio()
+    getPopAudio()
+  }
+}
+
+function stopPops() {
+  popPool?.forEach((a) => {
+    clearTimeout(a._popStop)
+    a.pause()
+  })
+}
+
 // Every named effect playSfx can trigger. Add a new key here (and call
 // playSfx with it) for a future effect - it gets muting/persistence/stop-
 // on-mute for free, nothing else to wire.
@@ -165,6 +206,14 @@ const SFX_PLAYERS = {
   tap() {
     noiseBurst({ duration: 0.035, filterFreq: 4500, peakGain: 0.22 })
     tone({ freq: 1800, duration: 0.02, type: 'triangle', peakGain: 0.05 })
+  },
+  pop() {
+    const audio = getPopAudio()
+    if (!audio) return
+    clearTimeout(audio._popStop)
+    audio.currentTime = 0
+    audio.play().catch(() => {})
+    audio._popStop = setTimeout(() => audio.pause(), POP_PLAY_MS)
   },
   menu() {
     const audio = getMenuAudio()

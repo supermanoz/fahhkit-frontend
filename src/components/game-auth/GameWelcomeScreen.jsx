@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import runConquestLogo from '../../assets/images/run-conquest-logo.png'
+import runConquestLogo from '../../assets/ui/brand/run_conquest_logo-ui.webp'
 import GoogleSignInButton from '../GoogleSignInButton'
 import AppleSignInButton from '../AppleSignInButton'
 

@@ -144,6 +144,7 @@ import {
   playSfx,
   setSfxMuted as persistSfxMuted,
 } from '../utils/gameSound'
+import { installUiSounds } from '../utils/uiSounds'
 import useDefaultHeroBootstrap from '../hooks/useDefaultHeroBootstrap'
 import { isCometHero, isPlaceholderHero } from '../utils/hero'
 import {
@@ -201,7 +202,7 @@ import SponsorBannerCarousel from '../components/SponsorBannerCarousel'
 import RouteTurnIndicator from '../components/RouteTurnIndicator'
 import { getRouteGuidance } from '../utils/routeNav'
 import defaultAvatarImage from '../assets/avatars/blaze.png'
-import runConquestLogo from '../assets/images/run-conquest-logo.png'
+import runConquestLogo from '../assets/ui/brand/run_conquest_logo-ui.webp'
 import globeScopeIcon from '../assets/ui/globe-scope.png'
 // TEMP: AVATARS / COMING_SOON_AVATARS / loadAvatarId return with the
 // Shop's Avatar picker (see avatarId below).
@@ -1895,14 +1896,34 @@ function GamePageInner() {
       }
     }
 
+    // Native shells: the WebView doesn't always fire visibilitychange when
+    // the OS backgrounds the app, and audio can keep playing under the home
+    // screen - so pause/resume on Capacitor's own app state too.
+    let appStateHandle
+    if (isNative) {
+      appStateHandle = CapacitorApp.addListener('appStateChange', (state) => {
+        if (state.isActive) tryPlay()
+        else audio.pause()
+      })
+    }
+
     tryPlay()
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       removeRetryListeners()
       document.removeEventListener('visibilitychange', handleVisibility)
+      appStateHandle?.then((h) => h.remove())
     }
   }, [gameReady, musicMuted])
+
+  // Click/tap + pop-up sounds: one global handler (utils/uiSounds.js), live
+  // for as long as the game screen is up. The Sound setting is checked
+  // inside playSfx, so toggling it needs no re-install.
+  useEffect(() => {
+    if (!gameReady) return undefined
+    return installUiSounds()
+  }, [gameReady])
 
   function toggleMusicMuted() {
     setMusicMuted((prev) => {
@@ -1943,20 +1964,6 @@ function GamePageInner() {
       playSfx('chime')
     }
   }, [tracker.status, tracker.distance])
-
-  // Delegated click-to-sound: capture phase so it fires even for buttons
-  // that stopPropagation() on their own click handler (e.g. LocateButton),
-  // and one listener here covers every button in the page instead of
-  // wiring a sound effect into each individual onClick.
-  function handleGameClick(e) {
-    const btn = e.target.closest('button')
-    if (!btn || btn.disabled) return
-    if (btn.classList.contains('game-menu-btn')) {
-      playSfx('menu')
-    } else {
-      playSfx('tap')
-    }
-  }
 
   async function loadLeaderboard(scope = individualScope) {
     setLeaderboardError(null)
@@ -3406,7 +3413,6 @@ function GamePageInner() {
     <div
       className="game-page game-root"
       style={{ '--sheet-h': `${controlsHeight}px` }}
-      onClickCapture={handleGameClick}
     >
       <audio
         ref={musicRef}
