@@ -26,6 +26,7 @@ import aryanShahPhoto from '../assets/images/team/aryanshah.jfif'
 import rajPhoto from '../assets/images/team/raj.png'
 import riteshChandPhoto from '../assets/images/team/riteshchand.jpeg'
 import jojanRaiPhoto from '../assets/images/team/jojanrai.jpeg'
+import amatLimbuPhoto from '../assets/images/team/amatlimbu.jpeg'
 import './LandingPage.css'
 
 // A signed-in visitor is already a member - sending them to /register from
@@ -151,6 +152,12 @@ const TEAM = [
     role: 'Graphic Designer',
     photo: riteshChandPhoto,
     bio: 'The eye behind the posters, banners, and race-day graphics that make FahhKit look as good as it runs.',
+  },
+  {
+    name: 'Amat Limbu',
+    role: 'Legal Adviser',
+    photo: amatLimbuPhoto,
+    bio: 'Our legal adviser — reviews contracts, waivers, and partnerships so every FahhKit event runs safely and by the book.',
   },
 ]
 
