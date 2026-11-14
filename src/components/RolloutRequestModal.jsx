@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Modal } from '../game/ui/Panel'
 import GameButton from '../game/ui/GameButton'
 import './RolloutRequestModal.css'
+import { formatNumber } from '../utils/format'
 
 const AUTO_CLOSE_MS = 2000
 
@@ -58,7 +59,7 @@ export default function RolloutRequestModal({
             {typeof requestCount === 'number' && requestCount > 0 && (
               <span className="rollout-modal-count">
                 {' '}
-                {requestCount.toLocaleString()}{' '}
+                {formatNumber(requestCount)}{' '}
                 {requestCount === 1 ? 'player has' : 'players have'} already
                 asked.
               </span>

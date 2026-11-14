@@ -1,6 +1,7 @@
 import {
   Suspense,
   lazy,
+  useLayoutEffect,
   useCallback,
   useEffect,
   useMemo,
@@ -8,7 +9,6 @@ import {
   useState,
 } from 'react'
 import {
-  IconBell,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
@@ -46,12 +46,9 @@ import { useAuthFlow } from '../hooks/useAuthFlow'
 import { useReminders } from '../hooks/useReminders'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { unregisterPushToken } from '../utils/push'
-import NotificationSettingsRows from '../components/NotificationSettingsRows'
+import NotificationsSection from '../components/NotificationsSection'
 import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
-import {
-  isRemindersDebugEnabled,
-  scheduleTestReminderInOneMinute,
-} from '../utils/reminders'
+import { isRemindersDebugEnabled } from '../utils/reminders'
 // Dynamically imported (not bundled with the rest of the game) - a logged-
 // in player never triggers this import at all, so it doesn't add to the
 // bundle they actually download. See the logged-out branch below.
@@ -87,6 +84,7 @@ import {
 import EmoteGlyph from '../components/EmoteGlyph'
 import { ToastProvider, useToast } from '../game/ui/Toast'
 import Avatar from '../game/ui/Avatar'
+import ProfileAvatar from '../components/ProfileAvatar'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
@@ -95,6 +93,7 @@ import {
   getOwnedStoreItems,
   getStoreCatalog,
   purchaseStoreItem,
+  claimFreeItem,
   unequipStoreItem,
 } from '../api/store'
 import { getFahhcoinBundles } from '../api/coinPurchase'
@@ -145,8 +144,19 @@ import {
   playSfx,
   setSfxMuted as persistSfxMuted,
 } from '../utils/gameSound'
+import useDefaultHeroBootstrap from '../hooks/useDefaultHeroBootstrap'
 import { isCometHero, isPlaceholderHero } from '../utils/hero'
-import { hasHero as hasHeroManifest } from '../utils/heroManifest'
+import {
+  getItemState,
+  isNotOwnedError,
+  ITEM_STATE,
+  needsClaim,
+  visibleStoreError,
+} from '../utils/itemState'
+import {
+  hasHero as hasHeroManifest,
+  getHero as getHeroManifest,
+} from '../utils/heroManifest'
 import HeroSprite from '../components/HeroSprite'
 import HeroStage from '../components/HeroStage'
 import LevelBar from '../components/LevelBar'
@@ -167,8 +177,15 @@ import ClubBadge from '../components/ClubBadge'
 import ClubTrophyIcon from '../components/ClubTrophyIcon'
 import NicknameCard from '../components/NicknameCard'
 import { playerName, playerNameOf } from '../utils/playerName'
-import { formatCoins } from '../utils/format'
-import { iosShopRedirectBlocked, openShopPack } from '../utils/siteUrl'
+import { formatCoins, formatNumber } from '../utils/format'
+import { formatPrice, getHeroUnlockItem } from '../utils/price'
+import Price from '../components/Price'
+import {
+  getSiteBaseUrl,
+  iosShopRedirectBlocked,
+  openShopPack,
+} from '../utils/siteUrl'
+import { openExternal } from '../utils/externalLink'
 import { App as CapacitorApp } from '@capacitor/app'
 import { isNative } from '../utils/geo'
 import HeroDetailModal from '../components/HeroDetailModal'
@@ -323,7 +340,7 @@ const RUN_REJECTION_COPY = {
   },
   AREA_TOO_SMALL: {
     title: 'Cozy, but tiny 🏠',
-    message: `That loop didn't enclose enough ground. Territory needs at least ${LOOP_MIN_AREA_SQ_METERS.toLocaleString()} m² inside it, so go bigger.`,
+    message: `That loop didn't enclose enough ground. Territory needs at least ${formatNumber(LOOP_MIN_AREA_SQ_METERS)} m² inside it, so go bigger.`,
   },
   INVALID_GEOMETRY_AFTER_REPAIR: {
     title: 'That shape broke geometry 🥨',
@@ -481,21 +498,18 @@ function ExitConfirmOverlay({ backButton }) {
 /* eslint-enable react/prop-types */
 
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-// Mail's own tab icon is the real mail_icon.png/.webp badge asset (see
-// MailBadgeIcon), shown plain - no .game-menu-picker-medal circle/border
-// behind it (it's already got its own round frame), unlike every other
-// tab here. Used for all three places that render a tab's icon (desktop
-// row, header "current" trigger, dropdown list) so none of them need
-// their own mail special-case.
+// Mail's tab icon is the real mail_icon badge asset, but it now sits inside
+// the SAME .game-menu-picker-medal ring every other tab uses (ink border,
+// drop shadow, size - one class, so they can't drift); the image just fills
+// the ring (MailBadgeIcon `fill`) and `tone-mail` swaps the coin colour for
+// the badge's blue. Used for all three places that render a tab's icon
+// (desktop row, header "current" trigger, dropdown list).
 function TabMedal({ tab, medalClassName = '' }) {
-  if (tab.tone === 'mail') {
-    return <tab.Icon />
-  }
   return (
     <span
       className={`game-menu-picker-medal ${medalClassName} tone-${tab.tone}`}
     >
-      <tab.Icon />
+      {tab.tone === 'mail' ? <tab.Icon fill /> : <tab.Icon />}
     </span>
   )
 }
@@ -606,6 +620,11 @@ function GamePageInner() {
   // ready. Cleared whenever the list could have shifted (a new run saved).
   const myRunsCacheRef = useRef(new Map())
   const myRunsListRef = useRef(null)
+  // The ONE scroll container every menu tab (Leaderboard, Club, Me, Shop,
+  // Settings...) shares - see the reset effect below.
+  const menuSheetRef = useRef(null)
+  // Latest menu tab, readable from async callbacks (see goToMyRunsPage).
+  const menuTabRef = useRef(null)
   const [viewingRun, setViewingRun] = useState(null)
   const [loadingRunId, setLoadingRunId] = useState(null)
   const [nearbyParcels, setNearbyParcels] = useState([])
@@ -716,6 +735,8 @@ function GamePageInner() {
   const [buyRedirectError, setBuyRedirectError] = useState(null)
   const [heroes, setHeroes] = useState([])
   const [heroesLoading, setHeroesLoading] = useState(false)
+  // True once /v1/store/owned has answered at least once (see loadStore).
+  const [ownedLoaded, setOwnedLoaded] = useState(false)
   // Id, not the object, so the modal picks up the refreshed hero after an
   // equip reloads the roster.
   const [selectedHeroId, setSelectedHeroId] = useState(null)
@@ -764,7 +785,7 @@ function GamePageInner() {
   }, [viewingProfile, storeCatalog])
   // Hardware Back button (native app only) - closes whichever of these is
   // open, topmost first; with nothing open it asks before exiting, and
-  // never exits (or does anything at all) mid-run. See
+  // never exits mid-run (it minimises the app instead). See
   // useAndroidBackButton's own comment for why `blocked` matters here.
   // Set by GameAuthGate (via onBackStateChange below) while logged out -
   // null at its WELCOME screen, otherwise a function that steps it back one
@@ -2018,6 +2039,7 @@ function GamePageInner() {
       ])
       setStoreCatalog(catalogPage?.content || [])
       setOwnedItems(owned || [])
+      setOwnedLoaded(true)
     } catch (err) {
       setStoreError(
         err instanceof ApiError ? err.message : 'Could not load the shop.'
@@ -2239,12 +2261,20 @@ function GamePageInner() {
   // User-facing page change (Prev/Next/jump, or the tab reopening on page
   // 1) - scrolls the list into view and prefetches the page after this one
   // so a forward Next tap almost never has to wait.
-  async function goToMyRunsPage(pageNumber) {
+  // `scroll` is only for the Prev/Next/jump buttons (a user action that
+  // lands on the list). Reopening the Me tab must NOT scroll: it used to
+  // scrollIntoView the History section every time, so Me opened scrolled
+  // down past the profile/XP/hero.
+  async function goToMyRunsPage(pageNumber, { scroll = true } = {}) {
     const result = await loadMyRunsPage(pageNumber)
-    myRunsListRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
+    // Only if the player is still on Me: the page load can outlive a tab
+    // switch, and the stale scroll would then fire when Me is reopened.
+    if (scroll && menuTabRef.current === 'me') {
+      myRunsListRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }
     if (result && pageNumber < result.totalPages) {
       loadMyRunsPage(pageNumber + 1, { silent: true })
     }
@@ -2471,7 +2501,7 @@ function GamePageInner() {
     if (tab === 'me' && storeCatalog.length === 0) loadStore()
     // Always back to page 1 on reopening the tab - cheap when it's
     // already cached (no fetch, no flash), a real fetch otherwise.
-    if (tab === 'me') goToMyRunsPage(1)
+    if (tab === 'me') goToMyRunsPage(1, { scroll: false })
     if (tab === 'me' && !myRoutesLoaded) loadMyRoutes()
     if (tab === 'mail') mailbox.refresh()
     if (tab === 'race') pvp.refreshChallenges()
@@ -2568,11 +2598,12 @@ function GamePageInner() {
     // drawing and would just get in the way.
     if (routeDraftMode) return
     const isMine = Boolean(user?.id) && parcel.ownerId === user.id
-    // Avatar: the owner's own real uploaded profile picture, never a
-    // cosmetic (equipped Hero skin, map marker art, etc.) - only ever shown
-    // for the player's own tapped territory (`user.profilePictureUrl`).
-    // TEMP: other players' real photos are hidden here for now - this
-    // popup falls back to their colored initial instead.
+    // Avatar: the owner's real uploaded profile picture, never a cosmetic
+    // (equipped Hero skin, map marker art, etc.). Own territory: the logged-
+    // in user's photo. Someone else's: the parcel's ownerProfilePictureUrl
+    // (the backend's TerritoryParcelResponse doesn't send it yet - see
+    // toDisplayParcel), else a picture already known from a loaded
+    // leaderboard list, else null -> the colored initial.
     // Run score: TerritoryParcel.currentScore, summed across exactly the
     // parcels that make up this tapped (merged) shape - see
     // toDisplayParcel's own comment on why this isn't a player-wide total.
@@ -2585,9 +2616,14 @@ function GamePageInner() {
       userId: parcel.ownerId,
       fullName: parcel.ownerName,
       areaSqMeters: parcel.area,
-      avatarSrc: isMine
-        ? resolveFileUrl(user?.profilePictureUrl) || null
-        : null,
+      avatarSrc:
+        resolveFileUrl(
+          isMine
+            ? user?.profilePictureUrl
+            : parcel.ownerProfilePictureUrl ||
+                leaderboard.find((e) => e.userId === parcel.ownerId)
+                  ?.profilePictureUrl
+        ) || null,
       // The territory's own display color (gold for mine, hashed/shade for
       // anyone else - see toDisplayParcel) - the avatar's ring color.
       color: parcel.color,
@@ -2962,9 +2998,14 @@ function GamePageInner() {
   // stale) so ColorShelf below can actually be React.memo'd - passing a
   // plain function here would hand it a new prop identity every render
   // and defeat that memo regardless of how stable its other props are.
-  const handleEquip = useCallback(async (item, isEquipped) => {
+  const handleEquip = useCallback(async (item, isEquipped, opts = {}) => {
     setStoreActionError(null)
     try {
+      // Free items are owned by rule (utils/itemState.js) but the backend
+      // only equips items with a row: claim any missing ones first
+      // (`claim` is true, or a list of extra items such as the emote's hero).
+      const toClaim = opts.claim === true ? [item] : opts.claim || []
+      for (const c of toClaim) await claimFreeItem(c.id)
       if (isEquipped) {
         await unequipStoreItem(item.id)
       } else {
@@ -3046,6 +3087,26 @@ function GamePageInner() {
   const activeHeroId = equippedHero
     ? equippedHero.storeItem.heroId
     : heroes.find((h) => isCometHero(h.name))?.id
+  // Clean accounts have no hero record server-side while the UI shows Comet
+  // as the default: load the store once up front and silently record Comet
+  // as owned + equipped (see hooks/useDefaultHeroBootstrap.js).
+  useEffect(() => {
+    if (user && !ownedLoaded) loadStore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, ownedLoaded])
+  useDefaultHeroBootstrap({
+    enabled: ownedLoaded && !heroesLoading,
+    heroes,
+    ownedItems,
+    onDone: loadStore,
+  })
+  // Every tab shares one scroll container, so a tab opened after scrolling
+  // another (or reopened later) inherited its scrollTop. Always start at
+  // the top when the menu opens or the tab changes.
+  useLayoutEffect(() => {
+    menuTabRef.current = menuOpen ? menuTab : null
+    if (menuSheetRef.current) menuSheetRef.current.scrollTop = 0
+  }, [menuOpen, menuTab])
   const selectedHero = selectedHeroId
     ? heroes.find((h) => h.id === selectedHeroId) || null
     : null
@@ -3234,6 +3295,23 @@ function GamePageInner() {
   const equippedEmoteAsset = equippedEmoteItem
     ? resolveEmoteAsset(activeHeroName, equippedEmoteItem.name)
     : null
+  // The HUD hero (map marker) plays the equipped emote too. Same selector as
+  // above but WITHOUT ignoreHidden (a hidden emote falls back to idle here),
+  // and Classic/emote1 (the idle alias) or an emote with no local art also
+  // mean "keep the idle sprite exactly as it is".
+  const hudEmoteAsset = useMemo(() => {
+    if (!animatedMarkerHero) return null
+    const item = resolveEquippedEmoteItem(
+      ownedItems.filter((o) => o.equipped).map((o) => o.storeItem),
+      activeHeroId,
+      activeHeroName
+    )
+    if (!item) return null
+    const asset = resolveEmoteAsset(activeHeroName, item.name)
+    if (!asset || asset === getHeroManifest(animatedMarkerHero).poses?.idle)
+      return null
+    return asset
+  }, [ownedItems, activeHeroId, activeHeroName, animatedMarkerHero])
   // Falls back to idle (see game-menu-hero below) rather than a broken/
   // blank image if an equipped emote has no local art mapped - same gap
   // warnMissingEmoteAssets already catches for the Shop catalog generally,
@@ -3351,6 +3429,8 @@ function GamePageInner() {
           mapStyleUrl={currentMapStyle?.styleUrl}
           ambience={skyLoaded ? mapAmbience : null}
           animatedMarkerHero={animatedMarkerHero}
+          heroEmoteAsset={hudEmoteAsset}
+          heroEmotePaused={menuOpen || !gameReady || introPlaying}
           playerMoving={playerMoving}
           isFollowing={isFollowing}
           isTracking={tracker.status === 'tracking'}
@@ -4485,6 +4565,7 @@ function GamePageInner() {
                       ring={highlightedEntry.color || 'var(--game-gold)'}
                       size={60}
                       className="game-highlight-toast-avatar"
+                      holdUntilLoaded
                     />
                     <div className="game-highlight-toast-owner">
                       <p className="game-highlight-toast-owner-label">
@@ -4516,9 +4597,7 @@ function GamePageInner() {
                     <div className="game-territory-stat">
                       <span className="game-territory-stat-value">
                         <IconTrophy />
-                        {Math.round(
-                          highlightedEntry.runScore || 0
-                        ).toLocaleString()}
+                        {formatNumber(highlightedEntry.runScore || 0)}
                       </span>
                       <span className="game-territory-stat-label">
                         Run score
@@ -4618,6 +4697,7 @@ function GamePageInner() {
         {menuOpen && (
           <motion.div
             className="game-menu-sheet"
+            ref={menuSheetRef}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -5115,17 +5195,18 @@ function GamePageInner() {
                     />
                   )}
                 </div>
-                <img
-                  className="game-menu-profile-pic"
-                  src={
-                    resolveFileUrl(user?.profilePictureUrl) ||
-                    defaultAvatarImage
-                  }
-                  alt=""
-                  onError={(e) => {
-                    e.currentTarget.onerror = null
-                    e.currentTarget.src = defaultAvatarImage
-                  }}
+                {/* XP bar, then the profile picture, then name and stats -
+                    same order as another player's profile. */}
+                {profile?.level != null && (
+                  <div className="game-level-hud">
+                    <LevelBar level={profile.level} xp={profile.xp} showXp />
+                  </div>
+                )}
+                <ProfileAvatar
+                  src={resolveFileUrl(user?.profilePictureUrl)}
+                  name={playerNameOf(user)}
+                  level={profile?.level}
+                  loading={userLoading || !profile}
                 />
                 {playerNameOf(user) && (
                   <p className="game-menu-player-name">{playerNameOf(user)}</p>
@@ -5137,11 +5218,6 @@ function GamePageInner() {
                   <p className="game-menu-phrase">
                     “{equippedPhrase.storeItem.name}”
                   </p>
-                )}
-                {profile?.level != null && (
-                  <div className="game-level-hud">
-                    <LevelBar level={profile.level} xp={profile.xp} showXp />
-                  </div>
                 )}
                 <div className="game-menu-summary">
                   <span className="game-menu-summary-value">
@@ -5182,7 +5258,7 @@ function GamePageInner() {
                                   {formatArea(t.area)}
                                 </span>
                                 <span className="game-menu-list-meta">
-                                  score {Math.round(t.currentScore || 0)}
+                                  score {formatNumber(t.currentScore || 0)}
                                 </span>
                               </button>
                             </li>
@@ -5480,67 +5556,20 @@ function GamePageInner() {
                   </span>
                 </button>
 
-                <NotificationSettingsRows push={push} />
+                {/* Every notification control (permission, game alerts, run
+                    reminders) lives in this one collapsible section. */}
+                <NotificationsSection
+                  push={push}
+                  reminders={reminders}
+                  showReminders={reminders.supported || remindersDebug}
+                  showReminderDebug={reminders.supported && remindersDebug}
+                />
 
                 <MapStylePicker
                   styles={MAP_STYLES}
                   selectedId={mapStyleId}
                   onSelect={handleChooseMapStyle}
                 />
-
-                {/* Native app only (see useReminders/isNative) - the 3 daily
-                    "let's run" local notifications. Renders nothing on the
-                    website. */}
-                {reminders.supported && (
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={reminders.enabled}
-                    className="game-settings-row"
-                    onClick={() => reminders.toggle(!reminders.enabled)}
-                  >
-                    <span className="game-settings-row-label">
-                      <span className="game-settings-row-icon">
-                        <span
-                          className="game-settings-row-icon-badge"
-                          aria-hidden="true"
-                        >
-                          <IconBell />
-                        </span>
-                      </span>
-                      <span className="game-settings-row-text">
-                        Reminders
-                        <span className="game-settings-row-sub">
-                          {reminders.enabled
-                            ? '3 daily nudges to go run'
-                            : 'Daily run reminders off'}
-                        </span>
-                      </span>
-                    </span>
-                    <span
-                      className={`game-switch ${reminders.enabled ? 'is-on' : ''}`}
-                      aria-hidden="true"
-                    >
-                      <span className="game-switch-knob" />
-                    </span>
-                  </button>
-                )}
-                {reminders.supported && remindersDebug && (
-                  <button
-                    type="button"
-                    className="game-settings-row"
-                    onClick={() => scheduleTestReminderInOneMinute()}
-                  >
-                    <span className="game-settings-row-label">
-                      <span className="game-settings-row-text">
-                        Send test reminder (1 min)
-                        <span className="game-settings-row-sub">
-                          Debug only - ?debug=reminders
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                )}
 
                 <button
                   type="button"
@@ -5596,7 +5625,12 @@ function GamePageInner() {
                 <button
                   type="button"
                   className="game-settings-row"
-                  onClick={() => navigate('/profile/edit')}
+                  onClick={() => {
+                    // Website-only page: native opens it in the system browser.
+                    if (isNative)
+                      openExternal(`${getSiteBaseUrl()}/profile/edit`)
+                    else navigate('/profile/edit')
+                  }}
                 >
                   <span className="game-settings-row-label">
                     <span className="game-settings-row-icon">
@@ -5658,7 +5692,7 @@ function GamePageInner() {
                 <div className="game-shop-wallet">
                   <span className="game-hud-icon game-hud-icon-coin" />
                   <span className="game-shop-wallet-value">
-                    {profile?.fahhcoinBalance ?? 0}
+                    {formatCoins(profile?.fahhcoinBalance ?? 0)}
                   </span>
                   <button
                     type="button"
@@ -5668,7 +5702,8 @@ function GamePageInner() {
                     + Get more
                   </button>
                 </div>
-                {(storeError || storeActionError) && (
+                {(storeError ||
+                  (storeActionError && !isNotOwnedError(storeActionError))) && (
                   <p className="game-controls-hint game-controls-hint-error">
                     {storeError || storeActionError}
                   </p>
@@ -5742,6 +5777,11 @@ function GamePageInner() {
               isMyEntry(viewingProfile) ? 'You' : viewingProfile.fullName
             }
             nickname={viewingProfile.nickname}
+            profilePictureUrl={
+              isMyEntry(viewingProfile)
+                ? user?.profilePictureUrl
+                : viewingProfile.profilePictureUrl
+            }
             onClose={() => setViewingProfile(null)}
             onViewClub={handleViewClubByName}
             // A join requester is already asking in - Accept/Decline in
@@ -6128,10 +6168,10 @@ function GamePageInner() {
                     <li key={bundle.fahhcoinAmount} className="game-store-item">
                       <span className="game-store-item-info">
                         <span className="game-menu-list-area">
-                          {bundle.fahhcoinAmount} Fahhcoin
+                          {formatNumber(bundle.fahhcoinAmount)} Fahhcoin
                         </span>
                         <span className="game-menu-list-meta">
-                          Rs. {bundle.priceNpr}
+                          Rs. {formatNumber(bundle.priceNpr)}
                         </span>
                       </span>
                       <button
@@ -6176,8 +6216,8 @@ function GamePageInner() {
               </button>
               <p className="game-buy-redirect-title">Open the Shop</p>
               <p className="game-buy-redirect-pack">
-                {buyRedirectBundle.fahhcoinAmount} Fahhcoin · Rs.{' '}
-                {buyRedirectBundle.priceNpr}
+                {formatNumber(buyRedirectBundle.fahhcoinAmount)} Fahhcoin · Rs.{' '}
+                {formatNumber(buyRedirectBundle.priceNpr)}
               </p>
               <p className="game-buy-redirect-note">
                 You&apos;ll be taken to the Fahhcoin shop page to complete your
@@ -6274,14 +6314,33 @@ function GamePageInner() {
               storeChoice.heroId,
               storeChoiceHeroName
             )
-            const ownedEmote = storeChoice.id
-              ? ownedItems.find((o) => o.storeItem.id === storeChoice.id) ||
-                // A free emote (price 0) counts as owned even with no real
-                // ownedItems record for it - nothing to buy either way.
-                (price <= 0
-                  ? { equipped: currentlyEquipped?.id === storeChoice.id }
-                  : null)
-              : { equipped: !currentlyEquipped }
+            // Shared rules (utils/itemState.js): equipped implies owned,
+            // free (price 0) and the virtual idle slide (id null) are owned
+            // for everyone; only a priced item with no row is locked.
+            const emoteState = storeChoice.id
+              ? getItemState(storeChoice, ownedItems, {
+                  equipped:
+                    currentlyEquipped?.id === storeChoice.id ||
+                    // Idle/Classic is the default: equipped when nothing
+                    // else is, row or not.
+                    Boolean(storeChoice.isIdleSlide && !currentlyEquipped),
+                })
+              : getItemState(storeChoice, ownedItems, {
+                  equipped: !currentlyEquipped,
+                })
+            const ownedEmote =
+              emoteState === ITEM_STATE.LOCKED
+                ? null
+                : { equipped: emoteState === ITEM_STATE.EQUIPPED }
+            // A claimable free emote needs its hero owned first (backend
+            // rule), so a free hero with no row is claimed ahead of it.
+            const emoteHeroItem = getHeroUnlockItem(
+              heroes.find((h) => h.id === storeChoice.heroId)
+            )
+            const emoteClaims = [
+              needsClaim(emoteHeroItem, ownedItems) ? emoteHeroItem : null,
+              needsClaim(storeChoice, ownedItems) ? storeChoice : null,
+            ].filter(Boolean)
             return (
               <EmoteShowcase
                 item={storeChoice}
@@ -6292,7 +6351,10 @@ function GamePageInner() {
                 short={short}
                 purchasing={purchasing}
                 purchaseError={purchaseError}
-                storeActionError={storeActionError}
+                storeActionError={visibleStoreError(
+                  storeActionError,
+                  emoteState
+                )}
                 onClose={closeStoreChoice}
                 onBuy={() => handlePurchase(storeChoice)}
                 onEquip={async () => {
@@ -6303,7 +6365,9 @@ function GamePageInner() {
                     closeStoreChoice()
                     return
                   }
-                  await handleEquip(storeChoice, ownedEmote.equipped)
+                  await handleEquip(storeChoice, ownedEmote.equipped, {
+                    claim: emoteClaims,
+                  })
                   closeStoreChoice()
                 }}
                 onGetCoins={() => {
@@ -6368,8 +6432,7 @@ function GamePageInner() {
                   <p className="game-buy-title">
                     {price > 0 ? (
                       <>
-                        Buy {storeChoice.name} for {price}{' '}
-                        <span className="game-coin" aria-label="Fahhcoin" />?
+                        Buy {storeChoice.name} for <Price amount={price} />?
                       </>
                     ) : (
                       `Unlock ${storeChoice.name} for free?`
@@ -6377,8 +6440,8 @@ function GamePageInner() {
                   </p>
                   {short && (
                     <p className="game-buy-short">
-                      Not enough Fahhcoin - you have {balance}, need{' '}
-                      {price - balance} more.
+                      Not enough Fahhcoin - you have {formatPrice(balance)},
+                      need {formatPrice(price - balance)} more.
                     </p>
                   )}
                   {purchaseError && (

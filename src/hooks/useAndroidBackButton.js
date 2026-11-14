@@ -9,9 +9,10 @@ import { isNative } from '../utils/geo'
 // GameAuthGate's current screen) that changes without GamePage itself
 // re-rendering. The first one reporting open gets closed and the press is
 // swallowed, same as a deliberate in-app "back" tap would. With nothing
-// open, Back either asks before exiting (idle) or is swallowed entirely
+// open, Back either asks before exiting (idle) or minimises the app
 // while `blocked` is true - GamePage passes `tracker.status === 'tracking'`
-// so Back can never exit (or navigate anywhere) mid-run.
+// so Back can never exit (or navigate anywhere) mid-run - there it
+// minimises the app instead, and tracking carries on in the background.
 export function useAndroidBackButton({ layers, blocked }) {
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
   // Subscribed once below; a ref keeps the listener reading the latest
@@ -30,7 +31,12 @@ export function useAndroidBackButton({ layers, blocked }) {
         topmost.close()
         return
       }
-      if (currentlyBlocked) return
+      // Mid-run: never exit, never end the run - send the app to the
+      // background instead (the foreground service keeps tracking).
+      if (currentlyBlocked) {
+        CapacitorApp.minimizeApp().catch(() => {})
+        return
+      }
       setExitConfirmOpen(true)
     })
     return () => {

@@ -45,11 +45,29 @@ export default function AnimatedSprite({
   height,
   active = false,
   className = '',
+  // Optional, for callers that overlay this on something else (the HUD
+  // hero's equipped emote, see TerritoryMap.jsx): `onReady(true|false)`
+  // fires once every sheet is decoded (`onError` if one fails) and the loop is drawing (and false
+  // again on teardown), `showStatic={false}` skips the frame-0 preview so
+  // nothing shows until then, and `paused` stops the rAF loop without
+  // releasing the decoded sheets (the clock is shifted on resume, so the
+  // gap isn't skipped over). Defaults leave every other call site as is.
+  paused = false,
+  onReady,
+  onError,
+  showStatic = true,
 }) {
   const width = Math.round((height * frameWidth) / frameHeight)
   const canvasRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [staticUrl, setStaticUrl] = useState(null)
+  const controlRef = useRef(null)
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
 
   const firstSheet = sheets?.[0]
 
@@ -82,6 +100,7 @@ export default function AnimatedSprite({
     let rafId = null
     let startTime = null
     let hiddenSince = null
+    let pausedAt = null
     const urls = []
 
     function onVisibility() {
@@ -95,10 +114,19 @@ export default function AnimatedSprite({
     document.addEventListener('visibilitychange', onVisibility)
 
     ;(async () => {
-      const urlList = await Promise.all(sheets.map((s) => s.loadUrl()))
-      if (cancelled) return
-      urlList.forEach((u) => urls.push(u))
-      const bitmaps = await Promise.all(urlList.map((u) => acquireSheet(u)))
+      let bitmaps
+      try {
+        const urlList = await Promise.all(sheets.map((s) => s.loadUrl()))
+        if (cancelled) return
+        urlList.forEach((u) => urls.push(u))
+        bitmaps = await Promise.all(urlList.map((u) => acquireSheet(u)))
+      } catch {
+        // A sheet failed to load/decode: stay not-ready (the static
+        // frame, or whatever the caller shows underneath, stays up).
+        urls.splice(0).forEach(releaseSheet)
+        if (!cancelled) onErrorRef.current?.()
+        return
+      }
       if (cancelled) {
         urls.forEach(releaseSheet)
         return
@@ -156,18 +184,46 @@ export default function AnimatedSprite({
         rafId = requestAnimationFrame(tick)
       }
 
+      controlRef.current = {
+        pause() {
+          if (rafId) cancelAnimationFrame(rafId)
+          rafId = null
+          if (pausedAt == null) pausedAt = performance.now()
+        },
+        resume() {
+          if (cancelled || rafId) return
+          if (pausedAt != null && startTime != null) {
+            startTime += performance.now() - pausedAt
+          }
+          pausedAt = null
+          rafId = requestAnimationFrame(tick)
+        },
+      }
+
       draw(0)
       setReady(true)
-      rafId = requestAnimationFrame(tick)
+      onReadyRef.current?.(true)
+      if (pausedRef.current) {
+        pausedAt = performance.now()
+      } else {
+        rafId = requestAnimationFrame(tick)
+      }
     })()
 
     return () => {
       cancelled = true
+      controlRef.current = null
+      onReadyRef.current?.(false)
       if (rafId) cancelAnimationFrame(rafId)
       document.removeEventListener('visibilitychange', onVisibility)
       urls.forEach(releaseSheet)
     }
   }, [active, sheets, frameCount, frameWidth, frameHeight])
+
+  useEffect(() => {
+    if (paused) controlRef.current?.pause()
+    else controlRef.current?.resume()
+  }, [paused])
 
   return (
     <span
@@ -175,7 +231,7 @@ export default function AnimatedSprite({
       style={{ width, height }}
       aria-hidden="true"
     >
-      {staticUrl && firstSheet && (
+      {showStatic && staticUrl && firstSheet && (
         <span
           className="animated-sprite-static"
           style={{

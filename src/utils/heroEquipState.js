@@ -8,9 +8,21 @@
 // loadStore/handleEquip). Reload, or any other fresh mount, re-derives the
 // exact same equip/owned/tier result from that same server data, so there
 // is nothing extra to persist or go stale here.
+import { getItemState, ITEM_STATE, needsClaim } from './itemState'
+
 export function resolveHeroEquipState(hero, ownedItems, activeHeroId) {
-  const equipped = hero.id === activeHeroId
-  const owned = ownedItems.some((o) => o.storeItem.heroId === hero.id)
+  // Shared rules (utils/itemState.js): equipped implies owned, and a free
+  // (price 0) hero is owned for everyone even when `ownedItems` has no row
+  // for it - e.g. Comet, the fallback active hero.
+  const heroItem =
+    (hero.skins || []).find((item) => item.category === 'HERO') || null
+  const state = getItemState(heroItem, ownedItems, {
+    equipped: hero.id === activeHeroId,
+  })
+  const equipped = state === ITEM_STATE.EQUIPPED || hero.id === activeHeroId
+  const owned =
+    state !== ITEM_STATE.LOCKED ||
+    ownedItems.some((o) => o.storeItem.heroId === hero.id)
   // The owned HERO unlock itself, not just any owned skin/emote of his -
   // `owned` above is deliberately broader (a player who only owns a skin
   // still sees him as "in the roster", not locked). This is what actually
@@ -35,5 +47,16 @@ export function resolveHeroEquipState(hero, ownedItems, activeHeroId) {
         : hero.limited
           ? 'limited'
           : 'locked'
-  return { equipped, owned, ownedHeroItem, tier }
+  // True when the hero counts as owned by rule but the backend has no row
+  // yet: Equip has to claim it (free purchase) first.
+  const claimable = !ownedHeroItem && needsClaim(heroItem, ownedItems)
+  return {
+    equipped,
+    owned,
+    ownedHeroItem,
+    heroItem,
+    state: equipped ? ITEM_STATE.EQUIPPED : state,
+    claimable,
+    tier,
+  }
 }

@@ -4,6 +4,7 @@ import { createStoreItem, findHeroes, getStoreCatalog } from '../api/store'
 import { isPlaceholderHero } from '../utils/hero'
 import { knownEmoteNames, resolveEmoteAsset } from '../utils/emotes'
 import './EmoteAdminPanel.css'
+import Price from './Price'
 
 const EMPTY_FORM = { heroId: '', name: '', priceFahhcoin: '0' }
 
@@ -195,7 +196,7 @@ export default function EmoteAdminPanel() {
                 <span className="emote-admin-existing-items">
                   {existingByHero.get(h.id).map((item) => (
                     <span key={item.id} className="emote-admin-existing-chip">
-                      {item.name} · {item.priceFahhcoin}🪙
+                      {item.name} · <Price amount={item.priceFahhcoin} />
                     </span>
                   ))}
                 </span>

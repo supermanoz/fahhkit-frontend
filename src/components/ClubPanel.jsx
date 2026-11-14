@@ -912,6 +912,7 @@ export default function ClubPanel({
                               userId: player.userId,
                               fullName: player.fullName,
                               nickname: player.nickname,
+                              profilePictureUrl: player.profilePictureUrl,
                               // The row's own Invite button covers inviting.
                               fromJoinRequest: true,
                             })
@@ -985,6 +986,7 @@ export default function ClubPanel({
                         userId: member.userId,
                         fullName: member.fullName,
                         nickname: member.nickname,
+                        profilePictureUrl: member.profilePictureUrl,
                         clubRole: member.role,
                         clubActions: actions,
                       })
@@ -1157,6 +1159,7 @@ export default function ClubPanel({
                     userId: member.userId,
                     fullName: member.fullName,
                     nickname: member.nickname,
+                    profilePictureUrl: member.profilePictureUrl,
                   })
                 return (
                   <li key={member.userId}>

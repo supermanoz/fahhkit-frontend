@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { isNative } from '../utils/geo'
+import { REMINDER_SLOTS } from '../config/reminders'
 import {
   checkNotificationPermission,
   requestNotificationPermission,
@@ -8,6 +9,9 @@ import {
   cancelTodaysRemainingReminders,
   getRemindersPref,
   setRemindersPref,
+  getSlotPref,
+  setSlotPref,
+  cancelSlotReminders,
 } from '../utils/reminders'
 
 // Asked once, not on first launch - the task's own ask is "after the first
@@ -21,6 +25,9 @@ const PROMPT_SHOWN_KEY = 'runconquest.reminderPromptShown'
 export function useReminders() {
   const [enabled, setEnabled] = useState(() => getRemindersPref() === true)
   const [showPrompt, setShowPrompt] = useState(false)
+  const [slots, setSlots] = useState(() =>
+    Object.fromEntries(REMINDER_SLOTS.map((s) => [s.id, getSlotPref(s.id)]))
+  )
 
   // Tops up the rolling schedule on every mount (app open) as long as the
   // toggle is on AND the OS permission is still actually granted - a user
@@ -77,6 +84,21 @@ export function useReminders() {
     }
   }, [])
 
+  // One of the Morning/Afternoon/Night switches: takes effect immediately
+  // (cancels just that slot, or re-tops-up the schedule), no master toggle
+  // round trip. Turning a slot on while the master is off does nothing
+  // visible until the master is on - the pref is still remembered.
+  const toggleSlot = useCallback(
+    async (slotId, next) => {
+      setSlotPref(slotId, next)
+      setSlots((s) => ({ ...s, [slotId]: next }))
+      if (!enabled) return
+      if (next) await scheduleReminders()
+      else await cancelSlotReminders(slotId)
+    },
+    [enabled]
+  )
+
   const notifyRunSaved = useCallback(() => {
     cancelTodaysRemainingReminders()
     offerPromptOnce()
@@ -97,6 +119,8 @@ export function useReminders() {
     acceptPrompt,
     declinePrompt,
     toggle,
+    slots,
+    toggleSlot,
     notifyRunSaved,
     notifyLoggedIn,
     notifyLoggedOut,

@@ -15,6 +15,8 @@ import EmoteGlyph from './EmoteGlyph'
 import { getHeroSprite } from '../utils/heroSprites'
 import { heroAbilityParts } from '../utils/hero'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
+import { getItemState, ITEM_STATE, visibleStoreError } from '../utils/itemState'
+import { PriceLabel } from './Price'
 import {
   filterVisibleEmotes,
   resolveEmoteAsset,
@@ -102,7 +104,10 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
     .map((item) => ({
       kind: 'emote',
       item,
-      owned: ownedItems.some((o) => o.storeItem.id === item.id),
+      owned:
+        getItemState(item, ownedItems, {
+          equipped: equippedItem?.id === item.id,
+        }) !== ITEM_STATE.LOCKED,
       equipped: equippedItem?.id === item.id,
     }))
   // No hero currently has a real "emote1" StoreItem row to find here - the
@@ -129,9 +134,8 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
       kind: 'idle',
       item: idleItem,
       owned: true,
-      equipped: idleAliasItem
-        ? equippedItem?.id === idleAliasItem.id
-        : !equippedItem,
+      // Idle/Classic is the default: equipped when nothing else is.
+      equipped: !equippedItem || equippedItem.id === idleAliasItem?.id,
     },
     ...emoteSlides,
   ]
@@ -223,7 +227,12 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
                 // when one exists - see its `item` above) - it used to be
                 // excluded entirely, so tapping it silently did nothing and
                 // there was no way to ever open its Equip button.
-                if (slide.item) onShowcase(slide.item)
+                if (slide.item)
+                  onShowcase(
+                    slide.kind === 'idle'
+                      ? { ...slide.item, isIdleSlide: true }
+                      : slide.item
+                  )
               }}
             >
               {/* Idle only - Hip Hop (or whatever a hero's own emote2 is) is
@@ -231,7 +240,7 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
                 hero's `emotes`, not `poses`), so the idle slide itself
                 can't free-preview anything past idle. */}
               <span
-                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''} ${slide.equipped ? 'is-equipped' : ''}`}
+                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''}`}
               >
                 {slide.kind === 'idle' ? (
                   <HeroFigure hero={hero} pose="idle" height={spriteHeight} />
@@ -255,7 +264,11 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
                     <IconLock />
                   </span>
                 )}
-                {slide.equipped && (
+                {/* The hero (idle) slide never shows an equipped mark - the
+                  hero looks the same equipped or not; that state lives on
+                  the Equip button + chip below. An equipped emote keeps its
+                  small check symbol. */}
+                {slide.kind === 'emote' && slide.equipped && (
                   <span
                     className="hero-emote-equipped-badge"
                     role="img"
@@ -263,16 +276,6 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
                   >
                     <IconCheck aria-hidden="true" />
                   </span>
-                )}
-                {/* Owned but not the active one - nothing else on the slide
-                  said "you already bought this, tap to equip it" (the lock
-                  badge only covers the unowned case). Purely informational;
-                  tapping the slide already opens the showcase popup with
-                  the real Equip button either way, same as before. Idle is
-                  always "owned" (free), so it only needs a real item to
-                  equip against. */}
-                {slide.owned && slide.item && !slide.equipped && (
-                  <span className="hero-emote-available-badge">Equip</span>
                 )}
               </span>
             </motion.div>
@@ -343,7 +346,7 @@ export default function HeroDetailModal({
   onShowcase,
 }) {
   const sprite = getHeroSprite(hero.name)
-  const { ownedHeroItem } = resolveHeroEquipState(
+  const { ownedHeroItem, claimable, state } = resolveHeroEquipState(
     hero,
     ownedItems,
     activeHeroId
@@ -356,6 +359,25 @@ export default function HeroDetailModal({
   // modal had no matching action at all before, so tapping "Unlock" landed
   // here with nothing to actually unlock the hero.
   const heroItem = (hero.skins || []).find((item) => item.category === 'HERO')
+
+  // Equip flips the button + chip right away; onEquip (GamePage.handleEquip)
+  // resolves only after the API call and the store reload, so without this
+  // the modal would sit on "Equip" for that whole round trip. Reset in
+  // `finally`: on success `isActive` has caught up by then, on failure it
+  // hasn't and the button reverts (handleEquip already toasts the error).
+  const [equipping, setEquipping] = useState(false)
+  const showEquipped = isActive || state === 'equipped' || equipping
+  async function handleEquipTap() {
+    if (equipping || !heroItem || !(ownedHeroItem || claimable)) return
+    setEquipping(true)
+    try {
+      await onEquip(heroItem, Boolean(ownedHeroItem?.equipped), {
+        claim: claimable,
+      })
+    } finally {
+      setEquipping(false)
+    }
+  }
 
   useEffect(() => {
     function onKey(e) {
@@ -419,38 +441,62 @@ export default function HeroDetailModal({
         />
 
         <div className="hero-modal-body">
-          <h2 className="hero-modal-name">
-            {hero.name}
-            {isActive && <span className="hero-modal-active">Your hero</span>}
-          </h2>
+          <h2 className="hero-modal-name">{hero.name}</h2>
+          {showEquipped && (
+            <span
+              className="hero-modal-equipped-chip"
+              data-testid="hero-equipped-chip"
+            >
+              <IconCheck aria-hidden="true" /> Equipped
+            </span>
+          )}
           {hero.tagline && (
             <p className="hero-modal-tagline">“{hero.tagline}”</p>
           )}
 
-          {heroItem && !isActive && (
+          {(heroItem || showEquipped) && (
             <div className="hero-modal-unlock">
-              {ownedHeroItem ? (
+              {showEquipped ? (
+                <button
+                  type="button"
+                  className="btn hero-modal-equipped-btn"
+                  data-testid="hero-action"
+                  disabled
+                  aria-disabled="true"
+                >
+                  <IconCheck aria-hidden="true" /> Equipped
+                </button>
+              ) : ownedHeroItem || claimable ? (
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => onEquip(heroItem, ownedHeroItem.equipped)}
+                  data-testid="hero-action"
+                  onClick={handleEquipTap}
                 >
-                  <IconCheck /> Equip
+                  Equip
                 </button>
               ) : (
                 <button
                   type="button"
                   className="btn btn-primary"
+                  data-testid="hero-action"
                   onClick={() => onBuy(heroItem)}
                   // Limited heroes can't be bought (server rejects with
                   // HERO_LIMITED).
                   disabled={hero.limited}
                 >
-                  {hero.limited
-                    ? 'Not for sale'
-                    : heroItem.priceFahhcoin > 0
-                      ? `Unlock for ${heroItem.priceFahhcoin} Fahhcoin`
-                      : 'Unlock free'}
+                  {hero.limited ? (
+                    'Not for sale'
+                  ) : heroItem.priceFahhcoin > 0 ? (
+                    <>
+                      <PriceLabel
+                        label="Unlock for"
+                        amount={heroItem.priceFahhcoin}
+                      />
+                    </>
+                  ) : (
+                    'Unlock free'
+                  )}
                 </button>
               )}
             </div>
@@ -509,7 +555,11 @@ export default function HeroDetailModal({
             </p>
           )}
 
-          {error && <p className="hero-modal-error">{error}</p>}
+          {visibleStoreError(error, state) && (
+            <p className="hero-modal-error">
+              {visibleStoreError(error, state)}
+            </p>
+          )}
         </div>
       </motion.div>
     </motion.div>

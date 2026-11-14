@@ -5,6 +5,7 @@ import { levelProgress } from '../utils/territoryGame'
 import { formatDistance, formatDuration, formatPace } from '../utils/run'
 import HeroFigure from './HeroFigure'
 import './RunRewardsModal.css'
+import { formatNumber } from '../utils/format'
 
 // One reward sequence for every mode that can grant XP or score - replaces
 // the old pair of popups (RunRewardAnimation's XP-only modal, and
@@ -275,7 +276,9 @@ export default function RunRewardsModal({
         {hasScore && reached('score') && (
           <div className="run-rewards-section run-rewards-score-row">
             <span className="run-rewards-score-label">{pointsLabel}</span>
-            <span className="run-rewards-score-value">+{scoreCount}</span>
+            <span className="run-rewards-score-value">
+              +{formatNumber(scoreCount)}
+            </span>
           </div>
         )}
 
@@ -302,12 +305,12 @@ export default function RunRewardsModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            Total:{hasXp && <> +{xpGained} XP</>}
+            Total:{hasXp && <> +{formatNumber(xpGained)} XP</>}
             {hasXp && hasScore && ' · '}
             {hasScore && (
               <>
                 {' '}
-                +{Math.round(totalScore)} {pointsLabel}
+                +{formatNumber(totalScore)} {pointsLabel}
               </>
             )}
           </motion.p>

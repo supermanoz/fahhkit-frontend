@@ -4,6 +4,8 @@ import { IconCheck, IconClose } from './GameIcons'
 import EmoteGlyph from './EmoteGlyph'
 import HeroStage from './HeroStage'
 import './EmoteShowcase.css'
+import { PriceLabel } from './Price'
+import { formatPrice } from '../utils/price'
 
 // Full-screen "first screen shown after clicking an emote" - replaces the
 // old shared buy-confirm card for EMOTE specifically (see GamePage.jsx's
@@ -88,8 +90,8 @@ export default function EmoteShowcase({
         )}
         {!owned && short && (
           <p className="emote-showcase-short">
-            Not enough Fahhcoin - you have {balance}, need {price - balance}{' '}
-            more.
+            Not enough Fahhcoin - you have {formatPrice(balance)}, need{' '}
+            {formatPrice(price - balance)} more.
           </p>
         )}
 
@@ -132,8 +134,7 @@ export default function EmoteShowcase({
                 'Buying…'
               ) : price > 0 ? (
                 <>
-                  Buy for {price}{' '}
-                  <span className="game-coin" aria-label="Fahhcoin" />
+                  <PriceLabel label="Buy for" amount={price} />
                 </>
               ) : (
                 'Unlock free'

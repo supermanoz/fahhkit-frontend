@@ -291,3 +291,20 @@
     transition: none;
   }
 }
+
+/* Shared <Price/> (components/Price.jsx): number then coin, inline. */
+.price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* Shared <PriceLabel/>: text, number, coin with a real gap, centred. */
+.price-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  white-space: nowrap;
+}

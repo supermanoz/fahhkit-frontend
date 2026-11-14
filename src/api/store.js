@@ -78,3 +78,14 @@ export function attachHeroAbility(heroId, componentType, multiplier) {
 export function createStoreItem(item) {
   return postJson('/v1/store/admin/items', item)
 }
+
+// Free (price 0) items are owned by rule even with no UserStoreItem row, but
+// the backend's equip / club-war lock-in need a row. Claiming = a free
+// purchase; "already owned" just means the row exists, which is the goal.
+export async function claimFreeItem(storeItemId) {
+  try {
+    await purchaseStoreItem(storeItemId)
+  } catch (err) {
+    if (!/already own/i.test(err?.message || '')) throw err
+  }
+}

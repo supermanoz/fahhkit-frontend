@@ -11,7 +11,7 @@ import { isNative, platform } from './geo'
 // androidScheme, capacitor.config.json - never a real public URL), so a
 // native build MUST have an explicit site URL - either VITE_SITE_URL baked
 // into that build's .env, or this hardcoded production fallback.
-const PRODUCTION_SITE_URL = 'https://cafebizarre.com.np'
+const PRODUCTION_SITE_URL = 'https://fahhkit.vercel.app'
 
 export function getSiteBaseUrl() {
   const configured = import.meta.env.VITE_SITE_URL

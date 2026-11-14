@@ -5,6 +5,7 @@
 export const REMINDER_SLOTS = [
   {
     id: 0,
+    label: 'Morning',
     hour: 7,
     minute: 30,
     messages: [
@@ -15,6 +16,7 @@ export const REMINDER_SLOTS = [
   },
   {
     id: 1,
+    label: 'Afternoon',
     hour: 13,
     minute: 0,
     messages: [
@@ -25,6 +27,7 @@ export const REMINDER_SLOTS = [
   },
   {
     id: 2,
+    label: 'Night',
     hour: 19,
     minute: 0,
     messages: [

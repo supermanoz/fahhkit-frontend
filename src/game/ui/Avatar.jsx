@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useState } from 'react'
+import { useImageStatus } from '../../hooks/useImageStatus'
 import './components.css'
 
 // The one avatar used across /game (player profiles, the territory popup,
@@ -23,11 +24,19 @@ export default function Avatar({
   initials = 1,
   level,
   className = '',
+  // Keep the initial/silhouette on screen until the photo has fully loaded,
+  // then swap (no flash of a half-loaded image). Off by default: list rows
+  // keep the native lazy <img>.
+  holdUntilLoaded = false,
 }) {
+  const preload = useImageStatus(holdUntilLoaded ? src : null)
   // Remembers which src failed, so a new src (another player) gets tried
   // again instead of inheriting the old broken flag.
   const [failedSrc, setFailedSrc] = useState(null)
-  const showPhoto = Boolean(src) && failedSrc !== src
+  const showPhoto =
+    Boolean(src) &&
+    failedSrc !== src &&
+    (!holdUntilLoaded || preload === 'loaded')
   const style = {
     '--avatar-size': `${size}px`,
     '--ring-color': ring,

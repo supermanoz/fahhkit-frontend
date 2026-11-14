@@ -1,7 +1,10 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveFileUrl } from '../api/client'
-import { getCurrentSeasonPartners } from '../api/sponsorPartners'
+import {
+  getCurrentSeasonPartners,
+  trackPartnerClick,
+} from '../api/sponsorPartners'
 import { openExternal } from '../utils/externalLink'
 import SeasonBanner from './SeasonBanner'
 import PrizeInfoPopup from './PrizeInfoPopup'
@@ -95,7 +98,12 @@ function PartnerBannerSlide({ partner: p, isSeasonPartner }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`Sponsor: ${p.name}`}
-      onClick={(e) => openExternal(p.socialLink1, e)}
+      onClick={(e) => {
+        // Counted by the backend's tracked-redirect endpoint, in the
+        // background - never waited on, so the link opens as before.
+        trackPartnerClick(p.id, 1)
+        openExternal(p.socialLink1, e)
+      }}
     >
       {image}
       <span className="sponsor-banner-scrim" aria-hidden="true" />
@@ -121,12 +129,10 @@ function PartnerBannerSlide({ partner: p, isSeasonPartner }) {
 // SponsorBannerAdminPanel.jsx) read via GET /v1/partner/current. A
 // full-bleed ad card for each partner (cover-fit image, dark bottom scrim,
 // a "View" pill) - was a small centred logo floating in an oversized box
-// before. Still just one real image per partner (imageUrl) and no
-// click-tracking endpoint on this entity at all (checked the backend
-// directly - PartnerController has nothing past create/update/extend) -
-// "calls the click endpoint" from the brief this was built against isn't
-// something to fake here; tapping the card still opens the partner's real
-// link, just without a tracked hit.
+// before. Still just one real image per partner (imageUrl). Tapping the
+// card pings the backend's tracked redirect (GET /v1/partner/{id}/link/1,
+// see trackPartnerClick) so the sponsor report can count it, then opens the
+// partner's real link as usual.
 //
 // One full-width card at a time: native scroll-snap for swipe (same
 // mechanism as ClubWarHeroPicker, including its debounced handleScroll - a

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { IconMap, IconChevronDown, IconCheck, IconLock } from './GameIcons'
+import Price from './Price'
 import './MapStylePicker.css'
 
 // OpenFreeMap doesn't ship static preview images for its styles, and
@@ -133,8 +134,7 @@ export default function MapStylePicker({ styles, selectedId, onSelect }) {
                         <IconCheck aria-label="Selected" />
                       ) : locked ? (
                         <>
-                          {style.priceFahhcoin}
-                          <span className="game-coin" aria-label="Fahhcoin" />
+                          <Price amount={style.priceFahhcoin} />
                           <IconLock aria-hidden="true" />
                         </>
                       ) : (

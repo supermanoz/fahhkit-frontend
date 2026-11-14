@@ -10,6 +10,8 @@ import HeroFigure from './HeroFigure'
 import { getHeroSprite } from '../utils/heroSprites'
 import { resolveFileUrl } from '../api/client'
 import { useToast } from '../game/ui/Toast'
+import { claimFreeItem } from '../api/store'
+import { getItemState, ITEM_STATE, needsClaim } from '../utils/itemState'
 
 // Swipeable "pick your war hero" slider - CSS scroll-snap (real native
 // swipe/momentum, no drag-gesture library), one full-width card visible at
@@ -112,12 +114,24 @@ export default function ClubWarHeroPicker({
 
   const currentItem = heroItems[index]
   const currentOwned = currentItem
-    ? ownedItems.some((o) => o.storeItem.id === currentItem.id)
+    ? getItemState(currentItem, ownedItems) !== ITEM_STATE.LOCKED
     : false
   const currentIsLockedIn = currentItem?.id === lockedHeroStoreItemId
 
   async function handleLockIn() {
     if (!currentItem) return
+    // A free hero with no backend row is owned by rule but the server's
+    // lock-in needs the row: claim it first.
+    if (needsClaim(currentItem, ownedItems)) {
+      try {
+        await claimFreeItem(currentItem.id)
+      } catch {
+        toast.push(`Couldn't lock in ${currentItem.name} - tap to try again.`, {
+          type: 'error',
+        })
+        return
+      }
+    }
     const ok = await onLockIn(currentItem)
     if (ok) {
       toast.push(`${currentItem.name} locked in`, { type: 'success' })
@@ -151,7 +165,7 @@ export default function ClubWarHeroPicker({
           aria-label="Choose your war hero"
         >
           {heroItems.map((item, i) => {
-            const owned = ownedItems.some((o) => o.storeItem.id === item.id)
+            const owned = getItemState(item, ownedItems) !== ITEM_STATE.LOCKED
             const isCentred = i === index
             const isLockedIn = item.id === lockedHeroStoreItemId
             const animated = Boolean(getHeroSprite(item.name))

@@ -1,5 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { IconCheck } from './GameIcons'
+import Price from './Price'
+import { formatPrice } from '../utils/price'
 
 // A Shop shelf of colour items (Territory Colors, Trail Colors): the same
 // Dota-style packed tile grid as the heroes, each tile a preview drawn by
@@ -32,7 +34,7 @@ export default function ColorShelf({
                 ? 'equipped, tap to unequip'
                 : 'owned, tap to equip'
               : item.priceFahhcoin > 0
-                ? `buy for ${item.priceFahhcoin} Fahhcoin`
+                ? `buy for ${formatPrice(item.priceFahhcoin)} Fahhcoin`
                 : 'free'
             return (
               <button
@@ -58,10 +60,7 @@ export default function ColorShelf({
                       'Owned'
                     )
                   ) : item.priceFahhcoin > 0 ? (
-                    <>
-                      <span className="game-coin" aria-hidden="true" />
-                      {item.priceFahhcoin}
-                    </>
+                    <Price amount={item.priceFahhcoin} />
                   ) : (
                     'Free'
                   )}

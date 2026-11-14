@@ -1,0 +1,50 @@
+[
+  {
+    "hero": "Nova",
+    "card": 0,
+    "modal": 0,
+    "backendHeroItem": 0,
+    "cheapestEmote": 0,
+    "currency": "Fahhcoin"
+  },
+  {
+    "hero": "Blaze",
+    "card": 0,
+    "modal": 0,
+    "backendHeroItem": 0,
+    "cheapestEmote": 0,
+    "currency": "Fahhcoin"
+  },
+  {
+    "hero": "Bolt",
+    "card": 5000,
+    "modal": 5000,
+    "backendHeroItem": 5000,
+    "cheapestEmote": 2500,
+    "currency": "Fahhcoin"
+  },
+  {
+    "hero": "Phantom",
+    "card": 5000,
+    "modal": 5000,
+    "backendHeroItem": 5000,
+    "cheapestEmote": 3200,
+    "currency": "Fahhcoin"
+  },
+  {
+    "hero": "Cyclone",
+    "card": 1200,
+    "modal": 1200,
+    "backendHeroItem": 1200,
+    "cheapestEmote": 400,
+    "currency": "Fahhcoin"
+  },
+  {
+    "hero": "Pulse",
+    "card": 12500,
+    "modal": 12500,
+    "backendHeroItem": 12500,
+    "cheapestEmote": 900,
+    "currency": "Fahhcoin"
+  }
+]

@@ -710,3 +710,33 @@
 .territory-map .leaflet-gl-layer {
   position: absolute;
 }
+
+/* Equipped emote over the HUD hero (HudEmoteLayer in TerritoryMap.jsx).
+   Sized/positioned inline so the character matches the idle sprite's size
+   and feet; shares its drop shadow. Idle fades out only once the emote is
+   decoded and drawing (.is-emoting) and its steps animation is paused while
+   hidden, so it costs nothing. */
+.territory-map-blaze-emote-slot {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.territory-map-hud-emote {
+  position: absolute;
+  display: block;
+  line-height: 0;
+}
+
+.territory-map-hud-emote .animated-sprite {
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.45));
+}
+
+.territory-map-blaze {
+  transition: opacity 0.12s ease;
+}
+
+.territory-map-blaze-body.is-emoting .territory-map-blaze {
+  opacity: 0;
+  animation-play-state: paused;
+}

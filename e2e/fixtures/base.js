@@ -48,7 +48,14 @@ const IGNORED_REQUEST_HOSTS = [
 // Background audio (useGameMusic) - autoplay-blocked in a headless/fresh
 // browser profile with no user gesture yet, which the browser reports as
 // an aborted request. Not a frontend bug and not API-related.
-const IGNORED_REQUEST_PATTERNS = [/\/audio\//]
+// Sponsor-banner click pings (api/sponsorPartners.js trackPartnerClick) are
+// fetch(..., {redirect: 'manual', keepalive: true}) against the tracked-
+// redirect endpoint, which answers 302 - Playwright reports that opaque
+// redirect as requestfailed/ERR_ABORTED even though the server counted it.
+const IGNORED_REQUEST_PATTERNS = [
+  /\/audio\//,
+  /\/v1\/partner\/[^/]+\/link\/\d+$/,
+]
 function isIgnoredRequest(url) {
   if (IGNORED_REQUEST_PATTERNS.some((p) => p.test(url))) return true
   try {
@@ -75,6 +82,8 @@ export const test = base.extend({
     page.on('pageerror', (err) => pageErrors.push(err.message))
     page.on('requestfailed', (req) => {
       if (isIgnoredRequest(req.url())) return
+      // A reload/navigation cancels in-flight fetches - not a real failure.
+      if (req.failure()?.errorText === 'net::ERR_ABORTED') return
       // Our own mock router never fails a request - a real failure here is
       // either a genuinely-missing mock (a bug in the test) or a real bug
       // (an uncaught exception during fetch, a bad URL construction, ...).

@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { levelProgress } from '../utils/territoryGame'
+import { formatNumber } from '../utils/format'
 
 // The Clash Royale-style level meter from the main HUD - burst badge with
 // the level number, bar flush against it, optional name riding the bar's top
@@ -22,7 +23,7 @@ export default function LevelBar({ level, xp, name, showXp = false }) {
           />
           {showXp && (
             <span className="game-hud-level-xp">
-              {into} / {span} XP
+              {formatNumber(into)} / {formatNumber(span)} XP
             </span>
           )}
         </div>

@@ -26,6 +26,7 @@ import {
   IconRunning,
 } from './GameIcons'
 import { playerNameOf } from '../utils/playerName'
+import { formatNumber } from '../utils/format'
 
 // 10 per page - matches the backend's own default noOfRecords for this
 // endpoint (see api/clubWar.js's getClubWarHistory).
@@ -73,7 +74,7 @@ function runOutcomeLabel(outcome) {
 }
 
 function formatScore(score) {
-  return score == null ? '—' : Math.round(score).toLocaleString()
+  return score == null ? '—' : formatNumber(score)
 }
 
 function formatDate(value) {
@@ -356,7 +357,7 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
                       )}
                       {xp != null && (
                         <span className="club-war-history-stat club-war-history-stat-xp">
-                          +{xp} XP
+                          +{formatNumber(xp)} XP
                         </span>
                       )}
                     </span>
@@ -439,6 +440,7 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
                         userId: p.userId,
                         fullName: p.fullName,
                         nickname: p.nickname,
+                        profilePictureUrl: p.profilePictureUrl,
                       })
                     }}
                   >

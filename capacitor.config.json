@@ -4,7 +4,8 @@
   "webDir": "dist-app",
   "android": {
     "allowMixedContent": false,
-    "useLegacyBridge": true
+    "useLegacyBridge": true,
+    "webContentsDebuggingEnabled": false
   },
   "server": {
     "androidScheme": "https",

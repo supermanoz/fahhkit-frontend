@@ -25,6 +25,26 @@ export function setRemindersPref(enabled) {
   localStorage.setItem(PREF_KEY, String(enabled))
 }
 
+// Per-slot switches (Morning / Afternoon / Night). Default on, so someone who
+// only ever used the old single Reminders toggle keeps all three.
+const SLOT_PREF_PREFIX = 'runconquest.reminderSlot.'
+
+export function getSlotPref(slotId) {
+  try {
+    return localStorage.getItem(SLOT_PREF_PREFIX + slotId) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+export function setSlotPref(slotId, enabled) {
+  try {
+    localStorage.setItem(SLOT_PREF_PREFIX + slotId, String(enabled))
+  } catch {
+    // Best-effort only.
+  }
+}
+
 async function ensureChannel() {
   await LocalNotifications.createChannel({
     id: CHANNEL_ID,
@@ -37,16 +57,41 @@ async function ensureChannel() {
   })
 }
 
+// 'granted' | 'denied' | 'prompt'. Native: the OS permission (on Android the
+// push and local-notification permission are the same POST_NOTIFICATIONS
+// one). Web: the browser's Notification permission, so Settings can show
+// (and ask for) it there too - nothing is ever scheduled on web, see the
+// isNative guards below.
+function normalizePermission(value) {
+  if (value === 'granted') return 'granted'
+  if (value === 'denied') return 'denied'
+  return 'prompt'
+}
+
+export function notificationPermissionSupported() {
+  return isNative || typeof Notification !== 'undefined'
+}
+
 export async function checkNotificationPermission() {
-  if (!isNative) return 'denied'
+  if (!isNative) {
+    if (typeof Notification === 'undefined') return 'denied'
+    return normalizePermission(Notification.permission)
+  }
   const { display } = await LocalNotifications.checkPermissions()
-  return display
+  return normalizePermission(display)
 }
 
 export async function requestNotificationPermission() {
-  if (!isNative) return 'denied'
+  if (!isNative) {
+    if (typeof Notification === 'undefined') return 'denied'
+    try {
+      return normalizePermission(await Notification.requestPermission())
+    } catch {
+      return 'denied'
+    }
+  }
   const { display } = await LocalNotifications.requestPermissions()
-  return display
+  return normalizePermission(display)
 }
 
 function dateKey(d) {
@@ -85,6 +130,7 @@ export async function scheduleReminders() {
     const key = dateKey(day)
     const doy = dayOfYear(day)
     for (const slot of REMINDER_SLOTS) {
+      if (!getSlotPref(slot.id)) continue
       const at = new Date(
         day.getFullYear(),
         day.getMonth(),
@@ -116,6 +162,21 @@ export async function cancelAllReminders() {
   const pending = await LocalNotifications.getPending()
   const ours = pending.notifications.filter(
     (n) => n.extra?.kind === 'run-reminder'
+  )
+  if (ours.length) {
+    await LocalNotifications.cancel({
+      notifications: ours.map((n) => ({ id: n.id })),
+    })
+  }
+}
+
+// One slot switched off: drop just that slot's pending reminders (ids are
+// dateKey * 10 + slotId, see idFor). Turning it back on is scheduleReminders.
+export async function cancelSlotReminders(slotId) {
+  if (!isNative) return
+  const pending = await LocalNotifications.getPending()
+  const ours = pending.notifications.filter(
+    (n) => n.extra?.kind === 'run-reminder' && n.id % 10 === slotId
   )
   if (ours.length) {
     await LocalNotifications.cancel({

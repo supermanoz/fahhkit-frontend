@@ -249,6 +249,11 @@ export default function Navbar() {
                         Fraud Flags
                       </Link>
                     )}
+                    {canManageEvents(user) && (
+                      <Link to="/admin/sponsor-report" onClick={close}>
+                        Sponsor Report
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>

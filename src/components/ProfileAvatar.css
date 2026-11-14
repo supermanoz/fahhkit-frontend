@@ -1,0 +1,116 @@
+/* Big profile avatar (see ProfileAvatar.jsx). 92px on phones, 112px from the
+   tablet breakpoint up. Sizes are set on width/height directly (Avatar's own
+   --avatar-size is inline) and the letter scales with --pa-size. */
+.profile-avatar-card {
+  --pa-size: 92px;
+  display: flex;
+  justify-content: center;
+  margin: 14px 0 8px;
+}
+
+@media (min-width: 768px) {
+  .profile-avatar-card {
+    --pa-size: 112px;
+  }
+}
+
+.profile-avatar-card .g-avatar-wrap {
+  position: relative;
+}
+
+.profile-avatar-card .g-avatar.profile-avatar {
+  width: var(--pa-size);
+  height: var(--pa-size);
+  border: 5px solid var(--game-ink);
+  /* Off-white ring + soft drop shadow. */
+  box-shadow:
+    0 0 0 4px #f6ecd9,
+    0 8px 18px rgba(0, 0, 0, 0.35);
+  object-fit: cover;
+}
+
+.profile-avatar-card .g-avatar-fallback.profile-avatar {
+  font-size: calc(var(--pa-size) * 0.46);
+  background: var(--avatar-bg, var(--game-wood));
+}
+
+.profile-avatar-card .g-avatar-level {
+  bottom: -6px;
+  right: -6px;
+}
+
+.profile-avatar-card .g-avatar-level .g-badge {
+  min-width: 28px;
+  height: 28px;
+  font-size: 14px;
+  border-width: 3px;
+  box-shadow: 0 2px 0 var(--game-ink);
+}
+
+.profile-avatar-btn {
+  all: unset;
+  display: inline-flex;
+  cursor: zoom-in;
+  border-radius: 50%;
+}
+.profile-avatar-btn:focus-visible {
+  outline: 3px solid var(--game-gold);
+  outline-offset: 6px;
+}
+
+.profile-avatar-skeleton {
+  width: var(--pa-size);
+  height: var(--pa-size);
+  border-radius: 50%;
+  border: 5px solid var(--game-ink);
+  box-shadow:
+    0 0 0 4px #f6ecd9,
+    0 8px 18px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(
+    100deg,
+    rgba(120, 110, 90, 0.35) 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(120, 110, 90, 0.35) 70%
+  );
+  background-size: 200% 100%;
+  animation: profile-avatar-shimmer 1.2s linear infinite;
+}
+
+@keyframes profile-avatar-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-avatar-skeleton {
+    animation: none;
+  }
+}
+
+.profile-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  background: rgba(10, 8, 6, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: zoom-out;
+}
+
+.profile-lightbox-img {
+  max-width: min(92vw, 720px);
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 16px;
+  border: 4px solid var(--game-ink);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.profile-lightbox-close {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  right: 16px;
+}

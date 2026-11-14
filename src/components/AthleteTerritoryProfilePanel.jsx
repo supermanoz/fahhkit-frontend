@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import HeroSprite from './HeroSprite'
 import HeroStage from './HeroStage'
 import EmoteGlyph from './EmoteGlyph'
+import ProfileAvatar from './ProfileAvatar'
 import LevelBar from './LevelBar'
 import ClubBadge from './ClubBadge'
 import { playerName } from '../utils/playerName'
@@ -32,6 +33,10 @@ export default function AthleteTerritoryProfilePanel({
   fullName,
   // Shown instead of the full name when set (else the first name).
   nickname,
+  // Raw (relative or absolute) picture path from whichever list the player was
+  // tapped in (leaderboard row, club member, ...); falls back to the profile
+  // response's own field if the backend ever adds one there.
+  profilePictureUrl = null,
   onClose,
   // Navigates to the Club tab for this profile's club (GamePage resolves
   // the name to a clubId - this panel never sees one).
@@ -214,6 +219,20 @@ export default function AthleteTerritoryProfilePanel({
           </div>
         )}
 
+        {/* XP bar, then the profile picture, then name and stats. */}
+        {profile?.level != null && (
+          <div className="game-level-hud">
+            <LevelBar level={profile.level} xp={profile.xp} showXp />
+          </div>
+        )}
+
+        <ProfileAvatar
+          src={resolveFileUrl(profilePictureUrl || profile?.profilePictureUrl)}
+          name={playerName(nickname, fullName === 'You' ? '' : fullName)}
+          level={profile?.level}
+          loading={!profile && !error}
+        />
+
         <p className="game-menu-player-name">
           {fullName === 'You' ? 'You' : playerName(nickname, fullName)}
         </p>
@@ -226,12 +245,6 @@ export default function AthleteTerritoryProfilePanel({
           <>
             {phrase && (
               <p className="game-menu-phrase">“{phrase.storeItem.name}”</p>
-            )}
-
-            {profile.level != null && (
-              <div className="game-level-hud">
-                <LevelBar level={profile.level} xp={profile.xp} showXp />
-              </div>
             )}
 
             <div

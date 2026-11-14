@@ -1,43 +1,16 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AOS from 'aos'
-import LandingPage from './pages/LandingPage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import TermsPage from './pages/TermsPage'
-import UpdatePasswordPage from './pages/UpdatePasswordPage'
-import EditProfilePage from './pages/EditProfilePage'
-import EventsPage from './pages/EventsPage'
-import EventDetailPage from './pages/EventDetailPage'
-import CreateEventPage from './pages/CreateEventPage'
-import EditEventPage from './pages/EditEventPage'
-import CreateModeratorPage from './pages/CreateModeratorPage'
-import ModeratorsPage from './pages/ModeratorsPage'
-import EditModeratorPage from './pages/EditModeratorPage'
-import AthleteSearchPage from './pages/AthleteSearchPage'
-import AthleteProfilePage from './pages/AthleteProfilePage'
-import EditAthletePage from './pages/EditAthletePage'
-import HistoryPage from './pages/HistoryPage'
-import TrackRunPage from './pages/TrackRunPage'
-import RunDetailPage from './pages/RunDetailPage'
-import ContactPage from './pages/ContactPage'
-import ShopPage from './pages/ShopPage'
-import PaymentStatusPage from './pages/PaymentStatusPage'
-import EventRegistrantsPage from './pages/EventRegistrantsPage'
-import EventReportPage from './pages/EventReportPage'
-import DashboardPage from './pages/DashboardPage'
 import GamePage from './pages/GamePage'
-import GameMechanicsPage from './pages/GameMechanicsPage'
-import FraudFlagsPage from './pages/FraudFlagsPage'
-import LiveEventRunPrompt from './components/LiveEventRunPrompt'
 import OfflineOverlay from './components/OfflineOverlay'
 
-// `npm run build:app` (the Capacitor/Android build) sets this so the native
-// shell opens straight into the game instead of the marketing homepage -
-// every other route (shop, profile, history, …) stays reachable exactly as
-// GamePage already links to them, this only changes what "/" resolves to.
+// `npm run build:app` (the Capacitor/Android/iOS build) sets this. The native
+// app is the game only: "/" and every website route redirect to /game, and
+// the website pages (WebShell) are never imported - the dynamic import below
+// sits in a branch Vite folds away at build time, so that chunk isn't even
+// emitted into the native bundle. The website build keeps all its routes.
 const APP_SHELL = import.meta.env.VITE_APP_SHELL === 'true'
+const WebShell = APP_SHELL ? null : lazy(() => import('./WebShell'))
 
 export default function App() {
   useEffect(() => {
@@ -46,57 +19,21 @@ export default function App() {
 
   return (
     <>
-      <LiveEventRunPrompt />
       <OfflineOverlay />
-      <Routes>
-        <Route path="/" element={APP_SHELL ? <GamePage /> : <LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/terms/:type" element={<TermsPage />} />
-        <Route path="/update-password" element={<UpdatePasswordPage />} />
-        <Route
-          path="/update-password/:phone/:password"
-          element={<UpdatePasswordPage />}
-        />
-        <Route path="/profile/edit" element={<EditProfilePage />} />
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/create" element={<CreateEventPage />} />
-        <Route path="/events/:id" element={<EventDetailPage />} />
-        <Route path="/events/:id/edit" element={<EditEventPage />} />
-        <Route
-          path="/events/:id/registrations"
-          element={<EventRegistrantsPage />}
-        />
-        <Route path="/events/:id/report" element={<EventReportPage />} />
-        <Route
-          path="/admin/create-moderator"
-          element={<CreateModeratorPage />}
-        />
-        <Route path="/admin/dashboard" element={<DashboardPage />} />
-        <Route path="/admin/moderators" element={<ModeratorsPage />} />
-        <Route
-          path="/admin/moderators/:id/edit"
-          element={<EditModeratorPage />}
-        />
-        <Route path="/athletes" element={<AthleteSearchPage />} />
-        <Route path="/athletes/:userId" element={<AthleteProfilePage />} />
-        <Route path="/athletes/:userId/edit" element={<EditAthletePage />} />
-        <Route path="/history" element={<HistoryPage />} />
-        <Route path="/runs" element={<Navigate to="/history" replace />} />
-        <Route path="/runs/track" element={<TrackRunPage />} />
-        <Route path="/runs/:id" element={<RunDetailPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/shop" element={<ShopPage />} />
-        <Route path="/game" element={<GamePage />} />
-        <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
-        <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />
-        <Route path="/payment-status" element={<PaymentStatusPage />} />
-        <Route
-          path="*"
-          element={<Navigate to={APP_SHELL ? '/game' : '/'} replace />}
-        />
-      </Routes>
+      {APP_SHELL ? (
+        // /game (incl. its in-game sign in / sign up / forgot password) is
+        // the only screen. /payment-status, /login, /shop, ... all land
+        // here too: payment return is handled by GamePage's own
+        // resume-refresh of the balance (see its appStateChange listener).
+        <Routes>
+          <Route path="/game" element={<GamePage />} />
+          <Route path="*" element={<Navigate to="/game" replace />} />
+        </Routes>
+      ) : (
+        <Suspense fallback={null}>
+          <WebShell />
+        </Suspense>
+      )}
     </>
   )
 }

@@ -5,6 +5,7 @@
 // GPS run is still being tracked, before it's ever submitted.
 import polygonClipping from 'polygon-clipping'
 import { haversineDistance } from './run'
+import { formatNumber } from './format'
 
 // Naxal, Kathmandu — matches the address already shown on the Contact page,
 // so the default map view lines up with where the club actually runs.
@@ -322,7 +323,7 @@ export function formatArea(sqMeters) {
 // and otherwise keeps km² to 1-2 decimals.
 export function formatAreaStat(sqMeters) {
   if (!sqMeters) return '0 m²'
-  if (sqMeters < 10000) return `${Math.round(sqMeters).toLocaleString()} m²`
+  if (sqMeters < 10000) return `${formatNumber(sqMeters)} m²`
   const km = sqMeters / 1_000_000
   return `${km.toFixed(km < 10 ? 2 : 1)} km²`
 }

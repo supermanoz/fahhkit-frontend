@@ -51,7 +51,9 @@ export async function mockApi(page, overrides = {}) {
   await page.route('**/v1/**', (route) => {
     const req = route.request()
     const url = new URL(req.url())
-    const key = `${req.method()} ${url.pathname}`
+    // Match on the path from /v1 on, so a base-URL path prefix (prod's
+    // https://cafebizarre.com.np/fahhkit/v1/...) hits the same overrides as dev.
+    const key = `${req.method()} ${url.pathname.replace(/^.*?(\/v1\/)/, '$1')}`
     if (routes[key]) return route.fulfill(routes[key])
     // Generic catch-all - logged so a real gap shows up in the test output
     // without failing every other test that doesn't care about it.

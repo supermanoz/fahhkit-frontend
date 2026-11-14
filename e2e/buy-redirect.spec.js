@@ -49,7 +49,7 @@ test.describe('Buy Fahhcoin redirect confirmation', () => {
       .click()
     const row = page
       .locator('.game-coin-bundle-list .game-store-item')
-      .filter({ hasText: `${fahhcoinAmount} Fahhcoin` })
+      .filter({ hasText: `${fahhcoinAmount.toLocaleString('en-US')} Fahhcoin` })
     await expect(row).toBeVisible({ timeout: 10_000 })
     await row.getByRole('button', { name: 'Buy' }).click()
   }
@@ -65,7 +65,7 @@ test.describe('Buy Fahhcoin redirect confirmation', () => {
         'Open the Shop'
       )
       await expect(page.locator('.game-buy-redirect-pack')).toHaveText(
-        `${bundle.fahhcoinAmount} Fahhcoin · Rs. ${bundle.priceNpr}`
+        `${bundle.fahhcoinAmount.toLocaleString('en-US')} Fahhcoin · Rs. ${bundle.priceNpr.toLocaleString('en-US')}`
       )
       await expect(page.locator('.game-buy-redirect-note')).toContainText(
         "You'll be taken to the Fahhcoin shop page"
@@ -114,7 +114,7 @@ test.describe('Buy Fahhcoin redirect confirmation', () => {
     // formatCoins uses a space as its thousands separator (utils/format.js).
     await expect(
       page.locator('.game-hud-stat-coin .game-hud-value')
-    ).toHaveText('2 500')
+    ).toHaveText('2,500')
 
     await openCoinShopAndPickBundle(page, 550)
 
@@ -144,7 +144,7 @@ test.describe('Buy Fahhcoin redirect confirmation', () => {
 
     await expect(
       page.locator('.game-hud-stat-coin .game-hud-value')
-    ).toHaveText('3 050', { timeout: 10_000 })
+    ).toHaveText('3,050', { timeout: 10_000 })
   })
 
   test('double-tap guard - Continue can only open one tab', async ({

@@ -43,3 +43,6 @@ scripts/emote-mapping-after.json
 # App target in Xcode. Unlike Android's google-services.json it is safe to commit if you prefer;
 # uncomment to keep it local instead:
 # ios/App/App/GoogleService-Info.plist
+
+# Signed APK/AAB output of the Android release (never commit)
+/release/

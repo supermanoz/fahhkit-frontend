@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import './components.css'
 import { useNumberRollup } from './useNumberRollup'
+import { formatNumber } from '../../utils/format'
 
 // `value` can be a number (gets the roll-up animation) or a ready-made
 // string (e.g. "12:04" for a pace/time display, which rolling up makes no
@@ -22,7 +23,7 @@ export default function StatBlock({
       <span
         className={`g-stat-value ${gold ? 'g-stat-gold' : ''} ${outlined ? 'text-outlined' : ''} tabular-nums`}
       >
-        {isNumber ? display.toLocaleString() : value}
+        {isNumber ? formatNumber(display) : value}
       </span>
       <span className="g-stat-label">{label}</span>
     </div>

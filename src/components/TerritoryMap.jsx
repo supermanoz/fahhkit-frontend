@@ -36,6 +36,7 @@ import { haversineDistance } from '../utils/run'
 import defaultAvatarImage from '../assets/avatars/blaze.png'
 import { getHero } from '../utils/heroManifest'
 import TapEffect from './TapEffect'
+import AnimatedSprite from './AnimatedSprite'
 import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './TerritoryMap.css'
@@ -295,6 +296,7 @@ function buildAnimatedMarkerIcon(heroKey, moving) {
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
       '</span>' +
+      '<span class="territory-map-blaze-emote-slot"></span>' +
       `<span class="territory-map-blaze is-${moving ? 'running' : 'idle'}" data-frames="${sheet.frames}" style="background-image:url('${sheet.src}');--cell-w:${cellWidth};--cell-h:${cellHeight}"></span>` +
       '</span>',
     iconSize: [BLAZE_ICON_WIDTH, BLAZE_ICON_HEIGHT],
@@ -338,13 +340,15 @@ function mergeOwnerTerritories(territories) {
 
   const merged = []
   for (const parcels of byOwner.values()) {
-    const { ownerId, ownerName, color, emojiUrl } = parcels[0]
+    const { ownerId, ownerName, ownerProfilePictureUrl, color, emojiUrl } =
+      parcels[0]
     for (const m of mergeTouchingParcels(parcels)) {
       merged.push({
         ...m,
         id: `${ownerId}-${m.id}`,
         ownerId,
         ownerName,
+        ownerProfilePictureUrl,
         color,
         emojiUrl,
       })
@@ -995,25 +999,118 @@ function WeatherLayer({ ambience }) {
 // and removed on unmount by react-leaflet's own Marker lifecycle - nothing
 // here ever calls L.marker()/removeLayer() a second time or swaps in a new
 // instance on a position/heading/moving change.
-function PlayerMarker({ playerLocation, icon, heading }) {
+// The HUD hero's equipped emote, drawn over the idle sprite inside the SAME
+// marker element (portalled into the icon's .territory-map-blaze-emote-slot,
+// so it moves/anchors with the marker and never touches the map's React
+// tree - only this component re-renders as the sprite loads). Scaled so the
+// character is the same size as the idle map sprite (idle's sheet character
+// height = frameHeight minus its ~27px of top/bottom margin) and bottom-
+// centred on the same feet point: every emote sheet keeps ~13px of floor
+// below the soles, which at this scale lands the soles exactly where the
+// idle sprite's are (64*s - 13k*s ~ 62.1*s). Idle is hidden only once the
+// emote's sheets are fully decoded (and kept up while a replacement emote
+// loads, so swapping emotes never flashes idle); a load failure leaves idle.
+const HUD_CHAR_HEIGHT = 60.2 // idle map sprite's character, px at 1x
+const HUD_FEET_X = 24 // icon feet anchor, px at 1x
+const HUD_FLOOR_Y = 64 // icon bottom edge = idle frame bottom, px at 1x
+const assetKeys = new WeakMap()
+let nextAssetKey = 1
+function assetKey(asset) {
+  if (!assetKeys.has(asset)) assetKeys.set(asset, nextAssetKey++)
+  return assetKeys.get(asset)
+}
+function HudEmoteLayer({ slot, heroKey, asset, paused }) {
+  const [shown, setShown] = useState(null)
+  const [failed, setFailed] = useState(null)
+  const idle = getHero(heroKey).poses?.idle
+  // The hero (or emote) changed out from under a shown/failed one.
+  const stale = shown && shown.heroKey !== heroKey
+  const current = failed === asset ? null : asset
+  const showing = stale ? null : shown?.asset
+
+  useEffect(() => {
+    const body = slot?.closest('.territory-map-blaze-body')
+    if (!body || !showing) return undefined
+    body.classList.add('is-emoting')
+    return () => body.classList.remove('is-emoting')
+  }, [slot, showing])
+
+  if (!slot || !idle) return null
+  const k = HUD_CHAR_HEIGHT / (idle.frameHeight - 27)
+  const sprites = []
+  for (const a of new Set([showing, current].filter(Boolean))) {
+    const height = Math.round(a.frameHeight * k * PLAYER_MARKER_SCALE)
+    const width = Math.round((height * a.frameWidth) / a.frameHeight)
+    sprites.push(
+      <span
+        key={assetKey(a)}
+        className="territory-map-hud-emote"
+        style={{
+          left: HUD_FEET_X * PLAYER_MARKER_SCALE - width / 2,
+          top: HUD_FLOOR_Y * PLAYER_MARKER_SCALE - height,
+        }}
+      >
+        <AnimatedSprite
+          {...a}
+          height={height}
+          active
+          showStatic={false}
+          paused={paused}
+          onReady={(ready) => {
+            if (ready) setShown({ heroKey, asset: a })
+          }}
+          onError={() => setFailed(a)}
+        />
+      </span>
+    )
+  }
+  return createPortal(sprites, slot)
+}
+
+function PlayerMarker({ playerLocation, icon, heading, emote }) {
   const markerRef = useRef(null)
+  // The marker's icon element is rebuilt by Leaflet whenever `icon` changes
+  // (idle <-> run), so the emote slot inside it is looked up again then.
+  const [emoteSlot, setEmoteSlot] = useState(null)
+  useEffect(() => {
+    const marker = markerRef.current
+    if (!marker) return undefined
+    const find = () =>
+      setEmoteSlot(
+        marker.getElement()?.querySelector('.territory-map-blaze-emote-slot') ||
+          null
+      )
+    find()
+    marker.on('add', find)
+    return () => marker.off('add', find)
+  }, [icon])
   const originRef = useRef(playerLocation)
   useSmoothMarkerPosition(markerRef, playerLocation)
   useSpriteFacing(markerRef, heading, icon)
   useWarnOnDuplicateCharacter()
   return (
-    <Marker
-      ref={markerRef}
-      position={[originRef.current.lat, originRef.current.lng]}
-      icon={icon}
-      zIndexOffset={1000}
-      // Tapping your own avatar shows nothing - interactive so the tap
-      // doesn't fall through to a territory badge/polygon it happens to be
-      // sitting on and pop that up instead.
-      eventHandlers={{
-        click: (e) => L.DomEvent.stopPropagation(e),
-      }}
-    />
+    <>
+      {emote && (
+        <HudEmoteLayer
+          slot={emoteSlot}
+          heroKey={emote.heroKey}
+          asset={emote.asset}
+          paused={emote.paused}
+        />
+      )}
+      <Marker
+        ref={markerRef}
+        position={[originRef.current.lat, originRef.current.lng]}
+        icon={icon}
+        zIndexOffset={1000}
+        // Tapping your own avatar shows nothing - interactive so the tap
+        // doesn't fall through to a territory badge/polygon it happens to be
+        // sitting on and pop that up instead.
+        eventHandlers={{
+          click: (e) => L.DomEvent.stopPropagation(e),
+        }}
+      />
+    </>
   )
 }
 
@@ -1371,6 +1468,8 @@ export default function TerritoryMap({
   mapStyleUrl,
   ambience,
   animatedMarkerHero,
+  heroEmoteAsset = null,
+  heroEmotePaused = false,
   playerMoving,
   isFollowing,
   isTracking = false,
@@ -1484,6 +1583,23 @@ export default function TerritoryMap({
   // avatar photo has no "facing" to show (see useSpriteFacing's own null
   // guard).
   const markerHeading = animatedMarkerHero && isTracking ? playerHeading : null
+  // Equipped emote on the HUD hero - only on the home screen: a run (or any
+  // moving state) keeps the run/idle sprite exactly as before. Memoized so
+  // the sprite layer only sees a new object when something real changes.
+  const emoteActive = Boolean(
+    heroEmoteAsset && animatedMarkerHero && !isTracking && !playerMoving
+  )
+  const hudEmote = useMemo(
+    () =>
+      emoteActive
+        ? {
+            heroKey: animatedMarkerHero,
+            asset: heroEmoteAsset,
+            paused: heroEmotePaused,
+          }
+        : null,
+    [emoteActive, animatedMarkerHero, heroEmoteAsset, heroEmotePaused]
+  )
 
   // Warm the cache so switching idle -> running never shows a blank frame.
   useEffect(() => {
@@ -1578,6 +1694,7 @@ export default function TerritoryMap({
               playerLocation={markerLocation}
               icon={playerMarkerIcon}
               heading={markerHeading}
+              emote={hudEmote}
             />
           )}
 

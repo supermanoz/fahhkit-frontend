@@ -131,11 +131,27 @@ export function drawBrandLogo(
   return h
 }
 
-// 28-32% of the card width, capped at 220px (never relevant at this
-// card's fixed 432 logical width, but keeps this correct if CARD_W ever
-// changes) - about 30% split the difference.
-function brandLogoWidth(cardWidth) {
-  return Math.min(cardWidth * 0.3, 220)
+// ONE place to tune the logo size. Share of the card width and a cap in
+// logical (1x) px, per layout family: the tall/story cards (every card this
+// file draws today - one 9:16 card, three variants) and the compact
+// square/wide family (no such card exists yet; kept here so a future one
+// reads the same constant). Drawn from the 1200px asset, so it stays crisp
+// at EXPORT_SCALE. Every layout below derives its logo/stat positions from
+// this, so the extra height is reserved, not overlapped.
+export const BRAND_LOGO_SIZE = {
+  tall: { ratio: 0.575, max: 360 },
+  compact: { ratio: 0.425, max: 300 },
+}
+// Safe margin from the card edges, as a share of the width.
+export const BRAND_LOGO_MIN_MARGIN = 0.04
+
+function brandLogoWidth(cardWidth, layout = 'tall') {
+  const { ratio, max } = BRAND_LOGO_SIZE[layout]
+  return Math.min(
+    cardWidth * ratio,
+    max,
+    cardWidth * (1 - BRAND_LOGO_MIN_MARGIN * 2)
+  )
 }
 
 export function drawStatsRow(
@@ -251,6 +267,58 @@ export function drawRoutePath(
   ctx.restore()
 }
 
+// Neon-tube route for the exported card (the old orange route colour is
+// gone from here; RunMap.jsx's live in-run map has its own, untouched).
+// Canvas has no CSS box-shadow, so the glow is layered passes of the same
+// stroke with ctx.shadow*, widest first, then the crisp tube and a thin
+// hot core on top. NOTE: shadowBlur is NOT scaled by the context
+// transform (unlike lineWidth), so it is multiplied by the current scale
+// by hand - otherwise the 2.5x export would get a glow 2.5x thinner than
+// the preview's relative to the card.
+export const ROUTE_NEON = '#FF073A'
+const ROUTE_NEON_CORE = '#FFE9EC'
+const ROUTE_NEON_GLOWS = [
+  { color: 'rgba(255, 7, 58, 0.7)', blur: 30 }, // outer bloom
+  { color: ROUTE_NEON, blur: 15 }, // mid glow
+  { color: ROUTE_NEON, blur: 6 }, // inner glow
+]
+
+export function drawNeonRoutePath(ctx, projected, { lineWidth = 4 } = {}) {
+  if (projected.length < 2) return
+  const m = ctx.getTransform()
+  const k = Math.hypot(m.a, m.b) || 1
+  const trace = () => {
+    ctx.beginPath()
+    projected.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y)
+      else ctx.lineTo(p.x, p.y)
+    })
+  }
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 0
+  ctx.strokeStyle = ROUTE_NEON
+  ctx.lineWidth = lineWidth
+  for (const glow of ROUTE_NEON_GLOWS) {
+    ctx.shadowColor = glow.color
+    ctx.shadowBlur = glow.blur * k
+    trace()
+    ctx.stroke()
+  }
+  // The tube itself, no shadow, then the hot white-red core.
+  ctx.shadowColor = 'transparent'
+  ctx.shadowBlur = 0
+  trace()
+  ctx.stroke()
+  ctx.strokeStyle = ROUTE_NEON_CORE
+  ctx.lineWidth = lineWidth * 0.375 // 1.5px at the 4px default
+  trace()
+  ctx.stroke()
+  ctx.restore()
+}
+
 // Colors match RunMap.jsx's start/end marker colors exactly.
 export function drawStartEndMarkers(
   ctx,
@@ -329,7 +397,7 @@ export async function drawShareCard(
       height: routeHeight,
       padding: 70,
     }).map((p) => ({ ...p, y: p.y + routeTop }))
-    drawRoutePath(ctx, projected, { strokeStyle: '#e8590c' })
+    drawNeonRoutePath(ctx, projected)
 
     const logoCenterY =
       routeTop +
@@ -393,23 +461,46 @@ export async function drawShareCard(
       chipBg: 'rgba(255,255,255,0.18)',
     })
   } else if (variant === SHARE_VARIANTS.MAP) {
-    const projected = projectRoute(points, { width, height, padding })
+    const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)
+    const creditRowHeight = 22
+    const barHeight = 220 + logoH + 24 + creditRowHeight
+    const logoBottom = height - 165 - creditRowHeight
+    const logoRect = {
+      x0: width - padding - logoW - 10,
+      x1: width - padding + 10,
+      y0: logoBottom - logoH - 10,
+    }
+    // The stats/credit text block under the logo spans the full width.
+    const statsTop = height - 124 - creditRowHeight - 30
+
+    // The route is projected across the full card, like before. Only if it
+    // (with a little glow margin) would touch the logo or the stats block
+    // is it re-projected into the clear area above them - never shrunk
+    // otherwise.
+    let projected = projectRoute(points, { width, height, padding })
+    const hits = (pts) =>
+      pts.some(
+        (q) =>
+          q.y + 8 > statsTop ||
+          (q.x + 8 > logoRect.x0 &&
+            q.x - 8 < logoRect.x1 &&
+            q.y + 8 > logoRect.y0)
+      )
+    if (hits(projected)) {
+      projected = projectRoute(points, {
+        width,
+        height: logoRect.y0 - 8,
+        padding,
+      })
+    }
     drawMapDecoration(ctx, { width, height })
-    drawRoutePath(ctx, projected, { strokeStyle: '#e8590c', lineWidth: 5 })
+    drawNeonRoutePath(ctx, projected)
     drawStartEndMarkers(ctx, projected)
 
     // Strava-style info panel: logo, a title, then a Distance/Time row
     // with Pace on its own row below - anchored over a dark gradient so
-    // it stays legible over any part of the route, which (unlike the
-    // other two variants) is projected across the FULL card height, not
-    // shrunk to leave room above this bar - the bar's own gradient is
-    // what keeps whatever's underneath it readable, same as before.
-    // barHeight grows to fit the logo (taller than the single line of
-    // text it replaces) instead of letting it crowd the title/stats
-    // below it - "reserve space, don't overlap" per the brief.
-    const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)
-    const creditRowHeight = 22
-    const barHeight = 220 + logoH + 24 + creditRowHeight
+    // it stays legible. barHeight grows to fit the logo instead of letting
+    // it crowd the title/stats below it ("reserve space, don't overlap").
     const bar = ctx.createLinearGradient(0, height - barHeight, 0, height)
     bar.addColorStop(0, 'rgba(20,18,16,0)')
     bar.addColorStop(1, 'rgba(20,18,16,0.78)')
@@ -418,7 +509,7 @@ export async function drawShareCard(
 
     drawBrandLogo(ctx, logo, {
       x: width - padding,
-      y: height - 165 - creditRowHeight,
+      y: logoBottom,
       width: logoW,
       align: 'right',
       valign: 'bottom',

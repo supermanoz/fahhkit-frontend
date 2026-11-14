@@ -6,7 +6,7 @@ import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
 import { getTerritoryProfile } from '../api/territory'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { withBundleExtras } from '../utils/coinBundles'
-import { formatCoins } from '../utils/format'
+import { formatCoins, formatNumber } from '../utils/format'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import CoinStack from '../components/CoinStack'
@@ -199,7 +199,7 @@ export default function ShopPage() {
                 {formatCoins(selectedBundle.fahhcoinAmount)} Fahhcoin
               </p>
               <p className="shop-confirm-price">
-                Rs. {Number(selectedBundle.priceNpr).toLocaleString()}
+                Rs. {formatNumber(selectedBundle.priceNpr)}
               </p>
               {buyError && <p className="shop-confirm-error">{buyError}</p>}
               <div className="shop-confirm-actions">
@@ -247,15 +247,13 @@ function PackCard({ bundle, tier, onSelect, isHighlighted, cardRef }) {
       )}
       <CoinStack tier={tier} size={76} className="shop-pack-coins" />
       <span className="shop-pack-amount">
-        {formatCoins(bundle.fahhcoinAmount)}
+        {formatNumber(bundle.fahhcoinAmount)}
       </span>
       <span className="shop-pack-amount-label">Fahhcoin</span>
       {bundle.bonusPercent > 0 && (
         <span className="shop-pack-ribbon">+{bundle.bonusPercent}% bonus</span>
       )}
-      <span className="shop-pack-buy">
-        Rs. {Number(bundle.priceNpr).toLocaleString()}
-      </span>
+      <span className="shop-pack-buy">Rs. {formatNumber(bundle.priceNpr)}</span>
     </button>
   )
 }

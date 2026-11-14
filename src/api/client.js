@@ -233,6 +233,24 @@ export async function getJson(path) {
   return parseResponse(response, hadToken)
 }
 
+// Fire-and-forget GET for tracking pings (banner clicks): never awaited by
+// the caller, never throws, survives the page/app navigating away
+// (keepalive), and doesn't follow redirects (redirect: 'manual') - the
+// tracked-redirect endpoint answers 302 to a third-party site that has no
+// CORS headers; the server-side count has already happened by then.
+export function pingGet(path) {
+  try {
+    fetch(`${getActiveApiBaseUrl()}${path}`, {
+      method: 'GET',
+      headers: { ...authHeaders() },
+      keepalive: true,
+      redirect: 'manual',
+    }).catch(() => {})
+  } catch {
+    // Tracking must never break the tap that triggered it.
+  }
+}
+
 export async function putJson(path, payload) {
   const hadToken = Boolean(getToken())
   let response

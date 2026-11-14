@@ -34,6 +34,7 @@ import { isPlaceholderHero, resolveHeroAssetOrDefault } from '../utils/hero'
 import './GameCards.css'
 import './ClubPanel.css'
 import { playerNameOf } from '../utils/playerName'
+import { formatNumber } from '../utils/format'
 
 // While queued or at war, re-check this often - matching and the phase
 // changes happen server-side on a schedule, with no push event for them.
@@ -91,7 +92,7 @@ function formatCountdown(until, now) {
 }
 
 function formatScore(score) {
-  return score == null ? '—' : Math.round(score).toLocaleString()
+  return score == null ? '—' : formatNumber(score)
 }
 
 // Club Wars tab inside the Club tab. Covers the whole backend flow (see
@@ -377,8 +378,10 @@ export default function ClubWarPanel({
           <span className="club-perk-icon tone-gold club-perk-icon-trophy">
             <ClubTrophyIcon size={26} />
           </span>
-          Winners: system-assigned trophies, and {CLUB_WAR_REWARDS.winXp} XP +{' '}
-          {CLUB_WAR_REWARDS.winCoins} Fahhcoin for everyone who ran.
+          Winners: system-assigned trophies, and{' '}
+          {formatNumber(CLUB_WAR_REWARDS.winXp)} XP +{' '}
+          {formatNumber(CLUB_WAR_REWARDS.winCoins)} Fahhcoin for everyone who
+          ran.
         </li>
       </ul>
     </section>
@@ -464,6 +467,7 @@ export default function ClubWarPanel({
               userId: p.userId,
               fullName: p.fullName,
               nickname: p.nickname,
+              profilePictureUrl: p.profilePictureUrl,
             })
           return (
             <li key={p.userId}>
@@ -586,7 +590,7 @@ export default function ClubWarPanel({
           <p className="game-row-meta club-war-sub">
             {war.squadSize} vs {war.squadSize}
             {completed && won
-              ? ` · system-assigned trophies, and ${CLUB_WAR_REWARDS.winXp} XP + ${CLUB_WAR_REWARDS.winCoins} Fahhcoin to every runner`
+              ? ` · system-assigned trophies, and ${formatNumber(CLUB_WAR_REWARDS.winXp)} XP + ${formatNumber(CLUB_WAR_REWARDS.winCoins)} Fahhcoin to every runner`
               : ''}
           </p>
           {completed && (

@@ -7,6 +7,14 @@ import { defineConfig, devices } from '@playwright/test'
 // starts. No fixed sleeps anywhere in e2e/ - Playwright's own auto-waiting
 // (locator assertions, toPass, etc.) handles timing; see each spec's own
 // comments where something non-obvious needed a specific wait condition.
+// E2E_PROD=1 runs the suite against the *production build* (`npm run build`
+// output served by `vite preview`, API base = the prod URL baked into it)
+// instead of the dev server, and also serves the native-shell build
+// (`npm run build:app` -> dist-app) for e2e/native-shell.spec.js. Build both
+// first. The API is mocked either way (route `**/v1/**` matches any base).
+const E2E_PROD = process.env.E2E_PROD === '1'
+const WEB_PORT = E2E_PROD ? 5175 : 5174
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -23,7 +31,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e-report' }]],
   timeout: 45_000,
   use: {
-    baseURL: 'https://localhost:5174',
+    baseURL: `https://localhost:${WEB_PORT}`,
     // The dev server's cert is self-signed (basicSsl plugin in
     // vite.config.js - geolocation needs a secure context, which plain
     // http:// LAN access doesn't count as).
@@ -49,11 +57,29 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'npm run dev -- --port 5174 --strictPort',
-    url: 'https://localhost:5174',
-    reuseExistingServer: true,
-    ignoreHTTPSErrors: true,
-    timeout: 60_000,
-  },
+  webServer: E2E_PROD
+    ? [
+        {
+          command: 'npx vite preview --port 5175 --strictPort',
+          url: 'https://localhost:5175',
+          reuseExistingServer: true,
+          ignoreHTTPSErrors: true,
+          timeout: 60_000,
+        },
+        {
+          command:
+            'npx vite preview --outDir dist-app --port 5176 --strictPort',
+          url: 'https://localhost:5176',
+          reuseExistingServer: true,
+          ignoreHTTPSErrors: true,
+          timeout: 60_000,
+        },
+      ]
+    : {
+        command: 'npm run dev -- --port 5174 --strictPort',
+        url: 'https://localhost:5174',
+        reuseExistingServer: true,
+        ignoreHTTPSErrors: true,
+        timeout: 60_000,
+      },
 })

@@ -11,6 +11,8 @@ import HeroFigure from './HeroFigure'
 import HeroStage from './HeroStage'
 import { getHeroSprite } from '../utils/heroSprites'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
+import { getHeroUnlockPrice } from '../utils/price'
+import { PriceLabel } from './Price'
 import './HeroGallery.css'
 
 // A swipe distance/velocity past either of these commits to the next/prev
@@ -60,14 +62,14 @@ export default function HeroGallery({
     setIndex(clamped)
   }
 
-  async function handleEquipClick(e, item) {
+  async function handleEquipClick(e, item, claim = false) {
     // The card itself opens the detail modal on click (onSelect below) -
     // without this, tapping Equip would do both at once.
     e.stopPropagation()
     if (equippingHeroId) return
     setEquippingHeroId(item.heroId)
     try {
-      await onEquip(item, false)
+      await onEquip(item, false, { claim })
     } finally {
       setEquippingHeroId(null)
     }
@@ -105,17 +107,13 @@ export default function HeroGallery({
   }
 
   const hero = heroes[index]
-  const { equipped, owned, ownedHeroItem, tier } = resolveHeroEquipState(
-    hero,
-    ownedItems,
-    activeHeroId
-  )
+  const { equipped, owned, ownedHeroItem, heroItem, claimable, tier } =
+    resolveHeroEquipState(hero, ownedItems, activeHeroId)
   const equipping = equippingHeroId === hero.id
   const animated = Boolean(getHeroSprite(hero.name))
-  const prices = (hero.skins || [])
-    .map((sk) => sk.priceFahhcoin || 0)
-    .filter((n) => n > 0)
-  const fromPrice = prices.length ? Math.min(...prices) : 0
+  // The HERO unlock item's own price - the same one the detail modal and the
+  // purchase use (see utils/price.js).
+  const unlockPrice = getHeroUnlockPrice(hero)
 
   return (
     <div className="hero-roster">
@@ -198,31 +196,29 @@ export default function HeroGallery({
                     >
                       <IconCheck /> Equipped
                     </button>
-                  ) : ownedHeroItem ? (
+                  ) : ownedHeroItem || claimable ? (
                     <button
                       type="button"
                       className="hero-card-equip-btn"
                       disabled={equipping}
                       onClick={(e) =>
-                        handleEquipClick(e, ownedHeroItem.storeItem)
+                        handleEquipClick(
+                          e,
+                          ownedHeroItem ? ownedHeroItem.storeItem : heroItem,
+                          claimable
+                        )
                       }
                     >
                       {equipping ? 'Equipping…' : 'Equip'}
                     </button>
                   ) : owned ? (
                     'Equip'
+                  ) : unlockPrice > 0 ? (
+                    <PriceLabel label="Unlock" amount={unlockPrice} />
                   ) : (
-                    <>
-                      <span className="hero-card-foot-label">
-                        {fromPrice > 0 ? 'Unlock' : 'Free'}
-                      </span>
-                      {fromPrice > 0 && (
-                        <span className="hero-card-foot-price">
-                          {fromPrice}
-                          <span className="game-coin" aria-hidden="true" />
-                        </span>
-                      )}
-                    </>
+                    <span className="hero-card-foot-label">
+                      {unlockPrice == null ? 'Unavailable' : 'Free'}
+                    </span>
                   )}
                 </span>
               )}

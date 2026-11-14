@@ -19,6 +19,7 @@ import {
   isRegistrationClosed,
 } from '../utils/events'
 import './EventDetailPage.css'
+import { formatNumber } from '../utils/format'
 
 export default function EventDetailPage() {
   const { id } = useParams()
@@ -181,8 +182,8 @@ export default function EventDetailPage() {
                           : '🐉 Raid boss'}
                       </span>
                       <span>
-                        {Math.round(event.currentScore || 0).toLocaleString()} /{' '}
-                        {Math.round(event.targetScore).toLocaleString()} dmg
+                        {formatNumber(event.currentScore || 0)} /{' '}
+                        {formatNumber(event.targetScore)} dmg
                       </span>
                     </div>
                     <div
