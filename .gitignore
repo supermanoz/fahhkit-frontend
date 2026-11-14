@@ -46,3 +46,6 @@ scripts/emote-mapping-after.json
 
 # Signed APK/AAB output of the Android release (never commit)
 /release/
+
+# Python bytecode
+__pycache__/
