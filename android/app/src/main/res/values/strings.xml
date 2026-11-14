@@ -5,6 +5,13 @@
     <string name="package_name">com.runconquest.game</string>
     <string name="custom_url_scheme">com.runconquest.game</string>
 
+    <!-- Google sign-in (@codetrix-studio/capacitor-google-auth): the WEB OAuth client id the
+         ID token is audienced to - must match capacitor.config.json's GoogleAuth.androidClientId
+         / serverClientId and be in the backend's google.oauth.client.ids. The plugin's own copy
+         of this resource is the placeholder "Your Web Client Key"; this overrides it so a config
+         without androidClientId can never ship the placeholder again. -->
+    <string name="server_client_id">797208432008-o19nbtt7bst014jm3i8efn9gv81n4prd.apps.googleusercontent.com</string>
+
     <!-- @capacitor-community/background-geolocation's persistent "Run in progress"
          notification while tracking continues with the screen locked - see
          src/utils/geo.js's watchPosition(). -->

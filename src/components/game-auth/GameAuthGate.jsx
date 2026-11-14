@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthFlow, authErrorMessage } from '../../hooks/useAuthFlow'
+import { describeOAuthServerError } from '../../utils/googleSignInErrors'
 import { createAuthThrottle } from '../../utils/authThrottle'
 import {
   SCREEN,
@@ -114,11 +115,15 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
       const data = await auth.signInWithGoogle(idToken)
       await completeSignIn(data)
     } catch (err) {
+      // 401/403 from POST /v1/auth/google get a specific line (token
+      // audience not allow-listed vs. account refused) - see
+      // utils/googleSignInErrors.js.
       dispatch({
         type: 'SUBMIT_ERROR',
-        message: authErrorMessage(
+        message: describeOAuthServerError(
           err,
-          'Google sign-in failed. Please try again.'
+          'Google',
+          authErrorMessage(err, 'Google sign-in failed. Please try again.')
         ),
       })
     }
@@ -140,10 +145,13 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
     }
   }
 
-  function handleOAuthError(provider) {
+  // `detail` is the provider-side reason when known (the native Google
+  // button maps Play Services status codes to text); without it, the
+  // generic line.
+  function handleOAuthError(provider, detail) {
     dispatch({
       type: 'SUBMIT_ERROR',
-      message: `${provider} sign-in was cancelled or failed.`,
+      message: detail || `${provider} sign-in was cancelled or failed.`,
     })
   }
 

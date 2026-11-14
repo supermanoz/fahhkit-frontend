@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthFlow, authErrorMessage } from '../hooks/useAuthFlow'
+import { describeOAuthServerError } from '../utils/googleSignInErrors'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PasswordField from '../components/PasswordField'
@@ -83,9 +84,10 @@ export default function LoginPage() {
     } catch (err) {
       setBanner({
         kind: 'error',
-        message: authErrorMessage(
+        message: describeOAuthServerError(
           err,
-          'Google sign-in failed. Please try again.'
+          'Google',
+          authErrorMessage(err, 'Google sign-in failed. Please try again.')
         ),
       })
     } finally {
@@ -175,10 +177,11 @@ export default function LoginPage() {
           <OAuthButtonsBlock
             onGoogleCredential={handleGoogleCredential}
             onAppleCredential={handleAppleCredential}
-            onError={(provider) =>
+            onError={(provider, detail) =>
               setBanner({
                 kind: 'error',
-                message: `${provider} sign-in was cancelled or failed.`,
+                message:
+                  detail || `${provider} sign-in was cancelled or failed.`,
               })
             }
           />
@@ -209,7 +212,7 @@ function OAuthButtonsBlock({ onGoogleCredential, onAppleCredential, onError }) {
       {hasGoogle && (
         <GoogleSignInButton
           onCredential={onGoogleCredential}
-          onError={() => onError('Google')}
+          onError={(detail) => onError('Google', detail)}
         />
       )}
       {hasApple && (

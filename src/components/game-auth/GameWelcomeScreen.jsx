@@ -59,7 +59,7 @@ export default function GameWelcomeScreen({
           {HAS_GOOGLE && (
             <GoogleSignInButton
               onCredential={onGoogleCredential}
-              onError={() => onOAuthError('Google')}
+              onError={(detail) => onOAuthError('Google', detail)}
             />
           )}
           {HAS_APPLE && (

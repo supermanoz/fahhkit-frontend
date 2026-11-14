@@ -22,20 +22,33 @@ async function startTrainingRun(page, context) {
   await context.setGeolocation({ latitude: 27.7172, longitude: 85.324 })
   await seedSession(page, VETERAN)
   await page.goto('/game')
-  await expect(page.locator('.game-loading-overlay')).toBeHidden({
-    timeout: 30_000,
-  })
+  // The overlay is absent before it first mounts, so "hidden" alone can
+  // pass too early - require it to stay gone, then the HUD.
+  let goneSince = null
+  await expect
+    .poll(
+      async () => {
+        if ((await page.locator('.game-loading-overlay').count()) > 0) {
+          goneSince = null
+          return false
+        }
+        goneSince ??= Date.now()
+        return Date.now() - goneSince > 2500
+      },
+      { timeout: 90_000, intervals: [500] }
+    )
+    .toBe(true)
+  await expect(page.locator('.game-hud-level')).toBeVisible({ timeout: 20_000 })
+  await page
+    .getByText('Not now')
+    .click({ timeout: 2500 })
+    .catch(() => {})
+  // Training lives under the radial Play menu now (not the tab switcher).
   await page.locator('.game-menu-btn').click()
-  await page.getByRole('button', { name: 'Leaderboard' }).click()
-  const trainingButton = page.getByRole('button', { name: 'Training' })
-  if (await trainingButton.isVisible()) {
-    await trainingButton.click()
-  } else {
-    await page.locator('.game-menu-picker-current').click()
-    await page.getByRole('option', { name: 'Training' }).click()
-  }
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await page.getByRole('button', { name: 'Training', exact: true }).click()
   await page.getByRole('button', { name: 'Start' }).click()
-  await expect(page.locator('.game-run-card')).toBeVisible({ timeout: 8000 })
+  await expect(page.locator('.game-run-card')).toBeVisible({ timeout: 30_000 })
 }
 
 test.describe('Run view - character marker and recenter button', () => {

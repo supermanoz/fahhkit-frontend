@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 import { isNative } from '../utils/geo'
+import { describeGoogleSignInError } from '../utils/googleSignInErrors'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
@@ -98,10 +99,16 @@ function GoogleSignInButtonNative({ onCredential, onError }) {
       if (user?.authentication?.idToken) {
         onCredential(user.authentication.idToken)
       } else {
-        onError?.()
+        onError?.('Google returned no sign-in token. Please try again.')
       }
-    } catch {
-      // User cancelled the account picker - not an error worth surfacing.
+    } catch (err) {
+      // Say what went wrong (Play Services status code -> text, see
+      // utils/googleSignInErrors.js) instead of failing silently; a plain
+      // cancel of the account picker (12501) stays quiet.
+      const { message, cancelled, code } = describeGoogleSignInError(err)
+      if (cancelled) return
+      console.warn('[GoogleSignIn] native sign-in failed', code, err)
+      onError?.(message)
     } finally {
       setBusy(false)
     }
