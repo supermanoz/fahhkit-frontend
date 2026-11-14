@@ -1,0 +1,19 @@
+{
+  "frames": 39470,
+  "gaps": [],
+  "events": [
+    {
+      "t": 24904,
+      "kind": "marker-pane-childList",
+      "added": "idle-nudge-backdrop",
+      "removed": ""
+    },
+    {
+      "t": 24912,
+      "kind": "marker-pane-childList",
+      "added": "animated-sprite-static",
+      "removed": ""
+    }
+  ],
+  "timers": {}
+}

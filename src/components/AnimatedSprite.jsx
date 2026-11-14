@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
 import { SPRITE_FRAME_MS } from '../utils/spriteTiming'
-import { acquireSheet, releaseSheet } from '../utils/spriteSheetCache'
+import { acquireSheet } from '../utils/spriteSheetCache'
 import './AnimatedSprite.css'
 
 // The one shared player for every hero sprite-sheet animation in the app -
@@ -62,6 +62,11 @@ export default function AnimatedSprite({
   const [ready, setReady] = useState(false)
   const [staticUrl, setStaticUrl] = useState(null)
   const controlRef = useRef(null)
+  // Bumped to rebuild the player (re-acquire + re-decode the sheets) when a
+  // draw fails - e.g. the decoded bitmap was dropped under us. Capped so a
+  // genuinely broken sheet can't spin forever.
+  const [reloadKey, setReloadKey] = useState(0)
+  const reloadsRef = useRef(0)
   const pausedRef = useRef(paused)
   pausedRef.current = paused
   const onReadyRef = useRef(onReady)
@@ -101,36 +106,67 @@ export default function AnimatedSprite({
     let startTime = null
     let hiddenSince = null
     let pausedAt = null
-    const urls = []
+    let lastDrawnIndex = -1
+    // One handle per sheet; release() is idempotent, so the cleanup below
+    // and the early-exit paths can never double-release (which used to close
+    // a bitmap another sprite was still drawing from).
+    const handles = []
+    const releaseAll = () => handles.splice(0).forEach((h) => h.release())
+    const canvasEl = canvasRef.current
 
     function onVisibility() {
       if (document.hidden) {
         hiddenSince = performance.now()
-      } else if (hiddenSince != null && startTime != null) {
-        startTime += performance.now() - hiddenSince
-        hiddenSince = null
+      } else {
+        if (hiddenSince != null && startTime != null) {
+          startTime += performance.now() - hiddenSince
+          hiddenSince = null
+        }
+        // The backing store may have been discarded while hidden: repaint
+        // the current frame on the next tick even if the index is unchanged.
+        lastDrawnIndex = -1
       }
     }
+    // Canvas 2D context loss/restore (GPU reset, WebView memory pressure):
+    // the restored canvas is blank, so force a repaint.
+    function onContextRestored() {
+      lastDrawnIndex = -1
+    }
     document.addEventListener('visibilitychange', onVisibility)
+    canvasEl?.addEventListener('contextrestored', onContextRestored)
+
+    function fail(err) {
+      console.warn('[AnimatedSprite] draw failed, reloading sheets', err)
+      cancelled = true
+      if (rafId) cancelAnimationFrame(rafId)
+      rafId = null
+      releaseAll()
+      setReady(false)
+      onReadyRef.current?.(false)
+      if (reloadsRef.current < 5) {
+        reloadsRef.current += 1
+        setReloadKey((k) => k + 1)
+      } else {
+        onErrorRef.current?.()
+      }
+    }
 
     ;(async () => {
       let bitmaps
       try {
         const urlList = await Promise.all(sheets.map((s) => s.loadUrl()))
         if (cancelled) return
-        urlList.forEach((u) => urls.push(u))
-        bitmaps = await Promise.all(urlList.map((u) => acquireSheet(u)))
+        for (const u of urlList) handles.push(acquireSheet(u))
+        bitmaps = await Promise.all(handles.map((h) => h.ready))
       } catch {
         // A sheet failed to load/decode: stay not-ready (the static
         // frame, or whatever the caller shows underneath, stays up).
-        urls.splice(0).forEach(releaseSheet)
+        releaseAll()
         if (!cancelled) onErrorRef.current?.()
         return
       }
-      if (cancelled) {
-        urls.forEach(releaseSheet)
-        return
-      }
+      // Unmounted while decoding: the effect cleanup already released.
+      if (cancelled) return
 
       const canvas = canvasRef.current
       const ctx = canvas?.getContext('2d')
@@ -143,7 +179,6 @@ export default function AnimatedSprite({
         acc += s.frames
       }
 
-      let lastDrawnIndex = -1
       function draw(frameIndex) {
         let sheetI = sheets.length - 1
         for (let i = 0; i < sheets.length; i += 1) {
@@ -170,15 +205,30 @@ export default function AnimatedSprite({
         )
       }
 
+      const readyAt = performance.now()
       function tick(now) {
         if (cancelled) return
         if (startTime == null) startTime = now
         if (!document.hidden) {
-          const elapsed = now - startTime
+          // Clamped: a huge or negative elapsed (clock reset, long
+          // throttle) must still land on a real frame.
+          const elapsed = Math.max(0, now - startTime)
           const frameIndex = Math.floor(elapsed / SPRITE_FRAME_MS) % frameCount
           if (frameIndex !== lastDrawnIndex) {
-            lastDrawnIndex = frameIndex
-            draw(frameIndex)
+            try {
+              draw(frameIndex)
+              lastDrawnIndex = frameIndex
+              // A sheet that has played fine for 30s is healthy again:
+              // forgive earlier reloads so a long session never runs out.
+              if (reloadsRef.current && now - readyAt > 30000) {
+                reloadsRef.current = 0
+              }
+            } catch (err) {
+              // drawImage threw (detached bitmap...). Never let that kill
+              // the loop after clearRect() blanked the canvas.
+              fail(err)
+              return
+            }
           }
         }
         rafId = requestAnimationFrame(tick)
@@ -200,7 +250,12 @@ export default function AnimatedSprite({
         },
       }
 
-      draw(0)
+      try {
+        draw(0)
+      } catch (err) {
+        fail(err)
+        return
+      }
       setReady(true)
       onReadyRef.current?.(true)
       if (pausedRef.current) {
@@ -216,9 +271,10 @@ export default function AnimatedSprite({
       onReadyRef.current?.(false)
       if (rafId) cancelAnimationFrame(rafId)
       document.removeEventListener('visibilitychange', onVisibility)
-      urls.forEach(releaseSheet)
+      canvasEl?.removeEventListener('contextrestored', onContextRestored)
+      releaseAll()
     }
-  }, [active, sheets, frameCount, frameWidth, frameHeight])
+  }, [active, sheets, frameCount, frameWidth, frameHeight, reloadKey])
 
   useEffect(() => {
     if (paused) controlRef.current?.pause()
@@ -247,7 +303,7 @@ export default function AnimatedSprite({
         ref={canvasRef}
         width={frameWidth}
         height={frameHeight}
-        className="animated-sprite-canvas"
+        className={`animated-sprite-canvas${showStatic ? '' : ' is-instant'}`}
         style={{ width, height, opacity: ready ? 1 : 0 }}
       />
     </span>

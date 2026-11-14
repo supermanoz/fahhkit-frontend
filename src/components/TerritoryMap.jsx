@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
 import MapAttribution from './MapAttribution'
@@ -1028,7 +1028,12 @@ function HudEmoteLayer({ slot, heroKey, asset, paused }) {
   const current = failed === asset ? null : asset
   const showing = stale ? null : shown?.asset
 
-  useEffect(() => {
+  // Layout effect, not a passive one: the class that hides the idle sprite
+  // has to be added/removed in the SAME commit that adds/removes the emote
+  // canvas. As a passive effect its cleanup ran a few frames after the canvas
+  // left the DOM (idle<->run swap, emote unmount), leaving the hero with
+  // neither sprite visible for those frames.
+  useLayoutEffect(() => {
     const body = slot?.closest('.territory-map-blaze-body')
     if (!body || !showing) return undefined
     body.classList.add('is-emoting')
@@ -1058,6 +1063,11 @@ function HudEmoteLayer({ slot, heroKey, asset, paused }) {
           paused={paused}
           onReady={(ready) => {
             if (ready) setShown({ heroKey, asset: a })
+            // The sheet stopped drawing (failed draw / teardown): drop back
+            // to the idle sprite instead of leaving it hidden behind a dead
+            // canvas. A replacement becoming ready replaces `shown` first,
+            // so a normal emote swap never flashes idle.
+            else setShown((cur) => (cur && cur.asset === a ? null : cur))
           }}
           onError={() => setFailed(a)}
         />
@@ -1065,6 +1075,94 @@ function HudEmoteLayer({ slot, heroKey, asset, paused }) {
     )
   }
   return createPortal(sprites, slot)
+}
+
+// Safety net for "the hero vanished and came back on its own": if the marker
+// element is detached, or the emote has hidden the idle sprite but its canvas
+// is missing/hidden for several checks in a row, or the idle sheet failed to
+// load, put the hero back on the next check and warn (throttled) so it is
+// visible in the console if it ever still happens. Cheap: a few property
+// reads about ten times a second, none while the tab is hidden.
+function useHeroPaintGuard(markerRef) {
+  const map = useMap()
+  useEffect(() => {
+    let raf = 0
+    let frame = 0
+    let lastWarn = -Infinity
+    let badStreak = 0
+    const probes = new Map() // sheet url -> Image
+    const warn = (what) => {
+      const now = performance.now()
+      if (now - lastWarn < 10000) return
+      lastWarn = now
+      console.warn(`[TerritoryMap] hero not painted (${what}) - restoring it`)
+    }
+    const check = () => {
+      raf = requestAnimationFrame(check)
+      frame += 1
+      if (document.hidden || frame % 6 !== 0) return
+      const marker = markerRef.current
+      if (!marker) return
+      const el = marker.getElement?.()
+      if (!el || !el.isConnected || !map.hasLayer(marker)) {
+        warn('marker element detached')
+        marker.remove()
+        marker.addTo(map)
+        return
+      }
+      const body = el.querySelector('.territory-map-blaze-body')
+      if (!body) return // flat avatar marker - nothing sprite-based to guard
+      const idle = body.querySelector('.territory-map-blaze')
+      if (body.classList.contains('is-emoting')) {
+        const canvas = body.querySelector('.territory-map-hud-emote canvas')
+        const hidden =
+          !canvas || !canvas.isConnected || canvas.style.opacity === '0'
+        badStreak = hidden ? badStreak + 1 : 0
+        if (badStreak >= 3) {
+          warn('idle hidden but emote canvas missing')
+          body.classList.remove('is-emoting')
+          badStreak = 0
+        }
+        return
+      }
+      badStreak = 0
+      if (!idle) return
+      const cs = getComputedStyle(idle)
+      if (
+        cs.display === 'none' ||
+        cs.visibility === 'hidden' ||
+        cs.opacity === '0'
+      ) {
+        warn('idle sprite hidden')
+        idle.style.display = ''
+        idle.style.visibility = ''
+        idle.style.opacity = ''
+        return
+      }
+      // Every ~2s: did the idle/run sheet itself load?
+      if (frame % 120 === 0) {
+        const url = cs.backgroundImage.match(/url\("?(.*?)"?\)/)?.[1]
+        if (url) {
+          let probe = probes.get(url)
+          if (!probe) {
+            probe = new Image()
+            probe.src = url
+            probes.set(url, probe)
+          } else if (probe.complete && probe.naturalWidth === 0) {
+            warn('sprite sheet failed to load')
+            probes.delete(url)
+            const bg = idle.style.backgroundImage
+            idle.style.backgroundImage = 'none'
+            requestAnimationFrame(() => {
+              idle.style.backgroundImage = bg
+            })
+          }
+        }
+      }
+    }
+    raf = requestAnimationFrame(check)
+    return () => cancelAnimationFrame(raf)
+  }, [map, markerRef])
 }
 
 function PlayerMarker({ playerLocation, icon, heading, emote }) {
@@ -1088,6 +1186,7 @@ function PlayerMarker({ playerLocation, icon, heading, emote }) {
   useSmoothMarkerPosition(markerRef, playerLocation)
   useSpriteFacing(markerRef, heading, icon)
   useWarnOnDuplicateCharacter()
+  useHeroPaintGuard(markerRef)
   return (
     <>
       {emote && (

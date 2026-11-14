@@ -19,3 +19,11 @@
   background-repeat: no-repeat;
   background-position: 0 0;
 }
+
+/* No static frame-0 layer underneath (the HUD hero's emote): there is nothing
+   to cross-fade from, and the idle sprite it replaces hides instantly, so a
+   fade-in would leave the character half-transparent for ~120ms on every
+   swap. */
+.animated-sprite-canvas.is-instant {
+  transition: none;
+}

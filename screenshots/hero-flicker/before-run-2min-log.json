@@ -1,0 +1,2043 @@
+{
+  "frames": 8854,
+  "gaps": [
+    {
+      "start": 1904,
+      "frames": 12,
+      "reason": "emote-canvas-blank",
+      "end": 2096,
+      "ms": 192
+    },
+    {
+      "start": 16816,
+      "frames": 1,
+      "reason": "emote-canvas-missing",
+      "end": 16832,
+      "ms": 16
+    },
+    {
+      "start": 97296,
+      "frames": 4,
+      "reason": "emote-canvas-blank",
+      "end": 97360,
+      "ms": 64
+    }
+  ],
+  "events": [
+    {
+      "t": 135,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "game-countdown-overlay"
+    },
+    {
+      "t": 880,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "game-locate-btn"
+    },
+    {
+      "t": 880,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 880,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-locate",
+      "removed": ""
+    },
+    {
+      "t": 880,
+      "kind": "marker-pane-childList",
+      "added": "game-fab-wrap",
+      "removed": ""
+    },
+    {
+      "t": 880,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "game-run-card"
+    },
+    {
+      "t": 880,
+      "kind": "marker-pane-childList",
+      "added": "game-confirm-overlay",
+      "removed": ""
+    },
+    {
+      "t": 896,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 6
+    },
+    {
+      "t": 1904,
+      "kind": "is-emoting",
+      "emoting": true
+    },
+    {
+      "t": 7952,
+      "kind": "marker-pane-childList",
+      "added": "idle-nudge-backdrop",
+      "removed": ""
+    },
+    {
+      "t": 8336,
+      "kind": "marker-pane-childList",
+      "added": "animated-sprite-static",
+      "removed": ""
+    },
+    {
+      "t": 16785,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 16816,
+      "kind": "replaced:canvas",
+      "from": 6,
+      "to": 0
+    },
+    {
+      "t": 16816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 16832,
+      "kind": "replaced:idle",
+      "from": 4,
+      "to": 7
+    },
+    {
+      "t": 16832,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 16832,
+      "kind": "is-emoting",
+      "emoting": false
+    },
+    {
+      "t": 17392,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "idle-nudge-backdrop"
+    },
+    {
+      "t": 19816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 19816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 19816,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 19816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 19824,
+      "kind": "replaced:idle",
+      "from": 7,
+      "to": 8
+    },
+    {
+      "t": 19824,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 9
+    },
+    {
+      "t": 19824,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 20944,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 20960,
+      "kind": "replaced:canvas",
+      "from": 9,
+      "to": 0
+    },
+    {
+      "t": 20960,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 20976,
+      "kind": "replaced:idle",
+      "from": 8,
+      "to": 10
+    },
+    {
+      "t": 20976,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 23960,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 23960,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 23960,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 23960,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 23968,
+      "kind": "replaced:idle",
+      "from": 10,
+      "to": 11
+    },
+    {
+      "t": 23968,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 12
+    },
+    {
+      "t": 23968,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 25136,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 25152,
+      "kind": "replaced:canvas",
+      "from": 12,
+      "to": 0
+    },
+    {
+      "t": 25152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 25168,
+      "kind": "replaced:idle",
+      "from": 11,
+      "to": 13
+    },
+    {
+      "t": 25168,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 28152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 28152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 28152,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 28152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 28160,
+      "kind": "replaced:idle",
+      "from": 13,
+      "to": 14
+    },
+    {
+      "t": 28160,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 15
+    },
+    {
+      "t": 28160,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 29392,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 29408,
+      "kind": "replaced:canvas",
+      "from": 15,
+      "to": 0
+    },
+    {
+      "t": 29408,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 29424,
+      "kind": "replaced:idle",
+      "from": 14,
+      "to": 16
+    },
+    {
+      "t": 29424,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 32408,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 32408,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 32416,
+      "kind": "replaced:idle",
+      "from": 16,
+      "to": 17
+    },
+    {
+      "t": 32416,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 32421,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 32432,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 18
+    },
+    {
+      "t": 33680,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 33696,
+      "kind": "replaced:canvas",
+      "from": 18,
+      "to": 0
+    },
+    {
+      "t": 33696,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 33712,
+      "kind": "replaced:idle",
+      "from": 17,
+      "to": 19
+    },
+    {
+      "t": 33712,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 36696,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 36696,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 36696,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 36696,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 36704,
+      "kind": "replaced:idle",
+      "from": 19,
+      "to": 20
+    },
+    {
+      "t": 36704,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 21
+    },
+    {
+      "t": 36704,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 37872,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 37888,
+      "kind": "replaced:canvas",
+      "from": 21,
+      "to": 0
+    },
+    {
+      "t": 37888,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 37904,
+      "kind": "replaced:idle",
+      "from": 20,
+      "to": 22
+    },
+    {
+      "t": 37904,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 40888,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 40896,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 23
+    },
+    {
+      "t": 40896,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 40896,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 40896,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 40912,
+      "kind": "replaced:idle",
+      "from": 22,
+      "to": 24
+    },
+    {
+      "t": 40912,
+      "kind": "replaced:canvas",
+      "from": 23,
+      "to": 25
+    },
+    {
+      "t": 40912,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 42112,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 42128,
+      "kind": "replaced:canvas",
+      "from": 25,
+      "to": 0
+    },
+    {
+      "t": 42128,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 42144,
+      "kind": "replaced:idle",
+      "from": 24,
+      "to": 26
+    },
+    {
+      "t": 42144,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 45128,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 45128,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 45128,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 45128,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 45136,
+      "kind": "replaced:idle",
+      "from": 26,
+      "to": 27
+    },
+    {
+      "t": 45136,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 28
+    },
+    {
+      "t": 45136,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 46257,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 46272,
+      "kind": "replaced:canvas",
+      "from": 28,
+      "to": 0
+    },
+    {
+      "t": 46272,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 46288,
+      "kind": "replaced:idle",
+      "from": 27,
+      "to": 29
+    },
+    {
+      "t": 46288,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 49280,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 49280,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 49280,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 49280,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 49296,
+      "kind": "replaced:idle",
+      "from": 29,
+      "to": 30
+    },
+    {
+      "t": 49296,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 31
+    },
+    {
+      "t": 49296,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 50528,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 50544,
+      "kind": "replaced:canvas",
+      "from": 31,
+      "to": 0
+    },
+    {
+      "t": 50544,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 50560,
+      "kind": "replaced:idle",
+      "from": 30,
+      "to": 32
+    },
+    {
+      "t": 50560,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 53544,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 53544,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 53544,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 53544,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 53552,
+      "kind": "replaced:idle",
+      "from": 32,
+      "to": 33
+    },
+    {
+      "t": 53552,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 34
+    },
+    {
+      "t": 53552,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 54800,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 54816,
+      "kind": "replaced:canvas",
+      "from": 34,
+      "to": 0
+    },
+    {
+      "t": 54816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 54832,
+      "kind": "replaced:idle",
+      "from": 33,
+      "to": 35
+    },
+    {
+      "t": 54832,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 57816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 57816,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 57824,
+      "kind": "replaced:idle",
+      "from": 35,
+      "to": 36
+    },
+    {
+      "t": 57824,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 57840,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 57856,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 37
+    },
+    {
+      "t": 59040,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 59056,
+      "kind": "replaced:canvas",
+      "from": 37,
+      "to": 0
+    },
+    {
+      "t": 59056,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 59072,
+      "kind": "replaced:idle",
+      "from": 36,
+      "to": 38
+    },
+    {
+      "t": 59072,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 62056,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 62056,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 62056,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 62056,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 62064,
+      "kind": "replaced:idle",
+      "from": 38,
+      "to": 39
+    },
+    {
+      "t": 62064,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 40
+    },
+    {
+      "t": 62064,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 63234,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 63248,
+      "kind": "replaced:canvas",
+      "from": 40,
+      "to": 0
+    },
+    {
+      "t": 63248,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 63264,
+      "kind": "replaced:idle",
+      "from": 39,
+      "to": 41
+    },
+    {
+      "t": 63264,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 66248,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 66248,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 66248,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 66248,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 66256,
+      "kind": "replaced:idle",
+      "from": 41,
+      "to": 42
+    },
+    {
+      "t": 66256,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 43
+    },
+    {
+      "t": 66256,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 67440,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 67447,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 67456,
+      "kind": "replaced:idle",
+      "from": 42,
+      "to": 44
+    },
+    {
+      "t": 67456,
+      "kind": "replaced:canvas",
+      "from": 43,
+      "to": 0
+    },
+    {
+      "t": 67456,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 70447,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 70447,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 70447,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 70447,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 70448,
+      "kind": "replaced:idle",
+      "from": 44,
+      "to": 45
+    },
+    {
+      "t": 70448,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 46
+    },
+    {
+      "t": 70448,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 71728,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 71744,
+      "kind": "replaced:canvas",
+      "from": 46,
+      "to": 0
+    },
+    {
+      "t": 71760,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 71776,
+      "kind": "replaced:idle",
+      "from": 45,
+      "to": 47
+    },
+    {
+      "t": 71776,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 74760,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 74768,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 48
+    },
+    {
+      "t": 74768,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 74768,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 74768,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 74784,
+      "kind": "replaced:idle",
+      "from": 47,
+      "to": 49
+    },
+    {
+      "t": 74784,
+      "kind": "replaced:canvas",
+      "from": 48,
+      "to": 50
+    },
+    {
+      "t": 74784,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 75831,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 75840,
+      "kind": "replaced:canvas",
+      "from": 50,
+      "to": 0
+    },
+    {
+      "t": 75840,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 75856,
+      "kind": "replaced:idle",
+      "from": 49,
+      "to": 51
+    },
+    {
+      "t": 75856,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 78848,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 78848,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 78848,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 78848,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 78864,
+      "kind": "replaced:idle",
+      "from": 51,
+      "to": 52
+    },
+    {
+      "t": 78864,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 53
+    },
+    {
+      "t": 78864,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 80210,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 80224,
+      "kind": "replaced:canvas",
+      "from": 53,
+      "to": 0
+    },
+    {
+      "t": 80224,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 80240,
+      "kind": "replaced:idle",
+      "from": 52,
+      "to": 54
+    },
+    {
+      "t": 80240,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 83224,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 83224,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 83224,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 83224,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 83232,
+      "kind": "replaced:idle",
+      "from": 54,
+      "to": 55
+    },
+    {
+      "t": 83232,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 56
+    },
+    {
+      "t": 83232,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 84608,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 84624,
+      "kind": "replaced:canvas",
+      "from": 56,
+      "to": 0
+    },
+    {
+      "t": 84624,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 84640,
+      "kind": "replaced:idle",
+      "from": 55,
+      "to": 57
+    },
+    {
+      "t": 84640,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 87624,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 87624,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 87624,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 87624,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 87632,
+      "kind": "replaced:idle",
+      "from": 57,
+      "to": 58
+    },
+    {
+      "t": 87632,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 59
+    },
+    {
+      "t": 87632,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 88848,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 88864,
+      "kind": "replaced:canvas",
+      "from": 59,
+      "to": 0
+    },
+    {
+      "t": 88864,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 88880,
+      "kind": "replaced:idle",
+      "from": 58,
+      "to": 60
+    },
+    {
+      "t": 88880,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 91864,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 91864,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 91864,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 91864,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 91872,
+      "kind": "replaced:idle",
+      "from": 60,
+      "to": 61
+    },
+    {
+      "t": 91872,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 62
+    },
+    {
+      "t": 91872,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 93088,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 93104,
+      "kind": "replaced:canvas",
+      "from": 62,
+      "to": 0
+    },
+    {
+      "t": 93104,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 93120,
+      "kind": "replaced:idle",
+      "from": 61,
+      "to": 63
+    },
+    {
+      "t": 93120,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 96104,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 96104,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 96104,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 96104,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 96112,
+      "kind": "replaced:idle",
+      "from": 63,
+      "to": 64
+    },
+    {
+      "t": 96112,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 65
+    },
+    {
+      "t": 96112,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 97296,
+      "kind": "is-emoting",
+      "emoting": true
+    },
+    {
+      "t": 97328,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 97344,
+      "kind": "replaced:canvas",
+      "from": 65,
+      "to": 0
+    },
+    {
+      "t": 97313,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 97360,
+      "kind": "replaced:idle",
+      "from": 64,
+      "to": 66
+    },
+    {
+      "t": 97360,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 97360,
+      "kind": "is-emoting",
+      "emoting": false
+    },
+    {
+      "t": 100813,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 100813,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 100813,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 100813,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 100816,
+      "kind": "replaced:idle",
+      "from": 66,
+      "to": 67
+    },
+    {
+      "t": 100816,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 68
+    },
+    {
+      "t": 100816,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 101744,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 101760,
+      "kind": "replaced:canvas",
+      "from": 68,
+      "to": 0
+    },
+    {
+      "t": 101760,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 101776,
+      "kind": "replaced:idle",
+      "from": 67,
+      "to": 69
+    },
+    {
+      "t": 101776,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 104760,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 104760,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 104760,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 104760,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 104768,
+      "kind": "replaced:idle",
+      "from": 69,
+      "to": 70
+    },
+    {
+      "t": 104768,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 71
+    },
+    {
+      "t": 104768,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 106000,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 106016,
+      "kind": "replaced:canvas",
+      "from": 71,
+      "to": 0
+    },
+    {
+      "t": 106016,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 106032,
+      "kind": "replaced:idle",
+      "from": 70,
+      "to": 72
+    },
+    {
+      "t": 106032,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 109016,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 109016,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 109016,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 109016,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 109024,
+      "kind": "replaced:idle",
+      "from": 72,
+      "to": 73
+    },
+    {
+      "t": 109024,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 74
+    },
+    {
+      "t": 109024,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 110105,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 110112,
+      "kind": "replaced:canvas",
+      "from": 74,
+      "to": 0
+    },
+    {
+      "t": 110112,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 110128,
+      "kind": "replaced:idle",
+      "from": 73,
+      "to": 75
+    },
+    {
+      "t": 110128,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 113112,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 113112,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 113112,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 113112,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 113120,
+      "kind": "replaced:idle",
+      "from": 75,
+      "to": 76
+    },
+    {
+      "t": 113120,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 77
+    },
+    {
+      "t": 113120,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 114368,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 114384,
+      "kind": "replaced:canvas",
+      "from": 77,
+      "to": 0
+    },
+    {
+      "t": 114384,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 114400,
+      "kind": "replaced:idle",
+      "from": 76,
+      "to": 78
+    },
+    {
+      "t": 114400,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 117384,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 117384,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 117384,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 117384,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 117392,
+      "kind": "replaced:idle",
+      "from": 78,
+      "to": 79
+    },
+    {
+      "t": 117392,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 80
+    },
+    {
+      "t": 117392,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 118568,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 118576,
+      "kind": "replaced:canvas",
+      "from": 80,
+      "to": 0
+    },
+    {
+      "t": 118576,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 118592,
+      "kind": "replaced:idle",
+      "from": 79,
+      "to": 81
+    },
+    {
+      "t": 118592,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 121576,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 121576,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 121576,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 121576,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 121584,
+      "kind": "replaced:idle",
+      "from": 81,
+      "to": 82
+    },
+    {
+      "t": 121584,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 83
+    },
+    {
+      "t": 121584,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 122820,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 122832,
+      "kind": "replaced:canvas",
+      "from": 83,
+      "to": 0
+    },
+    {
+      "t": 122832,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 122848,
+      "kind": "replaced:idle",
+      "from": 82,
+      "to": 84
+    },
+    {
+      "t": 122848,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 125832,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 125832,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 125832,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 125832,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 125840,
+      "kind": "replaced:idle",
+      "from": 84,
+      "to": 85
+    },
+    {
+      "t": 125840,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 86
+    },
+    {
+      "t": 125840,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 127136,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 127152,
+      "kind": "replaced:canvas",
+      "from": 86,
+      "to": 0
+    },
+    {
+      "t": 127152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 127168,
+      "kind": "replaced:idle",
+      "from": 85,
+      "to": 87
+    },
+    {
+      "t": 127168,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    },
+    {
+      "t": 130152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 130152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 130152,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 130152,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-hud-emote",
+      "removed": ""
+    },
+    {
+      "t": 130160,
+      "kind": "replaced:idle",
+      "from": 87,
+      "to": 88
+    },
+    {
+      "t": 130160,
+      "kind": "replaced:canvas",
+      "from": 0,
+      "to": 89
+    },
+    {
+      "t": 130160,
+      "kind": "idle-bg-changed",
+      "bg": "https://localhost:5174/src/assets/heroes/nova/map/idle.png\")"
+    },
+    {
+      "t": 131536,
+      "kind": "marker-pane-childList",
+      "added": "",
+      "removed": "territory-map-hud-emote"
+    },
+    {
+      "t": 131546,
+      "kind": "marker-pane-childList",
+      "added": "territory-map-blaze-body",
+      "removed": "territory-map-blaze-body"
+    },
+    {
+      "t": 131552,
+      "kind": "replaced:idle",
+      "from": 88,
+      "to": 90
+    },
+    {
+      "t": 131552,
+      "kind": "replaced:canvas",
+      "from": 89,
+      "to": 0
+    },
+    {
+      "t": 131552,
+      "kind": "idle-bg-changed",
+      "bg": "\"https://localhost:5174/src/assets/heroes/nova/map/run.png\")"
+    }
+  ],
+  "timers": {
+    "30000ms Object.connect (https://localhost:5174/@vite/client:472:24)": 1,
+    "300000ms https://localhost:5174/src/hooks/useLiveRegisteredEvent.js:34:16": 2,
+    "30000ms https://localhost:5174/src/hooks/useLiveRegisteredEvent.js:53:16": 3,
+    "100ms https://localhost:5174/src/pages/GamePage.jsx:1033:18": 2,
+    "900000ms https://localhost:5174/src/pages/GamePage.jsx:1006:21": 1,
+    "60000ms https://localhost:5174/src/pages/GamePage.jsx:1007:18": 1,
+    "1000ms https://localhost:5174/src/hooks/useRunTracker.js:312:24": 1,
+    "5000ms https://localhost:5174/src/pages/GamePage.jsx:534:22": 1
+  }
+}
