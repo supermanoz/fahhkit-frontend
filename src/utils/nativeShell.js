@@ -1,6 +1,7 @@
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { isNative } from './geo'
+import { initSafeArea } from './safeArea'
 
 // GamePage and most other screens draw their own full-bleed header behind
 // the status bar (using the safe-area insets already in their CSS), so the
@@ -8,6 +9,7 @@ import { isNative } from './geo'
 export function initNativeShell() {
   if (!isNative) return
   StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {})
+  initSafeArea()
   SplashScreen.hide().catch(() => {})
 }
 

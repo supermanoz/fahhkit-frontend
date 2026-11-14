@@ -1,4 +1,16 @@
+:root[data-native='true'] {
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--native-safe-top, 28px));
+}
+
 :root {
+  /* Top safe area. Web: just the device's own inset (0 on desktop, so layout
+     is unchanged). Native shell: the WebView reports env() as 0 on Android
+     while the status bar overlays the page, so take the real height injected
+     by SafeAreaPlugin (--native-safe-top, src/utils/safeArea.js; 28px if the
+     plugin reports 0 or is missing). --hud-top is where top-pinned game HUD
+     sits: the inset plus the original 16px margin. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --hud-top: calc(var(--safe-top) + 16px);
   --brand: #e8590c;
   --brand-dark: #c94a08;
   --brand-amber: #ff8a3d;

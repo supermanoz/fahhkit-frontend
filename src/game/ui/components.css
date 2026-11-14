@@ -253,7 +253,7 @@
    aware in case this modal is ever shown full-bleed on a notched phone. */
 .g-modal-close {
   position: absolute;
-  top: max(8px, env(safe-area-inset-top));
+  top: max(8px, var(--safe-top));
   right: max(8px, env(safe-area-inset-right));
 }
 .g-modal-body {
@@ -509,7 +509,7 @@
 /* ---------- Toast ---------- */
 .g-toast-region {
   position: fixed;
-  top: max(var(--space-3), env(safe-area-inset-top));
+  top: max(var(--space-3), var(--safe-top));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-toast);

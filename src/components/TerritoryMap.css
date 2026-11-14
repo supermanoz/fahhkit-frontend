@@ -83,7 +83,7 @@
    height/device, and left-of-everything so it's never near the locate
    button on the right either. */
 .territory-map-attribution-anchor {
-  left: 10px;
+  left: max(10px, env(safe-area-inset-left, 0px));
   bottom: calc(var(--sheet-h, 90px) + 10px);
 }
 
@@ -622,7 +622,7 @@
    every device/content state instead of a guessed fixed pixel value. */
 .territory-map-locate {
   position: absolute;
-  right: 14px;
+  right: max(14px, env(safe-area-inset-right, 0px));
   bottom: calc(var(--sheet-h, 90px) + 20px);
   z-index: 500;
   width: 46px;
@@ -637,7 +637,7 @@
    console. */
 .territory-map-locate-error {
   position: absolute;
-  right: 14px;
+  right: max(14px, env(safe-area-inset-right, 0px));
   bottom: calc(var(--sheet-h, 90px) + 74px);
   z-index: 500;
   max-width: 200px;

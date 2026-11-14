@@ -37,7 +37,7 @@
    classes, not one) beats .game-run-viewer-close regardless of CSS import
    order, no !important needed. */
 .hero-modal .hero-modal-close {
-  top: max(8px, env(safe-area-inset-top));
+  top: max(8px, var(--safe-top));
   right: max(8px, env(safe-area-inset-right));
   z-index: 3;
 }

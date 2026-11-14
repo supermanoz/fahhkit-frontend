@@ -45,7 +45,7 @@
 .pvp-race-hud {
   position: fixed;
   left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  top: calc(var(--safe-top) + 64px);
   transform: translateX(-50%);
   z-index: 1350;
   width: min(340px, calc(100vw - 32px));
