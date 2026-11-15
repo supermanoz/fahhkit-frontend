@@ -1182,7 +1182,20 @@ function PlayerMarker({ playerLocation, icon, heading, emote }) {
     marker.on('add', find)
     return () => marker.off('add', find)
   }, [icon])
-  const originRef = useRef(playerLocation)
+  // The <Marker position> prop must keep the SAME array identity for the
+  // marker's whole life. react-leaflet 4 calls marker.setLatLng(position)
+  // on any re-render where `position !== prevProps.position`, and a fresh
+  // `[lat, lng]` literal per render made that true every time: each
+  // PlayerMarker re-render (polls, GPS ticks, emote/profile refetches)
+  // snapped the hero - sprite AND ground glow - back to the FIRST fix of
+  // the session, and nothing moved it back until the next fix arrived
+  // (useSmoothMarkerPosition only reacts to a new fix). Walk away from
+  // where the app opened and the hero kept vanishing off-screen every few
+  // seconds. Position now belongs solely to useSmoothMarkerPosition.
+  const initialPositionRef = useRef(null)
+  if (initialPositionRef.current === null) {
+    initialPositionRef.current = [playerLocation.lat, playerLocation.lng]
+  }
   useSmoothMarkerPosition(markerRef, playerLocation)
   useSpriteFacing(markerRef, heading, icon)
   useWarnOnDuplicateCharacter()
@@ -1199,7 +1212,7 @@ function PlayerMarker({ playerLocation, icon, heading, emote }) {
       )}
       <Marker
         ref={markerRef}
-        position={[originRef.current.lat, originRef.current.lng]}
+        position={initialPositionRef.current}
         icon={icon}
         zIndexOffset={1000}
         // Tapping your own avatar shows nothing - interactive so the tap

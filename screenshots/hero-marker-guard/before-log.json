@@ -1,0 +1,794 @@
+{
+  "frames": 8556,
+  "bad": [
+    {
+      "t": 29904,
+      "reason": "marker-jumped 20px"
+    },
+    {
+      "t": 29920,
+      "reason": "marker-jumped 20px"
+    },
+    {
+      "t": 30912,
+      "reason": "marker-jumped 24px"
+    },
+    {
+      "t": 30928,
+      "reason": "marker-jumped 24px"
+    },
+    {
+      "t": 31920,
+      "reason": "marker-jumped 29px"
+    },
+    {
+      "t": 31936,
+      "reason": "marker-jumped 30px"
+    },
+    {
+      "t": 32928,
+      "reason": "marker-jumped 35px"
+    },
+    {
+      "t": 32944,
+      "reason": "marker-jumped 35px"
+    },
+    {
+      "t": 33952,
+      "reason": "marker-jumped 40px"
+    },
+    {
+      "t": 33968,
+      "reason": "marker-jumped 40px"
+    },
+    {
+      "t": 34960,
+      "reason": "marker-jumped 45px"
+    },
+    {
+      "t": 34976,
+      "reason": "marker-jumped 45px"
+    },
+    {
+      "t": 35984,
+      "reason": "marker-jumped 50px"
+    },
+    {
+      "t": 36000,
+      "reason": "marker-jumped 50px"
+    },
+    {
+      "t": 36992,
+      "reason": "marker-jumped 55px"
+    },
+    {
+      "t": 37008,
+      "reason": "marker-jumped 55px"
+    },
+    {
+      "t": 38016,
+      "reason": "marker-jumped 60px"
+    },
+    {
+      "t": 38032,
+      "reason": "marker-jumped 60px"
+    },
+    {
+      "t": 39024,
+      "reason": "marker-jumped 65px"
+    },
+    {
+      "t": 39040,
+      "reason": "marker-jumped 65px"
+    },
+    {
+      "t": 40048,
+      "reason": "marker-jumped 71px"
+    },
+    {
+      "t": 40064,
+      "reason": "marker-jumped 71px"
+    },
+    {
+      "t": 41056,
+      "reason": "marker-jumped 76px"
+    },
+    {
+      "t": 41072,
+      "reason": "marker-jumped 76px"
+    },
+    {
+      "t": 42080,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 42096,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 43088,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 43104,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 44112,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 44128,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 45120,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 45136,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 46128,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 46144,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 47136,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 47152,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 48160,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 48176,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 49168,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 49184,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 50176,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 50192,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 51184,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 51200,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 52208,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 52224,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 52384,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 52400,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 54240,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 54256,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 55248,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 55264,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 56256,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 56272,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 57264,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 57280,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 58272,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 58288,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 59280,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 59296,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 59376,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 59392,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 60288,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 60304,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 61296,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 61312,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 62320,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 62336,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 62576,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 62592,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 63328,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 63344,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 64352,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 64368,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 73424,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 73440,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 74432,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 74448,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 75456,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 75472,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 76464,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 76480,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 77488,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 77504,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 78496,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 78512,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 80528,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 80544,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 81552,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 81568,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 82560,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 82576,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 83584,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 83600,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 84592,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 84608,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 85600,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 85616,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 86624,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 86640,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 87632,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 87648,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 88656,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 88672,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 89664,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 89680,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 90672,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 90688,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 91696,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 91712,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 93728,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 93744,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 94736,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 94752,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 95760,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 95776,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 96768,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 96784,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 97792,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 97808,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 98800,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 98816,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 100832,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 100848,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 101840,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 101856,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 102864,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 102880,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 103872,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 103888,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 104880,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 104896,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 105888,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 105904,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 107920,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 107936,
+      "reason": "marker-jumped 81px"
+    },
+    {
+      "t": 108928,
+      "reason": "marker-jumped 86px"
+    },
+    {
+      "t": 108944,
+      "reason": "marker-jumped 87px"
+    },
+    {
+      "t": 109952,
+      "reason": "marker-jumped 90px"
+    },
+    {
+      "t": 109968,
+      "reason": "marker-jumped 90px"
+    },
+    {
+      "t": 110960,
+      "reason": "marker-jumped 95px"
+    },
+    {
+      "t": 110976,
+      "reason": "marker-jumped 95px"
+    },
+    {
+      "t": 111984,
+      "reason": "marker-jumped 101px"
+    },
+    {
+      "t": 112000,
+      "reason": "marker-jumped 101px"
+    },
+    {
+      "t": 115440,
+      "reason": "marker-jumped 106px"
+    },
+    {
+      "t": 121104,
+      "reason": "marker-jumped 106px"
+    },
+    {
+      "t": 122096,
+      "reason": "marker-jumped 108px"
+    },
+    {
+      "t": 122112,
+      "reason": "marker-jumped 108px"
+    },
+    {
+      "t": 122576,
+      "reason": "marker-jumped 112px"
+    },
+    {
+      "t": 122592,
+      "reason": "marker-jumped 112px"
+    },
+    {
+      "t": 123120,
+      "reason": "marker-jumped 115px"
+    },
+    {
+      "t": 123136,
+      "reason": "marker-jumped 115px"
+    },
+    {
+      "t": 124128,
+      "reason": "marker-jumped 120px"
+    },
+    {
+      "t": 124144,
+      "reason": "marker-jumped 121px"
+    },
+    {
+      "t": 125152,
+      "reason": "marker-jumped 126px"
+    },
+    {
+      "t": 125168,
+      "reason": "marker-jumped 126px"
+    },
+    {
+      "t": 126160,
+      "reason": "marker-jumped 131px"
+    },
+    {
+      "t": 126176,
+      "reason": "marker-jumped 131px"
+    },
+    {
+      "t": 127168,
+      "reason": "marker-jumped 137px"
+    },
+    {
+      "t": 127184,
+      "reason": "marker-jumped 137px"
+    },
+    {
+      "t": 128192,
+      "reason": "marker-jumped 141px"
+    },
+    {
+      "t": 128208,
+      "reason": "marker-jumped 142px"
+    },
+    {
+      "t": 129200,
+      "reason": "marker-jumped 146px"
+    },
+    {
+      "t": 129216,
+      "reason": "marker-jumped 146px"
+    },
+    {
+      "t": 130208,
+      "reason": "marker-jumped 151px"
+    },
+    {
+      "t": 130224,
+      "reason": "marker-jumped 151px"
+    },
+    {
+      "t": 131232,
+      "reason": "marker-jumped 156px"
+    },
+    {
+      "t": 131248,
+      "reason": "marker-jumped 156px"
+    },
+    {
+      "t": 132240,
+      "reason": "marker-jumped 161px"
+    },
+    {
+      "t": 132256,
+      "reason": "marker-jumped 161px"
+    },
+    {
+      "t": 133248,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 133264,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 134272,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 134288,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 135280,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 135296,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 136304,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 136320,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 137312,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 137328,
+      "reason": "marker-jumped 167px"
+    },
+    {
+      "t": 138320,
+      "reason": "marker-jumped 167px"
+    }
+  ],
+  "first": {
+    "t": 29904,
+    "reason": "marker-jumped 20px",
+    "events": [
+      {
+        "t": 27876,
+        "kind": "removeChild",
+        "stack": [
+          "ev (<anonymous>:20:14)",
+          "Node.removeChild (<anonymous>:29:26)",
+          "removeChildFromContainer (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:8509:23)",
+          "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17558:21)",
+          "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)",
+          "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17584:17)",
+          "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)"
+        ],
+        "node": "territory-map-hud-emote"
+      }
+    ]
+  },
+  "events": [
+    {
+      "t": 27876,
+      "kind": "removeChild",
+      "stack": [
+        "ev (<anonymous>:20:14)",
+        "Node.removeChild (<anonymous>:29:26)",
+        "removeChildFromContainer (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:8509:23)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17558:21)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17584:17)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)"
+      ],
+      "node": "territory-map-hud-emote"
+    },
+    {
+      "t": 109937,
+      "kind": "removeChild",
+      "stack": [
+        "ev (<anonymous>:20:14)",
+        "Node.removeChild (<anonymous>:29:26)",
+        "removeChildFromContainer (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:8509:23)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17558:21)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17584:17)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)"
+      ],
+      "node": "territory-map-hud-emote"
+    },
+    {
+      "t": 121072,
+      "kind": "removeChild",
+      "stack": [
+        "ev (<anonymous>:20:14)",
+        "Node.removeChild (<anonymous>:29:26)",
+        "removeChildFromContainer (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:8509:23)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17558:21)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17584:17)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)"
+      ],
+      "node": "territory-map-hud-emote"
+    }
+  ],
+  "iconIds": 0
+}

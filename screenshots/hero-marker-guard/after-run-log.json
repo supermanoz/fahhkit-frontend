@@ -1,0 +1,21 @@
+{
+  "frames": 6301,
+  "bad": [],
+  "events": [
+    {
+      "t": 12132,
+      "kind": "removeChild",
+      "stack": [
+        "ev (<anonymous>:20:14)",
+        "Node.removeChild (<anonymous>:29:26)",
+        "removeChildFromContainer (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:8509:23)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17558:21)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)",
+        "commitDeletionEffectsOnFiber (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17584:17)",
+        "recursivelyTraverseDeletionEffects (https://localhost:5174/node_modules/.vite/deps/chunk-KDCVS43I.js?v=eb313c46:17535:13)"
+      ],
+      "node": "territory-map-hud-emote"
+    }
+  ],
+  "iconIds": 0
+}
