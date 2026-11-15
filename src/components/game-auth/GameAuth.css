@@ -202,14 +202,49 @@
   gap: 18px;
 }
 
+/* Short-screen fit: trim the card's own padding/gaps for Create Account. */
+.game-auth-card.game-auth-signup {
+  padding: 12px 18px;
+  gap: 4px;
+}
+.game-auth-signup .game-auth-header {
+  gap: 2px;
+}
+.game-auth-signup .terms-agreement,
+.game-auth-signup [class*='terms-agreement'] {
+  padding: 8px 10px;
+}
+.game-auth-signup .game-auth-title {
+  font-size: 22px;
+}
+.game-auth-signup .game-auth-subtitle {
+  font-size: 13px;
+}
+
+/* Create Account is only 5 fields: tighter rhythm, and the country/date pair
+   side by side, so the whole card fits a 360x640 screen. Each field keeps a
+   one-line slot for its inline validation message so nothing jumps. */
+.game-auth-signup .game-auth-grid {
+  gap: 4px;
+}
+.game-auth-signup .game-auth-pair {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.game-auth-signup .game-auth-hint {
+  min-height: 14px;
+  margin: 0;
+  line-height: 14px;
+}
+
 /* Roomier sizing for the long sign-up form only, so Sign In/Forgot keep
    their current density. */
 .game-auth-signup .game-auth-form {
-  gap: 18px;
+  gap: 10px;
 }
 
 .game-auth-signup .game-auth-field {
-  gap: 8px;
+  gap: 4px;
 }
 
 .game-auth-signup .game-auth-label {
@@ -218,13 +253,13 @@
 
 .game-auth-signup .game-auth-input,
 .game-auth-signup .game-auth-select {
-  min-height: 48px;
-  height: 48px;
+  min-height: 40px;
+  height: 40px;
   text-overflow: ellipsis;
 }
 
 .game-auth-signup .game-auth-hint {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .game-auth-progress {
