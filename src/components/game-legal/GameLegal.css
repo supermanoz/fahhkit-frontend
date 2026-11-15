@@ -1,0 +1,170 @@
+/* Run Conquest terms / privacy: off-white solid panel, red close button,
+   dark readable text. Tokens only (see game/styles/tokens.css). */
+.game-legal-page {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px
+    max(12px, env(safe-area-inset-bottom));
+  background: var(--bg-900);
+  box-sizing: border-box;
+}
+
+.game-legal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px
+    max(12px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.6);
+  box-sizing: border-box;
+}
+
+.game-legal-panel {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  color: var(--text-body-dark);
+  border: 3px solid var(--panel-border);
+  border-radius: 20px;
+  box-shadow: 0 6px 0 var(--panel-border-dark);
+  overflow: hidden;
+}
+.game-legal-panel.is-page {
+  max-height: calc(100dvh - 24px);
+}
+
+.game-legal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
+.game-legal-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 22px 20px 28px;
+  scroll-behavior: smooth;
+}
+
+.game-legal-doc,
+.game-legal-doc * {
+  /* The game's outlined-lettering look is for buttons/headings; long
+     reading text must be plain and crisp. */
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  paint-order: normal;
+}
+.game-legal-doc {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.game-legal-title {
+  margin: 0 56px 4px 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--text-title-dark);
+}
+.game-legal-meta {
+  margin-right: 56px;
+  margin: 0 0 12px;
+  font-size: var(--text-xs);
+  color: var(--text-muted-dark);
+}
+.game-legal-intro {
+  margin: 0 0 16px;
+}
+
+.game-legal-toc {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border: 2px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.game-legal-toc-title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text-title-dark);
+}
+.game-legal-toc ol {
+  margin: 0;
+  padding-left: 22px;
+}
+.game-legal-toc a {
+  color: var(--text-link);
+  text-decoration: underline;
+}
+
+.game-legal-section {
+  margin-top: 20px;
+  scroll-margin-top: 8px;
+}
+.game-legal-section h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  color: var(--text-title-dark);
+}
+.game-legal-section p {
+  margin: 0 0 8px;
+}
+.game-legal-section ul {
+  margin: 0 0 8px;
+  padding-left: 22px;
+}
+.game-legal-section li {
+  margin-bottom: 4px;
+}
+
+/* Operator to-do markers: [CHECK ...] and [CONTACT EMAIL]. */
+.game-legal-check {
+  background: var(--red-tint);
+  color: var(--red-text);
+  padding: 0 4px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+/* Terms agreement line on the Create Account screen. */
+.game-auth-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 2px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--text-body-dark);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.game-auth-terms input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.game-auth-terms-link {
+  all: unset;
+  color: var(--text-link);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.game-auth-terms-link:focus-visible {
+  outline: 3px solid var(--game-gold);
+  outline-offset: 2px;
+}

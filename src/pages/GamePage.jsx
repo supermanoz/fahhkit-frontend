@@ -12,6 +12,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconChevronRight,
+  IconLock,
   IconClose,
   IconCrosshairs,
   IconEnvelope,
@@ -172,6 +173,7 @@ import EmoteShowcase from '../components/EmoteShowcase'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
+import GameLegalModal from '../components/game-legal/GameLegalModal'
 import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
 import RunRewardsModal from '../components/RunRewardsModal'
 import ClubBadge from '../components/ClubBadge'
@@ -744,6 +746,8 @@ function GamePageInner() {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTab, setMenuTab] = useState('me')
+  // Run Conquest terms/privacy overlay opened from Settings ('terms'|'privacy').
+  const [legalDoc, setLegalDoc] = useState(null)
   // 'main' shows RADIAL_ITEMS; 'play' swaps them for PLAY_OPTIONS.
   const [radialMode, setRadialMode] = useState('main')
   // The club war the current tracked run is for (HUD label only - the id
@@ -3732,6 +3736,9 @@ function GamePageInner() {
         )}
       </AnimatePresence>
 
+      {legalDoc && (
+        <GameLegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
+      )}
       <AnimatePresence>
         {announcementNotices.current && (
           <BroadcastPrompt
@@ -5651,6 +5658,60 @@ function GamePageInner() {
                       Edit Profile
                       <span className="game-settings-row-sub">
                         You&apos;ll be redirected to your FahhKit account
+                      </span>
+                    </span>
+                  </span>
+                  <IconChevronRight
+                    className="game-settings-row-chevron"
+                    aria-hidden="true"
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  className="game-settings-row"
+                  onClick={() => setLegalDoc('terms')}
+                >
+                  <span className="game-settings-row-label">
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        <IconLock />
+                      </span>
+                    </span>
+                    <span className="game-settings-row-text">
+                      Terms &amp; Conditions
+                      <span className="game-settings-row-sub">
+                        The rules of Run Conquest
+                      </span>
+                    </span>
+                  </span>
+                  <IconChevronRight
+                    className="game-settings-row-chevron"
+                    aria-hidden="true"
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  className="game-settings-row"
+                  onClick={() => setLegalDoc('privacy')}
+                >
+                  <span className="game-settings-row-label">
+                    <span className="game-settings-row-icon">
+                      <span
+                        className="game-settings-row-icon-badge"
+                        aria-hidden="true"
+                      >
+                        <IconLock />
+                      </span>
+                    </span>
+                    <span className="game-settings-row-text">
+                      Privacy Policy
+                      <span className="game-settings-row-sub">
+                        What we collect and why
                       </span>
                     </span>
                   </span>

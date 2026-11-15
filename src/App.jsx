@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AOS from 'aos'
 import GamePage from './pages/GamePage'
+import GameLegalPage from './pages/GameLegalPage'
 import OfflineOverlay from './components/OfflineOverlay'
 
 // `npm run build:app` (the Capacitor/Android/iOS build) sets this. The native
@@ -27,6 +28,11 @@ export default function App() {
         // resume-refresh of the balance (see its appStateChange listener).
         <Routes>
           <Route path="/game" element={<GamePage />} />
+          <Route path="/game/terms" element={<GameLegalPage doc="terms" />} />
+          <Route
+            path="/game/privacy"
+            element={<GameLegalPage doc="privacy" />}
+          />
           <Route path="*" element={<Navigate to="/game" replace />} />
         </Routes>
       ) : (

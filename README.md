@@ -102,3 +102,21 @@ way - see `src/components/GoogleSignInButton.jsx`). In [Google Cloud Console](ht
   `ACCESS_BACKGROUND_LOCATION` or Play Console's background-location declaration form - a foreground
   service is exempt from that restriction. If a future change needs location _without_ an active,
   visible foreground service, that calculus changes.
+
+## Run Conquest legal pages (store listings)
+
+The game has its own Terms & Conditions and Privacy Policy, separate from the
+website's FahhKit terms (`/terms/:type`, unchanged). Both render without
+login in the web build and the native app:
+
+- Terms: `https://fahhkit.vercel.app/game/terms`
+- Privacy Policy: `https://fahhkit.vercel.app/game/privacy`
+
+Use these URLs in the Google Play Console (Store listing → Privacy policy,
+Data safety) and App Store Connect (Privacy Policy URL, Terms in the app
+description / EULA field). Content lives in `src/constants/gameLegal.js`
+(search for `[CHECK` and `[CONTACT EMAIL]` before launch; bump
+`GAME_TERMS_VERSION` on material changes). In the app, Create Account opens
+them in an in-game modal and Settings lists both; the accepted version is
+stored locally (`fahhkit.gameTermsAccepted`) because the backend has no
+endpoint for it yet.

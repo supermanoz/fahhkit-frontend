@@ -9,7 +9,8 @@ import {
   PHONE_PATTERN,
   PHONE_TITLE,
 } from '../../constants/validation'
-import TermsAgreement from '../TermsAgreement'
+import GameLegalModal from '../game-legal/GameLegalModal'
+import { recordGameTermsAcceptance } from '../../utils/gameTermsAcceptance'
 
 // POST /v1/athlete/signup (via useAuthFlow.signUpAthlete) has NO password
 // or username field - the server generates a password and emails it (see
@@ -70,6 +71,7 @@ export default function GameSignUpScreen({
   const [form, setForm] = useState(INITIAL_FORM)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [touched, setTouched] = useState({})
+  const [legalDoc, setLegalDoc] = useState(null) // 'terms' | 'privacy' | null
   const firstFieldRef = useRef(null)
   const errors = validate(form)
 
@@ -98,6 +100,7 @@ export default function GameSignUpScreen({
       })
       return
     }
+    recordGameTermsAcceptance(form.email.trim())
     onSubmit({
       ...SIGNUP_DEFAULTS,
       fullName: form.fullName.trim(),
@@ -264,12 +267,42 @@ export default function GameSignUpScreen({
           </div>
         </div>
 
-        <TermsAgreement
-          id="game-signup-terms-agreement"
-          to="/terms/signup"
-          checked={agreedToTerms}
-          onChange={setAgreedToTerms}
-        />
+        <label
+          className="game-auth-terms"
+          htmlFor="game-signup-terms-agreement"
+        >
+          <input
+            id="game-signup-terms-agreement"
+            type="checkbox"
+            checked={agreedToTerms}
+            onChange={(e) => setAgreedToTerms(e.target.checked)}
+          />
+          <span>
+            I am old enough to play and agree to the{' '}
+            <button
+              type="button"
+              className="game-auth-terms-link"
+              onClick={(e) => {
+                e.preventDefault()
+                setLegalDoc('terms')
+              }}
+            >
+              Terms
+            </button>{' '}
+            and{' '}
+            <button
+              type="button"
+              className="game-auth-terms-link"
+              onClick={(e) => {
+                e.preventDefault()
+                setLegalDoc('privacy')
+              }}
+            >
+              Privacy Policy
+            </button>
+            .
+          </span>
+        </label>
 
         <div className="game-auth-actions">
           <button
@@ -288,6 +321,9 @@ export default function GameSignUpScreen({
           </button>
         </div>
       </form>
+      {legalDoc && (
+        <GameLegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
+      )}
     </div>
   )
 }

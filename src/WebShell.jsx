@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import GamePage from './pages/GamePage'
+import GameLegalPage from './pages/GameLegalPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -80,6 +81,8 @@ export default function WebShell() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/game" element={<GamePage />} />
+        <Route path="/game/terms" element={<GameLegalPage doc="terms" />} />
+        <Route path="/game/privacy" element={<GameLegalPage doc="privacy" />} />
         <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
         <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />
         <Route path="/admin/sponsor-report" element={<SponsorReportPage />} />
