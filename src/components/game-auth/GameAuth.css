@@ -44,15 +44,82 @@
   gap: 16px;
 }
 
+.game-auth-logo-float {
+  position: relative;
+  /* Same box the bare <img> used to have (width/margin moved here). */
+  width: 72%;
+  max-width: 300px;
+  margin: 0 auto 4px;
+  isolation: isolate;
+}
+
+/* Soft ground shadow: a small blurred ellipse under the logo that shrinks
+   and fades as the logo rises. Absolutely positioned (no layout), animated
+   with transform + opacity only. */
+.game-auth-logo-float::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -3px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.32);
+  filter: blur(3px);
+  opacity: 0.9;
+  transform: scale(1);
+  animation: authLogoShadow 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.game-auth-logo-float .game-auth-logo {
+  animation: authLogoFloat 3s ease-in-out infinite;
+  will-change: transform;
+}
+
+.game-auth-logo-float.is-paused::after,
+.game-auth-logo-float.is-paused .game-auth-logo {
+  animation-play-state: paused;
+}
+
+@keyframes authLogoFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes authLogoShadow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(0.8);
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-auth-logo-float::after,
+  .game-auth-logo-float .game-auth-logo {
+    animation: none;
+  }
+}
+
 .game-auth-logo {
   display: block;
   /* ~62% of the card's own width (the card has 22px side padding): about
      205px at 360, 225px at 390, 242px on desktop, never over 300px. The
      artwork is trimmed to its lettering, so there is no dead margin. */
-  width: 72%;
-  max-width: 300px;
+  width: 100%;
   height: auto;
-  margin: 0 auto 4px;
+  margin: 0;
   /* The white lettering carries its own black outline; this just lifts it
      off the off-white card (no background box). */
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));

@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import runConquestLogo from '../../assets/ui/brand/run_conquest_logo-ui.webp'
+import AuthLogo from './AuthLogo'
 import GoogleSignInButton from '../GoogleSignInButton'
 import AppleSignInButton from '../AppleSignInButton'
 
@@ -16,11 +16,7 @@ export default function GameWelcomeScreen({
 }) {
   return (
     <div className="game-auth-card">
-      <img
-        src={runConquestLogo}
-        alt="Run Conquest"
-        className="game-auth-logo"
-      />
+      <AuthLogo />
       <div className="game-auth-header">
         <h1 className="game-auth-title">Claim the streets</h1>
         <p className="game-auth-subtitle">
