@@ -436,6 +436,16 @@ export function IconLock(props) {
   )
 }
 
+export function IconInstagram(props) {
+  return (
+    <GameIcon {...props}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="5" {...TINT} />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M17.2 6.9h.01" />
+    </GameIcon>
+  )
+}
+
 export function IconLogout(props) {
   return (
     <GameIcon {...props}>

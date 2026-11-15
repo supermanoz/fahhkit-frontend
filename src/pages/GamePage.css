@@ -4910,3 +4910,30 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* Settings: "Issues? Reach out to us at @run_conquest" (Instagram). Off-white
+   card, dark text; link opens in a new tab / the system browser. */
+.game-settings-contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 2px solid var(--panel-border);
+  border-radius: 14px;
+  color: var(--text-body-dark);
+}
+.game-settings-contact-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  min-width: 0;
+}
+.game-settings-contact-text a {
+  color: var(--text-link);
+  font-weight: 800;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}

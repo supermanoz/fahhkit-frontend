@@ -34,11 +34,12 @@ for (const d of DOCS) {
       ).toBeVisible()
       await expect(page.getByRole('button', { name: 'Close' })).toBeVisible()
       await expect(page).toHaveURL(new RegExp(`${d.path}$`)) // no login redirect
-      // Scrollable, not clipped; no sideways scroll.
-      const scroll = page.locator('.game-legal-scroll')
-      expect(
-        await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)
-      ).toBe(true)
+      // Short: well under 350 words of body text.
+      const words = await page
+        .locator('.game-legal-doc')
+        .evaluate((el) => el.innerText.split(/\s+/).filter(Boolean).length)
+      expect(words).toBeLessThan(350)
+      // Not clipped; no sideways scroll.
       expect(
         await page.evaluate(
           () =>
@@ -46,15 +47,16 @@ for (const d of DOCS) {
             document.documentElement.clientWidth
         )
       ).toBe(true)
+      // Screenshot at the top of the document, then TOC jump check.
+      await page.screenshot({
+        path: `${OUT}${d.path.replace('/game', '')}-${vp.name}.png`,
+      })
       // TOC link jumps to its section.
       await page
         .getByRole('navigation', { name: 'Contents' })
         .getByRole('link')
         .nth(3)
         .click()
-      await page.screenshot({
-        path: `${OUT}${d.path.replace('/game', '')}-${vp.name}.png`,
-      })
     })
   }
 }
@@ -131,4 +133,37 @@ test('Settings lists Terms & Conditions and Privacy Policy', async ({
   await expect(
     page.getByRole('dialog', { name: 'Privacy Policy' })
   ).toBeVisible()
+})
+
+test('Settings contact block links to Instagram in a new tab', async ({
+  mockedPage: page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await seedSession(page, VETERAN)
+  await page.goto('/game')
+  await expect(page.locator('.game-loading-overlay')).toHaveCount(0, {
+    timeout: 90_000,
+  })
+  await page
+    .getByText('Not now')
+    .click({ timeout: 3000 })
+    .catch(() => {})
+  await page.locator('.game-menu-btn').click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  const block = page.locator('.game-settings-contact')
+  await block.scrollIntoViewIfNeeded()
+  await expect(block).toContainText('Issues? Reach out to us at @run_conquest')
+  const link = block.getByRole('link', { name: '@run_conquest' })
+  await expect(link).toHaveAttribute(
+    'href',
+    'https://www.instagram.com/runconquest.game/'
+  )
+  await expect(link).toHaveAttribute('target', '_blank')
+  await expect(link).toHaveAttribute('rel', /noopener/)
+  const box = await block.boundingBox()
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(390)
+  fs.mkdirSync(OUT, { recursive: true })
+  await block.screenshot({ path: `${OUT}/settings-contact-390.png` })
+  await page.screenshot({ path: `${OUT}/settings-bottom-390.png` })
 })

@@ -12,6 +12,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconChevronRight,
+  IconInstagram,
   IconLock,
   IconClose,
   IconCrosshairs,
@@ -5744,6 +5745,26 @@ function GamePageInner() {
                   </span>
                 </button>
 
+                <div className="game-settings-contact">
+                  <span
+                    className="game-settings-row-icon-badge"
+                    aria-hidden="true"
+                  >
+                    <IconInstagram />
+                  </span>
+                  <p className="game-settings-contact-text">
+                    Issues? Reach out to us at{' '}
+                    <a
+                      href={INSTAGRAM_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => openExternal(INSTAGRAM_URL, e)}
+                    >
+                      @run_conquest
+                    </a>
+                  </p>
+                </div>
+
                 {/* No dedicated About page exists in this app - this is
                     the closest real equivalent to the "Settings/About
                     page" the map tile credits need to show up on. */}
@@ -6607,6 +6628,9 @@ function GamePageInner() {
 
 // Minimum gap between foreground catch-up syncs (see syncOnForeground).
 const FOREGROUND_SYNC_MIN_GAP_MS = 20000
+
+// Support contact shown in Settings.
+const INSTAGRAM_URL = 'https://www.instagram.com/runconquest.game/'
 
 export default function GamePage() {
   return (
