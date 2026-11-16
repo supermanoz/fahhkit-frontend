@@ -58,4 +58,19 @@
          @capacitor/local-notifications - not declared here. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Saving run images to Photos (src/utils/saveImage.js, via
+         @capacitor-community/media). That plugin writes into the public
+         Pictures/Run Conquest folder and asks for its own storage permission
+         at save time: READ_MEDIA_IMAGES + READ_MEDIA_VIDEO on Android 13+
+         (the plugin requests both as one group, so both must be declared),
+         READ/WRITE_EXTERNAL_STORAGE on Android 12 and below. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 </manifest>

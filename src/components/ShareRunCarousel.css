@@ -151,3 +151,20 @@
     font-size: 12px;
   }
 }
+
+/* Native app: shown when saving to Photos was refused (see saveImage.js). */
+.share-carousel-permission {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 90, 60, 0.12);
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.share-carousel-permission p {
+  margin: 0;
+}

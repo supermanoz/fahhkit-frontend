@@ -26,6 +26,8 @@
 	<string>Run Conquest keeps tracking your route while your screen is locked during a run, so your distance and territory are counted accurately.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>FahhKit uses your location while you run to track your route and claim territory on the map.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your run images to Photos</string>
 	<key>NSMotionUsageDescription</key>
 	<string>FahhKit uses motion and compass data to point the run view in the direction you're facing and detect real movement during a run.</string>
 	<key>UIBackgroundModes</key>
