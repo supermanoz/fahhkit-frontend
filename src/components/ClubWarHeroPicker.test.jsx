@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import ClubWarHeroPicker from './ClubWarHeroPicker'
 import { ToastProvider } from '../game/ui/Toast'
 
@@ -80,5 +80,53 @@ describe('ClubWarHeroPicker', () => {
     expect(
       screen.getByRole('button', { name: `Lock In ${HERO_A.name}` })
     ).toBeInTheDocument()
+  })
+})
+
+describe('ClubWarHeroPicker - level-locked hero', () => {
+  // No test globals, so RTL doesn't auto-unmount between tests.
+  afterEach(cleanup)
+  const NOVA = {
+    id: 'hero-nova',
+    name: 'Nova',
+    assetUrl: null,
+    priceFahhcoin: 0,
+    unlockLevel: 5,
+  }
+  function renderAt(level) {
+    const onLockIn = vi.fn().mockResolvedValue(true)
+    const ui = (lvl) => (
+      <ToastProvider>
+        <ClubWarHeroPicker
+          heroItems={[NOVA]}
+          ownedItems={[]}
+          level={lvl}
+          lockedHeroStoreItemId={null}
+          busy={false}
+          onLockIn={onLockIn}
+        />
+      </ToastProvider>
+    )
+    const utils = render(ui(level))
+    return { onLockIn, rerenderAt: (l) => utils.rerender(ui(l)) }
+  }
+
+  it('cannot lock in a level-locked hero', () => {
+    const { onLockIn } = renderAt(4)
+    const btn = screen.getByRole('button', { name: /Reach level 5 to unlock/ })
+    expect(btn).toBeDisabled()
+    fireEvent.click(btn)
+    expect(onLockIn).not.toHaveBeenCalled()
+  })
+
+  it('becomes lockable live once the level is reached', () => {
+    const { rerenderAt } = renderAt(4)
+    expect(
+      screen.getByRole('button', { name: /Reach level 5 to unlock/ })
+    ).toBeDisabled()
+    rerenderAt(5)
+    expect(
+      screen.getByRole('button', { name: 'Lock In Nova' })
+    ).not.toBeDisabled()
   })
 })

@@ -108,6 +108,7 @@ export default function ClubWarPanel({
   treasuryBalance,
   ownedItems = [],
   storeCatalog = [],
+  level,
   onEquipHero,
   onStartWarRun,
   racing,
@@ -641,6 +642,7 @@ export default function ClubWarPanel({
                   <ClubWarHeroPicker
                     heroItems={allHeroItems}
                     ownedItems={ownedItems}
+                    level={level}
                     lockedHeroStoreItemId={me.lockedHeroStoreItemId}
                     busy={busy === 'lock'}
                     onLockIn={(item) =>

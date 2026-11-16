@@ -1780,6 +1780,19 @@ function GamePageInner() {
     }
   }
 
+  // Level-up: the backend grants level-gated heroes (Nova at 5) the moment
+  // the level is reached, so re-read the owned list when the profile's
+  // level changes - the hero then flips from level-locked to owned live,
+  // no reload needed. (The first load isn't a change, so it's skipped.)
+  const lastLevelRef = useRef(null)
+  const profileLevel = profile?.level ?? null
+  useEffect(() => {
+    if (profileLevel == null) return
+    const previous = lastLevelRef.current
+    lastLevelRef.current = profileLevel
+    if (previous != null && profileLevel > previous) refreshOwnedItems()
+  }, [profileLevel])
+
   // Catches up on mail/News/important notices published while the app was
   // in the background or the screen was locked: the STOMP socket (see
   // useGameSocket) is suspended by the OS there and the broker doesn't
@@ -3074,9 +3087,33 @@ function GamePageInner() {
   // (see that component's own React.memo), since a changed array
   // reference looks like changed data even when none of the items
   // actually did.
+  // The hero-detail response's `skins` leave out `unlockLevel` (the store
+  // catalog's items carry it), so copy it across by store item id - that is
+  // what level-locks Nova until level 5 (utils/itemState.js).
+  const unlockLevelByItemId = useMemo(() => {
+    const map = new Map()
+    storeCatalog.forEach((i) => {
+      if (i.unlockLevel != null) map.set(i.id, i.unlockLevel)
+    })
+    return map
+  }, [storeCatalog])
+  const heroesWithLevels = useMemo(
+    () =>
+      unlockLevelByItemId.size === 0
+        ? heroes
+        : heroes.map((h) => ({
+            ...h,
+            skins: (h.skins || []).map((s) =>
+              s.unlockLevel == null && unlockLevelByItemId.has(s.id)
+                ? { ...s, unlockLevel: unlockLevelByItemId.get(s.id) }
+                : s
+            ),
+          })),
+    [heroes, unlockLevelByItemId]
+  )
   const galleryHeroes = useMemo(
-    () => heroes.filter((h) => !isPlaceholderHero(h.name)),
-    [heroes]
+    () => heroesWithLevels.filter((h) => !isPlaceholderHero(h.name)),
+    [heroesWithLevels]
   )
   // Shop shelves: heroes live in the hero gallery; the two colour
   // categories get their own preview shelves (ColorShelf). The old
@@ -3148,7 +3185,7 @@ function GamePageInner() {
     if (menuSheetRef.current) menuSheetRef.current.scrollTop = 0
   }, [menuOpen, menuTab])
   const selectedHero = selectedHeroId
-    ? heroes.find((h) => h.id === selectedHeroId) || null
+    ? heroesWithLevels.find((h) => h.id === selectedHeroId) || null
     : null
   const closeHeroModal = useCallback(() => setSelectedHeroId(null), [])
 
@@ -5106,6 +5143,7 @@ function GamePageInner() {
                   onViewProfile={setViewingProfile}
                   ownedItems={ownedItems}
                   storeCatalog={storeCatalog}
+                  level={profile?.level}
                   onEquipHero={handleEquipWarHero}
                   onStartWarRun={handleStartWarRun}
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
@@ -5803,6 +5841,7 @@ function GamePageInner() {
                     heroes={galleryHeroes}
                     ownedItems={ownedItems}
                     activeHeroId={activeHeroId}
+                    level={profile?.level}
                     loading={heroesLoading}
                     onSelect={(hero) => {
                       setStoreActionError(null)
@@ -6338,6 +6377,7 @@ function GamePageInner() {
             hero={selectedHero}
             ownedItems={ownedItems}
             activeHeroId={activeHeroId}
+            level={profile?.level}
             isActive={selectedHero.id === activeHeroId}
             error={storeActionError}
             onClose={closeHeroModal}

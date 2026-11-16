@@ -38,6 +38,9 @@ export default function HeroGallery({
   heroes,
   ownedItems,
   activeHeroId,
+  // The player's current level (profile.level) - heroes with a higher
+  // unlockLevel show level-locked (utils/itemState.js).
+  level,
   loading,
   onSelect,
   onEquip,
@@ -107,8 +110,16 @@ export default function HeroGallery({
   }
 
   const hero = heroes[index]
-  const { equipped, owned, ownedHeroItem, heroItem, claimable, tier } =
-    resolveHeroEquipState(hero, ownedItems, activeHeroId)
+  const {
+    equipped,
+    owned,
+    ownedHeroItem,
+    heroItem,
+    claimable,
+    tier,
+    levelLocked,
+    unlockLevel,
+  } = resolveHeroEquipState(hero, ownedItems, activeHeroId, level)
   const equipping = equippingHeroId === hero.id
   const animated = Boolean(getHeroSprite(hero.name))
   // The HERO unlock item's own price - the same one the detail modal and the
@@ -181,7 +192,28 @@ export default function HeroGallery({
 
               <span className="hero-card-name">{hero.name}</span>
 
-              {tier === 'soon' || tier === 'limited' ? (
+              {levelLocked && (
+                <span
+                  className="hero-card-level-chip"
+                  data-testid="hero-level-chip"
+                >
+                  <IconLock aria-hidden="true" /> Unlocks at level {unlockLevel}
+                </span>
+              )}
+
+              {levelLocked ? (
+                <span className="hero-card-foot is-level-locked">
+                  <button
+                    type="button"
+                    className="hero-card-equip-btn"
+                    data-testid="hero-card-action"
+                    disabled
+                    aria-disabled="true"
+                  >
+                    Reach level {unlockLevel} to unlock
+                  </button>
+                </span>
+              ) : tier === 'soon' || tier === 'limited' ? (
                 <span className="hero-card-foot is-locked">
                   <IconLock />
                   <span>Limited</span>

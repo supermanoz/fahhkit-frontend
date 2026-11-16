@@ -15,7 +15,11 @@ import EmoteGlyph from './EmoteGlyph'
 import { getHeroSprite } from '../utils/heroSprites'
 import { heroAbilityParts } from '../utils/hero'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
-import { getItemState, ITEM_STATE, visibleStoreError } from '../utils/itemState'
+import {
+  getItemState,
+  isUsableState,
+  visibleStoreError,
+} from '../utils/itemState'
 import { PriceLabel } from './Price'
 import {
   filterVisibleEmotes,
@@ -53,7 +57,15 @@ const emoteFlipVariants = {
 // that) renders dimmed with a lock badge, frozen on its first frame
 // (EmoteGlyph only animates the `active` instance); tapping it opens the
 // same buy/showcase popup the old Shop Emotes tab used.
-function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
+function HeroEmoteStage({
+  hero,
+  sprite,
+  ownedItems,
+  onShowcase,
+  // Level-locked hero: every emote shows locked and can't be opened/bought
+  // (the backend wants the hero owned first).
+  levelLocked = false,
+}) {
   const stageRef = useRef(null)
   const [stageHeight, setStageHeight] = useState(0)
   useEffect(() => {
@@ -105,10 +117,13 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
       kind: 'emote',
       item,
       owned:
-        getItemState(item, ownedItems, {
-          equipped: equippedItem?.id === item.id,
-        }) !== ITEM_STATE.LOCKED,
-      equipped: equippedItem?.id === item.id,
+        !levelLocked &&
+        isUsableState(
+          getItemState(item, ownedItems, {
+            equipped: equippedItem?.id === item.id,
+          })
+        ),
+      equipped: !levelLocked && equippedItem?.id === item.id,
     }))
   // No hero currently has a real "emote1" StoreItem row to find here - the
   // 4 newest heroes never got one created (it's free, nothing to buy), and
@@ -227,7 +242,7 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
                 // when one exists - see its `item` above) - it used to be
                 // excluded entirely, so tapping it silently did nothing and
                 // there was no way to ever open its Equip button.
-                if (slide.item)
+                if (slide.item && !levelLocked)
                   onShowcase(
                     slide.kind === 'idle'
                       ? { ...slide.item, isIdleSlide: true }
@@ -240,7 +255,7 @@ function HeroEmoteStage({ hero, sprite, ownedItems, onShowcase }) {
                 hero's `emotes`, not `poses`), so the idle slide itself
                 can't free-preview anything past idle. */}
               <span
-                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''}`}
+                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''} ${levelLocked ? 'is-level-locked' : ''}`}
               >
                 {slide.kind === 'idle' ? (
                   <HeroFigure hero={hero} pose="idle" height={spriteHeight} />
@@ -339,6 +354,8 @@ export default function HeroDetailModal({
   ownedItems,
   activeHeroId,
   isActive,
+  // The player's current level (profile.level), for unlockLevel gating.
+  level,
   error,
   onClose,
   onEquip,
@@ -346,11 +363,8 @@ export default function HeroDetailModal({
   onShowcase,
 }) {
   const sprite = getHeroSprite(hero.name)
-  const { ownedHeroItem, claimable, state } = resolveHeroEquipState(
-    hero,
-    ownedItems,
-    activeHeroId
-  )
+  const { ownedHeroItem, claimable, state, levelLocked, unlockLevel } =
+    resolveHeroEquipState(hero, ownedItems, activeHeroId, level)
   // The hero-unlock item itself - mixed into `hero.skins` (the backend's
   // field name for every active store item tied to this hero, categories
   // and all) alongside his emotes (see the `emoteItems` filter above), not
@@ -438,6 +452,7 @@ export default function HeroDetailModal({
           sprite={sprite}
           ownedItems={ownedItems}
           onShowcase={onShowcase}
+          levelLocked={levelLocked}
         />
 
         <div className="hero-modal-body">
@@ -450,13 +465,32 @@ export default function HeroDetailModal({
               <IconCheck aria-hidden="true" /> Equipped
             </span>
           )}
+          {levelLocked && (
+            <span
+              className="hero-modal-level-chip"
+              data-testid="hero-level-chip"
+            >
+              <IconLock aria-hidden="true" /> Unlocks at level {unlockLevel}
+            </span>
+          )}
           {hero.tagline && (
             <p className="hero-modal-tagline">“{hero.tagline}”</p>
           )}
 
           {(heroItem || showEquipped) && (
             <div className="hero-modal-unlock">
-              {showEquipped ? (
+              {levelLocked ? (
+                <button
+                  type="button"
+                  className="btn hero-modal-level-btn"
+                  data-testid="hero-action"
+                  disabled
+                  aria-disabled="true"
+                >
+                  <IconLock aria-hidden="true" /> Reach level {unlockLevel} to
+                  unlock
+                </button>
+              ) : showEquipped ? (
                 <button
                   type="button"
                   className="btn hero-modal-equipped-btn"

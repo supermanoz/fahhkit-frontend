@@ -124,6 +124,12 @@
   opacity: 0.8;
 }
 
+/* Level-locked hero: greyed slightly (still readable - it can be previewed),
+   no colour glow. Matches the Shop card (HeroGallery.css). */
+.hero-emote-slide-figure.is-level-locked {
+  filter: grayscale(0.85) brightness(0.82);
+}
+
 .hero-emote-lock-badge {
   position: absolute;
   top: 50%;
@@ -390,6 +396,50 @@
 .hero-modal-equipped-chip svg {
   color: var(--green-500);
   font-size: 13px;
+}
+
+/* Level-locked: same off-white chip as Equipped, grey padlock instead of the
+   green check. */
+.hero-modal-level-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 1px 9px 1px 6px;
+  border: 2px solid var(--game-ink);
+  border-radius: 999px;
+  background: #fffdf8;
+  color: #2b2640;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  paint-order: normal;
+}
+
+.hero-modal-level-chip svg {
+  color: #6d6f72;
+  font-size: 13px;
+}
+
+.hero-modal-unlock .btn.hero-modal-level-btn,
+.hero-modal-unlock .btn.hero-modal-level-btn:disabled {
+  background: #fffdf8;
+  border: 2px solid var(--divider);
+  box-shadow: none;
+  color: var(--text-body-dark, #2b2640);
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  opacity: 1;
+  cursor: default;
+  pointer-events: none;
+}
+
+.hero-modal-level-btn svg {
+  color: #6d6f72;
 }
 
 /* Disabled-looking but solid: off-white, plain dark text, green check, no

@@ -88,3 +88,38 @@ describe('resolveHeroEquipState', () => {
     expect(state.ownedHeroItem).toBeNull()
   })
 })
+
+describe('resolveHeroEquipState - level-locked hero', () => {
+  const hero = {
+    id: HERO_ID,
+    skins: [
+      {
+        id: STORE_ITEM_ID,
+        heroId: HERO_ID,
+        category: 'HERO',
+        priceFahhcoin: 0,
+        unlockLevel: 5,
+      },
+    ],
+  }
+  it('level 4: level-locked, nothing to equip or claim', () => {
+    const r = resolveHeroEquipState(hero, [], null, 4)
+    expect(r.levelLocked).toBe(true)
+    expect(r.unlockLevel).toBe(5)
+    expect(r.tier).toBe('level-locked')
+    expect(r.owned).toBe(false)
+    expect(r.claimable).toBe(false)
+    expect(r.ownedHeroItem).toBeNull()
+  })
+  it('level 5: unlocked - free to claim/equip, no level lock', () => {
+    const r = resolveHeroEquipState(hero, [], null, 5)
+    expect(r.levelLocked).toBe(false)
+    expect(r.tier).toBe('owned')
+    expect(r.claimable).toBe(true)
+  })
+  it('already owned (backend granted it) stays owned at any level', () => {
+    const r = resolveHeroEquipState(hero, [heroItem()], null, 1)
+    expect(r.levelLocked).toBe(false)
+    expect(r.tier).toBe('owned')
+  })
+})

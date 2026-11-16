@@ -11,7 +11,12 @@ import { getHeroSprite } from '../utils/heroSprites'
 import { resolveFileUrl } from '../api/client'
 import { useToast } from '../game/ui/Toast'
 import { claimFreeItem } from '../api/store'
-import { getItemState, ITEM_STATE, needsClaim } from '../utils/itemState'
+import {
+  getItemState,
+  isUsableState,
+  ITEM_STATE,
+  needsClaim,
+} from '../utils/itemState'
 
 // Swipeable "pick your war hero" slider - CSS scroll-snap (real native
 // swipe/momentum, no drag-gesture library), one full-width card visible at
@@ -30,6 +35,8 @@ export default function ClubWarHeroPicker({
   heroItems,
   ownedItems,
   lockedHeroStoreItemId,
+  // The player's current level (profile.level), for unlockLevel gating.
+  level,
   onLockIn,
   busy,
 }) {
@@ -113,16 +120,20 @@ export default function ClubWarHeroPicker({
   }
 
   const currentItem = heroItems[index]
-  const currentOwned = currentItem
-    ? getItemState(currentItem, ownedItems) !== ITEM_STATE.LOCKED
-    : false
+  const currentState = currentItem
+    ? getItemState(currentItem, ownedItems, { level })
+    : ITEM_STATE.LOCKED
+  const currentOwned = isUsableState(currentState)
+  // Level-locked heroes can be browsed but never locked in.
+  const currentLevelLocked = currentState === ITEM_STATE.LEVEL_LOCKED
   const currentIsLockedIn = currentItem?.id === lockedHeroStoreItemId
 
   async function handleLockIn() {
     if (!currentItem) return
     // A free hero with no backend row is owned by rule but the server's
     // lock-in needs the row: claim it first.
-    if (needsClaim(currentItem, ownedItems)) {
+    if (currentLevelLocked) return
+    if (needsClaim(currentItem, ownedItems, level)) {
       try {
         await claimFreeItem(currentItem.id)
       } catch {
@@ -165,7 +176,9 @@ export default function ClubWarHeroPicker({
           aria-label="Choose your war hero"
         >
           {heroItems.map((item, i) => {
-            const owned = getItemState(item, ownedItems) !== ITEM_STATE.LOCKED
+            const itemState = getItemState(item, ownedItems, { level })
+            const owned = isUsableState(itemState)
+            const levelLocked = itemState === ITEM_STATE.LEVEL_LOCKED
             const isCentred = i === index
             const isLockedIn = item.id === lockedHeroStoreItemId
             const animated = Boolean(getHeroSprite(item.name))
@@ -217,7 +230,9 @@ export default function ClubWarHeroPicker({
                         aria-hidden="true"
                       >
                         <IconLock />
-                        <span>Unlock</span>
+                        <span>
+                          {levelLocked ? `Level ${item.unlockLevel}` : 'Unlock'}
+                        </span>
                       </span>
                     )}
                   </span>
@@ -283,6 +298,10 @@ export default function ClubWarHeroPicker({
               aria-hidden="true"
             />
             Locking in…
+          </>
+        ) : currentLevelLocked ? (
+          <>
+            <IconLock /> Reach level {currentItem.unlockLevel} to unlock
           </>
         ) : !currentOwned ? (
           <>

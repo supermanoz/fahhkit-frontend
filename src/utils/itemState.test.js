@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   getItemState,
+  isUsableState,
   ITEM_STATE,
   needsClaim,
   visibleStoreError,
@@ -41,5 +42,37 @@ describe('visibleStoreError', () => {
   })
   it('other errors always pass through', () => {
     expect(visibleStoreError('Boom', ITEM_STATE.EQUIPPED)).toBe('Boom')
+  })
+})
+
+describe('level-locked items (unlockLevel)', () => {
+  const nova = { id: 'nova', priceFahhcoin: 0, unlockLevel: 5 }
+  it('is level-locked below the level - even though it is free', () => {
+    expect(getItemState(nova, [], { level: 1 })).toBe(ITEM_STATE.LEVEL_LOCKED)
+    expect(getItemState(nova, [], { level: 4 })).toBe(ITEM_STATE.LEVEL_LOCKED)
+  })
+  it('at/above the level it is just owned (free), never level-locked', () => {
+    expect(getItemState(nova, [], { level: 5 })).toBe(ITEM_STATE.OWNED)
+    expect(getItemState(nova, [], { level: 7 })).toBe(ITEM_STATE.OWNED)
+  })
+  it('a real owned row or equipped always wins over the level', () => {
+    expect(getItemState(nova, [row(nova)], { level: 1 })).toBe(ITEM_STATE.OWNED)
+    expect(getItemState(nova, [row(nova, true)], { level: 1 })).toBe(
+      ITEM_STATE.EQUIPPED
+    )
+  })
+  it('unknown level (profile not loaded) or no requirement never level-locks', () => {
+    expect(getItemState(nova, [], {})).toBe(ITEM_STATE.OWNED)
+    expect(getItemState(free, [], { level: 1 })).toBe(ITEM_STATE.OWNED)
+  })
+  it('a level-locked item is not claimable and not usable', () => {
+    expect(needsClaim(nova, [], 4)).toBe(false)
+    expect(needsClaim(nova, [], 5)).toBe(true)
+    expect(isUsableState(ITEM_STATE.LEVEL_LOCKED)).toBe(false)
+    expect(isUsableState(ITEM_STATE.OWNED)).toBe(true)
+  })
+  it('flips live when the level changes', () => {
+    expect(getItemState(nova, [], { level: 4 })).toBe(ITEM_STATE.LEVEL_LOCKED)
+    expect(getItemState(nova, [], { level: 5 })).toBe(ITEM_STATE.OWNED)
   })
 })

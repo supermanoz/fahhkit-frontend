@@ -77,6 +77,8 @@ export default function ClubPanel({
   onViewProfile,
   ownedItems,
   storeCatalog,
+  // Player's current level (profile.level) - Club War hero lock-in gating.
+  level,
   onEquipHero,
   onStartWarRun,
   racing,
@@ -639,6 +641,7 @@ export default function ClubPanel({
             treasuryBalance={treasury?.balance ?? 0}
             ownedItems={ownedItems}
             storeCatalog={storeCatalog}
+            level={level}
             onEquipHero={onEquipHero}
             onStartWarRun={onStartWarRun}
             racing={racing}
