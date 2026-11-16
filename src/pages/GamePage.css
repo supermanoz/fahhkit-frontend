@@ -1047,7 +1047,18 @@
   align-items: center;
   justify-content: center;
   background: rgba(10, 8, 6, 0.45);
-  pointer-events: none;
+  /* Tappable - tap anywhere to cancel the countdown. */
+  cursor: pointer;
+}
+
+.game-countdown-hint {
+  position: absolute;
+  bottom: calc(18% + env(safe-area-inset-bottom, 0px));
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 0 var(--game-ink);
 }
 
 .game-countdown-value {

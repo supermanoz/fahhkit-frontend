@@ -959,6 +959,13 @@ function GamePageInner() {
     setStartCountdown(3)
   }
 
+  // Tap the countdown to back out - nothing starts (the queued start
+  // function is dropped before it can fire).
+  function cancelCountdown() {
+    pendingStartRef.current = null
+    setStartCountdown(null)
+  }
+
   useEffect(() => {
     if (startCountdown == null) return
     if (startCountdown === 'GO') {
@@ -2528,12 +2535,32 @@ function GamePageInner() {
 
   // Training - the exact same plain territory draw as Start Run (same
   // submit path, same exp/territory/leaderboard outcome - see
-  // useRunTracker's isTraining comment), just entered from its own menu
-  // screen and with Pause/Resume available on the run panel. Closes the
-  // menu first, same as handleStartRace, so the countdown/run take over the
-  // full screen instead of playing out behind it.
-  function handleStartTraining() {
+  // useRunTracker's isTraining comment), just with Pause/Resume available on
+  // the run panel. Tapped straight from the Play menu (no panel in between,
+  // like Conquer): the 3-2-1-GO countdown, then the run. A run already in
+  // progress (or one waiting to be saved) is left alone - the Play menu
+  // isn't offered then anyway. If location is blocked/unsupported the
+  // countdown is skipped and tracker.start() surfaces the existing GPS
+  // prompt right away instead of counting down to a run that can't start.
+  async function handleStartTraining() {
     setMenuOpen(false)
+    if (tracker.status === 'tracking' || pendingRun) return
+    let blocked = !('geolocation' in navigator)
+    if (!blocked) {
+      try {
+        const perm = await navigator.permissions?.query({
+          name: 'geolocation',
+        })
+        blocked = perm?.state === 'denied'
+      } catch {
+        // Permissions API missing/unsupported - fall through to the countdown.
+      }
+    }
+    if (blocked) {
+      resetForRunStart()
+      tracker.start(null, { isTraining: true })
+      return
+    }
     beginCountdownThenStart(() => tracker.start(null, { isTraining: true }))
   }
 
@@ -3192,14 +3219,10 @@ function GamePageInner() {
     },
     { id: 'me', label: 'Me', Icon: IconUser, tone: 'green' },
     { id: 'shop', label: 'Shop', Icon: IconStore, tone: 'wood' },
-    { id: 'training', label: 'Training', Icon: IconRunning, tone: 'green' },
     { id: 'settings', label: 'Settings', Icon: IconSettings, tone: 'stone' },
   ]
   const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
-  // Training is reached from the Play menu now, not this switcher - it
-  // stays in menuTabs (above) so activeMenuTab still resolves its
-  // icon/label/tone while its panel is open, it just isn't offered here.
-  const switcherTabs = menuTabs.filter((tab) => tab.id !== 'training')
+  const switcherTabs = menuTabs
   // Collapsed picker shows one dot summing what's waiting on other tabs.
   const otherTabsBadgeCount =
     (menuTab === 'race' ? 0 : pvp.actionCount) +
@@ -3527,6 +3550,9 @@ function GamePageInner() {
         {startCountdown != null && (
           <motion.div
             className="game-countdown-overlay"
+            onClick={cancelCountdown}
+            role="button"
+            aria-label="Cancel countdown"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -3545,6 +3571,7 @@ function GamePageInner() {
                 {startCountdown}
               </motion.span>
             </AnimatePresence>
+            <span className="game-countdown-hint">Tap to cancel</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -3850,6 +3877,11 @@ function GamePageInner() {
                           if (item.tab === 'conquer') {
                             setRadialOpen(false)
                             handleStartRun()
+                            return
+                          }
+                          if (item.tab === 'training') {
+                            setRadialOpen(false)
+                            handleStartTraining()
                             return
                           }
                           openMenu(item.tab)
@@ -5102,53 +5134,6 @@ function GamePageInner() {
             {menuTab === 'mail' && (
               <div className="game-menu-panel">
                 <MailPanel mailbox={mailbox} onClaimed={handleMailClaimed} />
-              </div>
-            )}
-
-            {menuTab === 'training' && (
-              <div className="game-menu-panel">
-                <div className="training-intro">
-                  <span className="training-intro-icon" aria-hidden="true">
-                    <IconRunning />
-                  </span>
-                  <h2 className="training-intro-title">Training</h2>
-                  {tracker.isTraining && tracker.paused ? (
-                    <>
-                      <p className="training-intro-text">
-                        You&apos;ve got a paused run waiting -{' '}
-                        {formatMeters(tracker.distance)} so far. Pick up right
-                        where you left off (needs a quick tap to re-arm GPS).
-                      </p>
-                      <button
-                        type="button"
-                        className="game-btn game-btn-green game-btn-lg"
-                        onClick={tracker.resume}
-                      >
-                        <IconPlay /> Resume unfinished run
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="training-intro-text">
-                        A free run with no pressure - pause whenever you need to
-                        and pick up right where you left off. Counts the same as
-                        any run otherwise: exp, territory, the works.
-                      </p>
-                      <button
-                        type="button"
-                        className="game-btn game-btn-green game-btn-lg"
-                        onClick={handleStartTraining}
-                        disabled={
-                          (tracker.status === 'tracking' &&
-                            !tracker.isTraining) ||
-                          Boolean(pendingRun)
-                        }
-                      >
-                        <IconPlay /> Start
-                      </button>
-                    </>
-                  )}
-                </div>
               </div>
             )}
 

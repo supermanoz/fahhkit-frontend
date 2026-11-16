@@ -46,8 +46,8 @@ async function startTrainingRun(page, context) {
   // Training lives under the radial Play menu now (not the tab switcher).
   await page.locator('.game-menu-btn').click()
   await page.getByRole('button', { name: 'Play', exact: true }).click()
+  // Tapping Training goes straight to the 3-2-1-GO countdown, then the run.
   await page.getByRole('button', { name: 'Training', exact: true }).click()
-  await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.locator('.game-run-card')).toBeVisible({ timeout: 30_000 })
 }
 
