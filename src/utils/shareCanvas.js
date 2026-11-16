@@ -139,8 +139,8 @@ export function drawBrandLogo(
 // at EXPORT_SCALE. Every layout below derives its logo/stat positions from
 // this, so the extra height is reserved, not overlapped.
 export const BRAND_LOGO_SIZE = {
-  tall: { ratio: 0.575, max: 360 },
-  compact: { ratio: 0.425, max: 300 },
+  tall: { ratio: 0.48, max: 300 },
+  compact: { ratio: 0.36, max: 250 },
 }
 // Safe margin from the card edges, as a share of the width.
 export const BRAND_LOGO_MIN_MARGIN = 0.04
