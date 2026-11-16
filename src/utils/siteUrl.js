@@ -1,23 +1,34 @@
 import { Browser } from '@capacitor/browser'
 import { isNative, platform } from './geo'
 
-// The public website's own origin - where /shop (ShopPage.jsx) actually
-// lives, same React app as /game, just a different route. On the web this
-// is always window.location.origin (dev's localhost:5173, Vercel's own
-// domain, ...) since /game and /shop are served from the same deployment -
-// VITE_SITE_URL only needs to be set to override that. Inside the native
-// Android/iOS shell, though, window.location.origin resolves to wherever
-// Capacitor's own WebView serves the bundled dist-app/ from (its
-// androidScheme, capacitor.config.json - never a real public URL), so a
-// native build MUST have an explicit site URL - either VITE_SITE_URL baked
-// into that build's .env, or this hardcoded production fallback.
-const PRODUCTION_SITE_URL = 'https://fahhkit.vercel.app'
+// The public website's own origin - where /shop (ShopPage.jsx) and
+// /payment-status live, same React app as /game, just different routes.
+//
+// On the web this is ALWAYS window.location.origin, so every deployment
+// links to itself (netlify -> netlify/shop, vercel -> vercel/shop,
+// localhost -> localhost/shop). VITE_SITE_URL is deliberately NOT consulted
+// there: .env.production bakes it into the web build too, which used to send
+// the netlify site's coin button to vercel.
+//
+// Inside the native Android/iOS shell window.location.origin is wherever
+// Capacitor's WebView serves the bundled dist-app/ from (never a real public
+// URL), so there - and only there - VITE_SITE_URL is used, falling back to
+// NATIVE_FALLBACK_SITE_URL when a native build was made without it.
+const NATIVE_FALLBACK_SITE_URL = 'https://fahhkit.vercel.app'
+
+// Pure resolver, split out so every case can be tested with simulated
+// origins (e2e/site-url.spec.js).
+export function resolveSiteBaseUrl({ native, origin, configured }) {
+  const base = native ? configured || NATIVE_FALLBACK_SITE_URL : origin
+  return base.replace(/\/+$/, '')
+}
 
 export function getSiteBaseUrl() {
-  const configured = import.meta.env.VITE_SITE_URL
-  if (configured) return configured.replace(/\/+$/, '')
-  if (isNative) return PRODUCTION_SITE_URL
-  return window.location.origin
+  return resolveSiteBaseUrl({
+    native: isNative,
+    origin: window.location.origin,
+    configured: import.meta.env.VITE_SITE_URL,
+  })
 }
 
 // Apple App Store Review Guideline 3.1.1: an app may not link out to an
