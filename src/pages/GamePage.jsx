@@ -1660,19 +1660,20 @@ function GamePageInner() {
   }
 
   async function refreshProfile() {
-    try {
-      const [profileData, myParcelsPage] = await Promise.all([
-        getTerritoryProfile(),
-        findMyParcels(1, 100),
-      ])
-      setProfile(profileData)
-      setMyParcels(myParcelsPage?.content || [])
-      return profileData
-    } catch {
-      // Leave whatever's already loaded in place - a background refresh
-      // failing isn't worth surfacing as an error.
-      return null
+    // Independent, not Promise.all: a failing parcels call (e.g. a brand-new
+    // account with none) must not keep the level/XP HUD from loading.
+    // Failures leave whatever's already loaded in place - a background
+    // refresh isn't worth surfacing as an error.
+    const [profileResult, parcelsResult] = await Promise.allSettled([
+      getTerritoryProfile(),
+      findMyParcels(1, 100),
+    ])
+    if (parcelsResult.status === 'fulfilled') {
+      setMyParcels(parcelsResult.value?.content || [])
     }
+    if (profileResult.status !== 'fulfilled') return null
+    setProfile(profileResult.value)
+    return profileResult.value
   }
 
   // Set the moment handleContinueToShop actually sends the player out

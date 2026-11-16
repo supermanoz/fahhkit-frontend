@@ -6,14 +6,22 @@ import { getJson, postJson } from './client'
 // processed asynchronously server-side. These calls only ever read state
 // the server has already computed.
 
+// A brand-new account has 0 XP and may come back with null level/xp - treat
+// that as level 1 / 0 XP (a real value) so every level/XP display, which
+// hides itself on a null level, still renders at 0%.
+function withLevelDefaults(profile) {
+  if (!profile) return profile
+  return { ...profile, level: profile.level ?? 1, xp: profile.xp ?? 0 }
+}
+
 export function getTerritoryProfile() {
-  return getJson('/v1/territory/profile')
+  return getJson('/v1/territory/profile').then(withLevelDefaults)
 }
 
 // Another player's public game profile (e.g. viewed from the leaderboard) - same shape as
 // getTerritoryProfile() except fahhcoinBalance is always null (a wallet balance is private).
 export function getTerritoryProfileByUserId(userId) {
-  return getJson(`/v1/territory/profile/${userId}`)
+  return getJson(`/v1/territory/profile/${userId}`).then(withLevelDefaults)
 }
 
 export function findMyParcels(pageNumber = 1, noOfRecords = 100) {
