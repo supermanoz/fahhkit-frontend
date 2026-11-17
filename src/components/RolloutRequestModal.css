@@ -6,7 +6,20 @@
 }
 
 .rollout-modal-count {
-  color: var(--text-muted);
+  color: var(--text-muted-dark);
+}
+
+/* On the off-white modal card: plain dark body text (no white, stroke or
+   shadow). */
+.rollout-modal-body,
+.rollout-modal-success-text,
+.rollout-modal-count {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.rollout-modal-body,
+.rollout-modal-success-text {
+  color: var(--text-body-dark);
 }
 
 .rollout-modal-error {

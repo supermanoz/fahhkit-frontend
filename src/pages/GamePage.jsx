@@ -6321,8 +6321,10 @@ function GamePageInner() {
               </button>
               <p className="game-buy-redirect-title">Open the Shop</p>
               <p className="game-buy-redirect-pack">
-                {formatNumber(buyRedirectBundle.fahhcoinAmount)} Fahhcoin · Rs.{' '}
-                {formatNumber(buyRedirectBundle.priceNpr)}
+                {formatNumber(buyRedirectBundle.fahhcoinAmount)} Fahhcoin ·{' '}
+                <span className="game-buy-redirect-price">
+                  Rs. {formatNumber(buyRedirectBundle.priceNpr)}
+                </span>
               </p>
               <p className="game-buy-redirect-note">
                 You&apos;ll be taken to the Fahhcoin shop page to complete your

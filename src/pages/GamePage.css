@@ -1947,6 +1947,22 @@
    on top of the HUD coin balance), not by reading the CSS; .game-coin-
    shop-card and .game-run-viewer both already carry this same override
    for the same reason, this one was just missed initially. */
+/* The Buy Fahhcoin pack list rows (on the off-white card): plain dark text
+   instead of white with a 1px stroke at 12-14px. */
+.game-coin-shop-card .game-menu-list-area,
+.game-coin-shop-card .game-menu-list-meta {
+  color: #2b2b2b;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-coin-shop-card .game-menu-list-area {
+  font-size: 16px;
+}
+.game-coin-shop-card .game-menu-list-meta {
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .game-buy-redirect-card {
   position: relative;
   max-width: 340px;
@@ -1989,19 +2005,27 @@
   text-align: center;
   text-shadow: none;
   -webkit-text-stroke-width: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
-  color: var(--text-title);
+  line-height: 1.4;
+  color: #2b2b2b;
+}
+
+/* The price in the game's orange, still plain (no stroke/shadow). */
+.game-buy-redirect-card .game-buy-redirect-price {
+  color: #dd571c;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
 }
 
 .game-buy-redirect-card .game-buy-redirect-note {
   text-align: center;
   text-shadow: none;
   -webkit-text-stroke-width: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 1.45;
-  color: var(--text-muted);
+  line-height: 1.4;
+  color: #2b2b2b;
 }
 
 .game-buy-redirect-card .game-buy-redirect-ios-note {
@@ -2018,10 +2042,36 @@
   -webkit-text-stroke-width: 0;
 }
 
+/* Confirmation dialogs sit on the off-white card, so their paragraph text
+   is the shared plain dark body style (white + the global stroke smeared at
+   these sizes): solid dark, no stroke/shadow, 16px with a 1.4 line-height.
+   Large titles keep the white-with-stroke look through their own classes
+   (.game-buy-redirect-title, .game-menu-avatars-title). :where() keeps the
+   specificity at (0,1,1) so coloured variants below still win. */
 .game-confirm-card p {
   margin: 0 0 16px;
   font-weight: 700;
-  color: var(--game-cream);
+  color: var(--text-title-dark);
+}
+.game-confirm-card
+  p:where(:not(.game-menu-avatars-title, .game-buy-redirect-title)) {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-confirm-card p:not([class]) {
+  font-size: 16px;
+  line-height: 1.4;
+}
+.game-confirm-card p.game-menu-avatars-title {
+  color: var(--text-title);
+}
+.game-confirm-card p.game-controls-hint-error,
+.game-confirm-card p.game-buy-short {
+  color: var(--red-text);
+}
+.game-confirm-card .game-end-run-summary {
+  font-size: 15px;
+  line-height: 1.4;
 }
 
 .game-confirm-actions {
@@ -4933,4 +4983,31 @@
 .game-settings-contact-text a {
   -webkit-text-stroke-width: 0;
   text-shadow: none;
+}
+
+/* --- Small body text on light popup cards: plain dark, no stroke/shadow ---
+   The same shared dark body colours the confirm dialogs use (see
+   .game-confirm-card p), applied to the other popups that sat white-on-
+   off-white: claim/highlight toasts and the incoming challenge prompt. Their
+   large titles (h3 / .challenge-prompt-title / kicker) are untouched. */
+.game-claim-toast p,
+.game-highlight-toast p,
+.challenge-prompt-term-value,
+.challenge-prompt-term-label,
+.challenge-prompt-note,
+.challenge-prompt-later,
+.game-highlight-toast-owner-label {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-claim-toast p,
+.game-highlight-toast p,
+.challenge-prompt-term-value {
+  color: var(--text-body-dark);
+}
+.challenge-prompt-term-label,
+.challenge-prompt-note,
+.challenge-prompt-later,
+.game-highlight-toast-owner-label {
+  color: var(--text-muted-dark);
 }
