@@ -4599,6 +4599,7 @@ function GamePageInner() {
                       : 'territory'
               }
               stats={completedRun}
+              run={completedRun}
               xpReward={xpReward}
               scoreBreakdown={runScoreBreakdown}
               onDismiss={() => {

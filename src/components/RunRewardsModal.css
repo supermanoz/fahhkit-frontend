@@ -223,3 +223,55 @@
     gap: 12px;
   }
 }
+
+/* The two steps are plain wrappers inside the one card (same flex column). */
+.run-rewards-main,
+.run-rewards-image-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.run-rewards-main[hidden],
+.run-rewards-image-step[hidden] {
+  display: none;
+}
+.run-rewards-image-close {
+  position: absolute;
+  /* Inside the card: the card scrolls (overflow-y), which would clip a
+     button hanging off its corner. */
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+.run-rewards-image-step .share-carousel {
+  width: 100%;
+}
+.run-rewards-skip {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  color: var(--text-muted-dark);
+  cursor: pointer;
+}
+
+/* Fit the whole image step (image, Download/Share, Done) in the viewport:
+   the card is portrait, so on short screens shrink it by height - width
+   follows from the canvas aspect-ratio. */
+.run-rewards-image-step .share-carousel {
+  padding: 8px;
+}
+.run-rewards-image-step .share-card-canvas-wrap {
+  display: flex;
+  justify-content: center;
+}
+.run-rewards-image-step .share-card-canvas-wrap canvas {
+  width: auto !important;
+  max-width: 100%;
+  height: clamp(160px, calc(100dvh - 400px), 520px) !important;
+}
