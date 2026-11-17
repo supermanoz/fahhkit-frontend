@@ -436,6 +436,15 @@ export function IconLock(props) {
   )
 }
 
+export function IconCopy(props) {
+  return (
+    <GameIcon {...props}>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2.5" {...TINT} />
+      <path d="M15.5 8.5v-1a2.5 2.5 0 0 0-2.5-2.5H7a2.5 2.5 0 0 0-2.5 2.5V13A2.5 2.5 0 0 0 7 15.5h1.5" />
+    </GameIcon>
+  )
+}
+
 export function IconInstagram(props) {
   return (
     <GameIcon {...props}>

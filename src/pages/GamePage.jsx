@@ -14,6 +14,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconInstagram,
+  IconCopy,
   IconLock,
   IconClose,
   IconCrosshairs,
@@ -190,7 +191,8 @@ import {
   iosShopRedirectBlocked,
   openShopPack,
 } from '../utils/siteUrl'
-import { openExternal } from '../utils/externalLink'
+import { copyText, openExternal, openMailto } from '../utils/externalLink'
+import { GAME_CONTACT_EMAIL } from '../constants/gameLegal'
 import { App as CapacitorApp } from '@capacitor/app'
 import { isNative } from '../utils/geo'
 import HeroDetailModal from '../components/HeroDetailModal'
@@ -5766,23 +5768,58 @@ function GamePageInner() {
                 </button>
 
                 <div className="game-settings-contact">
-                  <span
-                    className="game-settings-row-icon-badge"
-                    aria-hidden="true"
-                  >
-                    <IconInstagram />
-                  </span>
-                  <p className="game-settings-contact-text">
-                    Issues? Reach out to us at{' '}
-                    <a
-                      href={INSTAGRAM_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => openExternal(INSTAGRAM_URL, e)}
+                  <div className="game-settings-contact-row">
+                    <span
+                      className="game-settings-row-icon-badge"
+                      aria-hidden="true"
                     >
-                      @run_conquest
-                    </a>
-                  </p>
+                      <IconInstagram />
+                    </span>
+                    <p className="game-settings-contact-text">
+                      Issues? Reach out to us at{' '}
+                      <a
+                        href={INSTAGRAM_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => openExternal(INSTAGRAM_URL, e)}
+                      >
+                        @run_conquest
+                      </a>
+                    </p>
+                  </div>
+                  <div className="game-settings-contact-row">
+                    <span
+                      className="game-settings-row-icon-badge"
+                      aria-hidden="true"
+                    >
+                      <IconEnvelope />
+                    </span>
+                    <p className="game-settings-contact-text">
+                      <a
+                        href={`mailto:${GAME_CONTACT_EMAIL}`}
+                        onClick={(e) => openMailto(GAME_CONTACT_EMAIL, e)}
+                      >
+                        {GAME_CONTACT_EMAIL.split('@')[0]}
+                        <wbr />@{GAME_CONTACT_EMAIL.split('@')[1]}
+                      </a>
+                    </p>
+                    <button
+                      type="button"
+                      className="game-settings-contact-copy"
+                      aria-label="Copy email address"
+                      onClick={async () => {
+                        const ok = await copyText(GAME_CONTACT_EMAIL)
+                        toast.push(
+                          ok
+                            ? 'Copied'
+                            : "Couldn't copy - long-press the address",
+                          { type: ok ? 'success' : 'error', duration: 2000 }
+                        )
+                      }}
+                    >
+                      <IconCopy />
+                    </button>
+                  </div>
                 </div>
 
                 {/* No dedicated About page exists in this app - this is
