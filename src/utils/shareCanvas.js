@@ -1,5 +1,4 @@
 import { formatDistance, formatDuration, formatPace } from './run'
-import { formatNumber } from './format'
 import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
 
 // Fixed logical card size (9:16, matches an Instagram Story frame so the
@@ -442,18 +441,7 @@ function drawOutlinedText(ctx, text, x, y, { font, fill, maxWidth, size }) {
 
 export function drawOverlayCard(
   ctx,
-  {
-    width,
-    height,
-    points,
-    distance,
-    duration,
-    pace,
-    score,
-    xp,
-    modeLabel,
-    logo,
-  }
+  { width, height, points, distance, duration, pace, logo }
 ) {
   // (1) Route, back layer: ~85% of the canvas, centred, room left for the
   // glow so it is never clipped at the edges.
@@ -472,11 +460,6 @@ export function drawOverlayCard(
     { label: 'Pace', value: formatPace(pace) },
     { label: 'Time', value: formatDuration(duration) },
   ]
-  if (score != null) {
-    rows.push({ label: 'Score Points', value: formatNumber(Math.round(score)) })
-  }
-  if (xp != null && xp > 0) rows.push({ label: 'XP', value: `+${xp} XP` })
-  if (modeLabel) rows.push({ label: 'Mode', value: modeLabel, size: 26 })
 
   const logoW = brandLogoWidth(width, 'overlay')
   const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)
@@ -523,18 +506,7 @@ export function drawOverlayCard(
 
 export async function drawShareCard(
   ctx,
-  {
-    width,
-    height,
-    points,
-    distance,
-    duration,
-    pace,
-    variant,
-    score,
-    xp,
-    modeLabel,
-  }
+  { width, height, points, distance, duration, pace, variant }
 ) {
   const [, logo] = await Promise.all([
     ensureWordmarkFontLoaded(),
@@ -553,9 +525,6 @@ export async function drawShareCard(
       distance,
       duration,
       pace,
-      score,
-      xp,
-      modeLabel,
       logo,
     })
   } else if (variant === SHARE_VARIANTS.TRANSPARENT) {
@@ -747,9 +716,6 @@ export async function exportShareCardBlob({
   mimeType = 'image/png',
   quality,
   size,
-  score,
-  xp,
-  modeLabel,
 }) {
   const { w, h } = cardSize(variant, size)
   const canvas = document.createElement('canvas')
@@ -765,9 +731,6 @@ export async function exportShareCardBlob({
     duration,
     pace,
     variant,
-    score,
-    xp,
-    modeLabel,
   })
   return new Promise((resolve, reject) => {
     canvas.toBlob(

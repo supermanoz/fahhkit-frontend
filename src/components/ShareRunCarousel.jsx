@@ -10,7 +10,6 @@ import {
 } from '../utils/saveImage'
 import { useToast } from '../game/ui/Toast'
 import { motion } from 'framer-motion'
-import { RUN_MODE, getRunModeLabel } from '../utils/runModeLabel'
 import {
   SHARE_VARIANTS,
   cardSize,
@@ -56,21 +55,6 @@ const SLIDES = [
     quality: 0.92,
   },
 ]
-
-// Optional extras the Overlay card prints when the run has them (the
-// end-of-run step passes score/xp).
-function overlayExtras(run) {
-  let mode = null
-  if (run.isWar) mode = RUN_MODE.CLUB_WAR
-  else if (run.isRace) mode = RUN_MODE.PVP
-  else if (run.isTraining) mode = RUN_MODE.TRAINING
-  else if (run.isWar === false) mode = RUN_MODE.CONQUER
-  return {
-    score: run.score ?? undefined,
-    xp: run.xp ?? undefined,
-    modeLabel: mode ? getRunModeLabel(mode) : undefined,
-  }
-}
 
 // Swipeable set of downloadable share-card styles for a completed run.
 // Each canvas preview is drawn with the exact same function used to render
@@ -128,7 +112,6 @@ export default function ShareRunCarousel({ run }) {
       mimeType: slide.mime,
       quality: slide.quality,
       size: slide.size,
-      ...overlayExtras(run),
     })
   }
   const fileNameFor = (slide) =>
@@ -308,7 +291,6 @@ function ShareCardPreview({ run, slide }) {
       duration: run.duration,
       pace: run.avgPace,
       variant: slide.variant,
-      ...overlayExtras(run),
     }).catch(() => {})
   }, [run, slide.variant, slide.size])
 

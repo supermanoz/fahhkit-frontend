@@ -56,7 +56,7 @@ test.describe('Run export: Overlay sticker', () => {
     for (const [size, [ew, eh]] of Object.entries(SIZES)) {
       test(`${runName} run, ${size}`, async ({ mockedPage: page }) => {
         const r = await page.evaluate(
-          async ({ points, size, long }) => {
+          async ({ points, size }) => {
             const m = await import('/src/utils/shareCanvas.js')
             const blob = await m.exportShareCardBlob({
               points,
@@ -65,9 +65,6 @@ test.describe('Run export: Overlay sticker', () => {
               pace: 6.12,
               variant: 'overlay',
               size,
-              score: long ? 1234567 : 842,
-              xp: 120,
-              modeLabel: 'Territory Capture',
             })
             const bytes = new Uint8Array(await blob.arrayBuffer())
             const bmp = await createImageBitmap(blob)
@@ -151,7 +148,7 @@ test.describe('Run export: Overlay sticker', () => {
               busy: compose('busy'),
             }
           },
-          { points, size, long: runName === 'long' }
+          { points, size }
         )
         expect(r.size).toEqual([ew, eh])
         expect(r.colorType).toBe(6)
