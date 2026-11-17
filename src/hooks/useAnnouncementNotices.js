@@ -77,17 +77,21 @@ export function useAnnouncementNotices(userId) {
     }
   }, [userId])
 
-  const dismiss = useCallback(() => {
-    const current = currentNotice(state)
-    if (!current) return
-    addToSeenCache(`${userId}:${current.id}`)
-    dispatch({ type: 'DISMISS_CURRENT' })
-    markNoticeShown(current.id).catch(() => {
-      // Optimistic - if this fails, the next game open's GET still
-      // returns it (fails closed from the player's point of view: worst
-      // case it shows once more, never stuck forever).
-    })
-  }, [state, userId])
+  const dismiss = useCallback(
+    (id) => {
+      const target =
+        id == null ? currentNotice(state) : state.queue.find((n) => n.id === id)
+      if (!target) return
+      addToSeenCache(`${userId}:${target.id}`)
+      dispatch({ type: 'DISMISS_ID', id: target.id })
+      markNoticeShown(target.id).catch(() => {
+        // Optimistic - if this fails, the next game open's GET still
+        // returns it (fails closed from the player's point of view: worst
+        // case it shows once more, never stuck forever).
+      })
+    },
+    [state, userId]
+  )
 
   // For a live socket push of a freshly-published IMPORTANT_NOTICE -
   // queues it immediately instead of waiting for the next game open.
@@ -123,6 +127,8 @@ export function useAnnouncementNotices(userId) {
 
   return {
     current: currentNotice(state),
+    // Every unread notice, in arrival order (the popup pages between them).
+    queue: state.phase === 'ready' ? state.queue : [],
     hasMore: hasMoreNotices(state),
     dismiss,
     receive,

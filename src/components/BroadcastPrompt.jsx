@@ -1,86 +1,243 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { motion } from 'framer-motion'
-import { IconClose, IconMegaphone } from './GameIcons'
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconClose,
+  IconMegaphone,
+} from './GameIcons'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
+import { openExternal } from '../utils/externalLink'
+import './BroadcastPrompt.css'
 
 // News/announcement broadcasts, front and center the moment the game opens
-// (see GamePage's useAnnouncementNotices) instead of waiting for the player
-// to find them in the Mail tab - a title-bar dialog in the middle of the
-// screen, same shape as a mobile game's "Events" popup (banner image, title,
-// body, one big action button) rather than a small bottom-anchored toast.
-// "Got it"/Next, the X, Esc, and tapping the backdrop all call onDismiss.
-export default function BroadcastPrompt({ broadcast, hasMore, onDismiss }) {
+// (see GamePage's useAnnouncementNotices). Look only - what is shown, when,
+// and what "Got it"/X/Esc/backdrop do (dismiss = permanent, per broadcast id)
+// is unchanged. With several unread ones they are shown one at a time: the
+// arrows / swipe / dots only move between them, "Got it" dismisses the one on
+// screen and the next takes its place; the popup closes when none are left.
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)"'])/g
+const SWIPE_PX = 48
+
+function linkify(text) {
+  return text.split(URL_RE).map((part, i) =>
+    i % 2 === 1 ? (
+      <a
+        key={i}
+        className="bcast-link"
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => openExternal(part, e)}
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  )
+}
+
+function formatWhen(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+export default function BroadcastPrompt({ notices, onDismiss }) {
+  const [index, setIndex] = useState(0)
+  const lastShown = useRef(null)
+  const count = notices.length
+  const safeIndex = Math.min(index, Math.max(count - 1, 0))
+  // While the popup animates out the queue is already empty - keep drawing
+  // the last broadcast so it doesn't collapse mid-fade.
+  const broadcast = notices[safeIndex] || lastShown.current
+  if (notices[safeIndex]) lastShown.current = notices[safeIndex]
+
+  const dismissCurrent = useCallback(() => {
+    if (notices[safeIndex]) onDismiss(notices[safeIndex].id)
+  }, [notices, safeIndex, onDismiss])
+
+  const go = useCallback(
+    (delta) => {
+      if (count < 2) return
+      setIndex((safeIndex + delta + count) % count)
+    },
+    [count, safeIndex]
+  )
+
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') onDismiss()
+      if (e.key === 'Escape') dismissCurrent()
+      else if (e.key === 'ArrowLeft') go(-1)
+      else if (e.key === 'ArrowRight') go(1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onDismiss])
+  }, [dismissCurrent, go])
+
+  // Fade at the bottom of a long message only while there is more to scroll.
+  const scrollRef = useRef(null)
+  const [fade, setFade] = useState(false)
+  const measure = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setFade(el.scrollHeight - el.scrollTop - el.clientHeight > 4)
+  }, [])
+  useLayoutEffect(() => {
+    measure()
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }, [broadcast?.id, measure])
+
+  const swipe = useRef(null)
+  function onPointerDown(e) {
+    swipe.current = { x: e.clientX, y: e.clientY }
+  }
+  function onPointerUp(e) {
+    const s = swipe.current
+    swipe.current = null
+    if (!s) return
+    const dx = e.clientX - s.x
+    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(e.clientY - s.y)) {
+      go(dx < 0 ? 1 : -1)
+    }
+  }
+
+  if (!broadcast) return null
+  const title = toClubRoleWords(broadcast.title || '').trim()
+  const body = toClubRoleWords(broadcast.body || '')
+  const linkUrl = broadcast.linkUrl || broadcast.url || broadcast.link
+  const when = formatWhen(broadcast.publishedAt)
+  const isNew = !broadcast.readAt
 
   return (
     <motion.div
-      className="broadcast-prompt-backdrop"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      className="bcast-backdrop"
       exit={{ opacity: 0 }}
-      onClick={onDismiss}
+      transition={{ duration: 0.16 }}
+      onClick={dismissCurrent}
     >
       <motion.div
-        className="broadcast-prompt"
+        className="bcast-card"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="broadcast-prompt-title"
-        initial={{ scale: 0.85, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+        aria-labelledby="bcast-title"
+        exit={{ scale: 0.92, opacity: 0 }}
+        transition={{ duration: 0.16, ease: 'easeIn' }}
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => (swipe.current = null)}
       >
-        <div className="broadcast-prompt-titlebar">
-          <IconMegaphone aria-hidden="true" />
-          <span>Announcement</span>
-          <button
-            type="button"
-            className="game-close-btn broadcast-prompt-close"
-            onClick={onDismiss}
-            aria-label="Close"
+        <div className="bcast-banner">
+          <span className="bcast-badge" aria-hidden="true">
+            <IconMegaphone />
+          </span>
+          <span className="bcast-banner-title">Broadcast</span>
+          {isNew && <span className="bcast-new">NEW</span>}
+        </div>
+        <button
+          type="button"
+          className="game-close-btn bcast-close"
+          onClick={dismissCurrent}
+          aria-label="Close"
+        >
+          <IconClose />
+        </button>
+
+        <div className="bcast-content" key={broadcast.id}>
+          {title && (
+            <h3 id="bcast-title" className="bcast-title">
+              {title}
+            </h3>
+          )}
+          <div
+            ref={scrollRef}
+            className={`bcast-scroll${fade ? ' has-fade' : ''}`}
+            onScroll={measure}
+            tabIndex={0}
+            aria-label="Message"
           >
-            <IconClose />
-          </button>
+            {broadcast.imageUrl && (
+              <img
+                className="bcast-image"
+                src={resolveFileUrl(broadcast.imageUrl)}
+                alt=""
+                onLoad={measure}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  measure()
+                }}
+              />
+            )}
+            {body && <p className="bcast-body">{linkify(body)}</p>}
+          </div>
+          {when && <p className="bcast-when">{when}</p>}
         </div>
 
-        <div className="broadcast-prompt-content">
-          {broadcast.imageUrl && (
-            <img
-              className="broadcast-prompt-image"
-              src={resolveFileUrl(broadcast.imageUrl)}
-              alt=""
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-          )}
-          <h3 id="broadcast-prompt-title" className="broadcast-prompt-title">
-            {toClubRoleWords(broadcast.title)}
-          </h3>
-          {/* Every broadcast comes from the Game Mechanics admin tool - the
-              underlying mail carries whichever staff account published it,
-              but that's an implementation detail, not something a player
-              needs to see. */}
-          <p className="broadcast-prompt-meta">Admin</p>
-          {broadcast.body && (
-            <p className="broadcast-prompt-body">
-              {toClubRoleWords(broadcast.body)}
-            </p>
+        {count > 1 && (
+          <div className="bcast-pager">
+            <button
+              type="button"
+              className="bcast-arrow"
+              onClick={() => go(-1)}
+              aria-label="Previous broadcast"
+            >
+              <IconChevronLeft />
+            </button>
+            <div className="bcast-dots" aria-hidden="true">
+              {notices.map((n, i) => (
+                <span
+                  key={n.id}
+                  className={`bcast-dot${i === safeIndex ? ' is-on' : ''}`}
+                />
+              ))}
+            </div>
+            <span className="bcast-counter">
+              {safeIndex + 1}/{count}
+            </span>
+            <button
+              type="button"
+              className="bcast-arrow"
+              onClick={() => go(1)}
+              aria-label="Next broadcast"
+            >
+              <IconChevronRight />
+            </button>
+          </div>
+        )}
+
+        <div className="bcast-actions">
+          {linkUrl && (
+            <a
+              className="game-btn game-btn-wood bcast-open"
+              href={linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => openExternal(linkUrl, e)}
+            >
+              Open
+            </a>
           )}
           <button
             type="button"
-            className="game-btn game-btn-green broadcast-prompt-action"
-            onClick={onDismiss}
+            className="game-btn game-btn-green bcast-got-it"
+            onClick={dismissCurrent}
           >
-            {hasMore ? 'Next' : 'Got it'}
+            Got it
           </button>
         </div>
       </motion.div>

@@ -1,0 +1,373 @@
+/* Broadcast popup: off-white solid card, purple banner (same family as the
+   run-rewards header), dark readable body. Motion is transform/opacity only. */
+.bcast-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: rgba(10, 6, 3, 0.65);
+  animation: bcast-scrim-in 0.2s ease-out both;
+}
+
+.bcast-card {
+  position: relative;
+  box-sizing: border-box;
+  width: min(380px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  border: 4px solid var(--ink);
+  background: #fbf7ee;
+  color: #2b2a24;
+  overflow: hidden;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.9),
+    0 5px 0 var(--ink),
+    0 22px 44px rgba(0, 0, 0, 0.45);
+  animation: bcast-pop 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* --- banner ribbon --- */
+.bcast-banner {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 64px 12px 12px;
+  background: linear-gradient(180deg, #a770ee 0%, #8a4fe0 55%, #6a35b8 100%);
+  border-bottom: 4px solid var(--ink);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35);
+}
+
+.bcast-badge {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fbf7ee;
+  border: 3px solid var(--ink);
+  color: var(--icon-dark, #1a1a1a);
+  font-size: 20px;
+  animation: bcast-shake 0.6s ease-in-out 0.45s 1 both;
+  transform-origin: 50% 70%;
+}
+
+.bcast-badge svg {
+  width: 1em;
+  height: 1em;
+}
+
+.bcast-banner-title {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #fff;
+  -webkit-text-stroke: 1.2px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+.bcast-new {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #ffd23f;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+.bcast-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+}
+
+/* --- body --- */
+.bcast-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 6px;
+  animation: bcast-swap 0.22s ease-out both;
+}
+
+.bcast-title,
+.bcast-body,
+.bcast-when,
+.bcast-counter {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+.bcast-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: #2b2a24;
+  overflow-wrap: anywhere;
+}
+
+.bcast-scroll {
+  min-height: 0;
+  max-height: min(34dvh, 260px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bcast-scroll.has-fade {
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 calc(100% - 32px),
+    transparent
+  );
+  mask-image: linear-gradient(180deg, #000 calc(100% - 32px), transparent);
+}
+
+.bcast-image {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 3px solid var(--ink);
+}
+
+.bcast-body {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: #3a382f;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.bcast-link {
+  color: #710913;
+  font-weight: 700;
+  text-decoration: underline;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+.bcast-when {
+  margin: 0;
+  font-size: 12px;
+  color: #6b6759;
+}
+
+/* --- pager --- */
+.bcast-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px 0;
+}
+
+.bcast-arrow {
+  all: unset;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: #fff;
+  color: var(--icon-dark, #1a1a1a);
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bcast-arrow:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.bcast-arrow:focus-visible {
+  outline: 3px solid var(--game-gold);
+  outline-offset: 2px;
+}
+
+.bcast-arrow svg {
+  width: 1em;
+  height: 1em;
+}
+
+.bcast-dots {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.bcast-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d9d2c0;
+  border: 2px solid var(--ink);
+  box-sizing: border-box;
+}
+
+.bcast-dot.is-on {
+  background: #8a4fe0;
+}
+
+.bcast-counter {
+  min-width: 30px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #2b2a24;
+}
+
+/* --- actions --- */
+.bcast-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 18px 18px;
+}
+
+.bcast-open,
+.bcast-got-it {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  font-size: 17px;
+  text-decoration: none;
+  text-align: center;
+}
+
+/* Secondary button sits on a light fill: dark label, no outline. */
+.bcast-open {
+  color: #2b2a24;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+.bcast-got-it {
+  animation: bcast-pulse 3.6s ease-in-out 1.6s infinite;
+}
+
+/* --- motion --- */
+@keyframes bcast-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bcast-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bcast-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-16deg);
+  }
+  40% {
+    transform: rotate(13deg);
+  }
+  60% {
+    transform: rotate(-9deg);
+  }
+  80% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes bcast-pulse {
+  0%,
+  12%,
+  100% {
+    transform: scale(1);
+  }
+  6% {
+    transform: scale(1.045);
+  }
+}
+
+@keyframes bcast-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bcast-card {
+    animation: bcast-scrim-in 0.2s ease-out both;
+  }
+  .bcast-badge,
+  .bcast-got-it,
+  .bcast-content {
+    animation: none;
+  }
+}
+
+/* Short phones (360x640): tighten so nothing is cut off. */
+@media (max-height: 700px) {
+  .bcast-scroll {
+    max-height: min(28dvh, 200px);
+  }
+  .bcast-image {
+    max-height: 120px;
+  }
+  .bcast-title {
+    font-size: 21px;
+  }
+}

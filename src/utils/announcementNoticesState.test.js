@@ -66,6 +66,17 @@ describe('announcementNoticesReducer', () => {
     expect(hasMoreNotices(state)).toBe(false)
   })
 
+  it('DISMISS_ID removes exactly that notice, wherever it is', () => {
+    let state = announcementNoticesReducer(initialAnnouncementState, {
+      type: 'CHECK_SUCCESS',
+      notices: [notice('a'), notice('b'), notice('c')],
+    })
+    state = announcementNoticesReducer(state, { type: 'DISMISS_ID', id: 'b' })
+    expect(state.queue).toEqual([notice('a'), notice('c')])
+    state = announcementNoticesReducer(state, { type: 'DISMISS_ID', id: 'zzz' })
+    expect(state.queue).toHaveLength(2)
+  })
+
   it('DISMISS_CURRENT on an empty queue is a no-op', () => {
     const ready = announcementNoticesReducer(initialAnnouncementState, {
       type: 'CHECK_SUCCESS',

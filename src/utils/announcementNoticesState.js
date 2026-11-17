@@ -44,6 +44,14 @@ export function announcementNoticesReducer(state, action) {
       if (state.queue.some((n) => n.id === action.notice.id)) return state
       return { ...state, queue: [...state.queue, action.notice] }
 
+    // Dismiss one specific notice (the popup lets the player page between
+    // several before pressing "Got it", so it is not always the first).
+    case 'DISMISS_ID':
+      return {
+        ...state,
+        queue: state.queue.filter((n) => n.id !== action.id),
+      }
+
     case 'DISMISS_CURRENT':
       if (state.queue.length === 0) return state
       return { ...state, queue: state.queue.slice(1) }

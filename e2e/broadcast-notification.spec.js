@@ -122,7 +122,7 @@ test.describe('Broadcast arriving in the app (in-app path only)', () => {
 
     // 1. IMPORTANT_NOTICE -> in-app popup (foreground "toast").
     pushBroadcast(NOTICE)
-    const prompt = page.locator('.broadcast-prompt')
+    const prompt = page.locator('.bcast-card')
     await expect(prompt).toBeVisible()
     await expect(prompt).toContainText(NOTICE.title)
     await page.screenshot({
@@ -160,7 +160,7 @@ test.describe('Broadcast arriving in the app (in-app path only)', () => {
     mockedPage: page,
   }) => {
     await openGame(page)
-    await expect(page.locator('.broadcast-prompt')).toBeHidden()
+    await expect(page.locator('.bcast-card')).toBeHidden()
 
     // Published while the phone was locked: the socket never saw it, but the
     // server now lists it as pending.
@@ -172,7 +172,7 @@ test.describe('Broadcast arriving in the app (in-app path only)', () => {
       })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await expect(page.locator('.broadcast-prompt')).toContainText(NOTICE.title)
+    await expect(page.locator('.bcast-card')).toContainText(NOTICE.title)
     await page.screenshot({
       path: 'screenshots/notifications/broadcast-4-foreground-catchup.png',
     })

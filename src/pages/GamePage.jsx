@@ -3804,11 +3804,9 @@ function GamePageInner() {
         <GameLegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
       )}
       <AnimatePresence>
-        {announcementNotices.current && (
+        {announcementNotices.queue.length > 0 && (
           <BroadcastPrompt
-            key={announcementNotices.current.id}
-            broadcast={announcementNotices.current}
-            hasMore={announcementNotices.hasMore}
+            notices={announcementNotices.queue}
             onDismiss={announcementNotices.dismiss}
           />
         )}

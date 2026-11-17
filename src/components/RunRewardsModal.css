@@ -1,4 +1,4 @@
-/* Centered popup, same recipe as .broadcast-prompt-backdrop - shown after
+/* Centered popup, same recipe as .bcast-backdrop - shown after
    the run-result toast is dismissed (see GamePage's completedRun/xpReward/
    runScoreBreakdown). Off-white solid panel (no transparency), unlike the
    old dark .run-reward-card it replaces. */
