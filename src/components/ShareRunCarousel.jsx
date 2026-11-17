@@ -10,10 +10,10 @@ import {
 } from '../utils/saveImage'
 import { useToast } from '../game/ui/Toast'
 import { motion } from 'framer-motion'
+import { RUN_MODE, getRunModeLabel } from '../utils/runModeLabel'
 import {
-  CARD_H,
-  CARD_W,
   SHARE_VARIANTS,
+  cardSize,
   downloadBlob,
   drawShareCard,
   exportShareCardBlob,
@@ -28,6 +28,17 @@ const SLIDES = [
     ext: 'png',
     mime: 'image/png',
     checkerboard: true,
+  },
+  {
+    // Strava-style sticker for laying over a photo: real transparent PNG
+    // (4:5), route behind, stats in front. Second slide on purpose.
+    variant: SHARE_VARIANTS.OVERLAY,
+    label: 'Overlay',
+    badge: 'PNG',
+    ext: 'png',
+    mime: 'image/png',
+    checkerboard: true,
+    size: 'portrait',
   },
   {
     variant: SHARE_VARIANTS.GRADIENT,
@@ -45,6 +56,22 @@ const SLIDES = [
     quality: 0.92,
   },
 ]
+
+// Optional extras the Overlay card prints when the run has them (the
+// end-of-run step passes score/xp; History runs bring startedAt).
+function overlayExtras(run) {
+  let mode = null
+  if (run.isWar) mode = RUN_MODE.CLUB_WAR
+  else if (run.isRace) mode = RUN_MODE.PVP
+  else if (run.isTraining) mode = RUN_MODE.TRAINING
+  else if (run.isWar === false) mode = RUN_MODE.CONQUER
+  return {
+    score: run.score ?? undefined,
+    xp: run.xp ?? undefined,
+    modeLabel: mode ? getRunModeLabel(mode) : undefined,
+    startedAt: run.startedAt || undefined,
+  }
+}
 
 // Swipeable set of downloadable share-card styles for a completed run.
 // Each canvas preview is drawn with the exact same function used to render
@@ -101,10 +128,14 @@ export default function ShareRunCarousel({ run }) {
       variant: slide.variant,
       mimeType: slide.mime,
       quality: slide.quality,
+      size: slide.size,
+      ...overlayExtras(run),
     })
   }
   const fileNameFor = (slide) =>
-    `run-conquest-run-${run.id}-${slide.variant}.${slide.ext}`
+    slide.variant === SHARE_VARIANTS.OVERLAY
+      ? `run-conquest-overlay-${run.id}.png`
+      : `run-conquest-run-${run.id}-${slide.variant}.${slide.ext}`
 
   // Native app: save to Photos / the share sheet instead of <a download>,
   // which does nothing in the WebView. Web path unchanged below.
@@ -264,6 +295,7 @@ function ShareCardPreview({ run, slide }) {
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = window.devicePixelRatio || 1
+    const { w: CARD_W, h: CARD_H } = cardSize(slide.variant, slide.size)
     canvas.width = CARD_W * dpr
     canvas.height = CARD_H * dpr
     const ctx = canvas.getContext('2d')
@@ -277,8 +309,11 @@ function ShareCardPreview({ run, slide }) {
       duration: run.duration,
       pace: run.avgPace,
       variant: slide.variant,
+      ...overlayExtras(run),
     }).catch(() => {})
-  }, [run, slide.variant])
+  }, [run, slide.variant, slide.size])
+
+  const { w: CARD_W, h: CARD_H } = cardSize(slide.variant, slide.size)
 
   return (
     <div

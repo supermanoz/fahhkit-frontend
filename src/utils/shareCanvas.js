@@ -1,4 +1,10 @@
-import { formatDistance, formatDuration, formatPace } from './run'
+import {
+  formatDistance,
+  formatDuration,
+  formatPace,
+  formatRunDate,
+} from './run'
+import { formatNumber } from './format'
 import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
 
 // Fixed logical card size (9:16, matches an Instagram Story frame so the
@@ -14,6 +20,23 @@ export const SHARE_VARIANTS = {
   TRANSPARENT: 'transparent',
   GRADIENT: 'gradient',
   MAP: 'map',
+  // Strava-style sticker: big neon route behind centred stacked stats, on a
+  // REAL transparent background, meant to be laid over the player's photo.
+  OVERLAY: 'overlay',
+}
+
+// Logical sizes (432 wide, exported at EXPORT_SCALE -> 1080 wide). The
+// overlay defaults to 4:5; story and square are available to callers.
+export const OVERLAY_SIZES = {
+  portrait: { w: 432, h: 540 }, // 1080x1350
+  story: { w: 432, h: 768 }, // 1080x1920
+  square: { w: 432, h: 432 }, // 1080x1080
+}
+export function cardSize(variant, size) {
+  if (variant === SHARE_VARIANTS.OVERLAY) {
+    return OVERLAY_SIZES[size] || OVERLAY_SIZES.portrait
+  }
+  return { w: CARD_W, h: CARD_H }
 }
 
 const EPSILON = 1e-6
@@ -22,7 +45,12 @@ const EPSILON = 1e-6
 // Longitude is scaled by cos(avgLat) so the route isn't stretched
 // east-west, and y is flipped since latitude increases north but canvas y
 // increases downward.
-export function projectRoute(points, { width, height, padding = 40 }) {
+// minSpan (degrees) stops a tiny/stationary run being blown up into noise:
+// the route is then drawn smaller than the box and centred.
+export function projectRoute(
+  points,
+  { width, height, padding = 40, minSpan = EPSILON }
+) {
   if (!points || points.length === 0) return []
 
   const avgLat = points.reduce((sum, p) => sum + p.lat, 0) / points.length
@@ -34,8 +62,10 @@ export function projectRoute(points, { width, height, padding = 40 }) {
   const minPy = Math.min(...projected.map((p) => p.py))
   const maxPy = Math.max(...projected.map((p) => p.py))
 
-  const spanX = Math.max(maxPx - minPx, EPSILON)
-  const spanY = Math.max(maxPy - minPy, EPSILON)
+  const realX = maxPx - minPx
+  const realY = maxPy - minPy
+  const spanX = Math.max(realX, minSpan)
+  const spanY = Math.max(realY, minSpan)
 
   const availW = Math.max(width - padding * 2, 1)
   const availH = Math.max(height - padding * 2, 1)
@@ -46,9 +76,12 @@ export function projectRoute(points, { width, height, padding = 40 }) {
   const offsetX = padding + (availW - routeW) / 2
   const offsetY = padding + (availH - routeH) / 2
 
+  // When minSpan widened the box, keep the real route centred inside it.
+  const padX = ((spanX - realX) / 2) * scale
+  const padY = ((spanY - realY) / 2) * scale
   return projected.map((p) => ({
-    x: offsetX + (p.px - minPx) * scale,
-    y: offsetY + (maxPy - p.py) * scale,
+    x: offsetX + padX + (p.px - minPx) * scale,
+    y: offsetY + padY + (maxPy - p.py) * scale,
   }))
 }
 
@@ -141,6 +174,8 @@ export function drawBrandLogo(
 export const BRAND_LOGO_SIZE = {
   tall: { ratio: 0.48, max: 300 },
   compact: { ratio: 0.36, max: 250 },
+  // The Overlay sticker: ~40% of the canvas width.
+  overlay: { ratio: 0.4, max: 300 },
 }
 // Safe margin from the card edges, as a share of the width.
 export const BRAND_LOGO_MIN_MARGIN = 0.04
@@ -370,9 +405,149 @@ export function drawMapDecoration(ctx, { width, height }) {
   ctx.restore()
 }
 
+// --- Overlay sticker ---------------------------------------------------
+// White text with a thin dark outline and a soft shadow so it reads on any
+// photo. Everything is in 1x logical units (the ctx carries the export
+// scale); shadow blur/offset are not scaled by the transform, so they are
+// multiplied by hand.
+const OVERLAY_INK = 'rgba(20, 18, 16, 0.9)'
+
+function shadowScale(ctx) {
+  const m = ctx.getTransform()
+  return Math.hypot(m.a, m.b) || 1
+}
+
+function drawOutlinedText(ctx, text, x, y, { font, fill, maxWidth, size }) {
+  // Auto-shrink so long values never leave the canvas.
+  let px = size
+  ctx.font = font(px)
+  while (px > 8 && ctx.measureText(text).width > maxWidth) {
+    px -= 1
+    ctx.font = font(px)
+  }
+  const k = shadowScale(ctx)
+  ctx.save()
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 2
+  ctx.strokeStyle = OVERLAY_INK
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'
+  ctx.shadowBlur = 6 * k
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 2 * k
+  ctx.strokeText(text, x, y)
+  ctx.shadowColor = 'transparent'
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetY = 0
+  ctx.fillStyle = fill
+  ctx.fillText(text, x, y)
+  ctx.restore()
+}
+
+export function drawOverlayCard(
+  ctx,
+  {
+    width,
+    height,
+    points,
+    distance,
+    duration,
+    pace,
+    score,
+    xp,
+    modeLabel,
+    date,
+    logo,
+  }
+) {
+  // (1) Route, back layer: ~85% of the canvas, centred, room left for the
+  // glow so it is never clipped at the edges.
+  const pad = width * 0.075
+  const projected = projectRoute(points, {
+    width,
+    height,
+    padding: pad,
+    minSpan: 0.0015,
+  })
+  drawNeonRoutePath(ctx, projected, { lineWidth: 4 })
+
+  // (2)+(3) Logo then stacked stats, centred as one column.
+  const rows = [
+    { label: 'Distance', value: formatDistance(distance) },
+    { label: 'Pace', value: formatPace(pace) },
+    { label: 'Time', value: formatDuration(duration) },
+  ]
+  if (score != null) {
+    rows.push({ label: 'Score Points', value: formatNumber(Math.round(score)) })
+  }
+  if (xp != null && xp > 0) rows.push({ label: 'XP', value: `+${xp} XP` })
+  if (modeLabel) rows.push({ label: 'Mode', value: modeLabel, size: 26 })
+
+  const logoW = brandLogoWidth(width, 'overlay')
+  const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)
+  const LABEL = 14
+  const VALUE = 32
+  const ROW = 68 // label baseline to next label baseline
+  const DATE_H = date ? 30 : 0
+  const natural = logoH + 18 + rows.length * ROW + DATE_H
+  const avail = height * 0.9
+  const k = Math.min(1, avail / natural)
+  const total = natural * k
+  const cx = width / 2
+  let y = (height - total) / 2
+
+  drawBrandLogo(ctx, logo, {
+    x: cx,
+    y,
+    width: logoW * k,
+    align: 'center',
+    valign: 'alphabetic',
+    shadow: true,
+  })
+  y += (logoH + 18) * k
+
+  const maxW = width * 0.78
+  rows.forEach((row) => {
+    drawOutlinedText(ctx, row.label, cx, y + LABEL * k, {
+      font: (px) => `600 ${px}px 'Poppins', -apple-system, sans-serif`,
+      fill: 'rgba(255, 255, 255, 0.88)',
+      maxWidth: maxW,
+      size: LABEL * k,
+    })
+    drawOutlinedText(ctx, row.value, cx, y + (LABEL + 9 + VALUE * 0.8) * k, {
+      font: (px) => `800 ${px}px 'Poppins', sans-serif`,
+      fill: '#ffffff',
+      maxWidth: maxW,
+      size: (row.size || VALUE) * k,
+    })
+    y += ROW * k
+  })
+  if (date) {
+    drawOutlinedText(ctx, date, cx, y + 6 * k, {
+      font: (px) => `600 ${px}px 'Poppins', -apple-system, sans-serif`,
+      fill: 'rgba(255, 255, 255, 0.88)',
+      maxWidth: maxW,
+      size: 13 * k,
+    })
+  }
+}
+
 export async function drawShareCard(
   ctx,
-  { width, height, points, distance, duration, pace, variant }
+  {
+    width,
+    height,
+    points,
+    distance,
+    duration,
+    pace,
+    variant,
+    score,
+    xp,
+    modeLabel,
+    startedAt,
+  }
 ) {
   const [, logo] = await Promise.all([
     ensureWordmarkFontLoaded(),
@@ -383,7 +558,21 @@ export async function drawShareCard(
   const padding = 40
   const logoW = brandLogoWidth(width)
 
-  if (variant === SHARE_VARIANTS.TRANSPARENT) {
+  if (variant === SHARE_VARIANTS.OVERLAY) {
+    drawOverlayCard(ctx, {
+      width,
+      height,
+      points,
+      distance,
+      duration,
+      pace,
+      score,
+      xp,
+      modeLabel,
+      date: startedAt ? formatRunDate(startedAt) : null,
+      logo,
+    })
+  } else if (variant === SHARE_VARIANTS.TRANSPARENT) {
     // Strava-style stacked layout: route up top, logo centered below it,
     // then a plain (no chip) stats row - rather than the route filling
     // the card with the logo pinned in a corner. routeHeight is a touch
@@ -571,20 +760,30 @@ export async function exportShareCardBlob({
   variant,
   mimeType = 'image/png',
   quality,
+  size,
+  score,
+  xp,
+  modeLabel,
+  startedAt,
 }) {
+  const { w, h } = cardSize(variant, size)
   const canvas = document.createElement('canvas')
-  canvas.width = CARD_W * EXPORT_SCALE
-  canvas.height = CARD_H * EXPORT_SCALE
+  canvas.width = Math.round(w * EXPORT_SCALE)
+  canvas.height = Math.round(h * EXPORT_SCALE)
   const ctx = canvas.getContext('2d')
   ctx.scale(EXPORT_SCALE, EXPORT_SCALE)
   await drawShareCard(ctx, {
-    width: CARD_W,
-    height: CARD_H,
+    width: w,
+    height: h,
     points,
     distance,
     duration,
     pace,
     variant,
+    score,
+    xp,
+    modeLabel,
+    startedAt,
   })
   return new Promise((resolve, reject) => {
     canvas.toBlob(

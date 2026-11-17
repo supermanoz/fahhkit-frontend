@@ -2905,6 +2905,7 @@ function GamePageInner() {
         distance: pendingRun.distance,
         duration: pendingRun.duration,
         avgPace: created.avgPace,
+        startedAt: pendingRun.startedAt,
       })
       discardDraft()
       setSaving(false)

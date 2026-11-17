@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { levelProgress } from '../utils/territoryGame'
 import { formatDistance, formatDuration, formatPace } from '../utils/run'
@@ -81,6 +81,17 @@ export default function RunRewardsModal({
   const totalScore = scoreBreakdown?.totalScore
   const hasScore = totalScore != null
   const heroBonus = scoreBreakdown?.heroBonus || null
+
+  // The finished run plus what this reward sequence knows, for the Overlay
+  // image (score/XP lines only appear when there are any).
+  const shareRun = useMemo(
+    () => ({
+      ...run,
+      score: hasScore ? totalScore : undefined,
+      xp: hasXp ? xpGained : undefined,
+    }),
+    [run, hasScore, totalScore, hasXp, xpGained]
+  )
 
   const reduceMotionRef = useRef(reducedMotion())
 
@@ -252,7 +263,7 @@ export default function RunRewardsModal({
               <IconClose />
             </button>
             <h3 className="run-rewards-title">Your run</h3>
-            <ShareRunCarousel run={run} />
+            <ShareRunCarousel run={shareRun} />
             <button
               type="button"
               className="game-btn game-btn-green run-rewards-action"
