@@ -110,6 +110,16 @@
   margin-top: 4px;
 }
 
+/* "Starting a club costs ..." under the Create Club button: breathing room
+   (12px above, 4px more below than before) and plain dark text on the light
+   card - no stroke/shadow at this small size. */
+.club-create .game-card-empty {
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--text-body-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
 .game-club-input.club-input-light {
   background: var(--white);
   border-color: var(--border-soft);
