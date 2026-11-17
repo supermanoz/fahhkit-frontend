@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
-import { isNative } from '../utils/geo'
+import { isNative, platform } from '../utils/geo'
 import {
   ensureGoogleAuthInitialized,
   googleSignOut,
@@ -133,6 +133,15 @@ function GoogleSignInButtonNative({ onCredential, onError }) {
 
 export default function GoogleSignInButton({ onCredential, onError }) {
   if (!GOOGLE_CLIENT_ID) return null
+  // No iOS OAuth client id exists yet (capacitor.config.json only has the
+  // Android one), so native Google sign-in can't work on iOS: hide it there
+  // until VITE_IOS_GOOGLE=true is set alongside a real iosClientId.
+  if (
+    isNative &&
+    platform === 'ios' &&
+    import.meta.env.VITE_IOS_GOOGLE !== 'true'
+  )
+    return null
   return isNative ? (
     <GoogleSignInButtonNative onCredential={onCredential} onError={onError} />
   ) : (
