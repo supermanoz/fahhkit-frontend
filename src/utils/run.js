@@ -36,6 +36,21 @@ export function formatDuration(totalSeconds) {
   return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`
 }
 
+// Time as it is written on run images and share captions: unit letters, no
+// leading zeros, seconds always shown ("25s", "47m 25s", "1h 5m 12s",
+// "12m 0s"). Separate from formatDuration, which keeps the "m:ss" clock
+// format the in-game timers and lists use.
+export function formatDurationLabel(totalSeconds) {
+  const n = Number(totalSeconds)
+  const seconds = Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (h > 0) return `${h}h ${m}m ${s}s`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
 export function formatDistance(meters) {
   if (meters == null || Number.isNaN(meters)) return '--'
   return `${(meters / 1000).toFixed(2)} km`

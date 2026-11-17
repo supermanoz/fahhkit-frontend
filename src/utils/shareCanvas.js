@@ -1,4 +1,4 @@
-import { formatDistance, formatDuration, formatPace } from './run'
+import { formatDistance, formatDurationLabel, formatPace } from './run'
 import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
 
 // Fixed logical card size (9:16, matches an Instagram Story frame so the
@@ -183,6 +183,19 @@ function brandLogoWidth(cardWidth, layout = 'tall') {
   )
 }
 
+// Largest font size (<= size) at which `text` fits in maxWidth - same font,
+// weight and size as before unless the text is genuinely too wide ("1h 5m
+// 12s" vs "6:47"), then it shrinks just enough.
+function fitFontSize(ctx, text, makeFont, size, maxWidth) {
+  let px = size
+  ctx.font = makeFont(px)
+  while (px > 8 && ctx.measureText(text).width > maxWidth) {
+    px -= 0.5
+    ctx.font = makeFont(px)
+  }
+  return px
+}
+
 export function drawStatsRow(
   ctx,
   {
@@ -202,7 +215,7 @@ export function drawStatsRow(
   const stats = [
     { value: formatDistance(distance), label: 'Distance' },
     { value: formatPace(pace), label: 'Pace' },
-    { value: formatDuration(duration), label: 'Time' },
+    { value: formatDurationLabel(duration), label: 'Time' },
   ]
   const colWidth = width / stats.length
 
@@ -224,7 +237,14 @@ export function drawStatsRow(
     ctx.save()
     ctx.textAlign = 'center'
     ctx.fillStyle = color
-    ctx.font = `700 ${valueFontSize}px 'Poppins', sans-serif`
+    const px = fitFontSize(
+      ctx,
+      stat.value,
+      (n) => `700 ${n}px 'Poppins', sans-serif`,
+      valueFontSize,
+      colWidth - 12
+    )
+    ctx.font = `700 ${px}px 'Poppins', sans-serif`
     ctx.fillText(stat.value, cx, y + valueDy)
     ctx.globalAlpha = 0.75
     ctx.font = `600 ${labelFontSize}px -apple-system, sans-serif`
@@ -238,12 +258,12 @@ export function drawStatsRow(
 // each stat gets its own full-width line under the wordmark.
 function drawStatsStack(
   ctx,
-  { distance, duration, pace, x, y, color, rowGap = 56 }
+  { distance, duration, pace, x, y, color, rowGap = 56, maxWidth = 340 }
 ) {
   const stats = [
     { value: formatDistance(distance), label: 'Distance' },
     { value: formatPace(pace), label: 'Pace' },
-    { value: formatDuration(duration), label: 'Time' },
+    { value: formatDurationLabel(duration), label: 'Time' },
   ]
 
   stats.forEach((stat, i) => {
@@ -255,7 +275,14 @@ function drawStatsStack(
     ctx.font = '600 11px -apple-system, sans-serif'
     ctx.fillText(stat.label.toUpperCase(), x, cy - 13)
     ctx.globalAlpha = 1
-    ctx.font = "700 20px 'Poppins', sans-serif"
+    const px = fitFontSize(
+      ctx,
+      stat.value,
+      (n) => `700 ${n}px 'Poppins', sans-serif`,
+      20,
+      maxWidth
+    )
+    ctx.font = `700 ${px}px 'Poppins', sans-serif`
     ctx.fillText(stat.value, x, cy + 10)
     ctx.restore()
   })
@@ -263,7 +290,7 @@ function drawStatsStack(
 
 // Left-aligned label-over-value pair, for the Strava-style asymmetric stat
 // grid (as opposed to drawStatsRow's centered equal-width columns).
-function drawStatLabelValue(ctx, { label, value, x, y }) {
+function drawStatLabelValue(ctx, { label, value, x, y, maxWidth = Infinity }) {
   ctx.save()
   ctx.textAlign = 'left'
   ctx.fillStyle = '#ffffff'
@@ -271,7 +298,14 @@ function drawStatLabelValue(ctx, { label, value, x, y }) {
   ctx.font = '600 11px -apple-system, sans-serif'
   ctx.fillText(label.toUpperCase(), x, y - 22)
   ctx.globalAlpha = 1
-  ctx.font = "700 22px 'Poppins', sans-serif"
+  const px = fitFontSize(
+    ctx,
+    value,
+    (n) => `700 ${n}px 'Poppins', sans-serif`,
+    22,
+    maxWidth
+  )
+  ctx.font = `700 ${px}px 'Poppins', sans-serif`
   ctx.fillText(value, x, y)
   ctx.restore()
 }
@@ -458,7 +492,7 @@ export function drawOverlayCard(
   const rows = [
     { label: 'Distance', value: formatDistance(distance) },
     { label: 'Pace', value: formatPace(pace) },
-    { label: 'Time', value: formatDuration(duration) },
+    { label: 'Time', value: formatDurationLabel(duration) },
   ]
 
   const logoW = brandLogoWidth(width, 'overlay')
@@ -563,6 +597,7 @@ export async function drawShareCard(
       x: width / 2,
       y: logoCenterY + logoH / 2 + 44,
       color: '#ffffff',
+      maxWidth: width * 0.78,
     })
   } else if (variant === SHARE_VARIANTS.GRADIENT) {
     ctx.fillStyle = makeBrandGradient(ctx, 0, 0, width, height)
@@ -676,9 +711,10 @@ export async function drawShareCard(
     })
     drawStatLabelValue(ctx, {
       label: 'Time',
-      value: formatDuration(duration),
+      value: formatDurationLabel(duration),
       x: rightColX,
       y: height - 84 - creditRowHeight,
+      maxWidth: width - padding - rightColX,
     })
     drawStatLabelValue(ctx, {
       label: 'Pace',

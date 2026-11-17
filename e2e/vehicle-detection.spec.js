@@ -47,10 +47,9 @@ test.describe('Vehicle detection', () => {
   test.use({ viewport: { width: 390, height: 844 } })
   test.setTimeout(180_000)
   // Mobile layout only (390px) - the other projects add runtime, not coverage.
-  test.skip(
-    (_fixtures, testInfo) => testInfo.project.name !== 'mobile-390',
-    '390px only'
-  )
+  test.beforeEach(() => {
+    test.skip(test.info().project.name !== 'mobile-390', '390px only')
+  })
 
   test('walk, then a car: warning banner, then the run is discarded', async ({
     mockedPage: page,
