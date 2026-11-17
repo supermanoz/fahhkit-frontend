@@ -128,7 +128,17 @@
   margin-bottom: 4px;
 }
 
-/* Operator to-do markers: [CHECK ...] and [CONTACT EMAIL]. */
+/* Contact address in the legal text: dark red link, plain (no text stroke). */
+.game-legal-mail {
+  color: #710913;
+  font-weight: 700;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+/* Operator to-do markers: [CHECK ...]. */
 .game-legal-check {
   background: var(--red-tint);
   color: var(--red-text);

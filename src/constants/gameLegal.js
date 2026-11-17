@@ -3,14 +3,15 @@
 // which stay as they are. Rendered by components/game-legal/*.
 //
 // Anything the operator must confirm is marked [CHECK ...] (shown highlighted
-// in the page) and the contact address is the [CONTACT EMAIL] placeholder.
+// in the page). The contact address is GAME_CONTACT_EMAIL (rendered as a
+// mailto: link).
 // Bump GAME_TERMS_VERSION whenever either document changes materially: it is
 // what the sign-up screen records as "accepted".
 
 export const GAME_TERMS_VERSION = '2026-11-15'
 export const GAME_LEGAL_LAST_UPDATED = '15 November 2026'
 export const GAME_OPERATOR = 'Everest Solutions Digital Tech Pvt. Ltd.'
-export const GAME_CONTACT_EMAIL = '[CONTACT EMAIL]'
+export const GAME_CONTACT_EMAIL = 'runconquest.game@gmail.com'
 // The minimum age the sign-up DOB check enforces (GameSignUpScreen.jsx
 // MIN_AGE_YEARS, backend @MinimumAge(10) on AthleteSignupRequest).
 export const GAME_MIN_AGE = 10

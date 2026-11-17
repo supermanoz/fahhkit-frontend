@@ -12,3 +12,36 @@ export function openExternal(url, event) {
   event?.preventDefault()
   Browser.open({ url })
 }
+
+// mailto: links. On the web the plain <a href="mailto:..."> already opens the
+// default mail client. In the native app the click is turned into a
+// top-level navigation to the mailto: URL, which Capacitor's bridge hands to
+// the system (the mail app) instead of loading it inside the game WebView.
+export function openMailto(address, event) {
+  if (!isNative || !address) return
+  event?.preventDefault()
+  window.location.href = `mailto:${address}`
+}
+
+// Copies text for the "no mail app" fallback. Returns true on success.
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      ta.remove()
+      return ok
+    } catch {
+      return false
+    }
+  }
+}

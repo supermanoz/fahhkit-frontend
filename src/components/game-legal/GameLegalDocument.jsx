@@ -1,24 +1,41 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import {
+  GAME_CONTACT_EMAIL,
   GAME_LEGAL_DOCS,
   GAME_LEGAL_LAST_UPDATED,
   GAME_OPERATOR,
 } from '../../constants/gameLegal'
+import { openMailto } from '../../utils/externalLink'
 import './GameLegal.css'
 
-// [CHECK ...] and [CONTACT EMAIL] placeholders are highlighted so they are
-// impossible to miss before launch.
+// [CHECK ...] markers are highlighted so they are impossible to miss before
+// launch; the contact address becomes a mailto: link (opened through the
+// system in the native app, never inside the WebView).
+const ESCAPED_EMAIL = GAME_CONTACT_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const TEXT_SPLIT = new RegExp(`(\\[CHECK[^\\]]*\\]|${ESCAPED_EMAIL})`)
 function Text({ children }) {
-  const parts = String(children).split(/(\[CHECK[^\]]*\]|\[CONTACT EMAIL\])/)
-  return parts.map((p, i) =>
-    /^\[(CHECK|CONTACT)/.test(p) ? (
+  const parts = String(children).split(TEXT_SPLIT)
+  return parts.map((p, i) => {
+    if (p === GAME_CONTACT_EMAIL) {
+      return (
+        <a
+          key={i}
+          className="game-legal-mail"
+          href={`mailto:${GAME_CONTACT_EMAIL}`}
+          onClick={(e) => openMailto(GAME_CONTACT_EMAIL, e)}
+        >
+          {GAME_CONTACT_EMAIL}
+        </a>
+      )
+    }
+    return /^\[CHECK/.test(p) ? (
       <mark key={i} className="game-legal-check">
         {p}
       </mark>
     ) : (
       p
     )
-  )
+  })
 }
 
 // One document (terms | privacy): title, last-updated date, short table of
