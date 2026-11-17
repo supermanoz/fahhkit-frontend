@@ -4380,10 +4380,39 @@
 .game-leaderboard-mode .game-menu-subtab {
   width: auto;
   height: 44px;
-  padding: 0 16px;
+  /* Room to breathe: +6px each side vs the old 16px, and a 10px icon/label
+     gap (tighter steps for narrow phones in the media query below). */
+  padding: 0 22px;
   border-radius: 14px;
   font-size: 19px;
-  gap: 9px;
+  gap: 10px;
+}
+/* Two equal columns sized by the wider tab, row centred, same gap as before. */
+.game-leaderboard-mode {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+.game-leaderboard-mode .game-menu-subtab {
+  min-width: 0;
+}
+/* Both tabs share the same label rhythm. */
+.game-leaderboard-mode .game-menu-subtab-label {
+  letter-spacing: 0.04em;
+  word-spacing: 0.12em;
+}
+@media (max-width: 400px) {
+  /* Shrink the icon (not the 14px label) first when width gets tight. */
+  .game-leaderboard-mode .game-menu-subtab {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .game-leaderboard-mode .game-menu-subtab svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 /* Plain solid text, no stroke/no shadow by default - the inactive
@@ -4420,7 +4449,30 @@
    var(--text-title-dark)/#2b2a24) so it isn't a silent, untested change
    to the Shop tabs too. */
 .game-leaderboard-mode .game-menu-subtab:not(.active) {
-  color: #1f1e1a;
+  color: #2b2b2b;
+}
+/* The label's inner spans (.label-full/.label-short) are elements of their
+   own, so the global text-stroke/shadow rule hit them even though the label
+   wrapper had it switched off - that was the smeared look. Plain solid dark
+   text on the light tab, a touch bolder. */
+.game-leaderboard-mode .game-menu-subtab:not(.active) .game-menu-subtab-label,
+.game-leaderboard-mode
+  .game-menu-subtab:not(.active)
+  .game-menu-subtab-label
+  span {
+  font-weight: 800;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+/* My Club / Club Wars / Shared Routes: the inactive tab inherited white text
+   with the global dark stroke on the light fill - plain dark text instead. */
+.club-section-tabs .game-menu-subtab:not(.active) {
+  color: #2b2b2b;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
 }
 
 /* The one place a shadow is wanted - white text needs it for contrast on
