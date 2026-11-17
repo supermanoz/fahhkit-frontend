@@ -13,7 +13,7 @@ async function openSignup(page) {
     .getByRole('button', { name: 'Create Account', exact: true })
     .click({ timeout: 30_000 })
   await expect(
-    page.getByRole('heading', { name: 'Join FahhKit' })
+    page.getByRole('heading', { name: 'Join Run Conquest' })
   ).toBeVisible()
 }
 

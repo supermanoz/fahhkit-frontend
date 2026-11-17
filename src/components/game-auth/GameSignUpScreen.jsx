@@ -23,6 +23,35 @@ import { recordGameTermsAcceptance } from '../../utils/gameTermsAcceptance'
 // is simply not sent.
 const SIGNUP_DEFAULTS = { gender: 'OTHERS', address: 'Not provided' }
 const MIN_AGE_YEARS = 10
+const MIN_BIRTH_DATE = '1900-01-01'
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+// "2000-11-15" -> "15 Nov 2000" (parsed by hand: no timezone shifts).
+function formatBirthDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
+  if (!m) return ''
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`
+}
+
+function todayIso() {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
 
 const INITIAL_FORM = {
   fullName: '',
@@ -179,7 +208,7 @@ export default function GameSignUpScreen({
         ← Back
       </button>
       <div className="game-auth-header">
-        <h1 className="game-auth-title">Join FahhKit</h1>
+        <h1 className="game-auth-title">Join Run Conquest</h1>
         <p className="game-auth-subtitle">
           Your password is emailed to you right after.
         </p>
@@ -256,12 +285,26 @@ export default function GameSignUpScreen({
               <label className="game-auth-label" htmlFor="ga-birthDate">
                 Date of Birth
               </label>
-              <input
-                {...fieldProps('birthDate')}
-                className="game-auth-input"
-                type="date"
-                autoComplete="bday"
-              />
+              {/* Native date picker kept (tap opens it); the input itself is
+                  see-through and the formatted value / "Select date" text is
+                  drawn under it, so iOS/WebView's own date look and
+                  intrinsic size never show. */}
+              <div className="game-auth-date">
+                <input
+                  {...fieldProps('birthDate')}
+                  className="game-auth-input game-auth-date-input"
+                  type="date"
+                  min={MIN_BIRTH_DATE}
+                  max={todayIso()}
+                  autoComplete="bday"
+                />
+                <span
+                  className={`game-auth-date-text${form.birthDate ? ' has-value' : ''}`}
+                  aria-hidden="true"
+                >
+                  {formatBirthDate(form.birthDate) || 'Select date'}
+                </span>
+              </div>
               {msg('birthDate')}
             </div>
           </div>
@@ -273,6 +316,7 @@ export default function GameSignUpScreen({
         >
           <input
             id="game-signup-terms-agreement"
+            className="game-auth-checkbox"
             type="checkbox"
             checked={agreedToTerms}
             onChange={(e) => setAgreedToTerms(e.target.checked)}

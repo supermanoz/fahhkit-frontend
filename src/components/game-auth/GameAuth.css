@@ -318,11 +318,48 @@
   font-size: 14px;
 }
 
+.game-auth-signup .game-auth-select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  background: var(--white)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232b2a24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 12px center;
+}
 .game-auth-signup .game-auth-input,
 .game-auth-signup .game-auth-select {
   min-height: 40px;
   height: 40px;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   text-overflow: ellipsis;
+}
+/* The game-wide white-text-with-black-stroke recipe (tokens.css) turns dark
+   text on this cream card into a heavy smear at small sizes: plain dark text
+   here, no stroke or shadow, for everything under 16px. */
+.game-auth-signup .game-auth-label,
+.game-auth-signup .game-auth-hint,
+.game-auth-signup .game-auth-terms,
+.game-auth-signup .game-auth-terms *,
+.game-auth-signup .game-auth-date-text,
+.game-auth-signup .game-auth-link,
+.game-auth-signup .game-auth-select option {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-auth-signup .game-auth-subtitle {
+  color: var(--ink);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-auth-signup .game-auth-label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.game-auth-signup .game-auth-hint.error {
+  color: #b3261e;
 }
 
 .game-auth-signup .game-auth-hint {
@@ -449,12 +486,99 @@
   font-family: var(--font-body);
 }
 
-.game-auth-terms input {
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
+/* Styled checkbox: off-white box, dark border, green fill + white check.
+   Sized to the label's line height (12.5px x 1.4 ~ 18px) and sat on the
+   first line. */
+.game-auth-terms {
+  color: var(--ink);
+}
+.game-auth-checkbox {
+  -webkit-appearance: none;
+  appearance: none;
   flex: none;
-  accent-color: var(--game-gold);
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 5px;
+  background: #f6f3e8;
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+}
+.game-auth-checkbox::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg) scale(0);
+}
+.game-auth-checkbox:checked {
+  background: #2f8f46;
+  border-color: var(--ink);
+}
+.game-auth-checkbox:checked::after {
+  transform: translateY(-1px) rotate(45deg) scale(1);
+}
+.game-auth-checkbox:focus-visible {
+  outline: 2.5px solid var(--game-gold-light);
+  outline-offset: 2px;
+}
+
+/* Date of Birth: same box as the Country select. */
+.game-auth-date {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.game-auth-date-input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  /* Invisible: the overlay text below is what the player reads. */
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: var(--white);
+}
+.game-auth-date-input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+.game-auth-date-input::-webkit-datetime-edit,
+.game-auth-date-input::-webkit-datetime-edit-fields-wrapper {
+  color: transparent;
+}
+/* The whole box is the tap target for the native picker (Chromium). */
+.game-auth-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.game-auth-date-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 16px;
+  font-family: var(--font-body);
+  letter-spacing: 0.02em;
+  color: var(--ink);
 }
 
 .game-auth-terms a {

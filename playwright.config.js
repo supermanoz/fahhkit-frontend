@@ -49,6 +49,13 @@ export default defineConfig({
       name: 'small-360',
       use: { ...devices['Galaxy S8'], viewport: { width: 360, height: 640 } },
     },
+    // iOS-WebKit: date inputs render very differently there (own intrinsic
+    // size/look), so signup-form.spec.js is the only spec run on it.
+    {
+      name: 'ios-webkit',
+      testMatch: /signup-form\.spec\.js/,
+      use: { ...devices['iPhone 13'] },
+    },
     {
       name: 'desktop-1440',
       use: {
