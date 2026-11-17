@@ -1152,6 +1152,12 @@
   font-weight: 800;
   font-size: 16px;
   color: var(--text-title);
+  /* Mode label ("Territory Capture", "Training · Paused"): one line, never
+     wraps. */
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .game-run-card-expand-icon {

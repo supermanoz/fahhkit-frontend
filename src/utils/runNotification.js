@@ -35,10 +35,11 @@ export async function startRunNotification({
   elapsedMs = 0,
   distanceMeters = 0,
   paceLabel = null,
+  title = null,
 } = {}) {
   if (!isNative) return
   await ensurePermission()
-  RunNotification.start({ elapsedMs, distanceMeters, paceLabel }).catch(
+  RunNotification.start({ elapsedMs, distanceMeters, paceLabel, title }).catch(
     () => {}
   )
 }
@@ -52,9 +53,9 @@ export function updateRunNotification({ distanceMeters, paceLabel } = {}) {
   RunNotification.update({ distanceMeters, paceLabel }).catch(() => {})
 }
 
-export function pauseRunNotification() {
+export function pauseRunNotification({ title = null } = {}) {
   if (!isNative) return
-  RunNotification.pause().catch(() => {})
+  RunNotification.pause({ title }).catch(() => {})
 }
 
 // Resuming after pause() isn't a distinct native call - it's

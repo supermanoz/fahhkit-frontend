@@ -25,6 +25,7 @@ import {
   pauseRunNotification,
   stopRunNotification,
 } from '../utils/runNotification'
+import { getRunMode, getRunModeLabel } from '../utils/runModeLabel'
 
 // Bare "m:ss" (no " /km" suffix - the notification's own label already says
 // "Avg. pace (/km)"), gated exactly like GamePage.jsx's own run card
@@ -160,6 +161,16 @@ export function useRunTracker() {
   // off any earlier than this regardless of which of the three call sites
   // triggered it. null between runs/when nothing needs it.
   const pendingNotifyRef = useRef(null)
+  // Same words as the in-game run panel header (utils/runModeLabel.js).
+  const notifyTitle = (state) =>
+    getRunModeLabel(
+      getRunMode({
+        isTraining: isTrainingRef.current,
+        clubWarId: clubWarIdRef.current,
+        challengeId: challengeIdRef.current,
+      }),
+      state
+    )
   const statusRef = useRef(status)
   statusRef.current = status
   const wakeLock = useWakeLock()
@@ -460,7 +471,10 @@ export function useRunTracker() {
       }
       watchIdRef.current = id
       if (pendingNotifyRef.current) {
-        startRunNotification(pendingNotifyRef.current)
+        startRunNotification({
+          ...pendingNotifyRef.current,
+          title: notifyTitle(),
+        })
         pendingNotifyRef.current = null
       }
     })
@@ -774,7 +788,7 @@ export function useRunTracker() {
       pausedAt: new Date(pausedAtRef.current).toISOString(),
       pausedMs: pausedMsRef.current,
     })
-    pauseRunNotification()
+    pauseRunNotification({ title: notifyTitle('paused') })
   }, [clearTimers])
 
   const resume = useCallback(() => {

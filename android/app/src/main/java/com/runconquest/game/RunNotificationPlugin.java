@@ -61,6 +61,8 @@ public class RunNotificationPlugin extends Plugin {
     private long baseElapsedRealtime = 0L;
     private String distanceText = "0.00";
     private String paceText = "--";
+    // Header text from JS (utils/runModeLabel.js); null = legacy Running/Paused.
+    private String titleText = null;
 
     // Called whenever JS transitions into "tracking, not paused" - a brand
     // new run, a Training run resuming after pause(), or the app reattaching
@@ -80,6 +82,7 @@ public class RunNotificationPlugin extends Plugin {
                 : "0.00";
         String pace = call.getString("paceLabel");
         paceText = pace != null ? pace : "--";
+        titleText = call.getString("title");
         ensureChannel();
         startTicking();
         post();
@@ -111,6 +114,8 @@ public class RunNotificationPlugin extends Plugin {
     public void pause(PluginCall call) {
         if (active) {
             paused = true;
+            String pausedTitle = call.getString("title");
+            if (pausedTitle != null) titleText = pausedTitle;
             stopTicking();
             post();
         }
@@ -185,7 +190,7 @@ public class RunNotificationPlugin extends Plugin {
                 "setBackgroundResource",
                 paused ? R.drawable.run_notification_header_paused : R.drawable.run_notification_header_running
         );
-        views.setTextViewText(R.id.run_notif_header, paused ? "Paused" : "Running");
+        views.setTextViewText(R.id.run_notif_header, titleText != null ? titleText : (paused ? "Paused" : "Running"));
         views.setTextViewText(R.id.run_notif_value_time, formatElapsed());
         views.setTextViewText(R.id.run_notif_value_pace, paceText);
         views.setTextViewText(R.id.run_notif_value_distance, distanceText);

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { getRunMode, getRunModeLabel } from '../utils/runModeLabel'
 import {
   IconCheck,
   IconChevronDown,
@@ -4020,7 +4021,10 @@ function GamePageInner() {
                 onClick={() => setStatsOnly((collapsed) => !collapsed)}
               >
                 <span className="game-run-card-status">
-                  {tracker.paused ? 'Paused' : 'Running'}
+                  {getRunModeLabel(
+                    getRunMode(tracker),
+                    tracker.paused ? 'paused' : undefined
+                  )}
                 </span>
                 <IconExpand className="game-run-card-expand-icon" />
               </button>
