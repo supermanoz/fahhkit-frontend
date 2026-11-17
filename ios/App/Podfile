@@ -1,6 +1,7 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-platform :ios, '13.0'
+# Xcode 27 can't target below iOS 15 (plugins/Firebase need 13-15), so 15.0 it is.
+platform :ios, '15.0'
 # Dev-FreeTeam = Debug-like build for a free Apple ID (no entitlements); see SESSION_NOTES.
 project 'App', 'Debug' => :debug, 'Dev-FreeTeam' => :debug, 'Release' => :release
 use_frameworks!
@@ -40,5 +41,10 @@ target 'App' do
 end
 
 post_install do |installer|
+  installer.pods_project.targets.each do |t|
+    t.build_configurations.each do |c|
+      c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
   assertDeploymentTarget(installer)
 end
