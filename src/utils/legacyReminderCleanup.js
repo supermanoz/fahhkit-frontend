@@ -22,6 +22,10 @@ const OLD_PREF_KEYS = [
 
 function isOldReminder(n) {
   if (!n) return false
+  // The current come-back reminder (see dailyNudge.js) shares the title.
+  if (n.extra?.kind === 'daily-nudge' || n.channelId === 'daily_nudge') {
+    return false
+  }
   if (OLD_KINDS.includes(n.extra?.kind)) return true
   if (n.channelId === OLD_CHANNEL_ID) return true
   if (n.id === OLD_TEST_ID) return true
@@ -29,7 +33,15 @@ function isOldReminder(n) {
   return n.title === OLD_TITLE && n.schedule?.at != null
 }
 
-export async function removeLegacyReminders() {
+// Memoised so callers (app start, and the new daily nudge before it
+// schedules) can all await the same single run.
+let inflight = null
+export function removeLegacyReminders() {
+  if (!inflight) inflight = run()
+  return inflight
+}
+
+async function run() {
   if (!isNative) return
   let store
   try {

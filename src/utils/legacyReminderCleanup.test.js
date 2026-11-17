@@ -26,9 +26,11 @@ globalThis.window.localStorage = {
   removeItem: (k) => store.delete(k),
 }
 
-const { removeLegacyReminders } = await import('./legacyReminderCleanup')
+let removeLegacyReminders
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules()
+  ;({ removeLegacyReminders } = await import('./legacyReminderCleanup'))
   store.clear()
   native = true
   vi.clearAllMocks()
@@ -49,6 +51,13 @@ describe('removeLegacyReminders', () => {
           id: 999999,
           title: 'Run Conquest',
           extra: { kind: 'run-reminder-test' },
+        },
+        {
+          id: 7001,
+          title: 'Run Conquest',
+          channelId: 'daily_nudge',
+          schedule: { at: new Date() },
+          extra: { kind: 'daily-nudge' },
         },
         { id: 77, title: 'Club War', extra: { kind: 'club-war' } },
         { id: 78, title: 'Hello', channelId: 'other' },
@@ -76,6 +85,11 @@ describe('removeLegacyReminders', () => {
   it('runs once only', async () => {
     getPending.mockResolvedValue({ notifications: [] })
     await removeLegacyReminders()
+    await removeLegacyReminders()
+    expect(getPending).toHaveBeenCalledTimes(1)
+    // A later launch (fresh module, same storage) skips via the flag.
+    vi.resetModules()
+    ;({ removeLegacyReminders } = await import('./legacyReminderCleanup'))
     await removeLegacyReminders()
     expect(getPending).toHaveBeenCalledTimes(1)
   })

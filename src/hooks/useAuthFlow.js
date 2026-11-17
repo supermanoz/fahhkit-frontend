@@ -9,6 +9,7 @@ import {
   clearUser,
   ApiError,
 } from '../api/client'
+import { cancelDailyNudge } from '../utils/dailyNudge'
 
 // Shared auth actions used by both the website pages (LoginPage, RegisterPage,
 // ForgotPasswordPage, UpdatePasswordPage) and the in-game auth screens
@@ -107,6 +108,8 @@ export function useAuthFlow() {
   const signOut = useCallback(() => {
     clearToken()
     clearUser()
+    // No-op on the website; stops the come-back reminder outliving the session.
+    cancelDailyNudge()
   }, [])
 
   return {

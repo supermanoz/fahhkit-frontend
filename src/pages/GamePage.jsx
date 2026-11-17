@@ -46,6 +46,8 @@ import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfileP
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { useAuthFlow } from '../hooks/useAuthFlow'
+import { useDailyNudge } from '../hooks/useDailyNudge'
+import { scheduleDailyNudge } from '../utils/dailyNudge'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { unregisterPushToken } from '../utils/push'
 import NotificationsSection from '../components/NotificationsSection'
@@ -523,6 +525,7 @@ function GamePageInner() {
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const auth = useAuthFlow()
+  useDailyNudge({ isAuthed, loading: userLoading })
   const tracker = useRunTracker()
   // A full reload (not just clearing the token + re-rendering) is
   // deliberate here - this page holds dozens of pieces of React state tied
@@ -2882,6 +2885,7 @@ function GamePageInner() {
       // The History list's every page shifts by one with a new run saved -
       // next time the Me tab is open, it re-fetches from page 1 instead of
       // showing the now-stale cache.
+      scheduleDailyNudge()
       resetMyRunsPagination()
       if (pendingRun.challengeId) pvp.refreshChallenges()
       const isRace = Boolean(pendingRun.challengeId)
