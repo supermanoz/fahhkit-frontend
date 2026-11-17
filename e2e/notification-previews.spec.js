@@ -14,7 +14,6 @@ const IDS = [
   'gps-lost',
   'service-default',
   'run-finished',
-  'reminders',
   'broadcast',
   'ios',
 ]

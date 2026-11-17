@@ -38,10 +38,6 @@
   text-shadow: none;
 }
 
-.notif-row.is-nested {
-  padding-left: 20px;
-}
-
 .notif-row.is-blocked {
   opacity: 0.55;
   cursor: not-allowed;

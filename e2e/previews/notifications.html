@@ -61,7 +61,7 @@
 <h1>Run Conquest - notification previews</h1>
 <p class="banner">PREVIEWS, not device captures. Hand-built HTML using the strings, colours,
 font and layout sizes from the real code (RunNotificationPlugin.java, notification_run_*.xml,
-colors.xml, src/config/reminders.js, utils/geo.js). Real OS rendering (fonts, shade colours, Android
+colors.xml, utils/geo.js). Real OS rendering (fonts, shade colours, Android
 version styling) will differ slightly.</p>
 <div class="grid">
 
@@ -174,41 +174,16 @@ version styling) will differ slightly.</p>
     <div class="empty"><b>No notification.</b> stop() cancels notification 28351 and nothing replaces it; the result is only the in-app Run Rewards modal. No "run saved" / "territory claimed" notification exists.</div>
   </section>
 
-  <!-- 7. DAILY REMINDERS -->
-  <section class="preview" data-id="reminders">
-    <p class="caption">7. Android - daily "Run Conquest" reminders (local notifications)</p>
-    <p class="tag">PREVIEW - channel "Run reminders" (HIGH, sound+vibration+lights); title and messages from src/config/reminders.js</p>
-    <div class="notif" style="margin-bottom:8px">
-      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
-        <span class="app">Run Conquest</span><span class="dot">&bull;</span><span>7:30 AM</span></div>
-      <div class="notif-title">Run Conquest</div>
-      <div class="notif-text">Rise and run! 🌅 Claim some territory before the day starts.</div>
-    </div>
-    <div class="notif" style="margin-bottom:8px">
-      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
-        <span class="app">Run Conquest</span><span class="dot">&bull;</span><span>1:00 PM</span></div>
-      <div class="notif-title">Run Conquest</div>
-      <div class="notif-text">Lunch break run? 🏃 Your streets are waiting.</div>
-    </div>
-    <div class="notif">
-      <div class="notif-top"><span class="small-icon"><img src="../../android/app/src/main/res/drawable-xxhdpi/ic_stat_notify.png" alt=""></span>
-        <span class="app">Run Conquest</span><span class="dot">&bull;</span><span>7:00 PM</span></div>
-      <div class="notif-title">Run Conquest</div>
-      <div class="notif-text">Evening run time! 🌙 Defend your territory, let’s go!</div>
-    </div>
-    <p class="note">3 slots a day, each rotating 3 messages by day-of-year, scheduled 14 days ahead. Today's remaining slots are cancelled after a run is saved. Tapping just opens the app (no deep link).</p>
-  </section>
-
-  <!-- 8. BROADCAST -->
+  <!-- 7. BROADCAST -->
   <section class="preview" data-id="broadcast">
-    <p class="caption">8. Broadcast / news</p>
+    <p class="caption">7. Broadcast / news</p>
     <p class="tag">PREVIEW - no OS notification exists</p>
     <div class="empty"><b>Not in the notification bar.</b> Broadcasts arrive over the STOMP socket (/all/mail) while the app is open, or by fetch when it opens / returns to the foreground. They show as the in-app Announcement popup (important notices), the unread badge and the News tab - see broadcast-*.png.</div>
   </section>
 
-  <!-- 9. iOS -->
+  <!-- 8. iOS -->
   <section class="preview" data-id="ios">
-    <p class="caption">9. iOS - run in progress</p>
+    <p class="caption">8. iOS - run in progress</p>
     <p class="tag">PREVIEW - nothing custom is built</p>
     <div class="empty"><b>No lock-screen stats.</b> RunNotification is Android-only. On iOS the only indicator is the system's blue location pill / status-bar indicator while tracking in the background (showsBackgroundLocationIndicator). Live Activity is in the proposals table.</div>
   </section>

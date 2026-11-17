@@ -93,11 +93,6 @@ async function setup(page, context, heroName, equippedEmote, ownedEmotes = []) {
   await expect(page.locator('.game-loading-overlay')).toBeHidden({
     timeout: 60_000,
   })
-  // A daily-run reminder can pop over the HUD depending on the clock.
-  await page
-    .getByText('Not now')
-    .click({ timeout: 4000 })
-    .catch(() => {})
 }
 
 // Feet (lowest opaque pixel row, horizontal centre) and character height, in

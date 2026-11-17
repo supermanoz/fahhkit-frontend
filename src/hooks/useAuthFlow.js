@@ -9,7 +9,6 @@ import {
   clearUser,
   ApiError,
 } from '../api/client'
-import { cancelAllReminders } from '../utils/reminders'
 
 // Shared auth actions used by both the website pages (LoginPage, RegisterPage,
 // ForgotPasswordPage, UpdatePasswordPage) and the in-game auth screens
@@ -108,10 +107,6 @@ export function useAuthFlow() {
   const signOut = useCallback(() => {
     clearToken()
     clearUser()
-    // No-op on the website (see isNative/remindersSupported) - stops the
-    // native app's daily "let's run" notifications from outliving the
-    // session they were scheduled for.
-    cancelAllReminders()
   }, [])
 
   return {

@@ -3,7 +3,7 @@ import {
   checkNotificationPermission,
   requestNotificationPermission,
   notificationPermissionSupported,
-} from '../utils/reminders'
+} from '../utils/notificationPermission'
 
 // The one "may this app show notifications" state Settings reads:
 // 'unknown' (still checking) | 'granted' | 'denied' | 'prompt' (not asked yet).

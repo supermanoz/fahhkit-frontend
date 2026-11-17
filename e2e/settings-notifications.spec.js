@@ -3,11 +3,9 @@ import { ok } from './fixtures/mockApi.js'
 import { VETERAN } from './mocks/personas.js'
 
 // Settings -> Notifications section: permission row, game alerts (GET/PUT
-// /v1/notification-setting) and the daily run reminders. The permission is
+// /v1/notification-setting). The permission is
 // mocked per test through the browser's Notification API (native phones use
-// the OS one through the same hook); the actual scheduling of local
-// notifications only exists on a device, so that part is covered by
-// src/utils/reminders.test.js instead.
+// the OS one through the same hook).
 const SHOT_DIR = 'screenshots/settings-notifications'
 
 function mockPermission(page, initial, { onAsk = 'granted' } = {}) {
@@ -128,9 +126,8 @@ test.describe('Settings > Notifications', () => {
     await expect(page.getByText('Game alerts')).toBeVisible()
     // Old copies are gone: each control exists exactly once.
     await expect(page.getByTestId('notif-clubWarEnabled')).toHaveCount(1)
-    await expect(page.getByRole('switch', { name: /^Reminders/ })).toHaveCount(
-      0
-    )
+    await expect(page.getByTestId('notif-reminders')).toHaveCount(0)
+    await expect(page.getByText('Run reminders')).toHaveCount(0)
     // Music + Sound stay outside the section.
     await expect(
       page.locator('.game-menu-settings > button', { hasText: 'Music' })
@@ -254,59 +251,5 @@ test.describe('Settings > Notifications', () => {
     )
     await expect(row).toHaveAttribute('aria-checked', 'false')
     expect(puts).toEqual([])
-  })
-
-  test('run reminders: master gates the slots, which persist', async ({
-    mockedPage: page,
-  }, testInfo) => {
-    await mockPermission(page, 'granted')
-    // ?debug=reminders also shows the rows on web (they only exist on the
-    // phone otherwise); scheduling itself is a no-op off-device.
-    await openNotifications(page, '/game?debug=reminders')
-    const master = page.getByTestId('notif-reminders')
-    const morning = page.getByTestId('notif-slot-0')
-    await expect(master).toHaveAttribute('aria-checked', 'false')
-    await expect(morning).toBeDisabled()
-    await expect(morning).toContainText('Turn on daily reminders first')
-
-    await master.click()
-    await expect(master).toHaveAttribute('aria-checked', 'true')
-    await expect(morning).toBeEnabled()
-    await expect(morning).toContainText('7:30 AM')
-    await expect(page.getByTestId('notif-slot-1')).toContainText('1:00 PM')
-    await expect(page.getByTestId('notif-slot-2')).toContainText('7:00 PM')
-
-    await morning.click()
-    await expect(morning).toHaveAttribute('aria-checked', 'false')
-    await expectNoOverflow(page)
-    await shot(page, testInfo, 'reminders')
-
-    await page.reload()
-    await expect(page.locator('.game-loading-overlay')).toBeHidden({
-      timeout: 30_000,
-    })
-    await page.locator('.game-menu-btn').click()
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    await page.getByTestId('notif-section-toggle').click()
-    await expect(page.getByTestId('notif-reminders')).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
-    await expect(page.getByTestId('notif-slot-0')).toHaveAttribute(
-      'aria-checked',
-      'false'
-    )
-    await expect(page.getByTestId('notif-slot-1')).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
-  })
-
-  test('reminder rows are hidden on web without the debug flag', async ({
-    mockedPage: page,
-  }) => {
-    await mockPermission(page, 'granted')
-    await openNotifications(page)
-    await expect(page.getByTestId('notif-reminders')).toHaveCount(0)
   })
 })

@@ -7,15 +7,8 @@ import {
 } from '../api/push'
 import { useToast } from '../game/ui/Toast'
 import { useNotificationPermission } from '../hooks/useNotificationPermission'
-import { REMINDER_SLOTS } from '../config/reminders'
-import { scheduleTestReminderInOneMinute } from '../utils/reminders'
-import {
-  IconBell,
-  IconChevronDown,
-  IconClock,
-  IconFlag,
-  IconMegaphone,
-} from './GameIcons'
+import { isNative } from '../utils/geo'
+import { IconBell, IconChevronDown, IconFlag, IconMegaphone } from './GameIcons'
 import './NotificationsSection.css'
 
 // Every notification control in Settings lives here (Music/Sound stay out -
@@ -24,7 +17,6 @@ import './NotificationsSection.css'
 //
 // - Permission: the OS (native) / browser (web) state + the button to fix it.
 // - Game alerts: server prefs, GET/PUT /v1/notification-setting.
-// - Run reminders: the local daily notifications (master + per-slot).
 // A switch is greyed with "Allow notifications first" while the permission is
 // denied; while it is merely not asked yet, flipping one on shows the prompt
 // first and only applies if it is granted.
@@ -58,11 +50,6 @@ const PERMISSION_LABEL = {
   prompt: 'Not asked yet',
 }
 
-function formatSlotTime({ hour, minute }) {
-  const h12 = hour % 12 === 0 ? 12 : hour % 12
-  return `${h12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
-}
-
 function SwitchRow({
   testId,
   Icon,
@@ -70,7 +57,6 @@ function SwitchRow({
   sub,
   checked,
   disabled = false,
-  nested = false,
   onToggle,
 }) {
   return (
@@ -79,9 +65,7 @@ function SwitchRow({
       role="switch"
       aria-checked={checked}
       disabled={disabled}
-      className={`game-settings-row notif-row${nested ? ' is-nested' : ''}${
-        disabled ? ' is-blocked' : ''
-      }`}
+      className={`game-settings-row notif-row${disabled ? ' is-blocked' : ''}`}
       data-testid={testId}
       onClick={onToggle}
     >
@@ -106,12 +90,7 @@ function SwitchRow({
   )
 }
 
-export default function NotificationsSection({
-  push,
-  reminders,
-  showReminders,
-  showReminderDebug,
-}) {
+export default function NotificationsSection({ push }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const permission = useNotificationPermission(push)
@@ -172,29 +151,12 @@ export default function NotificationsSection({
     [settings, ensureAllowed, toast]
   )
 
-  const toggleReminders = useCallback(async () => {
-    const next = !reminders.enabled
-    if (next && !(await ensureAllowed())) return
-    reminders.toggle(next)
-  }, [reminders, ensureAllowed])
-
-  const toggleSlot = useCallback(
-    async (slotId) => {
-      const next = !reminders.slots[slotId]
-      if (next && !(await ensureAllowed())) return
-      reminders.toggleSlot(slotId, next)
-    },
-    [reminders, ensureAllowed]
-  )
-
   const summary =
-    permission.state === 'unknown'
-      ? 'Alerts and reminders'
-      : permission.state === 'granted'
-        ? 'Alerts and reminders'
-        : permission.state === 'denied'
-          ? 'Blocked - allow them to get alerts'
-          : 'Not turned on yet'
+    permission.state === 'denied'
+      ? 'Blocked - allow them to get alerts'
+      : permission.state === 'prompt'
+        ? 'Not turned on yet'
+        : 'Pick what you hear about'
 
   return (
     <div className="notif-section" data-testid="notif-section">
@@ -272,7 +234,7 @@ export default function NotificationsSection({
                     </button>
                   )}
                   {permission.state === 'denied' &&
-                    (push.supported || showReminders ? (
+                    (push.supported || isNative ? (
                       <button
                         type="button"
                         className="notif-permission-btn"
@@ -324,62 +286,6 @@ export default function NotificationsSection({
                     />
                   )
                 })
-              )}
-
-              {showReminders && (
-                <>
-                  <h4 className="notif-group-title">Run reminders</h4>
-                  <SwitchRow
-                    testId="notif-reminders"
-                    Icon={IconBell}
-                    label="Daily reminders"
-                    sub={
-                      blocked
-                        ? hint
-                        : reminders.enabled
-                          ? 'Nudges to go run, on your schedule'
-                          : 'Daily run reminders off'
-                    }
-                    checked={reminders.enabled}
-                    disabled={blocked}
-                    onToggle={toggleReminders}
-                  />
-                  {REMINDER_SLOTS.map((slot) => (
-                    <SwitchRow
-                      key={slot.id}
-                      testId={`notif-slot-${slot.id}`}
-                      Icon={IconClock}
-                      label={slot.label}
-                      sub={
-                        blocked
-                          ? hint
-                          : !reminders.enabled
-                            ? 'Turn on daily reminders first'
-                            : formatSlotTime(slot)
-                      }
-                      checked={reminders.slots[slot.id]}
-                      disabled={blocked || !reminders.enabled}
-                      nested
-                      onToggle={() => toggleSlot(slot.id)}
-                    />
-                  ))}
-                  {showReminderDebug && (
-                    <button
-                      type="button"
-                      className="game-settings-row"
-                      onClick={() => scheduleTestReminderInOneMinute()}
-                    >
-                      <span className="game-settings-row-label">
-                        <span className="game-settings-row-text">
-                          Send test reminder (1 min)
-                          <span className="game-settings-row-sub">
-                            Debug only - ?debug=reminders
-                          </span>
-                        </span>
-                      </span>
-                    </button>
-                  )}
-                </>
               )}
             </div>
           </motion.div>

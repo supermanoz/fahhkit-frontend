@@ -6,8 +6,10 @@ import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { initNativeShell } from './utils/nativeShell.js'
+import { removeLegacyReminders } from './utils/legacyReminderCleanup.js'
 
 initNativeShell()
+removeLegacyReminders()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

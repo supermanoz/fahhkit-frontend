@@ -1,6 +1,6 @@
 import { registerPlugin } from '@capacitor/core'
 import { isNative } from './geo'
-import { requestNotificationPermission } from './reminders'
+import { requestNotificationPermission } from './notificationPermission'
 
 // Android-only persistent "Running"/"Paused" notification shown while a run
 // is being tracked - styled like the in-game run panel (see
@@ -10,9 +10,9 @@ const RunNotification = registerPlugin('RunNotification')
 
 let permissionRequested = false
 
-// POST_NOTIFICATIONS is also what @capacitor/local-notifications' daily-
-// reminders feature already prompts for (see reminders.js) - reusing that
-// same check/request here avoids a second, redundant permission dialog.
+// POST_NOTIFICATIONS is the same permission push alerts use (see
+// notificationPermission.js) - reusing that same check/request here avoids a
+// second, redundant permission dialog.
 // Denied or not-yet-decided just means no notification shows; run tracking
 // itself is never gated on this.
 async function ensurePermission() {

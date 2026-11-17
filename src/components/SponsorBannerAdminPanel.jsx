@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { FaChevronDown } from 'react-icons/fa'
 import { ApiError, resolveFileUrl } from '../api/client'
+import { getCurrentSeason } from '../api/season'
 import {
   createPartner,
   getCurrentSeasonPartners,
@@ -72,7 +73,13 @@ function PartnerForm({
   error,
   submitLabel,
   isEdit = false,
+  activeSeason = null,
 }) {
+  const seasonMismatch =
+    !isEdit &&
+    activeSeason != null &&
+    form.seasonNumber !== '' &&
+    Number(form.seasonNumber) !== activeSeason
   return (
     <form className="sponsor-admin-form" onSubmit={onSubmit} noValidate>
       {error && <div className="banner error">{error}</div>}
@@ -108,13 +115,20 @@ function PartnerForm({
         </label>
         <input
           type="number"
-          min="1"
+          min="0"
           step="1"
           required
           disabled={isEdit}
           value={form.seasonNumber}
           onChange={(e) => onChange({ ...form, seasonNumber: e.target.value })}
         />
+        {!isEdit && activeSeason != null && (
+          <span className="opt">
+            {seasonMismatch
+              ? `The active season is ${activeSeason} - a banner for another season won't show on the leaderboard.`
+              : `Active season: ${activeSeason}`}
+          </span>
+        )}
       </div>
       <div className="field full">
         <label>
@@ -273,11 +287,23 @@ export default function SponsorBannerAdminPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+  // Active season number (may legitimately be 0) - only partners for this
+  // season come back from /v1/partner/current, so the form prefills and
+  // checks against it. null until loaded / if the lookup fails.
+  const [activeSeason, setActiveSeason] = useState(null)
 
   const [creating, setCreating] = useState(false)
   const [createForm, setCreateForm] = useState(EMPTY_FORM)
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState(null)
+
+  useEffect(() => {
+    getCurrentSeason()
+      .then((s) => {
+        if (Number.isInteger(s?.seasonNumber)) setActiveSeason(s.seasonNumber)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -297,10 +323,23 @@ export default function SponsorBannerAdminPanel() {
   async function handleCreate(e) {
     e.preventDefault()
     setCreateError(null)
+    const seasonNum = Number(createForm.seasonNumber)
+    if (
+      createForm.seasonNumber.trim() === '' ||
+      !Number.isInteger(seasonNum) ||
+      seasonNum < 0
+    ) {
+      setCreateError('Enter a season number (0 or higher).')
+      return
+    }
     setCreateBusy(true)
     try {
       const partner = await createPartner(toCreatePayload(createForm))
-      setPartners((prev) => [partner, ...prev])
+      // Only show it in the list if /current would return it - otherwise
+      // it'd look created, then vanish on the next load.
+      if (activeSeason == null || partner.seasonNumber === activeSeason) {
+        setPartners((prev) => [partner, ...prev])
+      }
       setCreateForm(EMPTY_FORM)
       setCreating(false)
     } catch (err) {
@@ -320,7 +359,16 @@ export default function SponsorBannerAdminPanel() {
         <button
           type="button"
           className="btn btn-outline sponsor-admin-new-btn"
-          onClick={() => setCreating(true)}
+          onClick={() => {
+            setCreateForm((f) => ({
+              ...f,
+              seasonNumber:
+                f.seasonNumber === '' && activeSeason != null
+                  ? String(activeSeason)
+                  : f.seasonNumber,
+            }))
+            setCreating(true)
+          }}
         >
           + New Sponsor Banner
         </button>
@@ -333,6 +381,7 @@ export default function SponsorBannerAdminPanel() {
             busy={createBusy}
             error={createError}
             submitLabel="Create banner"
+            activeSeason={activeSeason}
           />
           <button
             type="button"

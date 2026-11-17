@@ -46,12 +46,10 @@ import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfileP
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { useAuthFlow } from '../hooks/useAuthFlow'
-import { useReminders } from '../hooks/useReminders'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { unregisterPushToken } from '../utils/push'
 import NotificationsSection from '../components/NotificationsSection'
 import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
-import { isRemindersDebugEnabled } from '../utils/reminders'
 // Dynamically imported (not bundled with the rest of the game) - a logged-
 // in player never triggers this import at all, so it doesn't add to the
 // bundle they actually download. See the logged-out branch below.
@@ -525,8 +523,6 @@ function GamePageInner() {
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const auth = useAuthFlow()
-  const reminders = useReminders()
-  const [remindersDebug] = useState(isRemindersDebugEnabled)
   const tracker = useRunTracker()
   // A full reload (not just clearing the token + re-rendering) is
   // deliberate here - this page holds dozens of pieces of React state tied
@@ -802,7 +798,6 @@ function GamePageInner() {
   const authBackRef = useRef(null)
   const backButton = useAndroidBackButton({
     layers: [
-      { isOpen: () => reminders.showPrompt, close: reminders.declinePrompt },
       {
         isOpen: () => Boolean(authBackRef.current),
         close: () => authBackRef.current?.(),
@@ -2884,7 +2879,6 @@ function GamePageInner() {
         // of counting it twice. The backend scopes this id per user.
         clientRunId: `run-${new Date(pendingRun.startedAt).getTime()}`,
       })
-      reminders.notifyRunSaved()
       // The History list's every page shifts by one with a new run saved -
       // next time the Me tab is open, it re-fetches from page 1 instead of
       // showing the now-stale cache.
@@ -3464,7 +3458,6 @@ function GamePageInner() {
           <GameAuthGate
             onAuthenticated={(nextUser) => {
               replaceUser(nextUser)
-              reminders.notifyLoggedIn()
             }}
             onBackStateChange={(fn) => {
               authBackRef.current = fn
@@ -5599,14 +5592,9 @@ function GamePageInner() {
                   </span>
                 </button>
 
-                {/* Every notification control (permission, game alerts, run
-                    reminders) lives in this one collapsible section. */}
-                <NotificationsSection
-                  push={push}
-                  reminders={reminders}
-                  showReminders={reminders.supported || remindersDebug}
-                  showReminderDebug={reminders.supported && remindersDebug}
-                />
+                {/* Every notification control (permission, game alerts) lives
+                    in this one collapsible section. */}
+                <NotificationsSection push={push} />
 
                 <MapStylePicker
                   styles={MAP_STYLES}
@@ -6037,47 +6025,6 @@ function GamePageInner() {
       </AnimatePresence>
 
       <ExitConfirmOverlay backButton={backButton} />
-
-      <AnimatePresence>
-        {reminders.showPrompt && (
-          <motion.div
-            className="game-confirm-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="game-confirm-card"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-            >
-              <p>Want a nudge to go run? 🏃</p>
-              <p className="game-controls-hint">
-                Three quick reminders a day — morning, lunch, evening — skipped
-                automatically on days you&apos;ve already run. You can turn
-                these off anytime in Settings.
-              </p>
-              <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={reminders.declinePrompt}
-                >
-                  Not now
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={reminders.acceptPrompt}
-                >
-                  Turn on reminders
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {viewingRoute && !followingRoute && (

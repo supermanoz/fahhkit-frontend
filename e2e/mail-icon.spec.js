@@ -41,11 +41,6 @@ for (const unread of [0, 3]) {
     await expect(page.locator('.game-loading-overlay')).toBeHidden({
       timeout: 60_000,
     })
-    // A daily-run reminder can pop over the HUD depending on the clock.
-    await page
-      .getByText('Not now')
-      .click({ timeout: 4000 })
-      .catch(() => {})
     await page.locator('.game-menu-btn').click()
     await page.getByRole('button', { name: 'Leaderboard', exact: true }).click()
     await expect(page.locator('.game-menu-sheet')).toBeVisible()

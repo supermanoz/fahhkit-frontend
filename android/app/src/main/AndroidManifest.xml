@@ -22,7 +22,7 @@
         </activity>
 
         <!-- FCM push (backend FcmPushSender): the small status-bar icon (monochrome, same
-             asset as the local reminders) and accent colour for notifications Android draws
+             asset as the live run notification) and accent colour for notifications Android draws
              itself while the app is closed, plus the channel used when a push names none. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
