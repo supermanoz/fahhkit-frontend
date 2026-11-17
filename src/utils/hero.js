@@ -94,6 +94,22 @@ export const ABILITY_LABELS = {
   RACE_TIME: 'race time',
 }
 
+// Short "role" word for a hero's detail card, taken from the main thing his
+// first perk boosts - null for a perk-less hero (no role to claim).
+const ROLE_LABELS = {
+  AREA: 'Territory',
+  PERIMETER_EFFICIENCY: 'Efficiency',
+  PACE: 'Speed',
+  CLOSURE_PRECISION: 'Precision',
+  BASE_EFFORT: 'Endurance',
+  RACE_TIME: 'Racer',
+}
+
+export function heroRoleLabel(abilities) {
+  const first = (abilities || []).find((a) => ROLE_LABELS[a?.componentType])
+  return first ? ROLE_LABELS[first.componentType] : null
+}
+
 export const SCORE_COMPONENT_TYPES = Object.keys(ABILITY_LABELS)
 
 // The pieces of describeHeroAbility, for UIs that lay them out separately

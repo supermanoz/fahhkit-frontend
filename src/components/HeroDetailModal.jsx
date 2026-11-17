@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   IconBolt,
+  IconBook,
+  IconSparkle,
   IconCheck,
   IconChevronLeft,
   IconChevronRight,
@@ -13,10 +15,12 @@ import HeroFigure from './HeroFigure'
 import HeroStage from './HeroStage'
 import EmoteGlyph from './EmoteGlyph'
 import { getHeroSprite } from '../utils/heroSprites'
-import { heroAbilityParts } from '../utils/hero'
+import { heroAbilityParts, heroRoleLabel } from '../utils/hero'
+import { getHeroAccent } from '../utils/heroAccent'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
 import {
   getItemState,
+  isFreeItem,
   isUsableState,
   visibleStoreError,
 } from '../utils/itemState'
@@ -401,20 +405,40 @@ export default function HeroDetailModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // Lore starts clamped to ~3 lines (see .hero-modal-lore's max-height) -
-  // "Read more" only shows up if the text actually overflows that clamp,
-  // so a short backstory never gets a pointless toggle. Re-measured
-  // whenever the backstory text itself changes (a fresh HeroDetailModal
-  // instance per hero - see GamePage.jsx's key={selectedHero.id} - already
-  // resets loreExpanded to its default on its own).
+  // Lore starts clamped to 4 lines (.hero-modal-lore) with a fade at the
+  // bottom - "Read more" only shows when the text really overflows that, so a
+  // short backstory never gets a pointless toggle. Expanding animates
+  // max-height to the measured full height (a fresh HeroDetailModal instance
+  // per hero - see GamePage.jsx's key={selectedHero.id} - resets it).
   const loreRef = useRef(null)
   const [loreExpanded, setLoreExpanded] = useState(false)
   const [loreOverflows, setLoreOverflows] = useState(false)
+  const [loreFullHeight, setLoreFullHeight] = useState(null)
+  const backstory = (hero.backstory || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .trim()
   useLayoutEffect(() => {
     const el = loreRef.current
-    if (!el) return
-    setLoreOverflows(el.scrollHeight - el.clientHeight > 1)
-  }, [hero.backstory])
+    if (!el) return undefined
+    const measure = () => {
+      setLoreFullHeight(el.scrollHeight)
+      // Collapsed height is 4 lines (6em) - overflow means there is more.
+      const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24
+      setLoreOverflows(el.scrollHeight > lineHeight * 4 + 2)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [backstory])
+
+  const { accent, soft } = getHeroAccent(hero.name)
+  const role = heroRoleLabel(hero.abilities)
+  const isDefaultHero =
+    heroItem != null && isFreeItem(heroItem) && heroItem.unlockLevel == null
+  const owned = !levelLocked && (Boolean(ownedHeroItem) || claimable)
 
   const abilities = (hero.abilities || [])
     .map((a) => ({ id: a.id, ...heroAbilityParts(a) }))
@@ -433,6 +457,7 @@ export default function HeroDetailModal({
         role="dialog"
         aria-modal="true"
         aria-label={hero.name}
+        style={{ '--hero-accent': accent, '--hero-accent-soft': soft }}
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -456,33 +481,148 @@ export default function HeroDetailModal({
         />
 
         <div className="hero-modal-body">
-          <h2 className="hero-modal-name">{hero.name}</h2>
-          {showEquipped && (
-            <span
-              className="hero-modal-equipped-chip"
-              data-testid="hero-equipped-chip"
-            >
-              <IconCheck aria-hidden="true" /> Equipped
-            </span>
-          )}
-          {levelLocked && (
-            <span
-              className="hero-modal-level-chip"
-              data-testid="hero-level-chip"
-            >
-              <IconLock aria-hidden="true" /> Unlocks at level {unlockLevel}
-            </span>
-          )}
-          {hero.tagline && (
-            <p className="hero-modal-tagline">“{hero.tagline}”</p>
-          )}
+          <header
+            className="hero-modal-header hero-reveal"
+            style={{ '--i': 0 }}
+          >
+            <h2 className="hero-modal-name">{hero.name}</h2>
+            <span className="hero-modal-ribbon" aria-hidden="true" />
+            {hero.tagline && (
+              <p className="hero-modal-tagline">
+                <span className="hero-modal-quote" aria-hidden="true">
+                  “
+                </span>
+                {hero.tagline}
+                <span className="hero-modal-quote" aria-hidden="true">
+                  ”
+                </span>
+              </p>
+            )}
+            <div className="hero-modal-chips">
+              {role && <span className="hero-modal-chip is-role">{role}</span>}
+              {isDefaultHero && (
+                <span className="hero-modal-chip">Default hero</span>
+              )}
+              {hero.limited && !owned && (
+                <span className="hero-modal-chip">Limited</span>
+              )}
+              {showEquipped ? (
+                <span
+                  className="hero-modal-chip is-equipped"
+                  data-testid="hero-equipped-chip"
+                >
+                  <IconCheck aria-hidden="true" /> Equipped
+                </span>
+              ) : owned ? (
+                <span
+                  className="hero-modal-chip is-owned"
+                  data-testid="hero-owned-chip"
+                >
+                  <IconCheck aria-hidden="true" /> Owned
+                </span>
+              ) : null}
+              {levelLocked && (
+                <span
+                  className="hero-modal-chip is-locked"
+                  data-testid="hero-level-chip"
+                >
+                  <IconLock aria-hidden="true" /> Unlocks at level {unlockLevel}
+                </span>
+              )}
+            </div>
+          </header>
 
-          {(heroItem || showEquipped) && (
-            <div className="hero-modal-unlock">
-              {levelLocked ? (
+          <section
+            className="hero-modal-section hero-reveal"
+            style={{ '--i': 1 }}
+            aria-labelledby="hero-perk-title"
+          >
+            <h3 className="hero-modal-heading" id="hero-perk-title">
+              <IconBolt aria-hidden="true" /> Perk
+            </h3>
+            {abilities.length > 0 ? (
+              <ul className="hero-modal-stats">
+                {abilities.map((a) => (
+                  <li key={a.id}>
+                    <span className="hero-modal-stat-label">{a.label}</span>
+                    <span className="hero-modal-stat-value">
+                      {a.sign}
+                      {a.pct}%
+                    </span>
+                    <span className="hero-modal-stat-bar" aria-hidden="true">
+                      <span
+                        style={{
+                          width: `${Math.max(Math.min(a.pct / STAT_BAR_MAX_PCT, 1) * 100, 6)}%`,
+                        }}
+                      />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="hero-modal-muted">
+                <IconSparkle aria-hidden="true" /> Pure style, no perks - they
+                run on vibes alone.
+              </p>
+            )}
+          </section>
+
+          <section
+            className="hero-modal-section hero-reveal"
+            style={{ '--i': 2 }}
+            aria-labelledby="hero-lore-title"
+          >
+            <h3 className="hero-modal-heading" id="hero-lore-title">
+              <IconBook aria-hidden="true" /> Lore
+            </h3>
+            {backstory ? (
+              <>
+                <div
+                  className={`hero-modal-lore-wrap${loreOverflows && !loreExpanded ? ' is-faded' : ''}`}
+                >
+                  <p
+                    ref={loreRef}
+                    className={`hero-modal-lore${loreExpanded ? ' is-expanded' : ''}`}
+                    style={
+                      loreExpanded && loreFullHeight
+                        ? { maxHeight: `${loreFullHeight}px` }
+                        : undefined
+                    }
+                  >
+                    {backstory}
+                  </p>
+                </div>
+                {loreOverflows && (
+                  <button
+                    type="button"
+                    className="hero-modal-lore-toggle"
+                    aria-expanded={loreExpanded}
+                    onClick={() => setLoreExpanded((v) => !v)}
+                  >
+                    {loreExpanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="hero-modal-muted">
+                Their story is still being written… one lap at a time.
+              </p>
+            )}
+          </section>
+        </div>
+
+        {(heroItem || showEquipped || visibleStoreError(error, state)) && (
+          <div className="hero-modal-actionbar">
+            {visibleStoreError(error, state) && (
+              <p className="hero-modal-error">
+                {visibleStoreError(error, state)}
+              </p>
+            )}
+            {(heroItem || showEquipped) &&
+              (levelLocked ? (
                 <button
                   type="button"
-                  className="btn hero-modal-level-btn"
+                  className="hero-action-btn is-grey"
                   data-testid="hero-action"
                   disabled
                   aria-disabled="true"
@@ -493,7 +633,7 @@ export default function HeroDetailModal({
               ) : showEquipped ? (
                 <button
                   type="button"
-                  className="btn hero-modal-equipped-btn"
+                  className="hero-action-btn is-neutral"
                   data-testid="hero-action"
                   disabled
                   aria-disabled="true"
@@ -503,98 +643,41 @@ export default function HeroDetailModal({
               ) : ownedHeroItem || claimable ? (
                 <button
                   type="button"
-                  className="btn btn-outline"
+                  className="hero-action-btn is-green"
                   data-testid="hero-action"
                   onClick={handleEquipTap}
                 >
                   Equip
                 </button>
+              ) : hero.limited ? (
+                <button
+                  type="button"
+                  className="hero-action-btn is-grey"
+                  data-testid="hero-action"
+                  disabled
+                  aria-disabled="true"
+                >
+                  <IconLock aria-hidden="true" /> Not available yet
+                </button>
               ) : (
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="hero-action-btn is-green"
                   data-testid="hero-action"
                   onClick={() => onBuy(heroItem)}
-                  // Limited heroes can't be bought (server rejects with
-                  // HERO_LIMITED).
-                  disabled={hero.limited}
                 >
-                  {hero.limited ? (
-                    'Not for sale'
-                  ) : heroItem.priceFahhcoin > 0 ? (
-                    <>
-                      <PriceLabel
-                        label="Unlock for"
-                        amount={heroItem.priceFahhcoin}
-                      />
-                    </>
+                  {heroItem.priceFahhcoin > 0 ? (
+                    <PriceLabel
+                      label="Unlock for"
+                      amount={heroItem.priceFahhcoin}
+                    />
                   ) : (
                     'Unlock free'
                   )}
                 </button>
-              )}
-            </div>
-          )}
-
-          <h3 className="hero-modal-heading">Stats</h3>
-          {abilities.length > 0 ? (
-            <ul className="hero-modal-stats">
-              {abilities.map((a) => (
-                <li key={a.id}>
-                  <span className="hero-modal-stat-label">
-                    <IconBolt aria-hidden="true" /> {a.label}
-                  </span>
-                  <span className="hero-modal-stat-value">
-                    {a.sign}
-                    {a.pct}%
-                  </span>
-                  <span className="hero-modal-stat-bar" aria-hidden="true">
-                    <span
-                      style={{
-                        width: `${Math.min(a.pct / STAT_BAR_MAX_PCT, 1) * 100}%`,
-                      }}
-                    />
-                  </span>
-                </li>
               ))}
-            </ul>
-          ) : (
-            <p className="hero-modal-muted">
-              Pure style, no perks - they run on vibes alone.
-            </p>
-          )}
-
-          <h3 className="hero-modal-heading">Lore</h3>
-          {hero.backstory ? (
-            <>
-              <p
-                ref={loreRef}
-                className={`hero-modal-lore${loreExpanded ? ' is-expanded' : ''}`}
-              >
-                {hero.backstory}
-              </p>
-              {loreOverflows && (
-                <button
-                  type="button"
-                  className="hero-modal-lore-toggle"
-                  onClick={() => setLoreExpanded((v) => !v)}
-                >
-                  {loreExpanded ? 'Show less' : 'Read more'}
-                </button>
-              )}
-            </>
-          ) : (
-            <p className="hero-modal-muted">
-              Their story is still being written… one lap at a time.
-            </p>
-          )}
-
-          {visibleStoreError(error, state) && (
-            <p className="hero-modal-error">
-              {visibleStoreError(error, state)}
-            </p>
-          )}
-        </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )

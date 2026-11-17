@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hero card preview</title>
+  </head>
+  <body>
+    <!-- Test harness for e2e/hero-card.spec.js: mounts the real
+         HeroDetailModal with props handed over via window.__show(props),
+         so every hero x state can be rendered without reloading the game. -->
+    <div id="root" class="game-page game-root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import '/src/index.css'
+      import '/src/game/styles/tokens.css'
+      import '/src/pages/GamePage.css'
+      import HeroDetailModal from '/src/components/HeroDetailModal.jsx'
+
+      const root = createRoot(document.getElementById('root'))
+      let renders = 0
+      window.__show = (props) => {
+        root.render(
+          React.createElement(HeroDetailModal, {
+            // A fresh instance per render, like GamePage's key={hero.id}.
+            key: `${props.hero.id}-${renders++}`,
+            onClose() {},
+            onEquip() {},
+            onBuy() {},
+            onShowcase() {},
+            error: null,
+            ...props,
+          })
+        )
+      }
+      window.__ready = true
+    </script>
+  </body>
+</html>

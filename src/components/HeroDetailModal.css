@@ -197,215 +197,120 @@
   background: var(--green-700);
 }
 
-.hero-modal-body {
-  overflow-y: auto;
-  padding: 14px 18px 18px;
+/* Active pagination dot takes the hero's own accent (see
+   HeroDetailModal.jsx: --hero-accent is set on .hero-modal). Equipped dots
+   keep their green fill. */
+.hero-emote-dots .hero-roster-dot.active:not(.is-equipped) {
+  background: var(--hero-accent, var(--brand));
 }
 
+/* ------------------------------------------------------------------
+   Redesigned card body: header, Perk, Lore, sticky action bar. Every
+   panel is solid, text is plain dark (no stroke/shadow) for readability,
+   and the hero's accent (--hero-accent / --hero-accent-soft) themes the
+   underline, chips, perk pill + bar and focus states.
+   ------------------------------------------------------------------ */
+.hero-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 18px 16px;
+  color: var(--text-title-dark);
+}
+
+.hero-modal-body *,
+.hero-modal-actionbar * {
+  min-width: 0;
+}
+
+/* Entry: sections fade/slide up in sequence (--i * 40ms). */
+.hero-reveal {
+  animation: hero-reveal 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms + 120ms);
+}
+
+@keyframes hero-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+/* Game font, white fill, thin black outline (outside the glyph only, so the
+   fill stays crisp) + a small drop for lift. */
 .hero-modal-name {
   margin: 0;
-  font-size: 26px;
+  max-width: 100%;
+  font-size: clamp(28px, 8vw, 34px);
   font-weight: 900;
-  letter-spacing: 0.05em;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  text-shadow: 0 3px 0 var(--game-ink);
+  color: #fff;
+  -webkit-text-stroke: 1.5px var(--game-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  overflow-wrap: anywhere;
+}
+
+.hero-modal-ribbon {
+  width: 88px;
+  height: 6px;
+  border-radius: 999px;
+  border: 1.5px solid var(--game-ink);
+  background: var(--hero-accent);
 }
 
 .hero-modal-tagline {
-  margin: 2px 0 0;
-  font-size: 13px;
-  font-style: italic;
-  color: var(--gold-text);
-}
-
-/* Buy/Equip for the hero itself - the one action the gallery card's
-   "Unlock" label promises but this modal used to have no button for at
-   all, see HeroDetailModal.jsx's own heroItem comment. */
-.hero-modal-unlock {
-  margin: 12px 0 0;
-}
-
-.hero-modal-unlock .btn {
-  width: 100%;
-}
-
-/* Explicit dark colour + stroke off - same inherited-white issue as
-   .hero-modal-lore/.hero-modal-stat-label above. */
-.hero-modal-heading {
-  margin: 16px 0 8px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted-dark);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.hero-modal-stats {
-  list-style: none;
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.hero-modal-stats li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 8px;
-  font-size: 13px;
-}
-
-/* Explicit dark colour + stroke off, same reasoning as .hero-modal-lore
-   above - this inherited white text + the global black-stroke/-shadow
-   rule from .hero-modal's own `color: var(--game-cream)` (white), which
-   reads as a heavy outlined label rather than plain readable text on this
-   light panel. */
-.hero-modal-stat-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  text-transform: capitalize;
-  color: var(--text-title-dark);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.hero-modal-stat-label svg {
-  color: var(--gold-text);
-}
-
-.hero-modal-stat-value {
-  font-weight: 900;
-  color: var(--green-text);
-}
-
-.hero-modal-stat-bar {
-  grid-column: 1 / -1;
-  height: 8px;
-  border-radius: 999px;
-  border: 1.5px solid var(--game-ink);
-  background: var(--divider);
-  overflow: hidden;
-}
-
-.hero-modal-stat-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    var(--game-green-dark),
-    var(--game-green-light)
-  );
-}
-
-/* Clamped to ~3 lines by default (1.5 line-height * 3 + a hair of slack) -
-   HeroDetailModal.jsx only shows the Read more/Show less toggle when the
-   text actually overflows this, and .is-expanded lifts the cap so the
-   height change animates instead of snapping.
-   An off-white block of its own (var(--row), the same #f6f5ef token every
-   other inset surface in /game uses), not sitting straight on the modal's
-   own panel - and text-shadow/stroke explicitly off: this is real body
-   copy, not a button label, and the global white-stroke rule stacking a
-   black outline behind text that's ALREADY var(--text-title-dark)
-   (#2b2a24) is what was reading as a dark, heavy smudge instead of plain
-   readable text (same failure mode as .game-card-title's own comment
-   elsewhere in this app). 60ch caps the line length so it doesn't run the
-   modal's full width edge to edge. */
-.hero-modal-lore {
-  margin: 0;
-  max-width: 60ch;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--row);
+  max-width: 34ch;
   font-size: 15px;
+  font-style: italic;
   font-weight: 600;
-  line-height: 1.5;
-  white-space: pre-line;
-  color: var(--text-title-dark);
+  line-height: 1.4;
+  color: #3a3a3a;
   text-shadow: none;
   -webkit-text-stroke-width: 0;
-  max-height: 4.6em;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
+  overflow-wrap: anywhere;
 }
 
-.hero-modal-lore.is-expanded {
-  max-height: 60em;
-}
-
-.hero-modal-lore-toggle {
-  all: unset;
-  display: inline-block;
-  margin-top: 6px;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--green-text);
-  cursor: pointer;
-}
-
-.hero-modal-lore-toggle:hover {
-  text-decoration: underline;
-}
-
-/* Explicit dark colour + stroke off - same inherited-white issue as
-   .hero-modal-lore/.hero-modal-stat-label above (--text-muted defaults
-   white too, meant for dark panels, not this one). */
-.hero-modal-muted {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted-dark);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.hero-modal-error {
-  margin: 10px 0 0;
-  font-size: 12px;
-  font-weight: 700;
-  /* --red-text, not --game-red-light - this sits directly on the modal's
-     off-white body (1.46:1 there, fails AA; --red-text clears 5.8:1). */
-  color: var(--red-text);
-}
-
-/* Equipped state lives on the action button + this chip, not on the stage. */
-.hero-modal-equipped-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 4px 0 0;
-  padding: 1px 9px 1px 6px;
-  border: 2px solid var(--game-ink);
-  border-radius: 999px;
-  background: #e3f6e5;
-  color: #1c5f27;
-  font-size: 11px;
+.hero-modal-quote {
+  color: var(--hero-accent);
   font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1.5;
-  text-transform: uppercase;
-  text-shadow: none;
-  -webkit-text-stroke: 0;
-  paint-order: normal;
+  font-style: normal;
+  font-size: 1.3em;
+  line-height: 0;
+  vertical-align: -0.12em;
+  padding: 0 0.1em;
 }
 
-.hero-modal-equipped-chip svg {
-  color: var(--green-500);
-  font-size: 13px;
+.hero-modal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
 }
 
-/* Level-locked: same off-white chip as Equipped, grey padlock instead of the
-   green check. */
-.hero-modal-level-chip {
+.hero-modal-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin: 4px 0 0;
-  padding: 1px 9px 1px 6px;
+  padding: 2px 10px;
   border: 2px solid var(--game-ink);
   border-radius: 999px;
   background: #fffdf8;
@@ -420,43 +325,302 @@
   paint-order: normal;
 }
 
-.hero-modal-level-chip svg {
-  color: #6d6f72;
+.hero-modal-chip.is-role {
+  background: var(--hero-accent-soft);
+}
+
+.hero-modal-chip.is-equipped {
+  background: #e3f6e5;
+  color: #1c5f27;
+}
+
+.hero-modal-chip.is-owned {
+  background: var(--hero-accent-soft);
+}
+
+.hero-modal-chip svg {
   font-size: 13px;
 }
 
-.hero-modal-unlock .btn.hero-modal-level-btn,
-.hero-modal-unlock .btn.hero-modal-level-btn:disabled {
-  background: #fffdf8;
-  border: 2px solid var(--divider);
-  box-shadow: none;
-  color: var(--text-body-dark, #2b2640);
-  text-shadow: none;
-  -webkit-text-stroke: 0;
-  opacity: 1;
-  cursor: default;
-  pointer-events: none;
+.hero-modal-chip.is-equipped svg,
+.hero-modal-chip.is-owned svg {
+  color: var(--green-500);
 }
 
-.hero-modal-level-btn svg {
+.hero-modal-chip.is-locked svg {
   color: #6d6f72;
 }
 
-/* Disabled-looking but solid: off-white, plain dark text, green check, no
-   glow. Not tappable (disabled). */
-.hero-modal-unlock .btn.hero-modal-equipped-btn,
-.hero-modal-unlock .btn.hero-modal-equipped-btn:disabled {
-  background: #fffdf8;
+/* Solid, soft cards (no transparency). */
+.hero-modal-section {
+  padding: 12px 14px 14px;
   border: 2px solid var(--divider);
-  box-shadow: none;
-  color: var(--text-body-dark, #2b2640);
+  border-radius: 14px;
+  background: #fffdf8;
+}
+
+.hero-modal-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1.5px solid var(--divider);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-title-dark);
   text-shadow: none;
-  -webkit-text-stroke: 0;
-  opacity: 1;
-  cursor: default;
+  -webkit-text-stroke-width: 0;
+}
+
+.hero-modal-heading svg {
+  color: var(--hero-accent);
+  font-size: 16px;
+}
+
+.hero-modal-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hero-modal-stats li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.hero-modal-stat-label {
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: capitalize;
+  color: var(--text-title-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hero-modal-stat-value {
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--hero-accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.hero-modal-stat-bar {
+  grid-column: 1 / -1;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: var(--hero-accent-soft);
+  overflow: hidden;
+}
+
+.hero-modal-stat-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hero-accent);
+  transform-origin: left center;
+  animation: hero-bar-fill 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s both;
+}
+
+@keyframes hero-bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Lore: 4 lines, bottom fade while collapsed, the toggle below the text (so
+   it can never overlap the last line). */
+.hero-modal-lore-wrap {
+  position: relative;
+  border-radius: 10px;
+  background: var(--row);
+}
+
+.hero-modal-lore {
+  margin: 0;
+  padding: 10px 12px;
+  text-align: left;
+  text-indent: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  color: #2b2b2b;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  /* 4 lines + the vertical padding. */
+  max-height: calc(1.5em * 4 + 20px);
+  overflow: hidden;
+  transition: max-height 0.32s ease;
+}
+
+.hero-modal-lore.is-expanded {
+  max-height: 80em;
+}
+
+.hero-modal-lore-wrap.is-faded::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.4em;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(to bottom, rgba(246, 245, 239, 0), var(--row));
   pointer-events: none;
 }
 
-.hero-modal-equipped-btn svg {
+.hero-modal-lore-toggle {
+  display: block;
+  margin: 8px auto 0;
+  padding: 4px 14px;
+  border: 2px solid var(--game-ink);
+  border-radius: 999px;
+  background: #fffdf8;
+  color: #2b2b2b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.hero-modal-lore-toggle:hover {
+  background: var(--hero-accent-soft);
+}
+
+.hero-modal-lore-toggle:focus-visible,
+.hero-action-btn:focus-visible {
+  outline: 3px solid var(--hero-accent);
+  outline-offset: 2px;
+}
+
+.hero-modal-muted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--row);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.hero-modal-muted svg {
+  flex: none;
+  color: var(--hero-accent);
+  font-size: 18px;
+}
+
+/* Sticky action bar - always visible, outside the scrolling body. */
+.hero-modal-actionbar {
+  flex: 0 0 auto;
+  padding: 10px 18px 14px;
+  border-top: 2px solid var(--divider);
+  background: #fffdf8;
+}
+
+.hero-modal-error {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--red-text);
+}
+
+.hero-action-btn {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 3px solid var(--game-ink);
+  border-radius: 14px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--game-ink);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.hero-action-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--game-ink);
+}
+
+.hero-action-btn.is-green {
+  background: var(--game-green);
+  color: #fff;
+}
+
+.hero-action-btn.is-neutral,
+.hero-action-btn.is-grey {
+  background: #e6e3d8;
+  color: #2b2b2b;
+  box-shadow: none;
+  cursor: default;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+
+.hero-action-btn.is-neutral svg {
   color: var(--green-500);
+}
+
+.hero-action-btn.is-grey svg {
+  color: #6d6f72;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-reveal,
+  .hero-modal-stat-bar span {
+    animation: none;
+  }
+  .hero-modal-lore,
+  .hero-action-btn {
+    transition: none;
+  }
+}
+
+/* "Unlock for 5,000 [coin]" - real gaps between the label, the number and
+   the coin (a flex button collapses plain spaces; see Price.jsx). */
+.hero-action-btn .price-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-action-btn .price {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

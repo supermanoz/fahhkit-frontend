@@ -427,6 +427,27 @@ export function IconBolt(props) {
   )
 }
 
+export function IconBook(props) {
+  return (
+    <GameIcon {...props}>
+      <path
+        d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"
+        {...TINT}
+      />
+      <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z" />
+      <path d="M4 5.5v15M20 5.5v15" />
+    </GameIcon>
+  )
+}
+
+export function IconSparkle(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M12 3.5 14 10l6.5 2-6.5 2-2 6.5-2-6.5-6.5-2 6.5-2z" {...TINT} />
+    </GameIcon>
+  )
+}
+
 export function IconLock(props) {
   return (
     <GameIcon {...props}>
