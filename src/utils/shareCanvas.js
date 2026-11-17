@@ -1,9 +1,4 @@
-import {
-  formatDistance,
-  formatDuration,
-  formatPace,
-  formatRunDate,
-} from './run'
+import { formatDistance, formatDuration, formatPace } from './run'
 import { formatNumber } from './format'
 import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
 
@@ -457,7 +452,6 @@ export function drawOverlayCard(
     score,
     xp,
     modeLabel,
-    date,
     logo,
   }
 ) {
@@ -489,8 +483,10 @@ export function drawOverlayCard(
   const LABEL = 14
   const VALUE = 32
   const ROW = 68 // label baseline to next label baseline
-  const DATE_H = date ? 30 : 0
-  const natural = logoH + 18 + rows.length * ROW + DATE_H
+  // Visible height of the last row (label top to value descender); the
+  // trailing gap after it is not counted, so the stack is optically centred.
+  const LAST_ROW_H = LABEL + 9 + VALUE * 0.8 + 8
+  const natural = logoH + 18 + (rows.length - 1) * ROW + LAST_ROW_H
   const avail = height * 0.9
   const k = Math.min(1, avail / natural)
   const total = natural * k
@@ -523,14 +519,6 @@ export function drawOverlayCard(
     })
     y += ROW * k
   })
-  if (date) {
-    drawOutlinedText(ctx, date, cx, y + 6 * k, {
-      font: (px) => `600 ${px}px 'Poppins', -apple-system, sans-serif`,
-      fill: 'rgba(255, 255, 255, 0.88)',
-      maxWidth: maxW,
-      size: 13 * k,
-    })
-  }
 }
 
 export async function drawShareCard(
@@ -546,7 +534,6 @@ export async function drawShareCard(
     score,
     xp,
     modeLabel,
-    startedAt,
   }
 ) {
   const [, logo] = await Promise.all([
@@ -569,7 +556,6 @@ export async function drawShareCard(
       score,
       xp,
       modeLabel,
-      date: startedAt ? formatRunDate(startedAt) : null,
       logo,
     })
   } else if (variant === SHARE_VARIANTS.TRANSPARENT) {
@@ -764,7 +750,6 @@ export async function exportShareCardBlob({
   score,
   xp,
   modeLabel,
-  startedAt,
 }) {
   const { w, h } = cardSize(variant, size)
   const canvas = document.createElement('canvas')
@@ -783,7 +768,6 @@ export async function exportShareCardBlob({
     score,
     xp,
     modeLabel,
-    startedAt,
   })
   return new Promise((resolve, reject) => {
     canvas.toBlob(

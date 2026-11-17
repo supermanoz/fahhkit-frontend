@@ -68,7 +68,6 @@ test.describe('Run export: Overlay sticker', () => {
               score: long ? 1234567 : 842,
               xp: 120,
               modeLabel: 'Territory Capture',
-              startedAt: '2026-11-12T09:00:00Z',
             })
             const bytes = new Uint8Array(await blob.arrayBuffer())
             const bmp = await createImageBitmap(blob)

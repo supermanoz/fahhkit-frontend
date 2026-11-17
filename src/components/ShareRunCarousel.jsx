@@ -58,7 +58,7 @@ const SLIDES = [
 ]
 
 // Optional extras the Overlay card prints when the run has them (the
-// end-of-run step passes score/xp; History runs bring startedAt).
+// end-of-run step passes score/xp).
 function overlayExtras(run) {
   let mode = null
   if (run.isWar) mode = RUN_MODE.CLUB_WAR
@@ -69,7 +69,6 @@ function overlayExtras(run) {
     score: run.score ?? undefined,
     xp: run.xp ?? undefined,
     modeLabel: mode ? getRunModeLabel(mode) : undefined,
-    startedAt: run.startedAt || undefined,
   }
 }
 
