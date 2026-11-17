@@ -12,31 +12,42 @@
 // raw submitted points and never trusts anything this module reports.
 import { haversineDistance } from './run'
 import {
+  ACCESSIBILITY_SPEED_MULTIPLIER,
   ACCURACY_LIMIT_METERS,
+  BIKE_SPEED_MS,
+  BIKE_SUSTAIN_SECONDS,
   BRISK_SPEED_MS,
   CADENCE_WINDOW_SECONDS,
-  CLEAR_SUSTAIN_SECONDS,
-  CONSTANT_SPEED_VARIANCE_THRESHOLD,
+  FAST_PACE_SPEED_MS,
+  FAST_PACE_WINDOW_SECONDS,
   GAP_SECONDS,
   MAX_PLAUSIBLE_SPEED_MS,
   MIN_CADENCE_HZ,
+  MIN_WINDOW_COVERAGE_SECONDS,
+  NO_MOTION_TIMEOUT_SECONDS,
   RESUME_SECONDS,
+  RESUME_WINDOW_SECONDS,
   SKIP_INITIAL_SECONDS,
   STEP_ACCEL_DEVIATION_MPS2,
   STEP_MIN_INTERVAL_MS,
-  SUSPECT_SPEED_FALLBACK_MS,
-  SUSPECT_SPEED_MS,
   SUSPECT_SUSTAIN_SECONDS,
   VEHICLE_SPEED_MS,
   VEHICLE_SUSTAIN_SECONDS,
+  VEHICLE_WARNING_SECONDS,
+  WARNING_MEMORY_SECONDS,
   WINDOW_SECONDS,
-  ACCESSIBILITY_SPEED_MULTIPLIER,
 } from '../constants/antiCheat'
 
+// RUNNING  - nothing odd.
+// SUSPECT  - bike-like speed held for a while: banner only, still counts.
+// VEHICLE  - the WARNING phase: distance stops counting and a countdown
+//            (VEHICLE_WARNING_SECONDS) runs; running speed again clears it.
+// DISCARDED - the warning ran out: the run is thrown away (terminal).
 export const VehicleState = Object.freeze({
   RUNNING: 'running',
   SUSPECT: 'suspect',
   VEHICLE: 'vehicle',
+  DISCARDED: 'discarded',
 })
 
 export const SegmentKind = Object.freeze({
@@ -74,13 +85,22 @@ export const EvidenceReason = Object.freeze({
   PATTERN: 'pattern',
 })
 
+// Speed reported by the device is only a cross-check, and only when valid:
+// null/NaN/negative (iOS reports -1 for "unknown") is ignored.
+export function validDeviceSpeed(speedMps) {
+  return typeof speedMps === 'number' &&
+    Number.isFinite(speedMps) &&
+    speedMps >= 0
+    ? speedMps
+    : null
+}
+
 // Creates a fresh detector for one run. `hasMotionSensing` should reflect
 // whether step/cadence data will ever arrive this run (false if DeviceMotion
-// is unsupported or the iOS permission prompt was denied) - without it,
-// speed alone has to clear a higher bar before counting as evidence.
-// `accessibilityMode` raises every speed ceiling and skips the cadence
-// requirement entirely (wheelchair/hand-cycle athletes never show a running
-// footstrike).
+// is unsupported or the iOS permission prompt was denied); without it the
+// speed rules alone decide. `accessibilityMode` raises every speed ceiling
+// and skips the cadence requirement entirely (wheelchair/hand-cycle
+// athletes never show a running footstrike).
 export function createVehicleDetector({
   hasMotionSensing = true,
   accessibilityMode = false,
@@ -88,19 +108,30 @@ export function createVehicleDetector({
   let motionAvailable = hasMotionSensing
   let state = VehicleState.RUNNING
   let startedAtMs = null
-  let lastPoint = null
-  // Rolling window of accepted (non-jump, non-gap) segments: {t, speedMps, distanceMeters, dtSeconds}
-  const speedSamples = []
+  let lastPoint = null // last accepted fix {lat, lng, timestamp}
+  // A fix that implied > MAX_PLAUSIBLE_SPEED_MS from lastPoint, held back
+  // until the next fix says whether it was a GPS spike or real fast movement.
+  let suspectJump = null
+  // Set once a very fast stretch was confirmed (motorway speeds); hops above
+  // MAX_PLAUSIBLE_SPEED_MS are then taken at face value, not held back,
+  // until an ordinary-speed interval ends the regime.
+  let inFastRegime = false
+  // Accepted segments, newest last:
+  // {t, speedMps, distanceMeters, dtSeconds, counted}
+  const samples = []
   const stepTimestamps = []
   let motionBaseline = 9.81
   let lastStepAtMs = 0
+  let lastMotionAtMs = null
 
-  let suspectEvidenceSinceMs = null
-  let vehicleEvidenceSinceMs = null
-  // Consecutive time with neither suspect nor vehicle evidence - used both to
-  // drop SUSPECT back to RUNNING and (combined with a cadence check) to
-  // resume from VEHICLE.
-  let cleanEvidenceSinceMs = null
+  let suspectSinceMs = null
+  let vehicleSinceMs = null
+  let cleanSinceMs = null
+  // Vehicle time already spent in this/earlier warning episodes, and when
+  // the current episode started (null outside VEHICLE).
+  let warnedMs = 0
+  let episodeStartMs = null
+  let lastVehicleMs = null
 
   let lastSnapshot = {
     state,
@@ -108,16 +139,27 @@ export function createVehicleDetector({
     avgSpeedMps: 0,
     cadenceHz: 0,
     reason: null,
+    warningSecondsLeft: null,
   }
 
-  function speedCeiling(base) {
-    return accessibilityMode ? base * ACCESSIBILITY_SPEED_MULTIPLIER : base
+  const ceiling = (base) =>
+    accessibilityMode ? base * ACCESSIBILITY_SPEED_MULTIPLIER : base
+
+  function pruneSamples(nowMs) {
+    const cutoff = nowMs - FAST_PACE_WINDOW_SECONDS * 1000
+    while (samples.length && samples[0].t < cutoff) samples.shift()
   }
 
-  function pruneSpeedWindow(nowMs, windowMs) {
-    const cutoff = nowMs - windowMs
-    while (speedSamples.length && speedSamples[0].t < cutoff)
-      speedSamples.shift()
+  function windowStats(nowMs, seconds) {
+    const cutoff = nowMs - seconds * 1000
+    let distance = 0
+    let time = 0
+    for (const sample of samples) {
+      if (sample.t < cutoff) continue
+      distance += sample.distanceMeters
+      time += sample.dtSeconds
+    }
+    return { time, avg: time > 0 ? distance / time : 0 }
   }
 
   function cadenceHzAt(nowMs) {
@@ -127,15 +169,27 @@ export function createVehicleDetector({
     return stepTimestamps.length / CADENCE_WINDOW_SECONDS
   }
 
+  // Is a running gait something we can actually judge right now? Not when
+  // the sensor is missing/denied, in accessibility mode, or when it has
+  // gone quiet (a locked screen can throttle DeviceMotion to nothing - a
+  // runner must not be convicted for that).
+  function gaitJudgeable(nowMs) {
+    if (!motionAvailable || accessibilityMode) return false
+    const reference = lastMotionAtMs ?? startedAtMs
+    return (
+      reference != null && nowMs - reference <= NO_MOTION_TIMEOUT_SECONDS * 1000
+    )
+  }
+
   function setMotionAvailable(available) {
     motionAvailable = available
   }
 
   // Peak-detection on accelerometer magnitude - a running gait has a clear
   // rhythmic footstrike a smooth vehicle ride doesn't. Returns whether this
-  // sample counted as a new step, so the caller can keep its own run-total
-  // step count (this module only keeps a trailing cadence window).
+  // sample counted as a new step.
   function handleMotionSample(magnitude, nowMs) {
+    lastMotionAtMs = nowMs
     motionBaseline += (magnitude - motionBaseline) * 0.05
     const deviation = Math.abs(magnitude - motionBaseline)
     if (
@@ -149,14 +203,20 @@ export function createVehicleDetector({
     return false
   }
 
-  // Direct step injection for tests/simulated traces - bypasses the
-  // accelerometer magnitude math above.
+  // Direct step injection for tests/simulated traces.
   function recordStep(nowMs) {
+    lastMotionAtMs = nowMs
     lastStepAtMs = nowMs
     stepTimestamps.push(nowMs)
   }
 
-  function snapshot(segment) {
+  function warningSecondsLeft(nowMs) {
+    if (state !== VehicleState.VEHICLE || episodeStartMs == null) return null
+    const spent = warnedMs + (nowMs - episodeStartMs)
+    return Math.max(0, Math.ceil(VEHICLE_WARNING_SECONDS - spent / 1000))
+  }
+
+  function snapshot(segment, extra = {}, nowMs = null) {
     lastSnapshot = {
       state,
       speedMps: segment?.speedMps ?? lastSnapshot.speedMps,
@@ -165,207 +225,266 @@ export function createVehicleDetector({
       reason:
         segment?.reason ??
         (state === VehicleState.RUNNING ? null : lastSnapshot.reason),
+      warningSecondsLeft: nowMs != null ? warningSecondsLeft(nowMs) : null,
     }
-    return { state, segment, ...lastSnapshot }
+    return { state, segment, reclaimMeters: 0, ...lastSnapshot, ...extra }
   }
 
-  // Feed one accepted GPS fix. Returns { state, segment, speedMps, avgSpeedMps,
-  // cadenceHz, reason } - `segment` is null when this fix didn't produce a
-  // measurable segment (first fix, or this fix was dropped for poor
-  // accuracy), otherwise { kind, distanceMeters, excluded }.
+  // Feed one accepted GPS fix. Returns { state, segment, reclaimMeters,
+  // speedMps, avgSpeedMps, cadenceHz, reason, warningSecondsLeft }.
+  // `segment` is null when this fix produced no measurable segment, otherwise
+  // { kind, distanceMeters, excluded, ... }. `reclaimMeters` > 0 on the fix
+  // that tips into VEHICLE: distance the caller already counted from the
+  // vehicle stretch that the window needed time to recognise.
   function addGpsPoint({ lat, lng, timestamp, accuracy, speedMps }) {
     if (accuracy != null && accuracy > ACCURACY_LIMIT_METERS) {
-      return snapshot(null)
+      return snapshot(null, {}, timestamp)
     }
+    if (state === VehicleState.DISCARDED) return snapshot(null, {}, timestamp)
     if (startedAtMs == null) startedAtMs = timestamp
     const sinceStartMs = timestamp - startedAtMs
     const previous = lastPoint
-    lastPoint = { lat, lng, timestamp }
-    if (!previous) return snapshot(null)
+    if (!previous) {
+      lastPoint = { lat, lng, timestamp }
+      return snapshot(null, {}, timestamp)
+    }
 
     const dtSeconds = (timestamp - previous.timestamp) / 1000
-    if (dtSeconds <= 0) return snapshot(null)
+    if (dtSeconds <= 0) return snapshot(null, {}, timestamp)
 
-    const distanceMeters = haversineDistance(previous, { lat, lng })
-    const impliedSpeedMps = distanceMeters / dtSeconds
+    let distanceMeters = haversineDistance(previous, { lat, lng })
+    let impliedSpeedMps = distanceMeters / dtSeconds
 
     if (dtSeconds > GAP_SECONDS) {
-      // Tunnel/signal drop - don't let the implied speed across the gap count
-      // as evidence either way. Whatever hysteresis was already building
-      // stays frozen rather than reset, so a cheat caught right before a dead
-      // zone doesn't get a free pass.
-      return snapshot({
-        kind: SegmentKind.GAP,
-        distanceMeters,
-        excluded: false,
-        speedMps: impliedSpeedMps,
-      })
-    }
-    if (impliedSpeedMps > MAX_PLAUSIBLE_SPEED_MS) {
-      // A single-fix teleport - noise, not movement in either direction.
-      return snapshot({
-        kind: SegmentKind.JUMP,
-        distanceMeters,
-        excluded: true,
-        speedMps: impliedSpeedMps,
-      })
+      // Tunnel/signal drop - the implied speed across the gap is no evidence
+      // either way, and whatever hysteresis was building stays frozen.
+      lastPoint = { lat, lng, timestamp }
+      suspectJump = null
+      return snapshot(
+        {
+          kind: SegmentKind.GAP,
+          distanceMeters,
+          excluded: false,
+          speedMps: impliedSpeedMps,
+        },
+        {},
+        timestamp
+      )
     }
 
-    // Blend the device's own reported speed (when available) with the
-    // computed distance/time speed, rather than trusting either alone.
+    let confirmedFast = false
+    if (impliedSpeedMps > MAX_PLAUSIBLE_SPEED_MS && inFastRegime) {
+      // Already established as a motorway-speed stretch: real movement.
+    } else if (impliedSpeedMps > MAX_PLAUSIBLE_SPEED_MS) {
+      if (!suspectJump) {
+        // First impossible hop: hold it back. If the next fix is back on
+        // the path it was a spike; if the next fix keeps going, it was real.
+        suspectJump = { lat, lng, timestamp }
+        return snapshot(
+          {
+            kind: SegmentKind.JUMP,
+            distanceMeters,
+            excluded: true,
+            speedMps: impliedSpeedMps,
+          },
+          {},
+          timestamp
+        )
+      }
+      // Still impossible from the anchor after a second fix: the
+      // movement is real (a motorway at 30+ m/s, or a one-way teleport).
+      // Continue from the held-back fix; the hop into it stays excluded.
+      confirmedFast = true
+      inFastRegime = true
+      const held = suspectJump
+      suspectJump = null
+      lastPoint = { lat: held.lat, lng: held.lng, timestamp: held.timestamp }
+      const heldDt = (timestamp - held.timestamp) / 1000
+      if (heldDt <= 0) return snapshot(null, {}, timestamp)
+      distanceMeters = haversineDistance(lastPoint, { lat, lng })
+      impliedSpeedMps = distanceMeters / heldDt
+    } else {
+      suspectJump = null // it was a spike; this fix is back on the path
+      inFastRegime = false
+    }
+    const segDt = confirmedFast
+      ? (timestamp - lastPoint.timestamp) / 1000
+      : dtSeconds
+    lastPoint = { lat, lng, timestamp }
+
+    // The device's own speed is a cross-check, only when valid (iOS gives
+    // -1, some browsers null). When it disagrees wildly with the distance
+    // between fixes, trust the lower of the two (a jittery fix inflates the
+    // computed one; a stale chip value inflates the other).
+    const deviceSpeed = validDeviceSpeed(speedMps)
     const sampleSpeedMps =
-      speedMps != null ? (speedMps + impliedSpeedMps) / 2 : impliedSpeedMps
-    speedSamples.push({
+      deviceSpeed != null
+        ? Math.min(
+            impliedSpeedMps,
+            Math.max(deviceSpeed, impliedSpeedMps * 0.5)
+          )
+        : impliedSpeedMps
+    // Never let one hop weigh more than a very fast vehicle would cover.
+    const cappedDistance = Math.min(distanceMeters, 60 * segDt)
+    const sample = {
       t: timestamp,
       speedMps: sampleSpeedMps,
-      distanceMeters,
-      dtSeconds,
-    })
-    pruneSpeedWindow(timestamp, WINDOW_SECONDS * 1000)
+      distanceMeters: cappedDistance,
+      dtSeconds: segDt,
+      counted: false,
+    }
+    samples.push(sample)
+    pruneSamples(timestamp)
 
+    const baseSegment = {
+      distanceMeters,
+      speedMps: sampleSpeedMps,
+    }
     if (sinceStartMs < SKIP_INITIAL_SECONDS * 1000) {
-      return snapshot({
-        kind: SegmentKind.RUNNING,
-        distanceMeters,
-        excluded: false,
-        speedMps: sampleSpeedMps,
-      })
+      sample.counted = true
+      return snapshot(
+        { kind: SegmentKind.RUNNING, excluded: false, ...baseSegment },
+        {},
+        timestamp
+      )
     }
 
-    const windowDistance = speedSamples.reduce(
-      (sum, s) => sum + s.distanceMeters,
-      0
-    )
-    const windowTime = speedSamples.reduce((sum, s) => sum + s.dtSeconds, 0)
-    const avgSpeedMps =
-      windowTime > 0 ? windowDistance / windowTime : sampleSpeedMps
-
+    const win = windowStats(timestamp, WINDOW_SECONDS)
+    const longWin = windowStats(timestamp, FAST_PACE_WINDOW_SECONDS)
+    const recent = windowStats(timestamp, RESUME_WINDOW_SECONDS)
+    const windowCovered = win.time >= MIN_WINDOW_COVERAGE_SECONDS
+    const longCovered = longWin.time >= FAST_PACE_WINDOW_SECONDS * 0.75
     const cadenceHz = cadenceHzAt(timestamp)
-    const hasGait = motionAvailable && !accessibilityMode
-    // Complete absence of footstrike at a brisk-or-faster pace is decisive on
-    // its own (spec: "speed that's high or moderate while there are no steps
-    // = vehicle or bike") - it doesn't need to also clear the full suspect
-    // speed ceiling below.
+    const judgeGait = gaitJudgeable(timestamp)
+
+    // Fast, with no footstrike at all, is decisive on its own.
     const noGait =
-      hasGait && avgSpeedMps > BRISK_SPEED_MS && cadenceHz < MIN_CADENCE_HZ
-
-    // Only evaluated with real gait data - in accessibility mode a hand-cycle
-    // or wheelchair's naturally steady pace on a flat stretch would otherwise
-    // read as "suspiciously" constant for no good reason; that mode already
-    // relies on speed-only evidence at a raised ceiling instead.
-    const mean = avgSpeedMps
-    const variance =
-      speedSamples.length > 1
-        ? speedSamples.reduce((sum, s) => sum + (s.speedMps - mean) ** 2, 0) /
-          speedSamples.length
-        : 0
-    const coefficientOfVariation = mean > 0 ? Math.sqrt(variance) / mean : 1
-    const suspiciouslyConstant =
+      judgeGait &&
+      windowCovered &&
+      win.avg > BRISK_SPEED_MS &&
+      cadenceHz < MIN_CADENCE_HZ
+    const speedVehicle = windowCovered && win.avg > ceiling(VEHICLE_SPEED_MS)
+    const paceVehicle = longCovered && longWin.avg > ceiling(FAST_PACE_SPEED_MS)
+    const vehicleEvidence = speedVehicle || paceVehicle || noGait
+    const bikeSuspect =
       !accessibilityMode &&
-      speedSamples.length >= 4 &&
-      mean > SUSPECT_SPEED_MS * 0.7 &&
-      coefficientOfVariation < CONSTANT_SPEED_VARIANCE_THRESHOLD
-
-    const suspectCeiling = speedCeiling(
-      hasGait ? SUSPECT_SPEED_MS : SUSPECT_SPEED_FALLBACK_MS
-    )
-    const vehicleCeiling = speedCeiling(VEHICLE_SPEED_MS)
-
-    const speedTooHighForSuspect = avgSpeedMps > suspectCeiling
-    const suspectEvidence =
-      speedTooHighForSuspect || suspiciouslyConstant || noGait
-    const vehicleEvidence = avgSpeedMps > vehicleCeiling || noGait
+      longWin.time >= BIKE_SUSTAIN_SECONDS * 0.75 &&
+      longWin.avg > ceiling(BIKE_SPEED_MS)
+    const suspectEvidence = vehicleEvidence || bikeSuspect
 
     const reason = noGait
       ? EvidenceReason.NO_GAIT
-      : speedTooHighForSuspect
+      : speedVehicle || paceVehicle || bikeSuspect
         ? EvidenceReason.SPEED
-        : suspiciouslyConstant
-          ? EvidenceReason.PATTERN
-          : null
+        : null
 
-    // --- Hysteresis bookkeeping ---
-    vehicleEvidenceSinceMs = vehicleEvidence
-      ? (vehicleEvidenceSinceMs ?? timestamp)
-      : null
-    if (suspectEvidence) {
-      suspectEvidenceSinceMs = suspectEvidenceSinceMs ?? timestamp
-      cleanEvidenceSinceMs = null
-    } else {
-      suspectEvidenceSinceMs = null
-      cleanEvidenceSinceMs = cleanEvidenceSinceMs ?? timestamp
-    }
+    // Clear evidence: back at running speed over the recent window, and (if
+    // it can be judged) with footsteps again.
+    const recentCovered = recent.time >= RESUME_WINDOW_SECONDS * 0.6
+    const validRunningNow =
+      recentCovered &&
+      recent.avg <= ceiling(BIKE_SPEED_MS) &&
+      (!judgeGait || cadenceHz >= MIN_CADENCE_HZ || recent.avg < BRISK_SPEED_MS)
 
-    // --- State transitions ---
-    if (state === VehicleState.RUNNING) {
+    vehicleSinceMs = vehicleEvidence ? (vehicleSinceMs ?? timestamp) : null
+    suspectSinceMs = suspectEvidence ? (suspectSinceMs ?? timestamp) : null
+    cleanSinceMs = validRunningNow ? (cleanSinceMs ?? timestamp) : null
+
+    let reclaimMeters = 0
+    const wasState = state
+
+    if (state === VehicleState.RUNNING || state === VehicleState.SUSPECT) {
+      // Vehicle time is forgotten after a long stretch without any.
       if (
-        vehicleEvidenceSinceMs != null &&
-        timestamp - vehicleEvidenceSinceMs >= VEHICLE_SUSTAIN_SECONDS * 1000
+        lastVehicleMs != null &&
+        timestamp - lastVehicleMs > WARNING_MEMORY_SECONDS * 1000
+      ) {
+        warnedMs = 0
+        lastVehicleMs = null
+      }
+      if (
+        vehicleSinceMs != null &&
+        timestamp - vehicleSinceMs >= VEHICLE_SUSTAIN_SECONDS * 1000
       ) {
         state = VehicleState.VEHICLE
+        episodeStartMs = timestamp
+        // Take back what the window needed time to recognise.
+        reclaimMeters = samples
+          .filter(
+            (x) =>
+              x.counted &&
+              x.t >= timestamp - WINDOW_SECONDS * 1000 &&
+              x.speedMps > ceiling(BIKE_SPEED_MS)
+          )
+          .reduce((sum, x) => sum + x.distanceMeters, 0)
       } else if (
-        suspectEvidenceSinceMs != null &&
-        timestamp - suspectEvidenceSinceMs >= SUSPECT_SUSTAIN_SECONDS * 1000
+        state === VehicleState.RUNNING &&
+        suspectSinceMs != null &&
+        timestamp - suspectSinceMs >= SUSPECT_SUSTAIN_SECONDS * 1000
       ) {
         state = VehicleState.SUSPECT
-      }
-    } else if (state === VehicleState.SUSPECT) {
-      if (
-        vehicleEvidenceSinceMs != null &&
-        timestamp - vehicleEvidenceSinceMs >= VEHICLE_SUSTAIN_SECONDS * 1000
-      ) {
-        state = VehicleState.VEHICLE
-      } else if (
-        cleanEvidenceSinceMs != null &&
-        timestamp - cleanEvidenceSinceMs >= CLEAR_SUSTAIN_SECONDS * 1000
-      ) {
+      } else if (state === VehicleState.SUSPECT && suspectSinceMs == null) {
         state = VehicleState.RUNNING
       }
     } else if (state === VehicleState.VEHICLE) {
-      const validRunningNow =
-        !suspectEvidence &&
-        !vehicleEvidence &&
-        (!hasGait || cadenceHz >= MIN_CADENCE_HZ)
-      if (!validRunningNow) {
-        cleanEvidenceSinceMs = null
-      } else if (
-        cleanEvidenceSinceMs != null &&
-        timestamp - cleanEvidenceSinceMs >= RESUME_SECONDS * 1000
+      lastVehicleMs = timestamp
+      const spentMs = warnedMs + (timestamp - episodeStartMs)
+      if (
+        cleanSinceMs != null &&
+        timestamp - cleanSinceMs >= RESUME_SECONDS * 1000
       ) {
+        // Back to running speed: counting resumes (the vehicle stretch
+        // stays excluded). The time already spent is remembered.
+        warnedMs = spentMs
+        episodeStartMs = null
         state = VehicleState.RUNNING
+        // Judge from here on only: the vehicle stretch must not keep
+        // convicting the (now running) player through the long windows.
+        samples.length = 0
+        vehicleSinceMs = null
+        suspectSinceMs = null
+        cleanSinceMs = null
+      } else if (spentMs >= VEHICLE_WARNING_SECONDS * 1000) {
+        state = VehicleState.DISCARDED
       }
     }
 
-    const excluded = state === VehicleState.VEHICLE
+    const excluded =
+      state === VehicleState.VEHICLE || state === VehicleState.DISCARDED
+    sample.counted = !excluded
     const kind =
-      state === VehicleState.VEHICLE
+      state === VehicleState.DISCARDED || state === VehicleState.VEHICLE
         ? SegmentKind.VEHICLE
         : state === VehicleState.SUSPECT
           ? SegmentKind.SUSPECT
           : SegmentKind.RUNNING
 
-    return snapshot({
-      kind,
-      distanceMeters,
-      excluded,
-      speedMps: sampleSpeedMps,
-      avgSpeedMps,
-      cadenceHz,
-      reason,
-    })
+    return snapshot(
+      {
+        kind,
+        excluded,
+        avgSpeedMps: win.avg,
+        cadenceHz,
+        reason,
+        ...baseSegment,
+      },
+      {
+        reclaimMeters,
+        enteredVehicle:
+          wasState !== VehicleState.VEHICLE && state === VehicleState.VEHICLE,
+      },
+      timestamp
+    )
   }
 
-  // Manual override from the "I'm not in a vehicle" dispute button - trusts
-  // the athlete just enough to stop blocking them immediately, but never
-  // erases segments already recorded as vehicle-excluded (the backend
-  // re-validates independently regardless of anything disputed here). If
-  // they really are in a car, sustained evidence trips the state machine
-  // again within VEHICLE_SUSTAIN_SECONDS.
+  // The "I'm not in a vehicle" button: clears a SUSPECT banner only. It can
+  // no longer stop the VEHICLE warning - speed alone decides that - but the
+  // tap is still logged by the caller for moderator review.
   function dispute() {
-    state = VehicleState.RUNNING
-    suspectEvidenceSinceMs = null
-    vehicleEvidenceSinceMs = null
-    cleanEvidenceSinceMs = null
+    if (state === VehicleState.SUSPECT) {
+      state = VehicleState.RUNNING
+      suspectSinceMs = null
+    }
   }
 
   function reset() {
@@ -373,19 +492,26 @@ export function createVehicleDetector({
     state = VehicleState.RUNNING
     startedAtMs = null
     lastPoint = null
-    speedSamples.length = 0
+    suspectJump = null
+    inFastRegime = false
+    samples.length = 0
     stepTimestamps.length = 0
     motionBaseline = 9.81
     lastStepAtMs = 0
-    suspectEvidenceSinceMs = null
-    vehicleEvidenceSinceMs = null
-    cleanEvidenceSinceMs = null
+    lastMotionAtMs = null
+    suspectSinceMs = null
+    vehicleSinceMs = null
+    cleanSinceMs = null
+    warnedMs = 0
+    episodeStartMs = null
+    lastVehicleMs = null
     lastSnapshot = {
       state,
       speedMps: 0,
       avgSpeedMps: 0,
       cadenceHz: 0,
       reason: null,
+      warningSecondsLeft: null,
     }
   }
 

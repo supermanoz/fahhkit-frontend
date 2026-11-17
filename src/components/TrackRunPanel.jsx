@@ -11,6 +11,7 @@ import {
   setAccessibilityModeEnabled,
 } from '../utils/antiCheatSettings'
 import VehicleDebugOverlay from './VehicleDebugOverlay'
+import VehicleAlert from './VehicleAlert'
 import {
   MIN_DISTANCE_FOR_PACE_METERS,
   MIN_VALID_RUN_DISTANCE_METERS,
@@ -42,9 +43,11 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     clearPendingRun,
     vehicleState,
     vehicleReason,
+    vehicleWarningDeadline,
+    vehicleDiscarded,
+    dismissVehicleDiscarded,
     suspectDismissed,
     dismissSuspect,
-    disputeVehicle,
     getDebugInfo,
   } = useRunTracker()
   const [saving, setSaving] = useState(false)
@@ -244,27 +247,12 @@ export default function TrackRunPanel({ eventId, onSaved }) {
           </div>
         )}
 
-      {tracking && vehicleState === VehicleState.VEHICLE && (
-        <div className="track-run-error">
-          <span className="track-run-error-badge">
-            <FaExclamation />
-          </span>
-          <div>
-            <p className="track-run-error-title">Vehicle detected 🛵</p>
-            <p className="track-run-error-message">
-              Distance paused — it won&apos;t count until you slow down to a
-              run. Not in a vehicle?
-            </p>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={disputeVehicle}
-            >
-              I&apos;m not in a vehicle
-            </button>
-          </div>
-        </div>
-      )}
+      <VehicleAlert
+        vehicleState={tracking ? vehicleState : VehicleState.RUNNING}
+        warningDeadline={vehicleWarningDeadline}
+        discarded={vehicleDiscarded}
+        onDismissDiscard={dismissVehicleDiscarded}
+      />
 
       {backgroundGapSeconds != null && (
         <div className="banner error track-run-gap-banner">

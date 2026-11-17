@@ -11,6 +11,7 @@ import {
 import { VEHICLE_RUN_INVALID_RATIO } from '../constants/antiCheat'
 import {
   createVehicleDetector,
+  validDeviceSpeed,
   VehicleState,
   SegmentKind,
   compressSegments,
@@ -26,6 +27,12 @@ import {
   stopRunNotification,
 } from '../utils/runNotification'
 import { getRunMode, getRunModeLabel } from '../utils/runModeLabel'
+import {
+  VEHICLE_NOTIFICATION_HEADER,
+  alertVehicleDiscarded,
+  alertVehicleWarning,
+  resetVehicleAlertCooldown,
+} from '../utils/vehicleAlerts'
 
 // Bare "m:ss" (no " /km" suffix - the notification's own label already says
 // "Avg. pace (/km)"), gated exactly like GamePage.jsx's own run card
@@ -94,6 +101,12 @@ export function useRunTracker() {
   // banners in TrackRunPanel.jsx/GamePage.jsx.
   const [vehicleState, setVehicleState] = useState(VehicleState.RUNNING)
   const [vehicleReason, setVehicleReason] = useState(null)
+  // Wall-clock time (ms) the vehicle warning runs out and the run is thrown
+  // away, null outside the warning. The UI ticks a countdown off it.
+  const [vehicleWarningDeadline, setVehicleWarningDeadline] = useState(null)
+  // True once a run was discarded for being in a vehicle - drives the
+  // "Run discarded" message until the player dismisses it.
+  const [vehicleDiscarded, setVehicleDiscarded] = useState(false)
   // Hides the current SUSPECT banner without changing detection state (a
   // "keep going" dismiss) - resets the moment the state changes again.
   const [suspectDismissed, setSuspectDismissed] = useState(false)
@@ -120,6 +133,8 @@ export function useRunTracker() {
   const motionAvailableRef = useRef(false)
   const motionAttachedRef = useRef(false)
   const vehicleStateRef = useRef(VehicleState.RUNNING)
+  // Whether the run notification header currently says "Vehicle detected".
+  const vehicleHeaderShownRef = useRef(false)
   // PvP race this run counts for (see api/pvp.js) - persisted with the run
   // like eventId so a reload mid-race still submits it against the race.
   const challengeIdRef = useRef(null)
@@ -211,14 +226,22 @@ export function useRunTracker() {
     []
   )
 
-  const applyVehicleState = useCallback((nextState, reason) => {
-    if (nextState !== vehicleStateRef.current) {
-      vehicleStateRef.current = nextState
-      setVehicleState(nextState)
-      setSuspectDismissed(false)
-    }
-    setVehicleReason(reason ?? null)
-  }, [])
+  const applyVehicleState = useCallback(
+    (nextState, reason, warningSecondsLeft = null) => {
+      if (nextState !== vehicleStateRef.current) {
+        vehicleStateRef.current = nextState
+        setVehicleState(nextState)
+        setSuspectDismissed(false)
+      }
+      setVehicleReason(reason ?? null)
+      setVehicleWarningDeadline(
+        nextState === VehicleState.VEHICLE && warningSecondsLeft != null
+          ? Date.now() + warningSecondsLeft * 1000
+          : null
+      )
+    },
+    []
+  )
 
   const dismissSuspect = useCallback(() => setSuspectDismissed(true), [])
 
@@ -336,6 +359,9 @@ export function useRunTracker() {
 
     watchPosition(
       (position) => {
+        // A late fix after stop()/pause()/a vehicle discard must never
+        // re-create the run it just ended.
+        if (watchCancelledRef.current) return
         const { latitude, longitude, altitude, accuracy, speed, heading } =
           position.coords
         fixCountRef.current += 1
@@ -348,7 +374,8 @@ export function useRunTracker() {
           lng: longitude,
           accuracy: accuracy ?? null,
           timestamp: position.timestamp,
-          speed: speed ?? null,
+          // iOS reports -1 for "unknown" - never pass that on as a speed.
+          speed: validDeviceSpeed(speed),
           elevation: altitude ?? null,
           // The GPS chip's own course-over-ground, when the device/browser
           // can determine one (null when stationary or on a non-GPS
@@ -430,7 +457,31 @@ export function useRunTracker() {
               setDistance(distanceRef.current)
             }
           }
-          applyVehicleState(result.state, result.reason)
+          if (result.reclaimMeters > 0) {
+            // The detector needed a few seconds to recognise the vehicle:
+            // take back the distance it let through in the meantime.
+            const reclaim = Math.min(result.reclaimMeters, distanceRef.current)
+            distanceRef.current -= reclaim
+            vehicleExcludedMetersRef.current += reclaim
+            setDistance(distanceRef.current)
+          }
+          applyVehicleState(
+            result.state,
+            result.reason,
+            result.warningSecondsLeft
+          )
+          if (result.enteredVehicle) {
+            alertVehicleWarning()
+            if (!pausedRef.current) {
+              updateRunNotification({ title: VEHICLE_NOTIFICATION_HEADER })
+            }
+          } else if (
+            result.state === VehicleState.RUNNING &&
+            vehicleHeaderShownRef.current
+          ) {
+            updateRunNotification({ title: '' })
+          }
+          vehicleHeaderShownRef.current = result.state === VehicleState.VEHICLE
           updateRunNotification({
             distanceMeters: distanceRef.current,
             paceLabel: notificationPaceLabel(
@@ -638,6 +689,9 @@ export function useRunTracker() {
       setBackgroundGapSeconds(null)
       setPendingRun(null)
       applyVehicleState(VehicleState.RUNNING, null)
+      resetVehicleAlertCooldown()
+      vehicleHeaderShownRef.current = false
+      setVehicleDiscarded(false)
       startedAtRef.current = new Date()
       eventIdRef.current = eventId ?? null
       challengeIdRef.current = challengeId
@@ -766,6 +820,23 @@ export function useRunTracker() {
     setPath([])
   }, [])
 
+  // The vehicle warning ran out: the run is thrown away - stopped, nothing
+  // saved or submitted (no XP, no territory) - and a clear message stays up
+  // until the player dismisses it. Applies to every mode, Training included.
+  useEffect(() => {
+    if (vehicleState !== VehicleState.DISCARDED) return
+    if (statusRef.current !== 'tracking') return
+    stop()
+    clearPendingRun()
+    setVehicleDiscarded(true)
+    alertVehicleDiscarded()
+  }, [vehicleState, stop, clearPendingRun])
+
+  const dismissVehicleDiscarded = useCallback(
+    () => setVehicleDiscarded(false),
+    []
+  )
+
   // Training-only (other modes never call this - see GamePage's run panel,
   // which only ever shows a Pause button there). Stops watchPosition and the
   // timer exactly like a full stop() would, but leaves everything else
@@ -842,6 +913,9 @@ export function useRunTracker() {
     clearPendingRun,
     vehicleState,
     vehicleReason,
+    vehicleWarningDeadline,
+    vehicleDiscarded,
+    dismissVehicleDiscarded,
     suspectDismissed,
     dismissSuspect,
     disputeVehicle,

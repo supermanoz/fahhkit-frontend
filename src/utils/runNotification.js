@@ -48,9 +48,15 @@ export async function startRunNotification({
 // paceLabel should already be formatted the way the in-app panel shows it
 // (e.g. "5:30", or null/omitted for "--") so the notification never drifts
 // from TrackRunPanel's own numbers.
-export function updateRunNotification({ distanceMeters, paceLabel } = {}) {
+export function updateRunNotification({
+  distanceMeters,
+  paceLabel,
+  title,
+} = {}) {
   if (!isNative) return
-  RunNotification.update({ distanceMeters, paceLabel }).catch(() => {})
+  // `title` swaps the header text (e.g. "Vehicle detected"); '' restores the
+  // run-mode label. Omitted = unchanged.
+  RunNotification.update({ distanceMeters, paceLabel, title }).catch(() => {})
 }
 
 export function pauseRunNotification({ title = null } = {}) {

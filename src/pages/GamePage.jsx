@@ -43,6 +43,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
+import VehicleAlert from '../components/VehicleAlert'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
@@ -3963,6 +3964,15 @@ function GamePageInner() {
         </div>
       )}
 
+      {/* Vehicle detection: warning banner with countdown while tracking,
+          then the "Run discarded" card (see useRunTracker.js). */}
+      <VehicleAlert
+        vehicleState={tracker.vehicleState}
+        warningDeadline={tracker.vehicleWarningDeadline}
+        discarded={tracker.vehicleDiscarded}
+        onDismissDiscard={tracker.dismissVehicleDiscarded}
+      />
+
       {/* Google Maps' own run-mode location control, shown as soon as the
           run starts tracking - toggles Free/Follow (see toggleFollow),
           sitting where the menu FAB would be since that's hidden while
@@ -4017,10 +4027,12 @@ function GamePageInner() {
                 onClick={() => setStatsOnly((collapsed) => !collapsed)}
               >
                 <span className="game-run-card-status">
-                  {getRunModeLabel(
-                    getRunMode(tracker),
-                    tracker.paused ? 'paused' : undefined
-                  )}
+                  {tracker.vehicleState === 'vehicle'
+                    ? 'Vehicle detected'
+                    : getRunModeLabel(
+                        getRunMode(tracker),
+                        tracker.paused ? 'paused' : undefined
+                      )}
                 </span>
                 <IconExpand className="game-run-card-expand-icon" />
               </button>

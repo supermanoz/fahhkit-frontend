@@ -63,6 +63,8 @@ public class RunNotificationPlugin extends Plugin {
     private String paceText = "--";
     // Header text from JS (utils/runModeLabel.js); null = legacy Running/Paused.
     private String titleText = null;
+    // The title start() was given, restored when a temporary header clears.
+    private String runTitleText = null;
 
     // Called whenever JS transitions into "tracking, not paused" - a brand
     // new run, a Training run resuming after pause(), or the app reattaching
@@ -83,6 +85,7 @@ public class RunNotificationPlugin extends Plugin {
         String pace = call.getString("paceLabel");
         paceText = pace != null ? pace : "--";
         titleText = call.getString("title");
+        runTitleText = titleText;
         ensureChannel();
         startTicking();
         post();
@@ -97,6 +100,12 @@ public class RunNotificationPlugin extends Plugin {
         }
         Double distanceMeters = call.getDouble("distanceMeters");
         String pace = call.getString("paceLabel");
+        // Optional new header (e.g. "Vehicle detected"); an empty string
+        // clears it back to the run-mode label passed to start().
+        if (call.hasOption("title")) {
+            String newTitle = call.getString("title");
+            titleText = (newTitle == null || newTitle.isEmpty()) ? runTitleText : newTitle;
+        }
         if (distanceMeters != null) {
             distanceText = String.format(Locale.US, "%.2f", distanceMeters / 1000.0);
         }

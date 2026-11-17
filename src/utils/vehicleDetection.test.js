@@ -19,9 +19,10 @@ function buildTrace({
   intervalSeconds = 2.5,
   accuracy = 5,
   startTimestamp = 1_700_000_000_000,
+  startLat = 10,
 }) {
   const points = []
-  let lat = 10
+  let lat = startLat
   const lng = 10
   let t = startTimestamp
   const steps = Math.floor(durationSeconds / intervalSeconds)
@@ -33,10 +34,22 @@ function buildTrace({
   return points
 }
 
-function feed(detector, points, { cadenceHz = null } = {}) {
+// Where a follow-on trace picks up so concatenated traces stay continuous.
+function continueFrom(previous, gapMs = 2000) {
+  const last = previous[previous.length - 1]
+  return { startTimestamp: last.timestamp + gapMs, startLat: last.lat }
+}
+
+function feed(detector, points, { cadenceHz = null, motion = true } = {}) {
   const results = []
   let previousTimestamp = null
   for (const point of points) {
+    // A real accelerometer keeps reporting even when there are no footsteps.
+    if (motion && previousTimestamp != null) {
+      for (let t = previousTimestamp; t < point.timestamp; t += 1000) {
+        detector.handleMotionSample(9.81, t)
+      }
+    }
     if (cadenceHz && previousTimestamp != null) {
       const dtSeconds = (point.timestamp - previousTimestamp) / 1000
       const stepCount = Math.round(dtSeconds * cadenceHz)
@@ -78,13 +91,13 @@ describe('createVehicleDetector - plausible human traces never flag', () => {
       speedMps: 6.5,
       durationSeconds: 6,
       intervalSeconds: 2,
-      startTimestamp: warmup[warmup.length - 1].timestamp + 2000,
+      ...continueFrom(warmup, 2000),
     })
     const cooldown = buildTrace({
       speedMps: 3.0,
       durationSeconds: 30,
       intervalSeconds: 2,
-      startTimestamp: sprint[sprint.length - 1].timestamp + 2000,
+      ...continueFrom(sprint, 2000),
     })
     const results = feed(detector, [...warmup, ...sprint, ...cooldown], {
       cadenceHz: 3.0,
@@ -98,10 +111,17 @@ describe('createVehicleDetector - vehicle-assisted traces get caught', () => {
     const detector = createVehicleDetector()
     const trace = buildTrace({ speedMps: 5.5, durationSeconds: 90 })
     const results = feed(detector, trace) // no cadence at all
-    // Zero footstrike cadence at this speed is decisive enough that it can
-    // escalate straight past SUSPECT - see the no-gait handling comment in
-    // vehicleDetection.js.
-    expect(results[results.length - 1].state).toBe(VehicleState.VEHICLE)
+    // Zero footstrike cadence at this speed is decisive on its own: warning,
+    // then (30 s later, still pedalling) the run is discarded.
+    expect(results.some((r) => r.state === VehicleState.VEHICLE)).toBe(true)
+    expect(results[results.length - 1].state).toBe(VehicleState.DISCARDED)
+  })
+
+  it('cycling with the motion sensor gone quiet is judged on speed alone (suspect, not vehicle)', () => {
+    const detector = createVehicleDetector()
+    const trace = buildTrace({ speedMps: 5.5, durationSeconds: 90 })
+    const results = feed(detector, trace, { motion: false })
+    expect(results[results.length - 1].state).toBe(VehicleState.SUSPECT)
   })
 
   it('car in traffic (oscillating 0-10 m/s, no cadence) is still caught', () => {
@@ -148,7 +168,7 @@ describe('createVehicleDetector - vehicle-assisted traces get caught', () => {
       speedMps: 3.0,
       durationSeconds: 40,
       intervalSeconds: 2,
-      startTimestamp: drive[drive.length - 1].timestamp + 2000,
+      ...continueFrom(drive, 2000),
     })
     feed(detector, drive)
     expect(detector.getState()).toBe(VehicleState.VEHICLE)
@@ -179,6 +199,7 @@ describe('createVehicleDetector - GPS noise is discarded, not penalized', () => 
       durationSeconds: 20,
       intervalSeconds: 2,
       startTimestamp: jumpPoint.timestamp + 2000,
+      startLat: before[before.length - 1].lat,
     })
     const results = feed(detector, [...before, jumpPoint, ...after], {
       cadenceHz: 2.6,
@@ -201,7 +222,7 @@ describe('createVehicleDetector - GPS noise is discarded, not penalized', () => 
       durationSeconds: 20,
       intervalSeconds: 2,
       // 35s gap - longer than GAP_SECONDS (20s) - as if GPS dropped in a tunnel.
-      startTimestamp: before[before.length - 1].timestamp + 35000,
+      ...continueFrom(before, 35000),
     })
     const results = feed(detector, [...before, ...afterGap], { cadenceHz: 2.6 })
     const gapResult = results.find((r) => r.segment?.kind === SegmentKind.GAP)
@@ -212,36 +233,22 @@ describe('createVehicleDetector - GPS noise is discarded, not penalized', () => 
 })
 
 describe('createVehicleDetector - dispute and accessibility mode', () => {
-  it('dispute() immediately returns to RUNNING', () => {
+  it('dispute() clears a SUSPECT banner but can no longer cancel a VEHICLE warning', () => {
     const detector = createVehicleDetector()
-    const drive = buildTrace({
-      speedMps: 20,
-      durationSeconds: 20,
-      intervalSeconds: 2,
-    })
-    feed(detector, drive)
-    expect(detector.getState()).toBe(VehicleState.VEHICLE)
+    const bike = buildTrace({ speedMps: 5.5, durationSeconds: 90 })
+    feed(detector, bike, { motion: false })
+    expect(detector.getState()).toBe(VehicleState.SUSPECT)
     detector.dispute()
     expect(detector.getState()).toBe(VehicleState.RUNNING)
-  })
 
-  it('a sustained dispute does not stop re-detection if evidence keeps coming', () => {
-    const detector = createVehicleDetector()
-    const drive = buildTrace({
-      speedMps: 20,
-      durationSeconds: 20,
-      intervalSeconds: 2,
-    })
-    feed(detector, drive)
-    detector.dispute()
-    const moreDriving = buildTrace({
-      speedMps: 20,
-      durationSeconds: 20,
-      intervalSeconds: 2,
-      startTimestamp: drive[drive.length - 1].timestamp + 2000,
-    })
-    feed(detector, moreDriving)
-    expect(detector.getState()).toBe(VehicleState.VEHICLE)
+    const other = createVehicleDetector()
+    feed(
+      other,
+      buildTrace({ speedMps: 20, durationSeconds: 20, intervalSeconds: 2 })
+    )
+    expect(other.getState()).toBe(VehicleState.VEHICLE)
+    other.dispute()
+    expect(other.getState()).toBe(VehicleState.VEHICLE)
   })
 
   it('accessibility mode tolerates higher hand-cycle speeds with no cadence', () => {

@@ -4,31 +4,42 @@
 // Every number here is deliberately named and isolated so it can be tuned
 // without touching the detection logic itself.
 
-// Rolling window used to smooth consecutive GPS fixes into one speed reading,
-// so a single noisy fix can't trip anything on its own (10-15s per spec).
-export const WINDOW_SECONDS = 12
+// --- Speed rules (all speeds are m/s, smoothed over a sliding window of
+// *accepted* fixes; see utils/vehicleDetection.js) ---
 
-// Sustained speed above this (with motion sensors corroborating a lack of
-// running gait) is "suspicious" - ~25.2 km/h, well past genuine running pace
-// but still reachable on a bike/scooter.
-export const SUSPECT_SPEED_MS = 7
-// No motion sensor to corroborate with (denied/unsupported) - speed alone has
-// to look faster still before it's worth a warning, same philosophy the old
-// useRunTracker fallback used.
-export const SUSPECT_SPEED_FALLBACK_MS = 8.5
-// Sustained speed above this is "vehicle" - ~43 km/h. Matches the backend's
-// own TerritoryAntiCheatProperties.maxSustainedSpeedMetersPerSecond so the
-// client's real-time pause and the server's after-the-fact rejection agree.
-export const VEHICLE_SPEED_MS = 12
+// Window used to smooth consecutive GPS fixes into one speed reading, so a
+// single noisy fix can't trip anything on its own.
+export const WINDOW_SECONDS = 25
+// The window must actually cover this much time before it can convict
+// (otherwise 2 fast fixes after a signal gap would be "sustained").
+export const MIN_WINDOW_COVERAGE_SECONDS = 15
 
-// How long SUSPECT-level evidence has to hold before entering/leaving states -
-// hysteresis so a single GPS wobble can't flip the state machine.
-export const SUSPECT_SUSTAIN_SECONDS = 15
-export const VEHICLE_SUSTAIN_SECONDS = 8
-export const CLEAR_SUSTAIN_SECONDS = 6
-// Sustained valid running speed + cadence required to leave VEHICLE and
-// resume distance/territory credit (20-30s per spec).
-export const RESUME_SECONDS = 25
+// Sustained average speed above this over the window = vehicle (~25 km/h).
+// A world-class sprint is ~10 m/s but only for seconds, never for 25 s.
+export const VEHICLE_SPEED_MS = 7
+// Average pace faster than 2:30 /km (6.67 m/s) over 60 s = vehicle too -
+// catches the slower end a 25 s window would let through.
+export const FAST_PACE_SPEED_MS = 1000 / 150
+export const FAST_PACE_WINDOW_SECONDS = 60
+// 5-7 m/s held for more than 60 s = "suspicious" (a bike): banner only.
+export const BIKE_SPEED_MS = 5
+export const BIKE_SUSTAIN_SECONDS = 60
+
+// Evidence has to persist this long before a state change (hysteresis).
+export const SUSPECT_SUSTAIN_SECONDS = 5
+export const VEHICLE_SUSTAIN_SECONDS = 3
+// After a vehicle warning: valid running (speed back under BIKE_SPEED_MS
+// over the last RESUME_WINDOW_SECONDS, plus cadence when it can be sensed)
+// for this long clears it and counting resumes.
+export const RESUME_SECONDS = 5
+export const RESUME_WINDOW_SECONDS = 6
+// How long the player has to slow down before the run is discarded.
+export const VEHICLE_WARNING_SECONDS = 30
+// Vehicle time carries across episodes (a bus stopping at a stop must not
+// reset the clock) and is forgotten after this long without a vehicle.
+export const WARNING_MEMORY_SECONDS = 180
+// Minimum gap between two "vehicle detected" notifications.
+export const VEHICLE_NOTIFY_COOLDOWN_SECONDS = 120
 
 // Running cadence range (steps/sec) - below MIN_CADENCE_HZ while moving fast
 // reads as "no running gait detected" (vehicle or bike).
@@ -60,14 +71,13 @@ export const SKIP_INITIAL_SECONDS = 5
 export const GAP_SECONDS = 20
 
 // A single-fix implied speed above this is a GPS jump/teleport, not real
-// movement - discarded from both distance and evidence, mirroring the
+// movement - unless the very next fix confirms it (a motorway at 30 m/s) - discarded from both distance and evidence, mirroring the
 // backend's own filterTeleportingPoints.
-export const MAX_PLAUSIBLE_SPEED_MS = 40
+export const MAX_PLAUSIBLE_SPEED_MS = 25
 
-// Coefficient-of-variation floor for "suspiciously constant speed" - real
-// running pace wobbles; a long stretch this flat (above BRISK_SPEED_MS) reads
-// as cruise-controlled.
-export const CONSTANT_SPEED_VARIANCE_THRESHOLD = 0.06
+// No accelerometer sample for this long = the sensor went quiet (screen
+// locked / throttled WebView): stop requiring a running gait.
+export const NO_MOTION_TIMEOUT_SECONDS = 10
 
 // If this fraction (or more) of a run's distance ends up vehicle-excluded,
 // the whole run is marked invalid client-side. Matches the backend's
