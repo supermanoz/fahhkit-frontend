@@ -168,3 +168,104 @@
 .share-carousel-permission p {
   margin: 0;
 }
+
+/* Export buttons (ExportButton.jsx): fixed height + icon slot so the layout
+   never jumps between idle / loading / success / error. */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.export-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  font-weight: 800;
+}
+
+.export-btn-icon:empty {
+  display: none;
+}
+
+.export-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: export-spin 0.7s linear infinite;
+}
+
+@keyframes export-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.export-btn:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.export-btn--success {
+  background: #1f9d55 !important;
+  border-color: #1f9d55 !important;
+  color: #fff !important;
+}
+
+.export-btn--error {
+  background: #d93025 !important;
+  border-color: #d93025 !important;
+  color: #fff !important;
+}
+
+/* Toast at the bottom of the popup: solid off-white card, dark text. */
+.share-carousel-toast-slot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.share-carousel-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: #f8f5ee;
+  color: #1a1a1a;
+  border: 2px solid #1a1a1a;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.share-carousel-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 13px;
+}
+
+.share-carousel-toast--success .share-carousel-toast-icon {
+  background: #1f9d55;
+}
+
+.share-carousel-toast--error .share-carousel-toast-icon {
+  background: #d93025;
+}

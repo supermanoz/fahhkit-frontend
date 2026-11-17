@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useRef, useState } from 'react'
-import { IconChevronLeft, IconChevronRight, IconDownload } from './GameIcons'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { IconChevronLeft, IconChevronRight } from './GameIcons'
 import { isNative } from '../utils/geo'
 import {
   SAVE_STATUS,
@@ -8,7 +8,8 @@ import {
   saveImageToPhotos,
   shareImageFile,
 } from '../utils/saveImage'
-import { useToast } from '../game/ui/Toast'
+import ExportButton from './ExportButton'
+import { EXPORT_MESSAGES, withTimeout } from '../hooks/useExportAction'
 import { motion } from 'framer-motion'
 import {
   SHARE_VARIANTS,
@@ -61,12 +62,15 @@ const SLIDES = [
 // the downloaded file, so what's shown here is what gets saved.
 export default function ShareRunCarousel({ run }) {
   const [index, setIndex] = useState(0)
-  const [downloadingVariant, setDownloadingVariant] = useState(null)
-  // Native app only: which slide is mid save/share ('save' | 'share'), and
-  // whether the last save was refused for lack of Photos permission.
-  const [nativeBusy, setNativeBusy] = useState(null)
-  const [permissionDenied, setPermissionDenied] = useState(false)
-  const toast = useToast()
+  // Popup toast (solid card, bottom of the popup) for export success/failure.
+  const [toastMsg, setToastMsg] = useState(null)
+  const toastTimer = useRef(null)
+  const notify = useCallback((next) => {
+    clearTimeout(toastTimer.current)
+    setToastMsg(next)
+    toastTimer.current = setTimeout(() => setToastMsg(null), 2000)
+  }, [])
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
   const containerRef = useRef(null)
   const [containerWidth, setContainerWidth] = useState(0)
 
@@ -119,44 +123,30 @@ export default function ShareRunCarousel({ run }) {
       ? `run-conquest-overlay-${run.id}.png`
       : `run-conquest-run-${run.id}-${slide.variant}.${slide.ext}`
 
-  // Native app: save to Photos / the share sheet instead of <a download>,
-  // which does nothing in the WebView. Web path unchanged below.
-  async function handleNative(slide, action) {
-    setNativeBusy({ variant: slide.variant, action })
-    setPermissionDenied(false)
-    try {
-      const blob = await renderBlob(slide)
-      const filename = fileNameFor(slide)
-      const result =
-        action === 'share'
-          ? await shareImageFile(blob, filename)
-          : await saveImageToPhotos(blob, filename)
-      if (result.status === SAVE_STATUS.SAVED) {
-        toast.push('Saved to Photos', { type: 'success' })
-      } else if (result.status === SAVE_STATUS.SHARED) {
-        toast.push('Shared', { type: 'success' })
-      } else if (result.status === SAVE_STATUS.PERMISSION_DENIED) {
-        setPermissionDenied(true)
-      }
-    } catch (err) {
-      toast.push(
-        `Couldn't save the image${err?.message ? ` - ${err.message}` : ''}. Try Share instead.`,
-        { type: 'error' }
-      )
-    } finally {
-      setNativeBusy(null)
+  // One export per button (ExportButton / useExportAction own the loading,
+  // success and error states). Each returns what the hook needs to report.
+  async function exportSlide(slide, action) {
+    const filename = fileNameFor(slide)
+    if (!isNative) {
+      downloadBlob(await renderBlob(slide), filename)
+      return { message: EXPORT_MESSAGES.downloaded }
     }
-  }
-
-  async function handleDownload(slide) {
-    if (isNative) return handleNative(slide, 'save')
-    setDownloadingVariant(slide.variant)
-    try {
-      const blob = await renderBlob(slide)
-      downloadBlob(blob, fileNameFor(slide))
-    } finally {
-      setDownloadingVariant(null)
+    // The 15s limit covers building the image only - the share sheet stays
+    // open as long as the player likes.
+    const blob = await withTimeout(renderBlob(slide), 15000)
+    if (action === 'share') {
+      const result = await shareImageFile(blob, filename)
+      if (result.status === SAVE_STATUS.CANCELLED) return { silent: true }
+      return { message: EXPORT_MESSAGES.shared }
     }
+    const result = await saveImageToPhotos(blob, filename)
+    if (result.status === SAVE_STATUS.PERMISSION_DENIED) {
+      return { permissionDenied: true }
+    }
+    if (result.status === SAVE_STATUS.SHARED) {
+      return { message: EXPORT_MESSAGES.shared }
+    }
+    return { message: EXPORT_MESSAGES.saved }
   }
 
   return (
@@ -185,50 +175,45 @@ export default function ShareRunCarousel({ run }) {
                 <span className="share-carousel-slide-label">
                   {slide.label}
                 </span>
-                <button
-                  type="button"
+                <ExportButton
                   className="btn btn-primary btn-block"
-                  onClick={() => handleDownload(slide)}
-                  disabled={
-                    downloadingVariant === slide.variant ||
-                    nativeBusy?.variant === slide.variant
-                  }
+                  idleLabel={`Download ${slide.ext.toUpperCase()}`}
+                  loadingLabel="Downloading..."
+                  run={() => exportSlide(slide, 'save')}
+                  onNotify={notify}
+                  timeoutMs={isNative ? null : 15000}
+                  testId={`download-${slide.variant}`}
                 >
-                  <IconDownload />{' '}
-                  {downloadingVariant === slide.variant
-                    ? 'Preparing...'
-                    : nativeBusy?.variant === slide.variant &&
-                        nativeBusy.action === 'save'
-                      ? 'Saving...'
-                      : `Download ${slide.ext.toUpperCase()}`}
-                </button>
+                  {({ permissionDenied }) =>
+                    isNative &&
+                    permissionDenied && (
+                      <div className="share-carousel-permission" role="alert">
+                        <p>
+                          Photos access is off, so we can&apos;t save the image.
+                          Allow it in Settings, or use Share.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => openAppSettings().catch(() => {})}
+                        >
+                          Open settings
+                        </button>
+                      </div>
+                    )
+                  }
+                </ExportButton>
                 {isNative && (
-                  <button
-                    type="button"
+                  <ExportButton
                     className="btn btn-outline btn-block"
-                    onClick={() => handleNative(slide, 'share')}
-                    disabled={nativeBusy?.variant === slide.variant}
-                  >
-                    {nativeBusy?.variant === slide.variant &&
-                    nativeBusy.action === 'share'
-                      ? 'Opening...'
-                      : 'Share'}
-                  </button>
-                )}
-                {isNative && permissionDenied && (
-                  <div className="share-carousel-permission" role="alert">
-                    <p>
-                      Photos access is off, so we can&apos;t save the image.
-                      Allow it in Settings, or use Share.
-                    </p>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => openAppSettings().catch(() => {})}
-                    >
-                      Open settings
-                    </button>
-                  </div>
+                    idleLabel="Share"
+                    loadingLabel="Preparing..."
+                    icon={null}
+                    run={() => exportSlide(slide, 'share')}
+                    onNotify={notify}
+                    timeoutMs={null}
+                    testId={`share-${slide.variant}`}
+                  />
                 )}
               </div>
             </div>
@@ -254,6 +239,21 @@ export default function ShareRunCarousel({ run }) {
       >
         <IconChevronRight />
       </button>
+
+      <div className="share-carousel-toast-slot" aria-live="polite">
+        {toastMsg && (
+          <div
+            className={`share-carousel-toast share-carousel-toast--${toastMsg.type}`}
+            role="status"
+            data-testid="export-toast"
+          >
+            <span className="share-carousel-toast-icon" aria-hidden="true">
+              {toastMsg.type === 'success' ? '✓' : '✕'}
+            </span>
+            {toastMsg.message}
+          </div>
+        )}
+      </div>
 
       <div className="share-carousel-dots">
         {SLIDES.map((slide, i) => (
