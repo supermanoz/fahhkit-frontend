@@ -6,10 +6,12 @@ import {
   setToken,
   clearToken,
   setUser,
-  clearUser,
+  clearSession,
   ApiError,
 } from '../api/client'
 import { cancelDailyNudge } from '../utils/dailyNudge'
+import { googleSignOut } from '../utils/googleSession'
+import { unregisterPushToken } from '../utils/push'
 
 // Shared auth actions used by both the website pages (LoginPage, RegisterPage,
 // ForgotPasswordPage, UpdatePasswordPage) and the in-game auth screens
@@ -23,6 +25,9 @@ export function useAuthFlow() {
   // token, load the full user record, cache it. Callers decide what happens
   // after (navigate, close an overlay, etc).
   const finishSignIn = useCallback(async (authResponse) => {
+    // Start clean so nothing from a previous account can leak into this one;
+    // the stored user is replaced, never merged.
+    clearSession()
     setToken(authResponse.tokenId)
     const user = await getJson('/v1/user/find/logged-in')
     setUser(user)
@@ -105,9 +110,12 @@ export function useAuthFlow() {
     []
   )
 
-  const signOut = useCallback(() => {
-    clearToken()
-    clearUser()
+  const signOut = useCallback(async () => {
+    // Push token first (needs the auth token still valid; bounded, never
+    // throws), then forget the Google account, then wipe local state.
+    await unregisterPushToken()
+    await googleSignOut()
+    clearSession()
     // No-op on the website; stops the come-back reminder outliving the session.
     cancelDailyNudge()
   }, [])

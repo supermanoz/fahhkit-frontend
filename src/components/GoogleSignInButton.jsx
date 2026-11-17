@@ -2,11 +2,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 import { isNative } from '../utils/geo'
+import {
+  ensureGoogleAuthInitialized,
+  googleSignOut,
+} from '../utils/googleSession'
 import { describeGoogleSignInError } from '../utils/googleSignInErrors'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
-let googleAuthInitialized = false
 
 let gsiScriptPromise = null
 
@@ -55,6 +58,7 @@ function GoogleSignInButtonWeb({ onCredential, onError }) {
         if (cancelled || !containerRef.current) return
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
+          auto_select: false,
           callback: (response) => {
             if (response?.credential) {
               handlersRef.current.onCredential(response.credential)
@@ -87,14 +91,15 @@ function GoogleSignInButtonNative({ onCredential, onError }) {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (googleAuthInitialized) return
-    googleAuthInitialized = true
-    GoogleAuth.initialize()
+    ensureGoogleAuthInitialized()
   }, [])
 
   async function handleClick() {
     setBusy(true)
     try {
+      // Always start from a clean plugin state so Google shows the account
+      // chooser instead of silently reusing the last account.
+      await googleSignOut()
       const user = await GoogleAuth.signIn()
       if (user?.authentication?.idToken) {
         onCredential(user.authentication.idToken)

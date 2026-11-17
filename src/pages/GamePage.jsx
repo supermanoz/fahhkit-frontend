@@ -50,7 +50,6 @@ import { useAuthFlow } from '../hooks/useAuthFlow'
 import { useDailyNudge } from '../hooks/useDailyNudge'
 import { scheduleDailyNudge } from '../utils/dailyNudge'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { unregisterPushToken } from '../utils/push'
 import NotificationsSection from '../components/NotificationsSection'
 import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
 // Dynamically imported (not bundled with the rest of the game) - a logged-
@@ -538,8 +537,7 @@ function GamePageInner() {
   async function handleLogout() {
     // Stop pushes for this player on this phone first (needs the token still
     // valid; bounded to ~1.5s and never throws).
-    await unregisterPushToken()
-    auth.signOut()
+    await auth.signOut()
     window.location.reload()
   }
   // The live "Distance" stat during a run - throttled to refresh once every

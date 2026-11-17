@@ -3,11 +3,11 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { FaChevronDown, FaUserCircle } from 'react-icons/fa'
 import {
   canManageEvents,
-  clearToken,
-  clearUser,
+  clearSession,
   isAdmin,
   resolveFileUrl,
 } from '../api/client'
+import { googleSignOut } from '../utils/googleSession'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { getTerritoryProfile } from '../api/territory'
 import { formatCoins } from '../utils/format'
@@ -143,8 +143,8 @@ export default function Navbar() {
   }
 
   function handleSignOut() {
-    clearToken()
-    clearUser()
+    clearSession()
+    googleSignOut()
     close()
     navigate('/')
   }

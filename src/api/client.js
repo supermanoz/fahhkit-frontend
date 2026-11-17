@@ -3,6 +3,7 @@ import {
   compressFormDataImages,
   formDataFileBytes,
 } from '../utils/imageCompress'
+import { googleSignOut } from '../utils/googleSession'
 
 const PRIMARY_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
@@ -113,6 +114,36 @@ export function clearUser() {
   localStorage.removeItem(USER_KEY)
 }
 
+// Everything stored on this device that belongs to the signed-in player.
+// Device settings (sound/music, theme, map style, anti-cheat toggles) and
+// the per-user dismissed-broadcast list are deliberately kept.
+const USER_SCOPED_KEYS = [
+  TOKEN_KEY,
+  USER_KEY,
+  'fahhkit_active_run',
+  'fahhkit_territory_avatar_id',
+  'fahhkit_seen_medal_ids',
+  'fahhkit_pvp_discoverable',
+]
+const USER_SCOPED_PREFIXES = [
+  'fahhkit_club_war_last_',
+  'fahhkit_tracked_events_',
+]
+
+// Synchronous, idempotent wipe of the signed-in player's local state. Used by
+// logout, the 401 auto-logout and the start of every sign-in.
+export function clearSession() {
+  try {
+    USER_SCOPED_KEYS.forEach((key) => localStorage.removeItem(key))
+    Object.keys(localStorage)
+      .filter((key) => USER_SCOPED_PREFIXES.some((p) => key.startsWith(p)))
+      .forEach((key) => localStorage.removeItem(key))
+    sessionStorage.clear()
+  } catch {
+    // Storage unavailable - nothing to clear.
+  }
+}
+
 export function canManageEvents(user) {
   return user?.userType === 'ADMIN' || user?.userType === 'MODERATOR'
 }
@@ -147,8 +178,8 @@ const AUTH_FLOW_PATHS = [
 // navbar showing a cached user while every page silently fails.
 function handleAuthFailure(status, hadToken) {
   if (hadToken && (status === 401 || status === 403)) {
-    clearToken()
-    clearUser()
+    clearSession()
+    googleSignOut()
     if (
       !AUTH_FLOW_PATHS.some((path) => window.location.pathname.startsWith(path))
     ) {
