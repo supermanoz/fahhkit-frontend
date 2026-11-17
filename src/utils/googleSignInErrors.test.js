@@ -59,3 +59,13 @@ describe('describeOAuthServerError', () => {
     ).toMatch(/Could not reach/)
   })
 })
+
+describe('describeOAuthServerError - Apple backend errors', () => {
+  it('maps 409 to a readable link-conflict message', async () => {
+    const { ApiError } = await import('../api/client')
+    const { describeOAuthServerError } = await import('./googleSignInErrors')
+    expect(
+      describeOAuthServerError(new ApiError('dup', 409), 'Apple', 'fb')
+    ).toMatch(/already used by another account/)
+  })
+})

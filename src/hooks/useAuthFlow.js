@@ -56,8 +56,17 @@ export function useAuthFlow() {
   // authorization (Apple omits it on every later sign-in) - see
   // AppleSignInButton.jsx for where it's captured.
   const signInWithApple = useCallback(
-    (identityToken, fullName) =>
-      postJson('/v1/auth/apple', { identityToken, fullName }),
+    (identityToken, fullName, extra = {}) =>
+      postJson('/v1/auth/apple', {
+        identityToken,
+        fullName,
+        // Native iOS only: authorizationCode, the RAW nonce (Apple got its
+        // SHA-256) and the first-authorization email. Undefined keys are
+        // dropped by JSON.stringify.
+        authorizationCode: extra.authorizationCode,
+        nonce: extra.nonce,
+        email: extra.email,
+      }),
     []
   )
 

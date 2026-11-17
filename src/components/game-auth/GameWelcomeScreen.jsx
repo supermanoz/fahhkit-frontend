@@ -2,9 +2,10 @@
 import AuthLogo from './AuthLogo'
 import GoogleSignInButton from '../GoogleSignInButton'
 import AppleSignInButton from '../AppleSignInButton'
+import { isIosAppleSignInEnabled } from '../../utils/appleSignIn'
+import { isNative } from '../../utils/geo'
 
 const HAS_GOOGLE = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
-const HAS_APPLE = Boolean(import.meta.env.VITE_APPLE_CLIENT_ID)
 
 export default function GameWelcomeScreen({
   onSignIn,
@@ -14,6 +15,11 @@ export default function GameWelcomeScreen({
   onOAuthError,
   banner,
 }) {
+  // Native iOS: the Apple sheet (flag-gated). Never on Android; the web
+  // Apple flow only when a Services ID is configured (not in the native app).
+  const HAS_APPLE =
+    isIosAppleSignInEnabled() ||
+    (!isNative && Boolean(import.meta.env.VITE_APPLE_CLIENT_ID))
   return (
     <div className="game-auth-card">
       <AuthLogo />

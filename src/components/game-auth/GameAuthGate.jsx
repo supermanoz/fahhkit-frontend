@@ -129,17 +129,18 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
     }
   }
 
-  async function handleAppleCredential(identityToken, fullName) {
+  async function handleAppleCredential(identityToken, fullName, extra) {
     dispatch({ type: 'SUBMIT_START' })
     try {
-      const data = await auth.signInWithApple(identityToken, fullName)
+      const data = await auth.signInWithApple(identityToken, fullName, extra)
       await completeSignIn(data)
     } catch (err) {
       dispatch({
         type: 'SUBMIT_ERROR',
-        message: authErrorMessage(
+        message: describeOAuthServerError(
           err,
-          'Apple sign-in failed. Please try again.'
+          'Apple',
+          authErrorMessage(err, 'Apple sign-in failed. Please try again.')
         ),
       })
     }

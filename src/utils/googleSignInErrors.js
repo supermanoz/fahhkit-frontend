@@ -49,5 +49,7 @@ export function describeOAuthServerError(err, provider, fallback) {
     return `${provider} sign-in was rejected by the server (401): the token's client ID isn't in the server's allow-list, or it expired.${err.message ? ` Server said: ${err.message}` : ''}`
   if (err.status === 403)
     return `This ${provider} account isn't allowed to sign in (403).${err.message ? ` Server said: ${err.message}` : ''}`
+  if (err.status === 409)
+    return `This email is already used by another account, so ${provider} sign-in can't link to it. Sign in with your original method.`
   return err.message || fallback
 }

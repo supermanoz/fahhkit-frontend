@@ -1,5 +1,11 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
+import { isNative } from '../utils/geo'
+import {
+  authorizeWithApple,
+  isAppleCancel,
+  isIosAppleSignInEnabled,
+} from '../utils/appleSignIn'
 import './AppleSignInButton.css'
 
 const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID || ''
@@ -39,7 +45,58 @@ function loadAppleScript() {
 // the athlete's name on their *first* authorization (never again on later
 // sign-ins), so it's captured here and forwarded as `fullName` - the backend
 // already knows to only use it when creating a brand new account.
-export default function AppleSignInButton({ onCredential, onError }) {
+const APPLE_LOGO_PATH =
+  'M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-163.9-39.5c-76.7 0-104 39.5-166.5 39.5s-105.9-57-150.5-121.9C50.1 823.6 1.4 683.2 1.4 550.3c0-203.1 132-310.8 262.1-310.8 70.2 0 128.8 41.6 169.2 41.6 38.4 0 101.3-44.1 174.1-44.1 28.1 0 129.1 2.3 180.6 136.9zm-257-266.5c17.7-22.4 32.4-55.2 32.4-88.2 0-4.8-.4-9.6-1.3-13.6-26 1.1-56.4 17.4-78.6 41.4-20.3 22.4-37.8 54.7-37.8 87.7 0 5.1.9 10.1 1.3 11.6 2 .3 5.2.6 8.6.6 22.3 0 50.4-15.3 75.4-39.5z'
+
+// Native iOS sheet (ASAuthorizationAppleIDProvider). Hands the backend the
+// identity token, authorization code, the RAW nonce (Apple got its SHA-256)
+// and - first authorization only - the name/email.
+function AppleSignInButtonNative({ onCredential, onError }) {
+  const [busy, setBusy] = useState(false)
+
+  async function handleClick() {
+    setBusy(true)
+    try {
+      const result = await authorizeWithApple()
+      await onCredential(result.identityToken, result.fullName, {
+        authorizationCode: result.authorizationCode,
+        nonce: result.nonce,
+        email: result.email,
+      })
+    } catch (err) {
+      // 1001 = the athlete closed the Apple sheet: not an error.
+      if (isAppleCancel(err)) return
+      console.warn('[AppleSignIn] native sign-in failed', err)
+      onError?.(
+        err?.message
+          ? `Apple sign-in failed: ${err.message}`
+          : 'Apple sign-in failed. Please try again.'
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="apple-signin-button"
+      onClick={handleClick}
+      disabled={busy}
+    >
+      <svg
+        viewBox="0 0 814 1000"
+        aria-hidden="true"
+        className="apple-signin-icon"
+      >
+        <path fill="#fff" d={APPLE_LOGO_PATH} />
+      </svg>
+      Continue with Apple
+    </button>
+  )
+}
+
+function AppleSignInButtonWeb({ onCredential, onError }) {
   const handlersRef = useRef({ onCredential, onError })
   handlersRef.current = { onCredential, onError }
   const [ready, setReady] = useState(false)
@@ -110,4 +167,13 @@ export default function AppleSignInButton({ onCredential, onError }) {
       {busy ? 'Signing in…' : 'Continue with Apple'}
     </button>
   )
+}
+
+// iOS app: the native sheet, behind the IOS_APPLE_SIGNIN flag. Everywhere
+// else only the website's Apple JS flow exists (needs VITE_APPLE_CLIENT_ID);
+// it is never rendered inside any native shell (Android or iOS).
+export default function AppleSignInButton(props) {
+  if (isIosAppleSignInEnabled()) return <AppleSignInButtonNative {...props} />
+  if (isNative || !APPLE_CLIENT_ID) return null
+  return <AppleSignInButtonWeb {...props} />
 }
