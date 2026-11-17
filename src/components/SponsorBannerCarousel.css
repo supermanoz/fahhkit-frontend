@@ -142,10 +142,10 @@ a.sponsor-banner-card:focus-visible {
 .sponsor-banner-view-btn {
   position: absolute;
   left: 50%;
-  /* Clears the dots row below (see .sponsor-banner-dots) when there's more
-     than one partner - both are centred/overlaid at the bottom, this just
-     needs enough headroom not to touch it. */
-  bottom: 22px;
+  /* Scales with the banner (15% of its height) but never lower than 30px:
+     the dots sit at bottom: 8px (8px tall), so that keeps >= ~10px of clear
+     space between the button's hard drop shadow and the dots. */
+  bottom: clamp(30px, 15%, 44px);
   translate: -50% 0;
   display: flex;
   align-items: center;
