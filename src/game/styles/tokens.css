@@ -118,6 +118,18 @@
      low-funds) - same reasoning as --red-tint. */
   --gold-tint: #ffe8d3;
 
+  /* Amber - WARNINGS only ("very short run", "loop looks short/open").
+     Never red (red = destructive), never the brand orange above (that is
+     headings/highlights). Reads on both the dark sheet and light cards
+     because /game text always carries the black stroke. */
+  --amber-500: #f5a300;
+
+  /* Pause/Resume - one distinct secondary colour: not green (go), not red
+     (destructive), not shop purple (informational headers). */
+  --pause-300: #8cc2ff;
+  --pause-500: #3a8bf0;
+  --pause-700: #1f5fb8;
+
   /* Real gold - coins/trophies/rank-1 only, kept distinct from the
      gold/orange accent above (that one's closer to the site's brand
      orange; this is an actual metallic gold). */
@@ -196,6 +208,19 @@
   --shop-accent: #be2ed6;
   --shop-accent-light: #d75bea;
   --shop-accent-dark: #8f1fa3;
+
+  /* In-run stats card (GamePage.jsx's .game-run-card) - styled after the
+     iOS Live Activity: near-black card, orange runner, dark-brown mode
+     pill, grey unit labels. Own tokens so the card can't drift with the
+     light panel theme above. */
+  --live-bg: #0b0b0c;
+  --live-border: rgba(255, 255, 255, 0.1);
+  --live-orange: #e8662b;
+  --live-pill: #3a2218;
+  --live-muted: #8e8e93;
+  --live-font:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
 
   /* Text - every bit of /game text is white with a black stroke + drop
      shadow (see .game-text below), so the title/body/muted roles all

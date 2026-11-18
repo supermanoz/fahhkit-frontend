@@ -833,7 +833,7 @@ export default function ClubPanel({
                             </button>
                             <button
                               type="button"
-                              className="game-btn game-btn-red game-btn-sm"
+                              className="game-btn game-btn-wood game-btn-sm"
                               disabled={busyId === req.id}
                               onClick={() =>
                                 runAction(

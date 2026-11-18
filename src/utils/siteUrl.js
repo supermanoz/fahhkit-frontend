@@ -14,7 +14,7 @@ import { isNative, platform } from './geo'
 // Capacitor's WebView serves the bundled dist-app/ from (never a real public
 // URL), so there - and only there - VITE_SITE_URL is used, falling back to
 // NATIVE_FALLBACK_SITE_URL when a native build was made without it.
-const NATIVE_FALLBACK_SITE_URL = 'https://fahhkit.vercel.app'
+const NATIVE_FALLBACK_SITE_URL = 'https://fahhkit.netlify.app'
 
 // Pure resolver, split out so every case can be tested with simulated
 // origins (e2e/site-url.spec.js).
@@ -29,6 +29,13 @@ export function getSiteBaseUrl() {
     origin: window.location.origin,
     configured: import.meta.env.VITE_SITE_URL,
   })
+}
+
+// Full URL for a website page: getSiteUrl('/profile/edit'). The ONE helper
+// every "open the website" button/link goes through (never hardcode a host).
+export function getSiteUrl(path = '') {
+  const clean = path ? `/${String(path).replace(/^\/+/, '')}` : ''
+  return `${getSiteBaseUrl()}${clean}`
 }
 
 // Apple App Store Review Guideline 3.1.1: an app may not link out to an
@@ -57,7 +64,7 @@ export const iosShopRedirectBlocked =
 // doesn't refuse on its own, so a caller that already decided to show the
 // disabled state can still choose not to call it.
 export function openShopPack(fahhcoinAmount) {
-  const url = `${getSiteBaseUrl()}/shop?pack=${encodeURIComponent(fahhcoinAmount)}`
+  const url = getSiteUrl(`/shop?pack=${encodeURIComponent(fahhcoinAmount)}`)
   if (isNative) {
     return Browser.open({ url })
   }

@@ -790,7 +790,7 @@ export default function ClubWarPanel({
           {isLeader && (
             <button
               type="button"
-              className="game-btn game-btn-red"
+              className="game-btn game-btn-wood"
               onClick={handleCancelQueue}
               disabled={busy === 'cancel'}
             >

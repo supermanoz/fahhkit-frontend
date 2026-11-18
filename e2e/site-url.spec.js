@@ -52,7 +52,7 @@ test.describe('site base URL', () => {
     expect(r.vercel).toBe('https://fahhkit.vercel.app/shop?pack=500')
     expect(r.localhost).toBe('http://localhost:5173/shop?pack=500')
     expect(r.nativeConfigured).toBe('https://example.test/shop?pack=500')
-    expect(r.nativeFallback).toBe('https://fahhkit.vercel.app/shop?pack=500')
+    expect(r.nativeFallback).toBe('https://fahhkit.netlify.app/shop?pack=500')
   })
 
   test("openShopPack opens this page's own origin /shop", async ({

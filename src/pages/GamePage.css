@@ -32,16 +32,6 @@
   --game-gold: var(--gold-500);
   --game-gold-dark: var(--gold-700);
   --game-gold-light: var(--gold-300);
-  /* Run-stats card header strip (see .game-run-card-header) - its own
-     semantic pair so the header's gradient can move independently of
-     --game-gold elsewhere, even though it currently aliases the exact same
-     orange triad. Dark anchor + a slightly lighter stop for the Running
-     gradient; Paused reuses the same triad one tier up (lighter/brighter)
-     so the two states read as clearly different at a glance. */
-  --run-header-dark: var(--gold-700);
-  --run-header-light: var(--gold-500);
-  --run-header-paused-dark: var(--gold-500);
-  --run-header-paused-light: var(--gold-300);
   --game-green: var(--green-500);
   --game-green-dark: var(--green-700);
   --game-green-light: var(--green-300);
@@ -1084,6 +1074,12 @@
   font-weight: 600;
 }
 
+/* Warnings (not errors, not destructive): amber. */
+.game-controls-hint-warn {
+  color: var(--amber-500);
+  font-weight: 600;
+}
+
 .game-controls-expand {
   display: flex;
   flex-direction: column;
@@ -1093,127 +1089,227 @@
   width: 100%;
 }
 
-/* --- In-run status/stats card: a white card floating on the dark
-   .game-controls sheet (unlike the plain .game-stat rows used elsewhere in
-   this sheet), replacing the old bare Distance/Pace/Time row + separate
-   chevron pill. Header strip is itself the statsOnly toggle (was
-   .game-controls-handle) - a dark-to-light orange gradient (--run-header-*,
-   see the .game-page alias block up top) with the game's normal white
-   stroked text, one tier lighter/brighter while .is-paused so the two
-   states read as clearly different. The grip at the card's own bottom edge
-   is purely decorative (drag-handle look), not a second control. The stats
-   row below stays dark-on-white rather than the usual white-stroked
-   .game-text treatment (see tokens.css's :where() rule) since that part of
-   the card is its own light surface, same reasoning as the input-text
-   override there - the header strip above it is a normal coloured game
-   surface, so its text keeps the default stroke/shadow. */
+/* --- In-run status/stats card, styled after the iOS Live Activity (see the
+   --live-* tokens). Compact near-black card: top row = runner icon +
+   "Run Conquest" left, mode pill right (also the statsOnly toggle); main row
+   = Time left, Distance + Pace right. Swiping the grip at the bottom edge up
+   (or tapping it / the top row) reveals .game-run-card-details BELOW the
+   main row: a divider and a 2-column grid of stat tiles. System sans, and the
+   game's default white-stroke text treatment is switched off inside. --- */
+.game-run-card,
+.game-run-card * {
+  font-family: var(--live-font);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
 .game-run-card {
   width: 100%;
-  border-radius: 20px;
-  overflow: hidden;
-  background: var(--white);
-  border: 2px solid var(--panel-border);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+  padding: 14px 18px 0;
+  border-radius: 24px;
+  background: var(--live-bg);
+  border: 1px solid var(--live-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #fff;
+  text-align: left;
+  --run-details-max: max(96px, calc(55dvh - 300px));
 }
 
 .game-run-card-header {
-  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 10px 44px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
   border: none;
+  background: none;
   cursor: pointer;
-  background: linear-gradient(
-    180deg,
-    var(--run-header-light) 0%,
-    var(--run-header-dark) 100%
-  );
+  color: inherit;
 }
 
-.game-run-card.is-paused .game-run-card-header {
-  background: linear-gradient(
-    180deg,
-    var(--run-header-paused-light) 0%,
-    var(--run-header-paused-dark) 100%
-  );
-}
-
-/* White with the game's usual thin black stroke + drop shadow (the default
-   :where() rule in tokens.css already gives every /game element this, so
-   this just has to stop pointing color at a dark ink value like the stats
-   row below it does - it doesn't need to re-opt-in to the stroke/shadow
-   themselves). Keeps header text legible over either header gradient
-   regardless of orange shade - same technique used everywhere else text
-   sits on a busy/coloured game surface. */
-.game-run-card-status {
-  font-weight: 800;
-  font-size: 16px;
-  color: var(--text-title);
-  /* Mode label ("Territory Capture", "Training · Paused"): one line, never
-     wraps. */
+.game-run-card-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
+}
+
+.game-run-card-brand-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  color: var(--live-orange);
+}
+
+.game-run-card-brand-name {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.game-run-card-expand-icon {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  translate: 0 -50%;
-  width: 18px;
-  height: 18px;
-  color: var(--text-title);
+/* Mode pill ("Training", "PvP Battle", ...) - one line, never wraps. */
+.game-run-card-status {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--live-pill);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* Narrow phones: only cards with a long mode pill (GamePage.jsx's
+   has-long-mode > 12 chars, has-mid-mode > 8) shrink the brand + pill text so
+   "Run Conquest" isn't clipped. */
+@media (max-width: 370px) {
+  .game-run-card {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .game-run-card:is(.has-long-mode, .has-mid-mode) .game-run-card-brand {
+    gap: 8px;
+  }
+  .game-run-card:is(.has-long-mode, .has-mid-mode) .game-run-card-brand-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .game-run-card:is(.has-long-mode, .has-mid-mode) .game-run-card-brand-name {
+    font-size: 16px;
+  }
+  .game-run-card:is(.has-long-mode, .has-mid-mode) .game-run-card-status {
+    padding: 4px 9px;
+    font-size: 13px;
+  }
 }
 
 .game-run-card-stats {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 4px;
-  padding: 16px 18px 8px;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.game-run-card-metrics {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
 }
 
 .game-run-card-stats .game-stat {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 0 4px;
+  padding: 0;
+}
+
+.game-run-card-metrics .game-stat {
+  align-items: flex-end;
+  text-align: right;
 }
 
 .game-run-card-stats .game-stat-value {
   font-variant-numeric: tabular-nums;
-  font-size: 24px;
-  font-weight: 900;
-  color: var(--text-title-dark);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #fff;
 }
 
-.game-run-card-stats .game-stat-hero .game-stat-value {
-  font-size: 34px;
+.game-run-card-stats .game-stat-time .game-stat-value {
+  font-size: 40px;
+  line-height: 1;
 }
 
 .game-run-card-stats .game-stat-label {
-  font-size: 13px;
-  font-weight: 600;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 400;
   letter-spacing: normal;
   text-transform: none;
-  color: var(--text-muted-dark);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
+  color: var(--live-muted);
+}
+
+/* Details revealed by swiping up: height is driven from GamePage.jsx (0,
+   'auto', or the live drag height), so this only clips. The scroll area
+   inside caps at --run-details-max (~55% of the screen minus the rest of the
+   sheet) and scrolls if there are more tiles than fit. */
+.game-run-card-details {
+  overflow: hidden;
+}
+
+.game-run-card-details-scroll {
+  max-height: var(--run-details-max);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.game-run-card-divider {
+  height: 1px;
+  margin: 14px 0 12px;
+  background: var(--live-border);
+}
+
+.game-run-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.game-run-card-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.game-run-card-tile-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-run-card-tile-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--live-muted);
+}
+
+/* Drag handle: a generous touch target (full card width, ~28px tall) around
+   the small visible grip; touch-action none so the browser doesn't scroll
+   the page while the finger drags it. */
+.game-run-card-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .game-run-card-handle {
   display: block;
-  width: 40px;
-  height: 5px;
-  margin: 0 auto 10px;
+  width: 36px;
+  height: 4px;
   border-radius: 999px;
-  background: var(--panel-border);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* --- End/Discard - side by side, thumb-sized (48px), End clearly the
@@ -1239,6 +1335,19 @@
   transition: transform 0.1s ease;
 }
 
+/* 360px phones: three buttons (Pause/End/Discard) otherwise wrap to a second
+   row and eat the sheet's height. */
+@media (max-width: 380px) {
+  .game-run-actions {
+    gap: 6px;
+  }
+  .game-run-btn {
+    gap: 4px;
+    padding: 0 6px;
+    font-size: 14px;
+  }
+}
+
 .game-run-btn:active {
   transform: translateY(2px);
 }
@@ -1262,37 +1371,40 @@
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 
-/* Flat, muted wood tone (not the bright gradient .game-btn-wood uses
-   elsewhere) and no drop shadow of its own - visually a secondary, "quiet"
-   option next to End rather than a second primary action. */
-.game-run-btn-discard {
-  border: 2px solid rgba(246, 236, 217, 0.35);
-  color: rgba(246, 236, 217, 0.8);
-  background: rgba(0, 0, 0, 0.25);
-}
-
-/* Pause - secondary, same quiet treatment as Discard (not a second primary
-   action next to End). Resume swaps in for it while paused - the gold
-   accent (not End's green) so the two don't read as interchangeable. */
-.game-run-btn-pause {
-  border: 2px solid rgba(246, 236, 217, 0.35);
-  color: rgba(246, 236, 217, 0.9);
-  background: rgba(0, 0, 0, 0.25);
-}
-
+/* Discard = destructive = red (same triad as .game-btn-red), Pause/Resume =
+   the one blue secondary (--pause-*). Same slab recipe as End so none of
+   them read as greyed-out/disabled. */
+.game-run-btn-discard,
+.game-run-btn-pause,
 .game-run-btn-resume {
   border: 3px solid var(--game-ink);
   color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.game-run-btn-discard {
   background: linear-gradient(
     180deg,
-    var(--game-gold-light) 0%,
-    var(--game-gold) 45%,
-    var(--game-gold-dark) 100%
+    var(--game-red-light) 0%,
+    var(--game-red) 45%,
+    var(--game-red-dark) 100%
   );
   box-shadow:
-    inset 0 -4px 0 var(--game-gold-dark),
+    inset 0 -4px 0 var(--game-red-dark),
     0 3px 0 var(--game-ink);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.game-run-btn-pause,
+.game-run-btn-resume {
+  background: linear-gradient(
+    180deg,
+    var(--pause-300) 0%,
+    var(--pause-500) 45%,
+    var(--pause-700) 100%
+  );
+  box-shadow:
+    inset 0 -4px 0 var(--pause-700),
+    0 3px 0 var(--game-ink);
 }
 
 /* --- Training tab's own intro screen (menuTab === 'training') - icon,
@@ -2068,6 +2180,9 @@
 .game-confirm-card p.game-controls-hint-error,
 .game-confirm-card p.game-buy-short {
   color: var(--red-text);
+}
+.game-confirm-card p.game-controls-hint-warn {
+  color: var(--amber-500);
 }
 .game-confirm-card .game-end-run-summary {
   font-size: 15px;

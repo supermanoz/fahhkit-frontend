@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom'
 import { isNative } from '../utils/geo'
 import { openExternal } from '../utils/externalLink'
-import { getSiteBaseUrl } from '../utils/siteUrl'
+import { getSiteUrl } from '../utils/siteUrl'
 import './TermsAgreement.css'
 
 export default function TermsAgreement({ id, to, checked, onChange }) {
@@ -20,11 +20,11 @@ export default function TermsAgreement({ id, to, checked, onChange }) {
           // The native app has no /terms route (game only) - the website's
           // page opens in the system browser, never inside the game WebView.
           <a
-            href={`${getSiteBaseUrl()}${to}`}
+            href={getSiteUrl(to)}
             target="_blank"
             rel="noopener noreferrer"
             className="terms-agreement-link"
-            onClick={(e) => openExternal(`${getSiteBaseUrl()}${to}`, e)}
+            onClick={(e) => openExternal(getSiteUrl(to), e)}
           >
             Terms &amp; Conditions
           </a>

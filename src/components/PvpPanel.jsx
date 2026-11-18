@@ -310,7 +310,7 @@ export default function PvpPanel({
         ) : (
           <button
             type="button"
-            className="game-btn game-btn-red"
+            className="game-btn game-btn-wood"
             onClick={cancelQueue}
             disabled={busy === 'queue'}
           >
@@ -504,7 +504,7 @@ export default function PvpPanel({
                             : `${(p.distanceMeters / 1000).toFixed(1)} km away`}
                         </span>
                       </span>
-                      <span className="game-btn game-btn-red game-btn-sm">
+                      <span className="game-btn game-btn-green game-btn-sm">
                         Challenge
                       </span>
                     </button>

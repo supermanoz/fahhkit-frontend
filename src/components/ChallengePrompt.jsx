@@ -64,7 +64,7 @@ export default function ChallengePrompt({
         <div className="challenge-prompt-actions">
           <button
             type="button"
-            className="game-btn game-btn-red"
+            className="game-btn game-btn-wood"
             onClick={onDecline}
             disabled={Boolean(busy)}
           >

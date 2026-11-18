@@ -19,7 +19,6 @@ import {
   IconClose,
   IconCrosshairs,
   IconEnvelope,
-  IconExpand,
   IconFlag,
   IconFlagCheckered,
   IconFlagScope,
@@ -187,7 +186,7 @@ import { formatCoins, formatNumber } from '../utils/format'
 import { formatPrice, getHeroUnlockItem } from '../utils/price'
 import Price from '../components/Price'
 import {
-  getSiteBaseUrl,
+  getSiteUrl,
   iosShopRedirectBlocked,
   openShopPack,
 } from '../utils/siteUrl'
@@ -909,6 +908,65 @@ function GamePageInner() {
   // handle arrow revealing End/Cancel underneath. Reset to collapsed every
   // time a new run starts (see handleStartRun/handleStartRace).
   const [statsOnly, setStatsOnly] = useState(true)
+  // Mode pill text on the in-run card. Long ones ("Territory Capture",
+  // "Training · Paused") get a compact card variant on narrow phones so the
+  // "Run Conquest" brand text beside them isn't clipped.
+  const runStatusLabel =
+    tracker.vehicleState === 'vehicle'
+      ? 'Vehicle detected'
+      : getRunModeLabel(
+          getRunMode(tracker),
+          tracker.paused ? 'paused' : undefined
+        )
+  // Swipe-up/down on the run card's grip: while dragging, gripDragH is the
+  // live height of the details area (0..its natural capped height) so the
+  // card follows the finger; on release it snaps to expanded/collapsed.
+  const [gripDragH, setGripDragH] = useState(null)
+  const detailsScrollRef = useRef(null)
+  const gripDragRef = useRef(null)
+  function handleGripPointerDown(e) {
+    const cap = detailsScrollRef.current?.offsetHeight || 0
+    gripDragRef.current = {
+      startY: e.clientY,
+      startH: statsOnly ? 0 : cap,
+      cap,
+      lastY: e.clientY,
+      lastT: e.timeStamp,
+      v: 0,
+      h: statsOnly ? 0 : cap,
+      moved: false,
+    }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  function handleGripPointerMove(e) {
+    const d = gripDragRef.current
+    if (!d) return
+    const dy = d.startY - e.clientY
+    if (!d.moved && Math.abs(dy) < 6) return
+    d.moved = true
+    const dt = Math.max(1, e.timeStamp - d.lastT)
+    d.v = (d.lastY - e.clientY) / dt // px/ms, up = positive
+    d.lastY = e.clientY
+    d.lastT = e.timeStamp
+    d.h = Math.min(d.cap, Math.max(0, d.startH + dy))
+    setGripDragH(d.h)
+  }
+  function handleGripPointerUp() {
+    const d = gripDragRef.current
+    gripDragRef.current = null
+    if (!d) return
+    if (!d.moved) {
+      setStatsOnly((collapsed) => !collapsed)
+      return
+    }
+    const expand = Math.abs(d.v) > 0.4 ? d.v > 0 : d.h > d.cap / 2
+    setStatsOnly(!expand)
+    setGripDragH(null)
+  }
+  function handleGripPointerCancel() {
+    gripDragRef.current = null
+    setGripDragH(null)
+  }
   // One extra tap before End/Cancel/Discard actually fire - null | 'end' |
   // 'cancel' | 'discard'. Mirrors the two-tap confirm already used for
   // TrackRunPanel's Stop Run and PvpPanel's Forfeit, just inline in the
@@ -3286,6 +3344,62 @@ function GamePageInner() {
       )
     : ''
 
+  // Detail tiles under the run card's main row when it's expanded - only
+  // values the run already tracks/shows elsewhere (the loop sheet's area +
+  // perimeter, the PvP/club-war HUD's race/opponent/to-go), no new data.
+  const runDetailTiles = []
+  if (tracker.status === 'tracking') {
+    runDetailTiles.push({
+      label: 'Elapsed',
+      value: formatDuration(tracker.elapsedSeconds),
+    })
+    if (tracker.isTraining) {
+      runDetailTiles.push({
+        label: 'Paused',
+        value: formatDuration(
+          Math.max(0, tracker.elapsedSeconds - tracker.movingSeconds)
+        ),
+      })
+    } else if (raceChallenge) {
+      runDetailTiles.push(
+        { label: 'Race', value: raceModeLabel },
+        { label: 'Opponent', value: raceOpponentName },
+        {
+          label: 'To go',
+          value: formatMeters(
+            Math.max(0, raceChallenge.distanceMeters - tracker.distance)
+          ),
+        },
+        {
+          label: 'Progress',
+          value: `${Math.min(100, Math.round(raceProgress * 100))}%`,
+        }
+      )
+    } else if (tracker.clubWarId) {
+      if (activeWarRun?.id === tracker.clubWarId && activeWarRun.theirName) {
+        runDetailTiles.push({
+          label: 'Club war',
+          value: `${activeWarRun.ourName} vs ${activeWarRun.theirName}`,
+        })
+      }
+      runDetailTiles.push({
+        label: 'Squad meters',
+        value: formatMeters(tracker.distance),
+      })
+    } else {
+      runDetailTiles.push(
+        {
+          label: 'Loop area',
+          value: formatArea(polygonAreaSqMeters(tracker.path)),
+        },
+        {
+          label: 'Perimeter',
+          value: formatMeters(loopPerimeterMeters(tracker.path)),
+        }
+      )
+    }
+  }
+
   // Once the race's target distance is covered, the run ends and submits
   // itself - no more "hit End, then hit Submit". Guarded by a ref keyed on
   // the race id so it only fires once even though this effect re-runs on
@@ -4001,21 +4115,23 @@ function GamePageInner() {
       >
         {tracker.status === 'tracking' && (
           <>
-            {/* Status/stats card - a header strip (Running/Paused + the
-                expand/collapse toggle, replacing the old separate chevron
-                pill) over a white Time/Pace/Distance row, with a purely
-                decorative drag-handle grip at the card's own bottom edge.
+            {/* In-run status card, styled after the iOS Live Activity: brand
+                row (runner icon + "Run Conquest") with the mode pill on the
+                right, then Time on the left and Distance/Pace on the right.
+                The top row is still the statsOnly expand/collapse toggle.
                 "Paused" only ever shows for a Training run (see
-                useRunTracker's pause()) - every other mode stays "Running"
-                the whole time it's tracking. Pace is the hero here now (the
-                number most runners actually glance at mid-run), not Time.
-                Pace/Time both read off movingSeconds, not elapsedSeconds -
-                identical for any run that never pauses, but keeps a
-                Training run's pace honest instead of counting paused time
-                as covered ground. Same tracker fields/formatters as before,
-                just reflowed - no tracking logic changed here. */}
+                useRunTracker's pause()). Pace/Time read off movingSeconds,
+                not elapsedSeconds, so a Training run's pace stays honest
+                while paused. Same tracker fields/formatters as before - only
+                the layout/skin changed. */}
             <div
-              className={`game-run-card${tracker.paused ? ' is-paused' : ''}`}
+              className={`game-run-card${tracker.paused ? ' is-paused' : ''}${
+                runStatusLabel.length > 12
+                  ? ' has-long-mode'
+                  : runStatusLabel.length > 8
+                    ? ' has-mid-mode'
+                    : ''
+              }`}
             >
               <button
                 type="button"
@@ -4026,45 +4142,91 @@ function GamePageInner() {
                 aria-expanded={!statsOnly}
                 onClick={() => setStatsOnly((collapsed) => !collapsed)}
               >
-                <span className="game-run-card-status">
-                  {tracker.vehicleState === 'vehicle'
-                    ? 'Vehicle detected'
-                    : getRunModeLabel(
-                        getRunMode(tracker),
-                        tracker.paused ? 'paused' : undefined
-                      )}
+                <span className="game-run-card-brand">
+                  <IconRunning className="game-run-card-brand-icon" />
+                  <span className="game-run-card-brand-name">Run Conquest</span>
                 </span>
-                <IconExpand className="game-run-card-expand-icon" />
+                <span className="game-run-card-status">{runStatusLabel}</span>
               </button>
               <div className="game-run-card-stats">
-                <span className="game-stat">
+                <span className="game-stat game-stat-time">
                   <span className="game-stat-value">
                     {formatDuration(tracker.movingSeconds)}
                   </span>
                   <span className="game-stat-label">Time</span>
                 </span>
-                <span className="game-stat game-stat-hero">
-                  <span className="game-stat-value">
-                    {formatPace(
-                      tracker.movingSeconds < 30 ||
-                        tracker.distance < MIN_DISTANCE_FOR_PACE_METERS
-                        ? null
-                        : calculatePaceMinPerKm(
-                            tracker.distance,
-                            tracker.movingSeconds
-                          )
-                    ).replace(' /km', '')}
+                <span className="game-run-card-metrics">
+                  <span className="game-stat">
+                    <span className="game-stat-value">
+                      {formatDistance(displayedDistance).replace(' km', '')}
+                    </span>
+                    <span className="game-stat-label">km</span>
                   </span>
-                  <span className="game-stat-label">Avg. pace (/km)</span>
-                </span>
-                <span className="game-stat">
-                  <span className="game-stat-value">
-                    {formatDistance(displayedDistance).replace(' km', '')}
+                  <span className="game-stat">
+                    <span className="game-stat-value">
+                      {formatPace(
+                        tracker.movingSeconds < 30 ||
+                          tracker.distance < MIN_DISTANCE_FOR_PACE_METERS
+                          ? null
+                          : calculatePaceMinPerKm(
+                              tracker.distance,
+                              tracker.movingSeconds
+                            )
+                      ).replace(' /km', '')}
+                    </span>
+                    <span className="game-stat-label">min/km</span>
                   </span>
-                  <span className="game-stat-label">Distance (km)</span>
                 </span>
               </div>
-              <span className="game-run-card-handle" aria-hidden="true" />
+              <motion.div
+                className="game-run-card-details"
+                initial={false}
+                animate={{
+                  height: gripDragH ?? (statsOnly ? 0 : 'auto'),
+                }}
+                transition={{
+                  duration: gripDragH != null ? 0 : 0.22,
+                  ease: 'easeInOut',
+                }}
+                aria-hidden={statsOnly}
+              >
+                <div
+                  className="game-run-card-details-scroll"
+                  ref={detailsScrollRef}
+                >
+                  <div className="game-run-card-divider" />
+                  <div className="game-run-card-grid">
+                    {runDetailTiles.map((tile) => (
+                      <div key={tile.label} className="game-run-card-tile">
+                        <span className="game-run-card-tile-value">
+                          {tile.value}
+                        </span>
+                        <span className="game-run-card-tile-label">
+                          {tile.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+              <div
+                className="game-run-card-grip"
+                role="button"
+                tabIndex={0}
+                aria-label="Drag to expand run details"
+                onPointerDown={handleGripPointerDown}
+                onPointerMove={handleGripPointerMove}
+                onPointerUp={handleGripPointerUp}
+                onPointerCancel={handleGripPointerCancel}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setStatsOnly((collapsed) => !collapsed)
+                  }
+                }}
+              >
+                <span className="game-run-card-handle" aria-hidden="true" />
+              </div>
             </div>
             <AnimatePresence initial={false}>
               {!statsOnly && (
@@ -4184,13 +4346,13 @@ function GamePageInner() {
               </div>
             )}
             {draftLoopOpen ? (
-              <p className="game-controls-hint game-controls-hint-error">
+              <p className="game-controls-hint game-controls-hint-warn">
                 This loop isn&apos;t closed — your capture might not be complete
                 since you didn&apos;t finish back where you started.
               </p>
             ) : (
               draftLooksThin && (
-                <p className="game-controls-hint">
+                <p className="game-controls-hint game-controls-hint-warn">
                   This loop looks short or small — the server may not count it
                   as closed territory. Bigger, cleanly closed loops score best.
                 </p>
@@ -4309,7 +4471,7 @@ function GamePageInner() {
               </p>
               {confirmAction === 'end' &&
                 tracker.distance < MIN_VALID_RUN_DISTANCE_METERS && (
-                  <p className="game-controls-hint game-controls-hint-error">
+                  <p className="game-controls-hint game-controls-hint-warn">
                     This run is very short and may not count.
                   </p>
                 )}
@@ -4710,7 +4872,7 @@ function GamePageInner() {
                   )}
                   {territoryRunWarning && (
                     <>
-                      <p className="game-controls-hint game-controls-hint-error">
+                      <p className="game-controls-hint game-controls-hint-warn">
                         {territoryRunWarning}
                       </p>
                       <div className="game-highlight-toast-actions">
@@ -5673,8 +5835,7 @@ function GamePageInner() {
                   className="game-settings-row"
                   onClick={() => {
                     // Website-only page: native opens it in the system browser.
-                    if (isNative)
-                      openExternal(`${getSiteBaseUrl()}/profile/edit`)
+                    if (isNative) openExternal(getSiteUrl('/profile/edit'))
                     else navigate('/profile/edit')
                   }}
                 >
