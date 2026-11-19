@@ -106,6 +106,8 @@ export const test = base.extend({
 
     expect(consoleErrors, 'console.error calls during the test').toEqual([])
     expect(pageErrors, 'uncaught page exceptions during the test').toEqual([])
+    // A test that deliberately breaks the network (offline UX) opts out.
+    if (page.allowFailedRequests) failedRequests.length = 0
     expect(
       failedRequests,
       'failed/5xx network requests during the test'

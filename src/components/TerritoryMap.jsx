@@ -1,5 +1,12 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
 import MapAttribution from './MapAttribution'
@@ -366,6 +373,22 @@ function toLatLngs(points) {
 // container before that layout finishes and lock in the wrong size —
 // leaving tiles rendered into only part of the visible box until the
 // window is manually resized. Re-measuring once after mount fixes it.
+// While the game is still loading / the intro plays, keep the map centered
+// exactly on the latest fix with no animation (the hero marker snaps in step
+// - see useSmoothMarkerPosition's `snap`), so a refined fix never leaves a
+// visible drift between marker and map. Inactive afterwards: the player's own
+// panning is never fought.
+function SnapToPlayer({ active, playerLocation }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!active || !playerLocation) return
+    map.setView([playerLocation.lat, playerLocation.lng], map.getZoom(), {
+      animate: false,
+    })
+  }, [map, active, playerLocation])
+  return null
+}
+
 function InvalidateSizeOnMount() {
   const map = useMap()
   useEffect(() => {
@@ -473,7 +496,7 @@ function FocusHighlight({
       map.flyToBounds(bounds, {
         paddingTopLeft: padding,
         paddingBottomRight: bottomPadding,
-        maxZoom: 19,
+        maxZoom: MAX_MAP_ZOOM,
         duration: TERRITORY_FOCUS_FLY_SECONDS,
       })
       return
@@ -551,7 +574,16 @@ function TerritoryPolygon({
 // the map settles into its tilted "close-up" view, Google Maps/Pokémon GO
 // style — only at the very last zoom step (scrolled or pinched all the way
 // in), not partway through zooming closer.
+// MAX_MAP_ZOOM (18) now sits BELOW this on purpose: the 22deg perspective
+// tilt (+1.25 scale) used to kick in at the old max zoom of 19, and Leaflet's
+// pinch fires continuous fractional `zoom` events, so mid-pinch the class
+// toggled on/off with a 0.45s transition - the whole map AND the hero inside
+// it visibly skewed/distorted. Capping zoom under it removes that state; the
+// tilt code stays dormant.
 const CLOSE_IN_TILT_ZOOM = 19
+// Hard top of the whole game map (every mode: free, follow, run). Vector
+// tiles overzoom cleanly to here, the hero sprite stays crisp, no tilt.
+const MAX_MAP_ZOOM = 18
 
 // The map stays flat/top-down until the player zooms in close, at which
 // point it settles into a standing 3D tilt so building-3d extrusions in the
@@ -602,7 +634,7 @@ function ZoomTiltEffect({ tiltRef, isFollowing }) {
 // ZoomRangeLimiter below), which this now matches exactly. Only ever
 // raises the zoom (Math.max against whatever it currently is) - never
 // zooms OUT, so a player who's manually zoomed in further keeps that.
-const FOLLOW_ZOOM = 19
+const FOLLOW_ZOOM = MAX_MAP_ZOOM
 
 // Google Maps "start riding" nav mode - while actively tracking a run, the
 // camera keeps the player centered automatically instead of requiring a
@@ -624,7 +656,7 @@ function NavigationCameraEffect({
     map.setView(
       [playerLocation.lat, playerLocation.lng],
       Math.max(map.getZoom(), FOLLOW_ZOOM),
-      { animate: true, duration: 0.8 }
+      { animate: true, duration: 0.35 }
     )
   }, [map, isFollowing, playerLocation, programmaticMoveRef])
   return null
@@ -701,7 +733,7 @@ const MARKER_TWEEN_MIN_MS = 400
 const MARKER_TWEEN_MAX_MS = 2500
 const MARKER_TWEEN_DEFAULT_MS = 1500
 
-function useSmoothMarkerPosition(markerRef, target) {
+function useSmoothMarkerPosition(markerRef, target, snap = false) {
   const currentRef = useRef(null)
   const fromRef = useRef(null)
   const toRef = useRef(null)
@@ -714,6 +746,17 @@ function useSmoothMarkerPosition(markerRef, target) {
     const marker = markerRef.current
     if (!target || !marker) return
 
+    if (snap) {
+      // Startup/intro: no tween - marker lands exactly on the fix, in step
+      // with the map's own snap (see SnapToPlayer).
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      currentRef.current = target
+      toRef.current = target
+      lastArrivalRef.current = performance.now()
+      marker.setLatLng([target.lat, target.lng])
+      return
+    }
     if (!currentRef.current) {
       // First fix for this marker instance - nothing to tween from yet.
       currentRef.current = target
@@ -764,7 +807,7 @@ function useSmoothMarkerPosition(markerRef, target) {
       rafRef.current = t < 1 ? requestAnimationFrame(tick) : null
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [markerRef, target])
+  }, [markerRef, target, snap])
 
   useEffect(
     () => () => {
@@ -1165,7 +1208,7 @@ function useHeroPaintGuard(markerRef) {
   }, [map, markerRef])
 }
 
-function PlayerMarker({ playerLocation, icon, heading, emote }) {
+function PlayerMarker({ playerLocation, icon, heading, emote, snap }) {
   const markerRef = useRef(null)
   // The marker's icon element is rebuilt by Leaflet whenever `icon` changes
   // (idle <-> run), so the emote slot inside it is looked up again then.
@@ -1196,7 +1239,7 @@ function PlayerMarker({ playerLocation, icon, heading, emote }) {
   if (initialPositionRef.current === null) {
     initialPositionRef.current = [playerLocation.lat, playerLocation.lng]
   }
-  useSmoothMarkerPosition(markerRef, playerLocation)
+  useSmoothMarkerPosition(markerRef, playerLocation, snap)
   useSpriteFacing(markerRef, heading, icon)
   useWarnOnDuplicateCharacter()
   useHeroPaintGuard(markerRef)
@@ -1249,7 +1292,10 @@ function ZoomRangeLimiter() {
   const map = useMap()
   useEffect(() => {
     map.setMinZoom(GLOBE_ENTER_ZOOM)
-    map.setMaxZoom(19)
+    map.setMaxZoom(MAX_MAP_ZOOM)
+    // Leaflet clamps a pinch/wheel/double-tap past the limit and eases back.
+    if (map.getZoom() > MAX_MAP_ZOOM)
+      map.setZoom(MAX_MAP_ZOOM, { animate: false })
   }, [map])
   return null
 }
@@ -1489,18 +1535,16 @@ function CaptureMapInstance({ onReady }) {
 // Floating "locate me" FAB, styled after Pokémon GO's compass button.
 // Rendered as a sibling of the tilted map div (not a MapContainer child) so
 // the persistent close-in tilt (see ZoomTiltEffect) never warps it.
-function locateErrorMessage(error) {
-  if (error.code === error.PERMISSION_DENIED) {
-    return 'Location permission denied — enable it in your browser settings.'
-  }
-  if (error.code === error.TIMEOUT) {
-    return 'Timed out finding your location. Try again.'
-  }
-  return 'Could not find your location right now.'
-}
+const LOCATE_FLY_MS = 350
+const LOCATE_DEBOUNCE_MS = 300
 
-function LocateButton({ map, onLocated }) {
+// Uses the latest fix from the already-running watcher (no new GPS request
+// per tap) and pans there quickly. With no real fix yet it shows a short
+// loading state and recenters as soon as the first one lands.
+function LocateButton({ map, location, hasFix, onLocated }) {
   const [error, setError] = useState(null)
+  const [waiting, setWaiting] = useState(false)
+  const lastTapRef = useRef(0)
 
   useEffect(() => {
     if (!error) return
@@ -1508,36 +1552,51 @@ function LocateButton({ map, onLocated }) {
     return () => clearTimeout(timeout)
   }, [error])
 
+  const goTo = useCallback(
+    (loc) => {
+      onLocated?.()
+      map.setView(
+        [loc.lat, loc.lng],
+        Math.min(MAX_MAP_ZOOM, Math.max(map.getZoom(), 17)),
+        {
+          animate: true,
+          duration: LOCATE_FLY_MS / 1000,
+        }
+      )
+    },
+    [map, onLocated]
+  )
+
+  useEffect(() => {
+    if (!waiting) return undefined
+    if (hasFix && location) {
+      setWaiting(false)
+      goTo(location)
+      return undefined
+    }
+    const timeout = setTimeout(() => {
+      setWaiting(false)
+      setError('Could not find your location right now.')
+    }, 8000)
+    return () => clearTimeout(timeout)
+  }, [waiting, hasFix, location, goTo])
+
   function handleClick(e) {
     e.stopPropagation()
-    if (!('geolocation' in navigator)) {
-      setError('Location is not supported on this device.')
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setError(null)
-        onLocated?.()
-        map.flyTo(
-          [position.coords.latitude, position.coords.longitude],
-          Math.max(map.getZoom(), 17)
-        )
-      },
-      // A permission denial or an insecure (non-HTTPS, non-localhost) origin
-      // means the success callback never fires - without visible feedback
-      // here the button just looks completely unresponsive to the player.
-      (err) => {
-        console.warn('Locate button: geolocation failed', err)
-        setError(locateErrorMessage(err))
-      }
-    )
+    const now = performance.now()
+    if (now - lastTapRef.current < LOCATE_DEBOUNCE_MS) return
+    lastTapRef.current = now
+    setError(null)
+    if (hasFix && location) goTo(location)
+    else setWaiting(true)
   }
 
   return (
     <>
       <button
         type="button"
-        className="territory-map-locate"
+        className={`territory-map-locate${waiting ? ' is-loading' : ''}`}
+        aria-busy={waiting}
         onClick={handleClick}
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
@@ -1568,6 +1627,8 @@ const territoryRenderer = L.svg({ padding: 2 })
 export default function TerritoryMap({
   center,
   playerLocation,
+  hasFix = true,
+  snapToPlayer = false,
   territories,
   livePath,
   currentUserId,
@@ -1751,6 +1812,7 @@ export default function TerritoryMap({
         <MapContainer
           center={[center.lat, center.lng]}
           zoom={17}
+          maxZoom={MAX_MAP_ZOOM}
           scrollWheelZoom
           zoomControl={false}
           attributionControl={false}
@@ -1807,6 +1869,7 @@ export default function TerritoryMap({
               icon={playerMarkerIcon}
               heading={markerHeading}
               emote={hudEmote}
+              snap={snapToPlayer}
             />
           )}
 
@@ -1904,6 +1967,7 @@ export default function TerritoryMap({
             playerLocation={playerLocation}
           />
           <InvalidateSizeOnMount />
+          <SnapToPlayer active={snapToPlayer} playerLocation={playerLocation} />
           <InvalidateSizeOnResume />
           <ZoomRangeLimiter />
           <GlobeHandoff
@@ -1947,7 +2011,12 @@ export default function TerritoryMap({
       {/* Hidden mid-run - GamePage's own Free/Follow location buttons sit in
           this exact spot then and fully replace it. */}
       {mapInstance && !isTracking && (
-        <LocateButton map={mapInstance} onLocated={() => exitGlobe()} />
+        <LocateButton
+          map={mapInstance}
+          location={playerLocation}
+          hasFix={hasFix}
+          onLocated={() => exitGlobe()}
+        />
       )}
       {/* Leaflet's own attribution control lives inside .territory-map-tilt
           (attributionControl={false} above) - this renders instead of it,

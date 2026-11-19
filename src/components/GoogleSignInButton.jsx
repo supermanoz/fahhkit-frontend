@@ -6,7 +6,13 @@ import {
   ensureGoogleAuthInitialized,
   googleSignOut,
 } from '../utils/googleSession'
-import { describeGoogleSignInError } from '../utils/googleSignInErrors'
+import GoogleGLogo from './GoogleGLogo'
+import {
+  AUTH_FLOW,
+  MESSAGES,
+  describeAuthError,
+  logAuthError,
+} from '../utils/authErrors'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
@@ -44,7 +50,7 @@ function loadGsiScript() {
 // ID token audienced the same way (serverClientId in capacitor.config.json
 // is set to this same GOOGLE_CLIENT_ID), so the backend's verification is
 // unchanged either way.
-function GoogleSignInButtonWeb({ onCredential, onError }) {
+function GoogleSignInButtonWeb({ onCredential, onError, appearance }) {
   const containerRef = useRef(null)
   const handlersRef = useRef({ onCredential, onError })
   handlersRef.current = { onCredential, onError }
@@ -63,14 +69,17 @@ function GoogleSignInButtonWeb({ onCredential, onError }) {
             if (response?.credential) {
               handlersRef.current.onCredential(response.credential)
             } else {
-              handlersRef.current.onError?.()
+              handlersRef.current.onError?.(MESSAGES.provider('Google'))
             }
           },
         })
         window.google.accounts.id.renderButton(containerRef.current, {
-          theme: 'filled_black',
+          // In-game: Google's own white "outline" button (official G logo,
+          // "Continue with Google") - the only form Google allows for the
+          // web button. Elsewhere the original dark pill.
+          theme: appearance === 'game' ? 'outline' : 'filled_black',
           size: 'large',
-          shape: 'pill',
+          shape: appearance === 'game' ? 'rectangular' : 'pill',
           text: 'continue_with',
           width: Math.min(containerRef.current.offsetWidth || 320, 400),
         })
@@ -81,10 +90,15 @@ function GoogleSignInButtonWeb({ onCredential, onError }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [appearance])
 
   if (!GOOGLE_CLIENT_ID || failed) return null
-  return <div ref={containerRef} className="google-signin-button" />
+  return (
+    <div
+      ref={containerRef}
+      className={`google-signin-button${appearance === 'game' ? ' google-signin-button--game' : ''}`}
+    />
+  )
 }
 
 function GoogleSignInButtonNative({ onCredential, onError }) {
@@ -104,16 +118,19 @@ function GoogleSignInButtonNative({ onCredential, onError }) {
       if (user?.authentication?.idToken) {
         onCredential(user.authentication.idToken)
       } else {
-        onError?.('Google returned no sign-in token. Please try again.')
+        const info = describeAuthError(new Error('no token'), {
+          flow: AUTH_FLOW.GOOGLE,
+        })
+        onError?.(info.message, info)
       }
     } catch (err) {
-      // Say what went wrong (Play Services status code -> text, see
-      // utils/googleSignInErrors.js) instead of failing silently; a plain
-      // cancel of the account picker (12501) stays quiet.
-      const { message, cancelled, code } = describeGoogleSignInError(err)
-      if (cancelled) return
-      console.warn('[GoogleSignIn] native sign-in failed', code, err)
-      onError?.(message)
+      // Technical detail goes to the console only; the player sees a friendly
+      // line (see utils/authErrors.js) - and nothing at all when they simply
+      // closed the account picker.
+      logAuthError(AUTH_FLOW.GOOGLE, err)
+      const info = describeAuthError(err, { flow: AUTH_FLOW.GOOGLE })
+      if (info.silent) return
+      onError?.(info.message, info)
     } finally {
       setBusy(false)
     }
@@ -126,12 +143,17 @@ function GoogleSignInButtonNative({ onCredential, onError }) {
       onClick={handleClick}
       disabled={busy}
     >
-      Continue with Google
+      <GoogleGLogo className="google-signin-logo" />
+      <span>Continue with Google</span>
     </button>
   )
 }
 
-export default function GoogleSignInButton({ onCredential, onError }) {
+export default function GoogleSignInButton({
+  onCredential,
+  onError,
+  appearance,
+}) {
   if (!GOOGLE_CLIENT_ID) return null
   // No iOS OAuth client id exists yet (capacitor.config.json only has the
   // Android one), so native Google sign-in can't work on iOS: hide it there
@@ -145,6 +167,10 @@ export default function GoogleSignInButton({ onCredential, onError }) {
   return isNative ? (
     <GoogleSignInButtonNative onCredential={onCredential} onError={onError} />
   ) : (
-    <GoogleSignInButtonWeb onCredential={onCredential} onError={onError} />
+    <GoogleSignInButtonWeb
+      onCredential={onCredential}
+      onError={onError}
+      appearance={appearance}
+    />
   )
 }

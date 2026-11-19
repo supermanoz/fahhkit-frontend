@@ -30,7 +30,13 @@ export const initialRolloutState = {
 
 export function rolloutStatusReducer(state, action) {
   switch (action.type) {
+    // Only the very first check shows CHECKING - later re-checks (the player
+    // moved, or a retry) keep the last known phase so the lock/banner never
+    // flickers while a request is in flight.
     case 'CHECK_START':
+      if (state.phase !== PHASE.IDLE && state.phase !== PHASE.FAILED) {
+        return state
+      }
       return { ...state, phase: PHASE.CHECKING, submitError: null }
 
     case 'CHECK_SUCCESS':
@@ -39,6 +45,13 @@ export function rolloutStatusReducer(state, action) {
       }
       return {
         ...initialRolloutState,
+        // Still outside after a re-check: a popup the player already
+        // dismissed stays dismissed.
+        dismissed:
+          state.phase === PHASE.NEEDS_REQUEST ||
+          state.phase === PHASE.ALREADY_REQUESTED
+            ? state.dismissed
+            : false,
         phase: action.alreadyRequested
           ? PHASE.ALREADY_REQUESTED
           : PHASE.NEEDS_REQUEST,
@@ -47,9 +60,17 @@ export function rolloutStatusReducer(state, action) {
         requestCount: action.requestCount ?? null,
       }
 
-    // Fails open - never shows the popup, never blocks anything else in
-    // the game. The next game open (fresh mount) just tries again.
+    // Fails open - an unknown state never shows the popup or locks anything
+    // (the hook retries on a timer). A re-check that fails after a known
+    // result keeps that result instead of flipping the lock on or off.
     case 'CHECK_FAILED':
+      if (
+        state.phase === PHASE.ROLLED_OUT ||
+        state.phase === PHASE.NEEDS_REQUEST ||
+        state.phase === PHASE.ALREADY_REQUESTED
+      ) {
+        return state
+      }
       return { ...initialRolloutState, phase: PHASE.FAILED }
 
     case 'DISMISS':
@@ -89,4 +110,14 @@ export function shouldShowRolloutModal(state) {
 // Derived helper - whether the "already requested" chip should show.
 export function shouldShowRolloutChip(state) {
   return state.phase === PHASE.ALREADY_REQUESTED
+}
+
+// Derived helper - the game is halted (greyed out, controls disabled) while
+// the player is positively known to be outside a rolled-out area. Unknown
+// (idle/checking/failed) never locks.
+export function isRolloutBlocked(state) {
+  return (
+    state.phase === PHASE.NEEDS_REQUEST ||
+    state.phase === PHASE.ALREADY_REQUESTED
+  )
 }

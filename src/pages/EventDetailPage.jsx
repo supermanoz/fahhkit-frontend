@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { navigateToPayment } from '../utils/safeUrl'
 import { Link, useParams } from 'react-router-dom'
 import {
   ApiError,
@@ -58,7 +59,7 @@ export default function EventDetailPage() {
         const payment = await postJson(
           `/v1/event/registration/${data.registrationId}/initiate-payment`
         )
-        window.location.href = payment.paymentUrl
+        navigateToPayment(payment.paymentUrl)
         return
       }
       setRegistration(data)

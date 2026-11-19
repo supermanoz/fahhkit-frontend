@@ -16,6 +16,11 @@
       import '/src/index.css'
       import '/src/game/styles/tokens.css'
       import '/src/pages/GamePage.css'
+      // Shell stylesheets, so e2e/safe-area-modals.spec.js can drop the other
+      // big overlays (rewards, Modal, terms) into this same page.
+      import '/src/game/ui/components.css'
+      import '/src/components/RunRewardsModal.css'
+      import '/src/components/game-legal/GameLegal.css'
       import HeroDetailModal from '/src/components/HeroDetailModal.jsx'
 
       const root = createRoot(document.getElementById('root'))
@@ -25,7 +30,10 @@
           React.createElement(HeroDetailModal, {
             // A fresh instance per render, like GamePage's key={hero.id}.
             key: `${props.hero.id}-${renders++}`,
-            onClose() {},
+            onClose() {
+              // Lets specs see that the hero card itself was closed.
+              window.__closed = (window.__closed || 0) + 1
+            },
             onEquip() {},
             onBuy() {},
             onShowcase() {},

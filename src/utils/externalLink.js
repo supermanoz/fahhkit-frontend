@@ -1,5 +1,6 @@
 import { Browser } from '@capacitor/browser'
 import { isNative } from './geo'
+import { isSafeExternalUrl } from './safeUrl'
 
 // Capacitor's WebView doesn't reliably handle target="_blank" (it tries to
 // open a new WebView window that doesn't exist, which Android usually just
@@ -10,6 +11,9 @@ import { isNative } from './geo'
 export function openExternal(url, event) {
   if (!isNative || !url) return
   event?.preventDefault()
+  // Never hand javascript:/data:/file:/intent: (or credentialed) URLs from
+  // server content to the system browser.
+  if (!isSafeExternalUrl(url)) return
   Browser.open({ url })
 }
 

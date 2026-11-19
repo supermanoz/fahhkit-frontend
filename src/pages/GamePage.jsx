@@ -25,6 +25,8 @@ import {
   IconHelmet,
   IconLogout,
   IconMenuOrb,
+  IconBolt,
+  IconClock,
   IconMusicNote,
   IconPause,
   IconPlay,
@@ -167,10 +169,22 @@ import LevelBar from '../components/LevelBar'
 import ClubPanel from '../components/ClubPanel'
 import MailPanel from '../components/MailPanel'
 import PvpPanel from '../components/PvpPanel'
+import PortalClouds from '../components/portal/PortalClouds'
+import PvpGatePrompt from '../components/pvp/PvpGatePrompt'
+import { usePortalTransition } from '../hooks/usePortalTransition'
+import {
+  PVP_SOURCES,
+  createPvpEntry,
+  resolveMatchStart,
+} from '../utils/pvpEntry'
+import { getLocationState } from '../utils/locationPermission'
+import { isLive as isLivePvp } from '../utils/pvpCopy'
+import { openAppSettings } from '../utils/saveImage'
 import HeroGallery from '../components/HeroGallery'
 import ShadeFlag from '../components/ShadeFlag'
 import TrailPreview from '../components/TrailPreview'
 import ColorShelf from '../components/ColorShelf'
+import ColorItemSheet from '../components/shop/ColorItemSheet'
 import EmoteShowcase from '../components/EmoteShowcase'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
@@ -226,6 +240,8 @@ import {
 import '../game/styles/tokens.css'
 import './GamePage.css'
 import '../components/GameCards.css'
+import '../game/ui/gameSkin.css'
+import { GameModal, GameActions, StatChip, StatRow } from '../game/ui/GameModal'
 
 function formatMeters(meters) {
   if (!meters) return '0 m'
@@ -240,6 +256,17 @@ function formatMeters(meters) {
 // FAB's, so the layout itself is the point here, not incidental styling.
 // Icon-only - the name only surfaces via aria-label/title, no text label.
 // The red Play button opens PLAY_OPTIONS instead of a menu tab.
+// Menu entries that are gameplay (halted outside a rolled-out area). Me
+// (profile), Shop and Settings are deliberately absent so they stay usable.
+const ROLLOUT_LOCKED_TABS = new Set([
+  'play',
+  'conquer',
+  'training',
+  'race',
+  'club',
+  'leaderboard',
+])
+
 const RADIAL_ITEMS = [
   { tab: 'me', label: 'Me', Icon: IconUser, tone: 'green', x: -112, y: -300 },
   {
@@ -587,6 +614,14 @@ function GamePageInner() {
   // open (nothing shown), not silently check Kathmandu's rollout status.
   // See hooks/useRolloutStatus.js.
   const rolloutStatus = useRolloutStatus(liveLocation)
+  // Location permission denied (watchPosition error code 1) - its own
+  // message, deliberately NOT the "not rolled out" lock: we can't tell where
+  // the player is, so nothing is locked (unknown rollout state = available).
+  const [locationDenied, setLocationDenied] = useState(false)
+  // Positively outside a rolled-out area -> the whole game is halted and
+  // greyed out. Settings/Profile(Me)/Shop stay usable. Never applies mid-run
+  // (a run already underway is never yanked away).
+  const gameLocked = rolloutStatus.blocked && tracker.status !== 'tracking'
   // Gates the "Preparing your run…" loading screen - true only once the
   // basemap has actually finished loading tiles (see TerritoryMap.jsx's
   // PokemonStyleBaseLayer, which fires this on MapLibre's "idle" event), not
@@ -722,6 +757,8 @@ function GamePageInner() {
   const [openClubId, setOpenClubId] = useState(null)
   const [storeCatalog, setStoreCatalog] = useState([])
   const [shopSection, setShopSection] = useState('heroes')
+  // The Territory / Trail preview sheet: which item (by id) and which shelf.
+  const [colorPreview, setColorPreview] = useState(null)
   // Buy confirm pop-up: request in flight / its own error line.
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState(null)
@@ -766,12 +803,14 @@ function GamePageInner() {
     if (!menuOpen) return
     function handleKeyDown(e) {
       if (e.key !== 'Escape') return
+      // A Shop preview sheet is open: Escape closes just that.
+      if (colorPreview) return
       if (tabPickerOpen) setTabPickerOpen(false)
       else setMenuOpen(false)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [menuOpen, tabPickerOpen])
+  }, [menuOpen, tabPickerOpen, colorPreview])
 
   const [highlightedEntry, setHighlightedEntry] = useState(null)
   // Size/distance warning shown inline on the territory popup before
@@ -801,9 +840,18 @@ function GamePageInner() {
   const authBackRef = useRef(null)
   const backButton = useAndroidBackButton({
     layers: [
+      // A cloud transition in progress: Back cancels it cleanly.
+      {
+        isOpen: () => portalActiveRef.current,
+        close: () => portalCancelRef.current(),
+      },
       {
         isOpen: () => Boolean(authBackRef.current),
         close: () => authBackRef.current?.(),
+      },
+      {
+        isOpen: () => Boolean(colorPreview),
+        close: () => setColorPreview(null),
       },
       { isOpen: () => Boolean(viewingRun), close: () => setViewingRun(null) },
       { isOpen: () => Boolean(viewingRoute), close: handleCloseViewingRoute },
@@ -815,7 +863,13 @@ function GamePageInner() {
         isOpen: () => Boolean(viewingProfile),
         close: () => setViewingProfile(null),
       },
-      { isOpen: () => menuOpen, close: () => setMenuOpen(false) },
+      {
+        isOpen: () => menuOpen,
+        close: () =>
+          menuTabRef.current === 'race'
+            ? exitPvpRef.current()
+            : setMenuOpen(false),
+      },
     ],
     blocked: tracker.status === 'tracking',
   })
@@ -1002,6 +1056,8 @@ function GamePageInner() {
   // differs per run type). Club War runs (handleStartWarRun) still skip
   // it - a war entry has its own battle-start framing already.
   const [startCountdown, setStartCountdown] = useState(null)
+  // Who you're about to race (PvP only), shown above the 3-2-1.
+  const [countdownVs, setCountdownVs] = useState(null)
   const pendingStartRef = useRef(null)
 
   function resetForRunStart() {
@@ -1012,6 +1068,7 @@ function GamePageInner() {
   }
 
   function beginCountdownThenStart(startFn) {
+    if (gameLocked) return
     resetForRunStart()
     pendingStartRef.current = startFn
     setStartCountdown(3)
@@ -1022,6 +1079,7 @@ function GamePageInner() {
   function cancelCountdown() {
     pendingStartRef.current = null
     setStartCountdown(null)
+    setCountdownVs(null)
   }
 
   useEffect(() => {
@@ -1029,6 +1087,7 @@ function GamePageInner() {
     if (startCountdown === 'GO') {
       const timeout = setTimeout(() => {
         setStartCountdown(null)
+        setCountdownVs(null)
         const startFn = pendingStartRef.current
         pendingStartRef.current = null
         if (startFn) startFn()
@@ -1056,43 +1115,33 @@ function GamePageInner() {
     return () => observer.disconnect()
   }, [controlsEl])
 
+  // ONE standing GPS watch feeds both the map's starting center and the hero
+  // marker (liveLocation), so they can never disagree. It starts the moment
+  // the user is authed (long before the intro ends). `locating` clears at
+  // the first accurate fix (<= GOOD_FIX_ACCURACY_M) or after 5s with the
+  // best fix so far; until then `center` follows each incoming fix so the
+  // map starts exactly where the hero is. Once a good fix exists, a worse
+  // fix that would jump the hero further than its own error is ignored, and
+  // near-identical fixes within 1s are dropped (fewer GamePage re-renders).
+  const liveLocationRef = useRef(null)
   useEffect(() => {
-    if (!isAuthed) {
+    if (!isAuthed || !('geolocation' in navigator)) {
       setLocating(false)
       return
     }
-    if (!('geolocation' in navigator)) {
+    const GOOD_FIX_ACCURACY_M = 50
+    let settled = false
+    let lastCommitAt = 0
+    const settle = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
       setLocating(false)
-      return
     }
-    const timeout = setTimeout(() => setLocating(false), 5000)
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        clearTimeout(timeout)
-        setCenter({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        })
-        setLocating(false)
-      },
-      () => {
-        clearTimeout(timeout)
-        setLocating(false)
-      },
-      { enableHighAccuracy: true, timeout: 4500 }
-    )
-    return () => clearTimeout(timeout)
-  }, [isAuthed])
-
-  // A standing "where am I" watch, independent of whether a run is being
-  // tracked — Pokémon GO always shows your position on the map, not just
-  // while a loop is actively being recorded.
-  useEffect(() => {
-    if (!isAuthed) return
-    if (!('geolocation' in navigator)) return
+    const timeout = setTimeout(settle, 5000)
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        setLiveLocation({
+        const fix = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           // Kept (like useRunTracker's points) so the heading cone and
@@ -1100,12 +1149,36 @@ function GamePageInner() {
           accuracy: position.coords.accuracy,
           speed: position.coords.speed ?? null,
           heading: position.coords.heading ?? null,
-        })
+        }
+        const good = fix.accuracy != null && fix.accuracy <= GOOD_FIX_ACCURACY_M
+        const prev = liveLocationRef.current
+        const now = Date.now()
+        if (prev) {
+          const prevGood =
+            prev.accuracy != null && prev.accuracy <= GOOD_FIX_ACCURACY_M
+          const moved = haversineDistance(prev, fix)
+          if (prevGood && !good && moved > (prev.accuracy || 0)) return
+          if (now - lastCommitAt < 1000 && moved < 2) return
+        }
+        lastCommitAt = now
+        liveLocationRef.current = fix
+        setLocationDenied(false)
+        setLiveLocation(fix)
+        if (!settled) {
+          setCenter({ lat: fix.lat, lng: fix.lng })
+          if (good) settle()
+        }
       },
-      () => {},
+      (err) => {
+        if (err?.code === 1) setLocationDenied(true)
+        settle()
+      },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     )
-    return () => navigator.geolocation.clearWatch(watchId)
+    return () => {
+      clearTimeout(timeout)
+      navigator.geolocation.clearWatch(watchId)
+    }
   }, [isAuthed])
 
   // Territory-capture rollout request (see api/territoryRollout.js) - the
@@ -1240,6 +1313,156 @@ function GamePageInner() {
   // a race that just went live, a queue match).
   const [pvpFocusId, setPvpFocusId] = useState(null)
 
+  // --- Entering / leaving PvP ------------------------------------------------
+  // ONE entry function: every way in (Play menu, section pickers, challenge
+  // alerts, accepted challenges, the idle nudge, push taps) calls
+  // enterPvp(source) -> rollout lock / run rules -> location permission ->
+  // Visibility gate -> cloud transition -> the PvP hub. The routing itself
+  // lives in utils/pvpEntry.js (unit-tested); this is the wiring.
+  const portal = usePortalTransition()
+  const portalActiveRef = useRef(false)
+  portalActiveRef.current = portal.active
+  const [pvpGate, setPvpGate] = useState(null)
+  const portalCancelRef = useRef(() => {})
+  portalCancelRef.current = portal.cancel
+  const exitPvpRef = useRef(() => {})
+  exitPvpRef.current = exitPvp
+  // Lets the final step reach switchTab('race') without re-entering the gate.
+  const pvpBypassRef = useRef(false)
+  // Mount the sheet in place (no slide-up): the clouds are covering it.
+  const pvpInstantRef = useRef(false)
+  const entryCtxRef = useRef(null)
+  entryCtxRef.current = {
+    gameLocked,
+    running: tracker.status === 'tracking',
+    pvp,
+    locationDenied,
+    hasFix: Boolean(liveLocation),
+  }
+  const entryFnsRef = useRef({})
+  const pvpEntryRef = useRef(null)
+  if (!pvpEntryRef.current) {
+    pvpEntryRef.current = createPvpEntry({
+      getContext: async () => {
+        const c = entryCtxRef.current
+        const locationState = await getLocationState({
+          knownDenied: c.locationDenied,
+          hasFix: c.hasFix,
+        })
+        const queued = ['WAITING', 'MATCHED'].includes(c.pvp.queueEntry?.status)
+        return {
+          locked: c.gameLocked,
+          running: c.running,
+          locationState,
+          // Re-read on every entry (not just the value from page load).
+          discoverable: c.pvp.refreshDiscoverable(),
+          hasLiveRace: c.pvp.challenges.some(isLivePvp) || queued,
+        }
+      },
+      showGate: (variant, source) =>
+        setPvpGate({ variant, source, busy: false, error: null }),
+      hideGate: () => setPvpGate(null),
+      turnOnVisibility: () => entryFnsRef.current.turnOnVisibility(),
+      runPortal: (kind, onCovered) => portal.start(kind, onCovered),
+      openPvp: () => entryFnsRef.current.openPvpNow(),
+    })
+  }
+  entryFnsRef.current = { turnOnVisibility, openPvpNow }
+  // Portal: start is read through a ref too (the controller outlives renders).
+  const portalStartRef = useRef(portal.start)
+  portalStartRef.current = portal.start
+
+  function enterPvp(source) {
+    return pvpEntryRef.current.enterPvp(source)
+  }
+
+  // Same thing the Settings > Visibility row does: ask (once) to notify while
+  // the app is in the background, then call the same API / state.
+  async function turnOnVisibility() {
+    if (
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'default'
+    ) {
+      Notification.requestPermission().catch(() => {})
+    }
+    const ok = await pvp.toggleDiscoverable(true)
+    pvp.clearError()
+    return ok
+  }
+
+  function openPvpNow() {
+    pvpInstantRef.current = true
+    pvpBypassRef.current = true
+    switchTab('race')
+    pvpBypassRef.current = false
+    setMenuOpen(true)
+    setRadialOpen(false)
+  }
+
+  const GATE_FAILED =
+    "Couldn't turn on Visibility. Check your connection and try again."
+
+  async function handleGateTurnOn() {
+    const gate = pvpGate
+    if (!gate || gate.busy) return
+    setPvpGate({ ...gate, busy: true, error: null })
+    if (gate.source === 'new-match') {
+      // Already inside PvP (a live race): turning it on just lets them start.
+      const ok = await turnOnVisibility().catch(() => false)
+      if (ok) {
+        setPvpGate(null)
+        gate.proceed?.()
+      } else {
+        setPvpGate((g) => g && { ...g, busy: false, error: GATE_FAILED })
+      }
+      return
+    }
+    const r = await pvpEntryRef.current.confirmVisibility(gate.source)
+    if (r.status === 'failed')
+      setPvpGate((g) => g && { ...g, busy: false, error: GATE_FAILED })
+    else if (r.status === 'ignored')
+      setPvpGate((g) => g && { ...g, busy: false })
+  }
+
+  // "Battle" inside PvP: starting a NEW match needs Visibility + location. A
+  // player with a live race is let in without these, so the gate is applied
+  // here instead (same popup).
+  async function requestNewMatch(proceed) {
+    const c = entryCtxRef.current
+    const locationState = await getLocationState({
+      knownDenied: c.locationDenied,
+      hasFix: c.hasFix,
+    })
+    const gate = resolveMatchStart({
+      locationState,
+      discoverable: pvp.refreshDiscoverable(),
+    })
+    if (!gate) {
+      proceed()
+      return
+    }
+    setPvpGate({
+      variant: gate.variant,
+      source: 'new-match',
+      proceed,
+      busy: false,
+      error: null,
+    })
+  }
+
+  // Leaving PvP (X / back): a search still running is cancelled, then a short
+  // reverse of the cloud transition back to the map.
+  function exitPvp() {
+    if (pvp.queueEntry?.status === 'WAITING') pvp.leaveQueue()
+    portalStartRef.current('exit', () => {
+      setMenuOpen(false)
+      setTabPickerOpen(false)
+    })
+  }
+  useEffect(() => {
+    if (!menuOpen) pvpInstantRef.current = false
+  }, [menuOpen])
+
   // A race of mine just went live (the rival accepted my challenge) or the
   // queue found me a rival → take me straight to that race screen, whether
   // it came by socket push or by usePvp's polling. Not while I'm mid-run -
@@ -1253,7 +1476,7 @@ function GamePageInner() {
     // "Rival found!" and opens the race itself.
     if (a.kind === 'matched' && menuOpen && menuTab === 'race') return
     setPvpFocusId(a.challenge.id)
-    openMenu('race')
+    openMenu('race', PVP_SOURCES.ALERT_AUTO)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pvp.alert])
 
@@ -1357,7 +1580,7 @@ function GamePageInner() {
       refreshProfile()
       if (accept) {
         setPvpFocusId(updated.id)
-        openMenu('race')
+        openMenu('race', PVP_SOURCES.CHALLENGE_ACCEPTED)
       }
     }
   }
@@ -1453,7 +1676,10 @@ function GamePageInner() {
       gameReady && tracker.status !== 'tracking' && !tracker.pendingRun,
     onRoute: (route) => {
       if (route.tab) {
-        openMenu(route.tab)
+        openMenu(
+          route.tab,
+          route.tab === 'race' ? PVP_SOURCES.PUSH_TAP : undefined
+        )
       } else if (route.map) {
         setMenuOpen(false)
         setRadialOpen(false)
@@ -1721,7 +1947,7 @@ function GamePageInner() {
   function battleFromIdleNudge() {
     idleDelayRef.current = IDLE_NUDGE_MS
     setIdleNudgeOpen(false)
-    openMenu('race')
+    openMenu('race', PVP_SOURCES.IDLE_NUDGE)
   }
 
   async function refreshProfile() {
@@ -2215,12 +2441,21 @@ function GamePageInner() {
   function handleStartRace(challenge) {
     setMenuOpen(false)
     autoFinishedRaceIdRef.current = null
+    setCountdownVs({
+      opponent: mySide(challenge, user?.id).opponentName || 'your rival',
+      pot: Number(challenge.stakeAmount) * 2,
+    })
     beginCountdownThenStart(() =>
       tracker.start(null, { challengeId: challenge.id })
     )
   }
 
-  function openMenu(tab) {
+  function openMenu(tab, source) {
+    // PvP is entered through the one gate (see enterPvp).
+    if (tab === 'race') {
+      enterPvp(source || PVP_SOURCES.PLAY_MENU)
+      return
+    }
     switchTab(tab)
     setMenuOpen(true)
     setRadialOpen(false)
@@ -2269,7 +2504,7 @@ function GamePageInner() {
   // window.location.href = paymentUrl used to, and keeping actual payment
   // for a virtual currency out of the native WebView sidesteps Apple's App
   // Store guideline 3.1.1 risk entirely on iOS (still gated by
-  // iosShopRedirectBlocked as a second layer, in case this ever changes).
+  // iosShopRedirectBlocked, i.e. VITE_IOS_EXTERNAL_SHOP, as a second layer).
   // buyRedirecting is the brief's own "double-tap guard" - set synchronously
   // before the (possibly async, on native) Browser.open/window.open call,
   // so a second tap before either resolves can't open a second tab/popup.
@@ -2479,6 +2714,7 @@ function GamePageInner() {
   }
 
   function handleStartDrawRoute() {
+    if (gameLocked) return
     setMenuOpen(false)
     setRadialOpen(false)
     setViewingRoute(null)
@@ -2580,6 +2816,11 @@ function GamePageInner() {
   }
 
   function switchTab(nextTab) {
+    // Section pickers that list PvP route through the same entry function.
+    if (nextTab === 'race' && !pvpBypassRef.current) {
+      enterPvp(PVP_SOURCES.SECTION_MENU)
+      return
+    }
     // Heroes now live inside the Shop tab.
     const tab = nextTab === 'heroes' ? 'shop' : nextTab
     setMenuTab(tab)
@@ -2615,6 +2856,7 @@ function GamePageInner() {
   // prompt right away instead of counting down to a run that can't start.
   async function handleStartTraining() {
     setMenuOpen(false)
+    if (gameLocked) return
     if (tracker.status === 'tracking' || pendingRun) return
     let blocked = !('geolocation' in navigator)
     if (!blocked) {
@@ -2861,26 +3103,23 @@ function GamePageInner() {
   function renderCompletedRunStats() {
     if (!completedRun) return null
     return (
-      <div className="game-controls-stats game-claim-toast-stats">
-        <span className="game-stat">
-          <span className="game-stat-value">
-            {formatDistance(completedRun.distance)}
-          </span>
-          <span className="game-stat-label">Distance</span>
-        </span>
-        <span className="game-stat">
-          <span className="game-stat-value">
-            {formatPace(completedRun.avgPace)}
-          </span>
-          <span className="game-stat-label">Pace</span>
-        </span>
-        <span className="game-stat">
-          <span className="game-stat-value">
-            {formatDuration(completedRun.duration)}
-          </span>
-          <span className="game-stat-label">Time</span>
-        </span>
-      </div>
+      <StatRow>
+        <StatChip
+          icon={<IconRunning />}
+          value={formatDistance(completedRun.distance)}
+          label="Distance"
+        />
+        <StatChip
+          icon={<IconBolt />}
+          value={formatPace(completedRun.avgPace)}
+          label="Pace"
+        />
+        <StatChip
+          icon={<IconClock />}
+          value={formatDuration(completedRun.duration)}
+          label="Time"
+        />
+      </StatRow>
     )
   }
 
@@ -3591,7 +3830,7 @@ function GamePageInner() {
 
   return (
     <div
-      className="game-page game-root"
+      className={`game-page game-root${gameLocked ? ' is-rollout-locked' : ''}`}
       style={{ '--sheet-h': `${controlsHeight}px` }}
     >
       <audio
@@ -3603,6 +3842,8 @@ function GamePageInner() {
         <TerritoryMap
           center={center}
           playerLocation={playerLocation}
+          hasFix={Boolean(liveLocation)}
+          snapToPlayer={!gameReady || introPlaying}
           territories={nearbyParcels}
           livePath={tracker.path}
           currentUserId={user?.id}
@@ -3708,6 +3949,20 @@ function GamePageInner() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
+            {countdownVs && (
+              <div className="pvp-countdown-vs">
+                <span className="pvp-countdown-vs-names">
+                  <span>You</span>
+                  <span className="pvp-countdown-vs-badge">VS</span>
+                  <span>{countdownVs.opponent}</span>
+                </span>
+                {countdownVs.pot > 0 && (
+                  <span className="pvp-countdown-vs-pot">
+                    {countdownVs.pot} Fahhcoin to the winner
+                  </span>
+                )}
+              </div>
+            )}
             <AnimatePresence mode="wait">
               <motion.span
                 key={startCountdown}
@@ -3727,17 +3982,27 @@ function GamePageInner() {
         )}
       </AnimatePresence>
 
+      {/* Persistent while outside a rolled-out area (not dismissible); the
+          grey tint sits over the map only - pointer-events: none, so the map
+          can still be panned. */}
+      {gameReady && gameLocked && (
+        <>
+          <div className="game-rollout-tint" aria-hidden="true" />
+          <div className="game-rollout-banner" role="status">
+            <strong>Territory not rolled out here</strong>
+            <span>Run Conquest isn&rsquo;t live in your area yet.</span>
+          </div>
+        </>
+      )}
+      {gameReady && !gameLocked && locationDenied && (
+        <div className="game-rollout-banner is-denied" role="status">
+          <strong>Location is off</strong>
+          <span>Enable location for Run Conquest to find your area.</span>
+        </div>
+      )}
+
       {gameReady && !introPlaying && rolloutStatus.showModal && (
-        <RolloutRequestModal
-          cityName={rolloutStatus.state.cityName}
-          countryName={rolloutStatus.state.countryName}
-          requestCount={rolloutStatus.state.requestCount}
-          submitting={rolloutStatus.state.submitting}
-          submitError={rolloutStatus.state.submitError}
-          justRequested={rolloutStatus.state.justRequested}
-          onRequest={rolloutStatus.request}
-          onDismiss={rolloutStatus.dismiss}
-        />
+        <RolloutRequestModal onDismiss={rolloutStatus.dismiss} />
       )}
 
       {profile?.level != null && (
@@ -3842,11 +4107,16 @@ function GamePageInner() {
           className={`pvp-race-hud ${raceProgress >= 1 ? 'is-done' : ''}`}
           role="status"
         >
-          {raceProgress >= 1
-            ? `🏁 ${raceModeLabel} done! Submitting your race…`
-            : `⚡ Race vs ${raceOpponentName} · ${formatMeters(
-                Math.max(0, raceChallenge.distanceMeters - tracker.distance)
-              )} to go`}
+          <div className="pvp-race-hud-line">
+            {raceProgress >= 1 ? <IconFlagCheckered /> : <IconBolt />}
+            <span>
+              {raceProgress >= 1
+                ? `${raceModeLabel} done! Submitting your race…`
+                : `Race vs ${raceOpponentName} · ${formatMeters(
+                    Math.max(0, raceChallenge.distanceMeters - tracker.distance)
+                  )} to go`}
+            </span>
+          </div>
           <div className="pvp-race-hud-bar">
             <div
               className="pvp-race-hud-fill"
@@ -3894,7 +4164,7 @@ function GamePageInner() {
             className="game-weather-hype game-pvp-alert"
             onClick={() => {
               pvp.clearAlert()
-              openMenu('race')
+              openMenu('race', PVP_SOURCES.ALERT_PILL)
             }}
             initial={{ opacity: 0, y: -40, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -4001,6 +4271,7 @@ function GamePageInner() {
                       : item.tab === 'race'
                         ? pvp.actionCount
                         : 0
+                  const locked = gameLocked && ROLLOUT_LOCKED_TABS.has(item.tab)
                   return (
                     <motion.div
                       key={item.tab}
@@ -4017,7 +4288,8 @@ function GamePageInner() {
                     >
                       <button
                         type="button"
-                        className={`game-radial-btn radial-${item.tone}`}
+                        className={`game-radial-btn radial-${item.tone}${locked ? ' is-locked' : ''}`}
+                        disabled={locked}
                         onClick={() => {
                           if (item.tab === 'play') {
                             setRadialMode('play')
@@ -4442,67 +4714,51 @@ function GamePageInner() {
           pattern elsewhere - see TrackRunPanel/PvpPanel). This one gets the
           heavier treatment since ending/discarding an in-progress run is a
           bigger, easier-to-fat-finger decision than those. */}
-      <AnimatePresence>
-        {(confirmAction === 'end' || confirmAction === 'cancel') && (
-          <motion.div
-            className="game-confirm-overlay game-end-run-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      <GameModal
+        open={confirmAction === 'end' || confirmAction === 'cancel'}
+        onClose={() => setConfirmAction(null)}
+        tone={confirmAction === 'cancel' ? 'danger' : 'success'}
+        title={
+          confirmAction === 'cancel' ? 'Discard this run?' : 'End this run?'
+        }
+        overlayClassName="game-end-run-overlay"
+      >
+        <p className="game-end-run-summary">
+          {formatMeters(displayedDistance)} ·{' '}
+          {formatDuration(tracker.elapsedSeconds)}
+          {confirmAction === 'end' ? ' will be saved' : ' will be lost'}
+        </p>
+        {confirmAction === 'end' &&
+          tracker.distance < MIN_VALID_RUN_DISTANCE_METERS && (
+            <p className="game-controls-hint game-controls-hint-warn">
+              This run is very short and may not count.
+            </p>
+          )}
+        <GameActions>
+          <button
+            type="button"
+            className="game-btn game-btn-wood"
             onClick={() => setConfirmAction(null)}
           >
-            <motion.div
-              className="game-confirm-card game-end-run-card"
-              initial={{ opacity: 0, y: 28 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="game-end-run-title">
-                {confirmAction === 'end'
-                  ? 'End this run?'
-                  : 'Discard this run?'}
-              </h3>
-              <p className="game-end-run-summary">
-                {formatMeters(displayedDistance)} ·{' '}
-                {formatDuration(tracker.elapsedSeconds)}
-                {confirmAction === 'end' ? ' will be saved' : ' will be lost'}
-              </p>
-              {confirmAction === 'end' &&
-                tracker.distance < MIN_VALID_RUN_DISTANCE_METERS && (
-                  <p className="game-controls-hint game-controls-hint-warn">
-                    This run is very short and may not count.
-                  </p>
-                )}
-              <div className="game-end-run-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
-                  onClick={() => setConfirmAction(null)}
-                >
-                  Keep Running
-                </button>
-                <button
-                  type="button"
-                  className={`game-btn ${
-                    confirmAction === 'end' ? 'game-btn-green' : 'game-btn-red'
-                  }`}
-                  onClick={() => {
-                    setConfirmAction(null)
-                    if (confirmAction === 'end') {
-                      setLoopWarningDismissed(false)
-                      tracker.stop()
-                    } else handleCancelTracking()
-                  }}
-                >
-                  {confirmAction === 'end' ? 'Yes, End' : 'Yes, Discard'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Keep Running
+          </button>
+          <button
+            type="button"
+            className={`game-btn ${
+              confirmAction === 'end' ? 'game-btn-green' : 'game-btn-red'
+            }`}
+            onClick={() => {
+              setConfirmAction(null)
+              if (confirmAction === 'end') {
+                setLoopWarningDismissed(false)
+                tracker.stop()
+              } else handleCancelTracking()
+            }}
+          >
+            {confirmAction === 'end' ? 'Yes, End' : 'Yes, Discard'}
+          </button>
+        </GameActions>
+      </GameModal>
 
       <AnimatePresence>
         {saveError && (
@@ -4594,7 +4850,7 @@ function GamePageInner() {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="game-claim-toast game-claim-toast-center glass-card"
+              className="game-claim-toast game-claim-toast-center glass-card game-confirm-card"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
@@ -4955,127 +5211,173 @@ function GamePageInner() {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className="game-menu-sheet"
+            className={`game-menu-sheet${menuTab === 'race' ? ' is-pvp' : ''}`}
             ref={menuSheetRef}
-            initial={{ y: '100%' }}
+            // Opened through the cloud portal: appear in place (the clouds
+            // cover it), no slide-up flash.
+            initial={pvpInstantRef.current ? false : { y: '100%' }}
             animate={{ y: 0 }}
-            exit={{ y: '100%' }}
+            exit={
+              menuTab === 'race'
+                ? { opacity: 0, transition: { duration: 0.01 } }
+                : { y: '100%' }
+            }
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
           >
-            <button
-              type="button"
-              className="game-close-btn game-menu-close"
-              onClick={() => {
-                setMenuOpen(false)
-                setTabPickerOpen(false)
-              }}
-              aria-label="Close menu"
-            >
-              <IconClose />
-            </button>
+            {menuTab === 'race' ? (
+              // PvP: the same pill header + close X as the other sections,
+              // without the section dropdown, plus the coin balance.
+              <>
+                <button
+                  type="button"
+                  className="game-close-btn game-menu-close"
+                  onClick={exitPvp}
+                  aria-label="Close PvP"
+                >
+                  <IconClose />
+                </button>
+                <div className="game-menu-picker is-static">
+                  <div className="game-menu-picker-current is-static">
+                    <TabMedal tab={activeMenuTab} />
+                    <h1 className="game-menu-picker-label">PvP</h1>
+                    <span
+                      className="pvp-balance-chip"
+                      aria-label={`${profile?.fahhcoinBalance ?? 0} Fahhcoin`}
+                    >
+                      <span className="pvp-coin" aria-hidden="true" />
+                      <span className="pvp-num">
+                        {profile?.fahhcoinBalance ?? 0}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="game-close-btn game-menu-close"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setTabPickerOpen(false)
+                  }}
+                  aria-label="Close menu"
+                >
+                  <IconClose />
+                </button>
 
-            {/* Desktop: one row of tabs. Phones: a single game-style
+                {/* Desktop: one row of tabs. Phones: a single game-style
                 picker showing the current tab, which drops down the rest -
                 six tabs in a row/grid was too cramped on a narrow screen. */}
-            <div className="game-menu-tabs">
-              {switcherTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}`}
-                  onClick={() => switchTab(tab.id)}
-                >
-                  <TabMedal tab={tab} medalClassName="game-menu-tab-medal" />
-                  {tab.label}
-                  {tab.badge && (
-                    <span className="game-menu-tab-badge">{tab.badge}</span>
-                  )}
-                </button>
-              ))}
-            </div>
+                <div className="game-menu-tabs">
+                  {switcherTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}${gameLocked && ROLLOUT_LOCKED_TABS.has(tab.id) ? ' is-locked' : ''}`}
+                      disabled={gameLocked && ROLLOUT_LOCKED_TABS.has(tab.id)}
+                      onClick={() => switchTab(tab.id)}
+                    >
+                      <TabMedal
+                        tab={tab}
+                        medalClassName="game-menu-tab-medal"
+                      />
+                      {tab.label}
+                      {tab.badge && (
+                        <span className="game-menu-tab-badge">{tab.badge}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
 
-            <div className="game-menu-picker">
-              {tabPickerOpen && (
-                <div
-                  className="game-menu-picker-scrim"
-                  onClick={() => setTabPickerOpen(false)}
-                />
-              )}
-              <button
-                type="button"
-                className="game-menu-picker-current"
-                onClick={() => setTabPickerOpen((open) => !open)}
-                aria-haspopup="listbox"
-                aria-expanded={tabPickerOpen}
-              >
-                <TabMedal tab={activeMenuTab} />
-                <span className="game-menu-picker-label">
-                  {activeMenuTab.label}
-                </span>
-                {!tabPickerOpen && otherTabsBadgeCount > 0 && (
-                  <span className="game-menu-tab-badge game-menu-picker-badge">
-                    {otherTabsBadgeCount > 9 ? '9+' : otherTabsBadgeCount}
-                  </span>
-                )}
-                <span
-                  className={`game-menu-picker-knob ${tabPickerOpen ? 'is-open' : ''}`}
-                >
-                  <IconChevronDown />
-                </span>
-              </button>
-              <AnimatePresence>
-                {tabPickerOpen && (
-                  <motion.ul
-                    className="game-menu-picker-list"
-                    role="listbox"
-                    initial={{ opacity: 0, y: -14, scale: 0.92 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ type: 'spring', stiffness: 460, damping: 26 }}
+                <div className="game-menu-picker">
+                  {tabPickerOpen && (
+                    <div
+                      className="game-menu-picker-scrim"
+                      onClick={() => setTabPickerOpen(false)}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="game-menu-picker-current"
+                    onClick={() => setTabPickerOpen((open) => !open)}
+                    aria-haspopup="listbox"
+                    aria-expanded={tabPickerOpen}
                   >
-                    {switcherTabs.map((tab, i) => (
-                      <motion.li
-                        key={tab.id}
-                        initial={{ opacity: 0, x: -18 }}
-                        animate={{ opacity: 1, x: 0 }}
+                    <TabMedal tab={activeMenuTab} />
+                    <span className="game-menu-picker-label">
+                      {activeMenuTab.label}
+                    </span>
+                    {!tabPickerOpen && otherTabsBadgeCount > 0 && (
+                      <span className="game-menu-tab-badge game-menu-picker-badge">
+                        {otherTabsBadgeCount > 9 ? '9+' : otherTabsBadgeCount}
+                      </span>
+                    )}
+                    <span
+                      className={`game-menu-picker-knob ${tabPickerOpen ? 'is-open' : ''}`}
+                    >
+                      <IconChevronDown />
+                    </span>
+                  </button>
+                  <AnimatePresence>
+                    {tabPickerOpen && (
+                      <motion.ul
+                        className="game-menu-picker-list"
+                        role="listbox"
+                        initial={{ opacity: 0, y: -14, scale: 0.92 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
                         transition={{
                           type: 'spring',
-                          stiffness: 520,
-                          damping: 24,
-                          delay: 0.03 + i * 0.035,
+                          stiffness: 460,
+                          damping: 26,
                         }}
                       >
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={menuTab === tab.id}
-                          className={`game-menu-picker-option ${menuTab === tab.id ? 'active' : ''}`}
-                          onClick={() => {
-                            switchTab(tab.id)
-                            setTabPickerOpen(false)
-                          }}
-                        >
-                          <TabMedal tab={tab} />
-                          <span className="game-menu-picker-label">
-                            {tab.label}
-                          </span>
-                          {tab.badge && (
-                            <span className="game-menu-tab-badge game-menu-picker-badge">
-                              {tab.badge}
-                            </span>
-                          )}
-                          {menuTab === tab.id && (
-                            <span className="game-menu-picker-here">
-                              <IconCheck />
-                            </span>
-                          )}
-                        </button>
-                      </motion.li>
-                    ))}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
-            </div>
+                        {switcherTabs.map((tab, i) => (
+                          <motion.li
+                            key={tab.id}
+                            initial={{ opacity: 0, x: -18 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{
+                              type: 'spring',
+                              stiffness: 520,
+                              damping: 24,
+                              delay: 0.03 + i * 0.035,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={menuTab === tab.id}
+                              className={`game-menu-picker-option ${menuTab === tab.id ? 'active' : ''}`}
+                              onClick={() => {
+                                switchTab(tab.id)
+                                setTabPickerOpen(false)
+                              }}
+                            >
+                              <TabMedal tab={tab} />
+                              <span className="game-menu-picker-label">
+                                {tab.label}
+                              </span>
+                              {tab.badge && (
+                                <span className="game-menu-tab-badge game-menu-picker-badge">
+                                  {tab.badge}
+                                </span>
+                              )}
+                              {menuTab === tab.id && (
+                                <span className="game-menu-picker-here">
+                                  <IconCheck />
+                                </span>
+                              )}
+                            </button>
+                          </motion.li>
+                        ))}
+                      </motion.ul>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </>
+            )}
 
             {menuTab === 'leaderboard' && (
               <div className="game-menu-panel game-cards">
@@ -5340,6 +5642,15 @@ function GamePageInner() {
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
                   focusRaceId={pvpFocusId}
                   onFocusHandled={() => setPvpFocusId(null)}
+                  heroName={showHeroTurntable ? activeHeroName : null}
+                  avatarSrc={
+                    resolveFileUrl(user?.profilePictureUrl) || avatarSrc
+                  }
+                  playerName={playerNameOf(user)}
+                  onClose={exitPvp}
+                  onGetCoins={openCoinShop}
+                  onOpenSettings={() => switchTab('settings')}
+                  onRequestStart={requestNewMatch}
                 />
               </div>
             )}
@@ -6057,26 +6368,34 @@ function GamePageInner() {
 
                 {shopSection === 'territory' && (
                   <ColorShelf
+                    kind="territory"
                     title="Territory"
-                    Icon={IconFlag}
                     items={shadeItems}
                     ownedItems={ownedItems}
-                    Preview={ShadeFlag}
-                    onBuy={setStoreChoice}
-                    onEquip={handleEquip}
+                    balance={profile?.fahhcoinBalance ?? 0}
+                    level={profile?.level}
+                    onSelect={(item) => {
+                      setPurchaseError(null)
+                      setStoreActionError(null)
+                      setColorPreview({ id: item.id, kind: 'territory' })
+                    }}
                     emptyText="No territory colours in stock yet."
                   />
                 )}
 
                 {shopSection === 'trail' && (
                   <ColorShelf
+                    kind="trail"
                     title="Trail"
-                    Icon={IconRunning}
                     items={trailItems}
                     ownedItems={ownedItems}
-                    Preview={TrailPreview}
-                    onBuy={setStoreChoice}
-                    onEquip={handleEquip}
+                    balance={profile?.fahhcoinBalance ?? 0}
+                    level={profile?.level}
+                    onSelect={(item) => {
+                      setPurchaseError(null)
+                      setStoreActionError(null)
+                      setColorPreview({ id: item.id, kind: 'trail' })
+                    }}
                     emptyText="Fresh trail colours are on their way - check back soon!"
                   />
                 )}
@@ -6129,7 +6448,7 @@ function GamePageInner() {
       <AnimatePresence>
         {viewingRun && (
           <motion.div
-            className="game-confirm-overlay"
+            className="game-confirm-overlay game-run-viewer-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -6236,6 +6555,28 @@ function GamePageInner() {
       </AnimatePresence>
 
       <ExitConfirmOverlay backButton={backButton} />
+
+      {/* "Turn on Visibility" / "Location is off" in front of PvP. */}
+      <AnimatePresence>
+        {pvpGate && (
+          <PvpGatePrompt
+            key="pvp-gate"
+            variant={pvpGate.variant}
+            busy={pvpGate.busy}
+            error={pvpGate.error}
+            canOpenSettings={isNative}
+            onTurnOn={handleGateTurnOn}
+            onNotNow={() => setPvpGate(null)}
+            onOpenSettings={() => {
+              openAppSettings()?.catch?.(() => {})
+              setPvpGate(null)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* The cloud portal into / out of PvP: above everything, input locked. */}
+      <PortalClouds {...portal.state} />
 
       <AnimatePresence>
         {viewingRoute && !followingRoute && (
@@ -6763,6 +7104,40 @@ function GamePageInner() {
               </motion.div>
             )
           })()}
+      </AnimatePresence>
+
+      {/* Territory / Trail preview sheet (Shop). Buy / Get / Equip go through
+          the same handlePurchase / handleEquip as before. */}
+      <AnimatePresence>
+        {(() => {
+          if (!colorPreview) return null
+          const list = colorPreview.kind === 'trail' ? trailItems : shadeItems
+          const item = list.find((i) => i.id === colorPreview.id)
+          if (!item) return null
+          const closePreview = () => {
+            setColorPreview(null)
+            setPurchaseError(null)
+          }
+          return (
+            <ColorItemSheet
+              key={`color-${item.id}`}
+              item={item}
+              kind={colorPreview.kind}
+              ownedItems={ownedItems}
+              balance={profile?.fahhcoinBalance ?? 0}
+              level={profile?.level}
+              purchasing={purchasing}
+              purchaseError={purchaseError}
+              onBuy={handlePurchase}
+              onEquip={handleEquip}
+              onGetCoins={() => {
+                closePreview()
+                openCoinShop()
+              }}
+              onClose={closePreview}
+            />
+          )
+        })()}
       </AnimatePresence>
 
       <AnimatePresence>

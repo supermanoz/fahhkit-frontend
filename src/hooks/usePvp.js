@@ -271,13 +271,23 @@ export function usePvp({ userId, playerLocation, pvpOpen }) {
       },
       'Could not update that setting.'
     )
-    if (!ok) return
+    if (!ok) return false
     setDiscoverableState(next)
     try {
       localStorage.setItem(DISCOVERABLE_KEY, String(next))
     } catch {
       // Just won't be remembered next visit.
     }
+    return true
+  }
+
+  // Re-read the stored Visibility value (another tab may have changed it).
+  // The server has no "read" endpoint for this flag (only a toggle), so the
+  // stored copy is the best there is; see pvpEntry.js.
+  function refreshDiscoverable() {
+    const stored = loadDiscoverable()
+    setDiscoverableState(stored)
+    return stored
   }
 
   async function scanNearby() {
@@ -427,8 +437,10 @@ export function usePvp({ userId, playerLocation, pvpOpen }) {
     alert,
     actionCount,
     clearAlert: () => setAlert(null),
+    clearError: () => setError(null),
     refreshChallenges,
     toggleDiscoverable,
+    refreshDiscoverable,
     scanNearby,
     challengePlayer,
     joinQueue,

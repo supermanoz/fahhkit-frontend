@@ -19,23 +19,42 @@ export const initialGameAuthState = {
   resendCooldownSeconds: 0,
   signUpSentEmail: null,
   forgotSent: false,
+  // Reset-password flow finished: SET_PASSWORD shows its success step (with a
+  // Sign In button) instead of dropping straight back to Sign In.
+  passwordUpdated: false,
   pendingMobile: '',
 }
 
 export function gameAuthReducer(state, action) {
   switch (action.type) {
     case 'GO_TO':
-      return { ...state, screen: action.screen, banner: null }
+      return {
+        ...state,
+        screen: action.screen,
+        banner: null,
+        passwordUpdated: false,
+      }
 
     case 'SUBMIT_START':
       return { ...state, submitting: true, banner: null }
 
+    // `kind`: 'error' (red - a real blocking failure like a wrong password)
+    // or 'warning' (amber - help / try again). Defaults to 'error'.
     case 'SUBMIT_ERROR':
       return {
         ...state,
         submitting: false,
-        banner: { kind: 'error', message: action.message },
+        banner: { kind: action.kind || 'error', message: action.message },
       }
+
+    // The player edited a field or retried: the notice has done its job.
+    case 'CLEAR_BANNER':
+      return state.banner ? { ...state, banner: null } : state
+
+    // Back to idle with nothing shown - e.g. the player cancelled the
+    // Google/Apple sheet.
+    case 'SUBMIT_CANCELLED':
+      return { ...state, submitting: false, banner: null }
 
     // The website's own LoginPage rule: only a MODERATOR's first login is
     // blocked into a forced password change; a normal athlete's firstLogin
@@ -80,22 +99,18 @@ export function gameAuthReducer(state, action) {
     case 'RESEND_STARTED':
       return { ...state, resendCooldownSeconds: 30 }
 
-    // Mirrors UpdatePasswordPage's own result exactly: the athlete is NOT
-    // left signed in on the password they just set (completePasswordSetup
-    // drops that token) - they land back on Sign In with a success banner,
-    // same as the website.
+    // The athlete is NOT left signed in on the password they just set
+    // (completePasswordSetup drops that token): the reset flow ends on its
+    // own success step, whose button goes to Sign In (mobile pre-filled).
     case 'SET_PASSWORD_DONE':
       return {
         ...state,
         submitting: false,
-        screen: SCREEN.SIGN_IN,
+        banner: null,
+        passwordUpdated: true,
         forgotSent: false,
         signUpSentEmail: null,
         pendingMobile: action.mobileNumber,
-        banner: {
-          kind: 'success',
-          message: 'Password updated! Sign in with your new password.',
-        },
       }
 
     case 'LOGIN_FAILURE_COOLDOWN':

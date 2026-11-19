@@ -9,6 +9,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconClose,
+  IconInfo,
   IconLock,
 } from './GameIcons'
 import HeroFigure from './HeroFigure'
@@ -16,6 +17,9 @@ import HeroStage from './HeroStage'
 import EmoteGlyph from './EmoteGlyph'
 import { getHeroSprite } from '../utils/heroSprites'
 import { heroAbilityParts, heroRoleLabel } from '../utils/hero'
+import { describePerk } from '../utils/heroPerks'
+import { Modal } from '../game/ui/Panel'
+import GameButton from '../game/ui/GameButton'
 import { getHeroAccent } from '../utils/heroAccent'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
 import {
@@ -397,9 +401,24 @@ export default function HeroDetailModal({
     }
   }
 
+  // The perk popup (opened from the Perk panel below). Escape closes just the
+  // popup: the hero card's own Escape handler ignores the key while it is
+  // open - and for a beat after, since the popup's handler (document) runs
+  // first and its re-render would otherwise let this one see it as closed.
+  const [perkId, setPerkId] = useState(null)
+  const perkOpenRef = useRef(false)
+  const perkClosedAtRef = useRef(0)
+  perkOpenRef.current = perkId != null
+  function closePerk() {
+    perkClosedAtRef.current = Date.now()
+    setPerkId(null)
+  }
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      if (perkOpenRef.current || Date.now() - perkClosedAtRef.current < 200)
+        return
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -441,8 +460,34 @@ export default function HeroDetailModal({
   const owned = !levelLocked && (Boolean(ownedHeroItem) || claimable)
 
   const abilities = (hero.abilities || [])
-    .map((a) => ({ id: a.id, ...heroAbilityParts(a) }))
+    .map((a) => ({
+      id: a.id,
+      ...heroAbilityParts(a),
+      // Plain-language explanation (utils/heroPerks.js); null if there is none.
+      perk: describePerk(a, hero.abilities),
+    }))
     .filter((a) => a.label)
+  const openPerk = abilities.find((a) => a.id === perkId)?.perk || null
+  // Where this hero stands, for the popup's "is it working?" line.
+  const perkStatus = levelLocked
+    ? {
+        tone: 'locked',
+        chip: `Locked until level ${unlockLevel}`,
+        hint: `Reach level ${unlockLevel} to unlock this hero, then equip it to use this perk.`,
+      }
+    : showEquipped
+      ? {
+          tone: 'on',
+          chip: 'Equipped',
+          hint: 'This perk is working on your runs.',
+        }
+      : {
+          tone: 'off',
+          chip: 'Not equipped',
+          hint: owned
+            ? 'Equip this hero to use it.'
+            : 'Unlock this hero, then equip it to use this perk.',
+        }
 
   return (
     <motion.div
@@ -542,13 +587,8 @@ export default function HeroDetailModal({
             </h3>
             {abilities.length > 0 ? (
               <ul className="hero-modal-stats">
-                {abilities.map((a) => (
-                  <li key={a.id}>
-                    <span className="hero-modal-stat-label">{a.label}</span>
-                    <span className="hero-modal-stat-value">
-                      {a.sign}
-                      {a.pct}%
-                    </span>
+                {abilities.map((a) => {
+                  const bar = (
                     <span className="hero-modal-stat-bar" aria-hidden="true">
                       <span
                         style={{
@@ -556,8 +596,53 @@ export default function HeroDetailModal({
                         }}
                       />
                     </span>
-                  </li>
-                ))}
+                  )
+                  // A perk with an explanation is a button: the whole row is
+                  // the (44px+) tap target for the popup.
+                  if (a.perk) {
+                    return (
+                      <li key={a.id} className="has-perk">
+                        <button
+                          type="button"
+                          className="hero-perk-btn"
+                          aria-haspopup="dialog"
+                          aria-label={`${a.perk.name}, ${a.sign}${a.pct}%. ${a.perk.summary} Tap to learn more.`}
+                          onClick={() => setPerkId(a.id)}
+                        >
+                          <span className="hero-modal-stat-label">
+                            {a.label}
+                            <IconInfo
+                              className="hero-perk-info"
+                              aria-hidden="true"
+                            />
+                          </span>
+                          <span className="hero-modal-stat-value">
+                            {a.sign}
+                            {a.pct}%
+                            <IconChevronRight
+                              className="hero-perk-chev"
+                              aria-hidden="true"
+                            />
+                          </span>
+                          {bar}
+                          <span className="hero-perk-summary">
+                            {a.perk.summary}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  }
+                  return (
+                    <li key={a.id}>
+                      <span className="hero-modal-stat-label">{a.label}</span>
+                      <span className="hero-modal-stat-value">
+                        {a.sign}
+                        {a.pct}%
+                      </span>
+                      {bar}
+                    </li>
+                  )
+                })}
               </ul>
             ) : (
               <p className="hero-modal-muted">
@@ -679,6 +764,63 @@ export default function HeroDetailModal({
           </div>
         )}
       </motion.div>
+
+      {/* Perk explanation. Inside the overlay (so it stacks above the card),
+          wrapped so taps in it never close the hero card behind. */}
+      {openPerk && (
+        <div
+          className="hero-perk-host"
+          style={{ '--hero-accent': accent, '--hero-accent-soft': soft }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Modal title={openPerk.name} onClose={closePerk}>
+            <div className="hero-perk-pop">
+              <p
+                className="hero-perk-value"
+                aria-label={`${openPerk.sign}${openPerk.pct} percent`}
+              >
+                {openPerk.valueText}
+              </p>
+              <p className="hero-perk-sentence">{openPerk.sentence}</p>
+              {openPerk.note && (
+                <p className="hero-perk-note">{openPerk.note}</p>
+              )}
+              <p className="hero-perk-example">
+                <span className="hero-perk-eg">Example</span> {openPerk.example}
+              </p>
+              <div className="hero-perk-where">
+                <span className="hero-perk-where-label">Works in</span>
+                <ul className="hero-perk-chips">
+                  {openPerk.where.map((mode) => (
+                    <li key={mode} className="hero-perk-chip">
+                      {mode}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className={`hero-perk-status is-${perkStatus.tone}`}>
+                {perkStatus.tone === 'locked' ? (
+                  <IconLock aria-hidden="true" />
+                ) : perkStatus.tone === 'on' ? (
+                  <IconCheck aria-hidden="true" />
+                ) : (
+                  <IconBolt aria-hidden="true" />
+                )}
+                {perkStatus.chip}
+              </p>
+              <p className="hero-perk-hint">{perkStatus.hint}</p>
+              <GameButton
+                variant="success"
+                size="lg"
+                className="g-full-width"
+                onClick={closePerk}
+              >
+                OK
+              </GameButton>
+            </div>
+          </Modal>
+        </div>
+      )}
     </motion.div>
   )
 }

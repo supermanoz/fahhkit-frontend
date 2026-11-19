@@ -14,8 +14,10 @@ const TWILIGHT_WINDOW_SECONDS = 45 * 60
 
 export async function fetchSkyConditions(lat, lng, { signal } = {}) {
   const params = new URLSearchParams({
-    latitude: lat.toFixed(4),
-    longitude: lng.toFixed(4),
+    // 2 decimals (~1 km): plenty for weather, and the exact position is
+    // never sent to a third party.
+    latitude: lat.toFixed(2),
+    longitude: lng.toFixed(2),
     current: 'weather_code,is_day,temperature_2m,cloud_cover',
     daily: 'sunrise,sunset',
     timezone: 'auto',

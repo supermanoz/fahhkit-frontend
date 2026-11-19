@@ -2,7 +2,9 @@
   position: relative;
   width: 100%;
   max-width: 400px;
-  max-height: calc(100dvh - 40px);
+  /* The overlay (.game-confirm-overlay) starts below the status bar and ends
+     above the home indicator; this is the room that leaves. */
+  max-height: var(--modal-max-h);
   display: flex;
   flex-direction: column;
   /* Left as a full overflow: hidden (not just overflow-x) - the lore body
@@ -36,9 +38,11 @@
    stage's own slide/arrows (1/2) so it's never covered. Specificity (two
    classes, not one) beats .game-run-viewer-close regardless of CSS import
    order, no !important needed. */
+/* Inside the visible card (the card itself already sits below the status bar,
+   so no safe-area term here - adding one would double-count it). */
 .hero-modal .hero-modal-close {
-  top: max(8px, var(--safe-top));
-  right: max(8px, env(safe-area-inset-right));
+  top: 10px;
+  right: 10px;
   z-index: 3;
 }
 
@@ -57,7 +61,7 @@
 .hero-modal-stage {
   position: relative;
   flex-shrink: 0;
-  height: clamp(200px, 34vh, 36vh);
+  height: clamp(150px, 34dvh, 340px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -73,6 +77,14 @@
   overflow-x: clip;
   overflow-y: visible;
   background: transparent;
+}
+
+/* Short phones: a smaller hero so the name, perk and the action button are
+   reachable without a long scroll. */
+@media (max-height: 700px) {
+  .hero-modal-stage {
+    height: clamp(130px, 27dvh, 260px);
+  }
 }
 
 .hero-modal-stage.is-flat {
@@ -623,4 +635,202 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* ---------- perk panel: tappable rows + the explanation popup ---------- */
+.hero-modal-stats li.has-perk {
+  display: block;
+}
+.hero-perk-btn {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.12s ease,
+    transform 0.1s ease;
+}
+.hero-perk-btn:active {
+  background: var(--hero-accent-soft);
+  transform: translateY(1px);
+}
+.hero-perk-btn:focus-visible {
+  outline: 3px solid var(--hero-accent);
+  outline-offset: 1px;
+}
+.hero-modal-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hero-perk-info {
+  flex: none;
+  font-size: 18px;
+  color: var(--hero-accent);
+}
+.hero-modal-stat-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hero-perk-chev {
+  margin-right: -4px;
+  font-size: 16px;
+  opacity: 0.85;
+}
+/* One plain line under the value: the idea without tapping. */
+.hero-perk-summary {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-muted-dark);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+.hero-perk-host {
+  display: contents;
+}
+.hero-perk-pop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-body-dark);
+}
+.hero-perk-pop,
+.hero-perk-pop * {
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
+}
+.hero-perk-pop *:not(.gb):not(.gb *):not(.hero-perk-value):not(svg):not(svg *) {
+  font-family: var(--font-body);
+}
+.hero-perk-pop .gb,
+.hero-perk-pop .gb * {
+  -webkit-text-stroke: 2px #0a0e28;
+  paint-order: stroke fill;
+}
+.hero-perk-pop .gb-lg {
+  height: 56px;
+  font-size: 19px;
+}
+.hero-perk-value {
+  margin: 0;
+  padding: 4px 22px;
+  border-radius: 999px;
+  border: 3px solid var(--game-ink);
+  background: var(--hero-accent);
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1.1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.hero-perk-sentence {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-title-dark);
+}
+.hero-perk-note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted-dark);
+}
+.hero-perk-example {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--divider);
+  background: var(--hero-accent-soft);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-title-dark);
+}
+.hero-perk-eg {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted-dark);
+}
+.hero-perk-where {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.hero-perk-where-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted-dark);
+}
+.hero-perk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hero-perk-chip {
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  background: #fffdf8;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-title-dark);
+}
+.hero-perk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--game-ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+.hero-perk-status.is-on {
+  background: #dff5e1;
+  color: #1f6b2c;
+}
+.hero-perk-status.is-off {
+  background: #ecebe4;
+  color: #4d4a3f;
+}
+.hero-perk-status.is-locked {
+  background: #ecebe4;
+  color: #4d4a3f;
+}
+.hero-perk-hint {
+  margin: -4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-body-dark);
 }

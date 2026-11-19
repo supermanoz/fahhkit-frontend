@@ -41,17 +41,18 @@ export function getSiteUrl(path = '') {
 // Apple App Store Review Guideline 3.1.1: an app may not link out to an
 // external purchase flow for a virtual/in-app currency like Fahhcoin - that
 // has to go through Apple's own In-App Purchase, or the app risks
-// rejection. No IOS_IAP (or any other) feature-flag mechanism existed
-// anywhere in this codebase before this change (checked directly - no
-// FEATURE_FLAG/featureFlag hits anywhere) - this env var is a new one,
-// defaulting OFF (unset = disabled) until real Apple IAP exists for
-// Fahhcoin, so the iOS build never ships this external-purchase link
-// without someone deliberately turning it on. Android has no equivalent
-// restriction (Google Play allows linking to web purchase flows for this
-// kind of digital good) and the website obviously isn't under App Store
-// review at all, so this only ever gates the iOS native case.
+// rejection. INTENTIONAL gate: on iOS the "Continue to Shop" button is
+// disabled (greyed) unless VITE_IOS_EXTERNAL_SHOP=true. Unset/false (the
+// default) keeps it blocked. .env.production sets it to true so internal /
+// TestFlight builds can reach the web shop.
+//
+// MUST be turned OFF (or replaced by real in-app purchase) before the
+// public App Store release - shipping this link on iOS risks rejection.
+// Android has no equivalent restriction (Google Play allows linking to web
+// purchase flows for this kind of digital good) and the website isn't under
+// App Store review, so this only ever gates the iOS native case.
 export const iosShopRedirectBlocked =
-  platform === 'ios' && import.meta.env.VITE_IOS_IAP !== 'true'
+  platform === 'ios' && import.meta.env.VITE_IOS_EXTERNAL_SHOP !== 'true'
 
 // Opens the website's Fahhcoin shop, preselected to `pack` (the bundle's
 // fahhcoinAmount - ShopPage.jsx reads this back off ?pack= to highlight the

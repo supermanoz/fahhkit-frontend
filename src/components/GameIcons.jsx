@@ -539,3 +539,29 @@ export function IconEmote(props) {
     </GameIcon>
   )
 }
+
+// "i" in a circle - the small info row (tips, explanations).
+export function IconInfo(props) {
+  return (
+    <GameIcon {...props}>
+      <circle cx="12" cy="12" r="9" {...TINT} />
+      <path d="M12 11v5.5M12 7.6v.1" />
+    </GameIcon>
+  )
+}
+
+export function IconPlus(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </GameIcon>
+  )
+}
+
+export function IconMinus(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M5 12h14" />
+    </GameIcon>
+  )
+}

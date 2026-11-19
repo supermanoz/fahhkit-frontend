@@ -1,0 +1,99 @@
+/* Cloud portal overlay (PortalClouds.jsx). Full screen and above everything
+   (HUD, sheets, toasts, popups), swallowing taps while it is up. transform +
+   opacity only; every moving layer has will-change. */
+.portal-clouds {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  overflow: hidden;
+  pointer-events: auto; /* locks input during the transition */
+  touch-action: none;
+  contain: strict;
+}
+
+/* Soft mist behind the clouds: no gap can ever show through. */
+.portal-mist {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #dcebff 0%, #f4f9ff 55%, #cfe1fb 100%);
+  opacity: 0;
+  will-change: opacity;
+}
+
+.portal-cloud {
+  position: absolute;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  filter: none;
+  opacity: var(--pc-shade, 1);
+}
+.portal-cloud svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.portal-cloud.is-left {
+  left: 0;
+  transform: translate3d(-115%, 0, 0);
+}
+.portal-cloud.is-right {
+  right: 0;
+  transform: translate3d(115%, 0, 0) scaleX(-1);
+}
+
+/* IN: slide to the middle and cover. */
+.is-in .portal-cloud,
+.is-hold .portal-cloud {
+  transition: transform var(--pc-in-dur, 520ms)
+    cubic-bezier(0.45, 0.05, 0.35, 1) var(--pc-delay, 0ms);
+}
+.is-in .portal-cloud.is-left,
+.is-hold .portal-cloud.is-left {
+  transform: translate3d(8%, 0, 0);
+}
+.is-in .portal-cloud.is-right,
+.is-hold .portal-cloud.is-right {
+  transform: translate3d(-8%, 0, 0) scaleX(-1);
+}
+.is-in .portal-mist,
+.is-hold .portal-mist {
+  opacity: 1;
+  transition: opacity calc(var(--pc-in) * 0.7) ease-in-out;
+}
+
+/* OUT: part outward and fade. */
+.is-out .portal-cloud {
+  opacity: 0;
+  transition:
+    transform var(--pc-out, 600ms) cubic-bezier(0.45, 0.05, 0.35, 1),
+    opacity var(--pc-out, 600ms) ease-in;
+}
+.is-out .portal-cloud.is-left {
+  transform: translate3d(-120%, 0, 0);
+}
+.is-out .portal-cloud.is-right {
+  transform: translate3d(120%, 0, 0) scaleX(-1);
+}
+.is-out .portal-mist {
+  opacity: 0;
+  transition: opacity var(--pc-out, 600ms) ease-in;
+}
+/* Leaving PvP: the same clouds, quicker. */
+.is-exit .portal-cloud {
+  /* Slightly less drift so the short version still reads. */
+  --pc-shade: 1;
+}
+
+/* Reduced motion: no sliding, just a quick crossfade of the mist. */
+@media (prefers-reduced-motion: reduce) {
+  .portal-cloud {
+    display: none;
+  }
+  .is-in .portal-mist,
+  .is-hold .portal-mist {
+    transition-duration: 90ms;
+  }
+  .is-out .portal-mist {
+    transition-duration: 110ms;
+  }
+}

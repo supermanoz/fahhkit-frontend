@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { navigateToPayment } from '../utils/safeUrl'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ApiError } from '../api/client'
@@ -7,6 +8,7 @@ import { getTerritoryProfile } from '../api/territory'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { withBundleExtras } from '../utils/coinBundles'
 import { formatCoins, formatNumber } from '../utils/format'
+import { buildLoginPath } from '../utils/safeNext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import CoinStack from '../components/CoinStack'
@@ -92,7 +94,7 @@ export default function ShopPage() {
 
   function handlePick(bundle) {
     if (!isAuthed) {
-      navigate('/login', { state: { from: '/shop' } })
+      navigate(buildLoginPath(`/shop${window.location.search}`))
       return
     }
     setBuyError(null)
@@ -105,7 +107,7 @@ export default function ShopPage() {
     setBuyError(null)
     try {
       const payment = await initiateCoinPurchase(selectedBundle.fahhcoinAmount)
-      window.location.href = payment.paymentUrl
+      navigateToPayment(payment.paymentUrl)
     } catch (err) {
       setBuyError(
         err instanceof ApiError ? err.message : 'Could not start payment.'

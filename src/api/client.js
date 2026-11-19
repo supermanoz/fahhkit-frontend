@@ -4,6 +4,7 @@ import {
   formDataFileBytes,
 } from '../utils/imageCompress'
 import { googleSignOut } from '../utils/googleSession'
+import { buildLoginPath } from '../utils/safeNext'
 
 const PRIMARY_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
@@ -93,12 +94,39 @@ export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+// Pages that need a session (RequireAuth) re-check it when this fires, so a
+// sign-out or an expired/rejected token in THIS tab redirects them at once,
+// and the browser's own `storage` event covers a sign-out in ANOTHER tab.
+export const AUTH_CHANGED_EVENT = 'fahhkit:auth-changed'
+
+function notifyAuthChanged() {
+  try {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
+  } catch {
+    // No window (tests, SSR) - nothing is listening.
+  }
+}
+
+export function subscribeAuth(onChange) {
+  const onStorage = (e) => {
+    if (e.key === null || e.key === TOKEN_KEY) onChange()
+  }
+  window.addEventListener(AUTH_CHANGED_EVENT, onChange)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(AUTH_CHANGED_EVENT, onChange)
+    window.removeEventListener('storage', onStorage)
+  }
+}
+
 export function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token)
+  notifyAuthChanged()
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
+  notifyAuthChanged()
 }
 
 export function getUser() {
@@ -142,6 +170,7 @@ export function clearSession() {
   } catch {
     // Storage unavailable - nothing to clear.
   }
+  notifyAuthChanged()
 }
 
 export function canManageEvents(user) {
@@ -183,7 +212,15 @@ function handleAuthFailure(status, hadToken) {
     if (
       !AUTH_FLOW_PATHS.some((path) => window.location.pathname.startsWith(path))
     ) {
-      window.location.href = '/login'
+      // The website remembers where they were (path + query only, never a
+      // credential) so signing in brings them straight back. The native app
+      // shell has no website sign-in page, so it keeps the plain redirect.
+      window.location.href =
+        import.meta.env.VITE_APP_SHELL === 'true'
+          ? '/login'
+          : buildLoginPath(
+              `${window.location.pathname}${window.location.search}${window.location.hash}`
+            )
     }
   }
 }

@@ -1,5 +1,7 @@
 export { default as GameButton } from './GameButton'
-export { Panel, Modal } from './Panel'
+export { Panel, Panel as GamePanel, Modal } from './Panel'
+export { default as TitleRibbon } from './TitleRibbon'
+export { default as StatChip } from './StatChip'
 export { default as Tabs } from './Tabs'
 export { default as CurrencyPill } from './CurrencyPill'
 export { default as Badge } from './Badge'

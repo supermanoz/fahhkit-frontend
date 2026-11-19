@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { navigateToPayment, numericId } from '../utils/safeUrl'
 import { Link, useSearchParams } from 'react-router-dom'
 import { FaEnvelopeOpenText } from 'react-icons/fa'
 import { ApiError, getJson, postJson } from '../api/client'
@@ -66,7 +67,7 @@ const COIN_STATUS_CONTENT = {
 
 export default function PaymentStatusPage() {
   const [searchParams] = useSearchParams()
-  const registrationId = searchParams.get('registrationId')
+  const registrationId = numericId(searchParams.get('registrationId'))
   const purchaseId = searchParams.get('purchaseId')
   const coinStatus = searchParams.get('status')
   const [registration, setRegistration] = useState(null)
@@ -123,7 +124,7 @@ export default function PaymentStatusPage() {
       const data = await postJson(
         `/v1/event/registration/${registrationId}/initiate-payment`
       )
-      window.location.href = data.paymentUrl
+      navigateToPayment(data.paymentUrl)
     } catch (err) {
       setRetryError(
         err instanceof ApiError

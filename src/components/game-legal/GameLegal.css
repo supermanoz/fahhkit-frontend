@@ -4,8 +4,7 @@
   min-height: 100dvh;
   display: flex;
   justify-content: center;
-  padding: max(12px, env(safe-area-inset-top)) 12px
-    max(12px, env(safe-area-inset-bottom));
+  padding: max(12px, var(--overlay-top)) 12px max(12px, var(--overlay-bottom));
   background: var(--bg-900);
   box-sizing: border-box;
 }
@@ -17,8 +16,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: max(12px, env(safe-area-inset-top)) 12px
-    max(12px, env(safe-area-inset-bottom));
+  padding: max(12px, var(--overlay-top)) 12px max(12px, var(--overlay-bottom));
   background: rgba(0, 0, 0, 0.6);
   box-sizing: border-box;
 }
@@ -38,7 +36,9 @@
   overflow: hidden;
 }
 .game-legal-panel.is-page {
-  max-height: calc(100dvh - 24px);
+  max-height: calc(
+    100dvh - max(12px, var(--overlay-top)) - max(12px, var(--overlay-bottom))
+  );
 }
 
 .game-legal-close {

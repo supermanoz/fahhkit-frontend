@@ -1,78 +1,64 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   IconBolt,
-  IconChevronLeft,
   IconChevronRight,
+  IconClock,
   IconCrosshairs,
   IconFlag,
+  IconInfo,
+  IconLock,
+  IconMinus,
+  IconPlus,
   IconRunning,
   IconSwords,
+  IconTrophy,
 } from './GameIcons'
 import { PVP_MODES, getPvpMode, getPvpModeByMeters } from '../api/pvp'
+import { resolveFileUrl } from '../api/client'
 import { mySide } from '../hooks/usePvp'
 import { playerNameOf } from '../utils/playerName'
+import {
+  distanceAwayLabel,
+  estimateLabel,
+  isLive,
+  modeInfo,
+  needCoinsLine,
+  potSummary,
+  raceOutcome,
+  recordLabel,
+  statusChip,
+  timeLeftLabel,
+  winRateLabel,
+} from '../utils/pvpCopy'
+import { useNumberRollup } from '../game/ui/useNumberRollup'
+import GameButton from '../game/ui/GameButton'
+import StatChip from '../game/ui/StatChip'
+import Avatar from '../game/ui/Avatar'
+import {
+  ArenaEmptyArt,
+  BackRow,
+  Coin,
+  RivalFigure,
+  StatusChip,
+  StepRail,
+  VsStage,
+  YouFigure,
+} from './pvp/PvpParts'
 import './PvpPanel.css'
 
-// PvP tab as a step-by-step flow instead of one cluttered page:
-//   home → 1 distance → 2 opponent (quick match | nearby) → 3 searching /
-//   pick a runner → 4 race screen (confirm, run, forfeit, result).
-// Active races and history live on the home screen and open the same race
-// screen. A queue match (or an accepted challenge prompt, via focusRaceId)
-// jumps straight to its race screen.
+// The PvP arena, as a step-by-step flow:
+//   hub → 1 distance → 2 rival (quick match | nearby) → 3 searching / stake →
+//   4 race screen (accept, run, forfeit, result).
+// Active races and history live on the hub and open the same race screen. A
+// queue match (or an accepted challenge pop-up, via focusRaceId) jumps
+// straight to its race screen. All state, APIs and stake rules are unchanged
+// from the previous version - this file is presentation only (copy and the
+// small pure helpers are in utils/pvpCopy.js).
 
-const MODE_FLAVOR = {
-  FIVE_HUNDRED_M: { tag: 'Sprint', line: 'All-out dash. Blink and it’s over.' },
-  ONE_KM: { tag: 'Classic', line: 'The sweet spot - fast but tactical.' },
-  FIVE_KM: { tag: 'Endurance', line: 'Pace yourself. Legends are made here.' },
-}
-
-const RESOLUTION_COPY = {
-  WIN_BY_TIME: 'on time',
-  WIN_BY_FORFEIT: 'by forfeit',
-  MUTUAL_FORFEIT_REFUND: 'nobody finished, stakes refunded',
-  TIE_REFUND: 'dead heat, stakes refunded',
-}
-
-// The game's gold coin (same face as the HUD's), inline with text.
-function Coin() {
-  return <span className="game-coin pvp-coin" aria-label="Fahhcoin" />
-}
-
-function modeLabel(challenge) {
-  return (
-    getPvpModeByMeters(challenge.distanceMeters)?.label ||
-    `${challenge.distanceMeters} m`
-  )
-}
-
-function timeLeft(expiresAt) {
-  if (!expiresAt) return ''
-  const ms = new Date(expiresAt).getTime() - Date.now()
-  if (Number.isNaN(ms) || ms <= 0) return 'expiring'
-  const mins = Math.round(ms / 60000)
-  if (mins < 60) return `${mins} min left`
-  const hours = Math.floor(mins / 60)
-  return hours < 24 ? `${hours} h left` : `${Math.floor(hours / 24)} d left`
-}
-
-function resultLine(challenge, userId) {
-  if (challenge.status === 'DECLINED') return 'Declined'
-  if (challenge.status === 'CANCELLED') return 'Cancelled'
-  if (challenge.status === 'EXPIRED') return 'Expired'
-  const how = RESOLUTION_COPY[challenge.resolutionType] || ''
-  if (!challenge.winnerId) return how ? `Draw · ${how}` : 'Draw'
-  // Winner is paid the whole pot (both stakes), so net it's +stake.
-  const won = challenge.winnerId === userId
-  return (
-    <>
-      {won ? `Won ${how} · +` : `Lost ${how} · −`}
-      {challenge.stakeAmount} <Coin />
-    </>
-  )
-}
-
-const isLive = (c) => c.status === 'PENDING' || c.status === 'IN_PROGRESS'
+const modeLabel = (c) =>
+  getPvpModeByMeters(c.distanceMeters)?.label || `${c.distanceMeters} m`
 
 // Where a race stands for me, as one of four timeline steps.
 function raceStep(c, side) {
@@ -86,30 +72,19 @@ const TIMELINE = ['Matched', 'Locked in', 'Run', 'Result']
 // How long the searching screen shows "Rival found!" before the race.
 const FOUND_FLASH_MS = 1500
 
-// Back button + title, with step dots for the four flow steps.
-function StepHeader({ title, step, onBack }) {
+// The rival's id in a challenge, whichever seat I'm in.
+const rivalId = (c, userId) =>
+  c.challengerId === userId ? c.opponentId : c.challengerId
+
+function Notice({ children, tone = 'info' }) {
   return (
-    <div className="pvp-step-head">
-      <button
-        type="button"
-        className="pvp-back"
-        onClick={onBack}
-        aria-label="Back"
-      >
-        <IconChevronLeft />
-      </button>
-      <span className="pvp-step-title">{title}</span>
-      {step != null && (
-        <span className="pvp-step-dots" aria-label={`Step ${step} of 4`}>
-          {[1, 2, 3, 4].map((n) => (
-            <span
-              key={n}
-              className={`pvp-step-dot ${n <= step ? 'is-done' : ''}`}
-            />
-          ))}
-        </span>
-      )}
-    </div>
+    <p
+      className={`pvp-notice is-${tone}`}
+      role={tone === 'error' ? 'alert' : 'status'}
+    >
+      <IconInfo />
+      <span>{children}</span>
+    </p>
   )
 }
 
@@ -122,6 +97,16 @@ export default function PvpPanel({
   racing,
   focusRaceId,
   onFocusHandled,
+  // Presentation wiring from GamePage (all optional):
+  heroName,
+  avatarSrc,
+  playerName,
+  onClose,
+  onGetCoins,
+  onOpenSettings,
+  // Starting a NEW match: GamePage checks Visibility + location first and
+  // calls proceed() when the player is set (a live race gets in without them).
+  onRequestStart,
 }) {
   const [screen, setScreen] = useState('home')
   const [modeId, setModeId] = useState(null)
@@ -131,6 +116,7 @@ export default function PvpPanel({
   const [stake, setStake] = useState('')
   // Race id whose Forfeit button is waiting for the confirming second tap.
   const [confirmForfeitId, setConfirmForfeitId] = useState(null)
+  const reduceMotion = useReducedMotion()
 
   const {
     challenges,
@@ -146,6 +132,7 @@ export default function PvpPanel({
   const active = challenges.filter(isLive)
   const past = challenges.filter((c) => !isLive(c)).slice(0, 12)
   const race = raceId ? challenges.find((c) => c.id === raceId) : null
+  const me = playerName || 'You'
 
   function openRace(id) {
     setRaceId(id)
@@ -179,6 +166,14 @@ export default function PvpPanel({
     onFocusHandled?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusRaceId])
+
+  // "Battle" / "Find a rival": go to the distance step - after the Visibility /
+  // location check when GamePage supplies one.
+  function beginNewMatch() {
+    const go = () => setScreen('distance')
+    if (onRequestStart) onRequestStart(go)
+    else go()
+  }
 
   function pickMode(id) {
     setModeId(id)
@@ -219,6 +214,21 @@ export default function PvpPanel({
     }
   }
 
+  // Rematch: the same rival, distance and stake, sent through the same direct
+  // challenge call the nearby flow uses. If the server won't take it (the
+  // rival isn't discoverable right now) the error shows on this screen.
+  async function rematch(c) {
+    const m = getPvpModeByMeters(c.distanceMeters)
+    const id = rivalId(c, userId)
+    if (!m || !id) {
+      setScreen('distance')
+      return
+    }
+    setModeId(m.id)
+    const created = await pvp.challengePlayer(id, m.id, Number(c.stakeAmount))
+    if (created) openRace(created.id)
+  }
+
   async function forfeit(c) {
     if (confirmForfeitId !== c.id) {
       setConfirmForfeitId(c.id)
@@ -229,651 +239,942 @@ export default function PvpPanel({
     if (done) onForfeited?.(done)
   }
 
-  const errorLine = error && (
-    <p className="game-controls-hint game-controls-hint-error">{error}</p>
+  // Keep a focused field clear of the on-screen keyboard.
+  const focusTimer = useRef(null)
+  useEffect(() => () => clearTimeout(focusTimer.current), [])
+  function keepInView(e) {
+    const el = e.currentTarget
+    clearTimeout(focusTimer.current)
+    focusTimer.current = setTimeout(
+      () => el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }),
+      300
+    )
+  }
+
+  const errorLine = error && <Notice tone="error">{error}</Notice>
+
+  const queueScreen = screen === 'queue' || (inQueue && screen !== 'race')
+
+  function goBack() {
+    if (queueScreen) {
+      if (inQueue) cancelQueue()
+      else setScreen('opponent')
+      return
+    }
+    if (screen === 'distance') setScreen('home')
+    else if (screen === 'opponent') setScreen('distance')
+    else if (screen === 'nearby') {
+      if (target) setTarget(null)
+      else setScreen('opponent')
+    } else if (screen === 'race' || screen === 'history') setScreen('home')
+    else onClose?.()
+  }
+
+  const youFigure = (size = 72) => (
+    <YouFigure
+      heroName={heroName}
+      avatarSrc={avatarSrc}
+      name={me}
+      size={size}
+    />
   )
 
+  let step = null
+  let key = screen
+  let body = null
+
   // --- 3a. Searching (queue) ---
-  if (screen === 'queue' || (inQueue && screen !== 'race')) {
+  if (queueScreen) {
+    key = 'queue'
+    step = 3
     const queuedMode = getPvpMode(queueEntry?.mode) || mode
     const expired = !inQueue && queueEntry?.status === 'EXPIRED'
     // Matched but the race screen hasn't taken over yet (race still loading).
     const found = !inQueue && queueEntry?.status === 'MATCHED'
-    return (
-      <div className="pvp-flow">
-        <StepHeader
-          title={
-            expired
-              ? 'No rival found'
-              : found
-                ? 'Rival found!'
-                : 'Finding a rival'
-          }
-          step={3}
-          onBack={inQueue ? cancelQueue : () => setScreen('opponent')}
-        />
-        <div className="pvp-radar-wrap">
-          <div
-            className={`pvp-radar ${expired ? 'is-idle' : ''} ${found ? 'is-found' : ''}`}
-          >
-            <span className="pvp-radar-sweep" />
-            <span className="pvp-radar-ring" />
-            <span className="pvp-radar-ring is-2" />
-            <span className="pvp-radar-core">
-              <IconSwords />
-            </span>
-          </div>
-          <p className="pvp-big-line">
-            {expired
-              ? 'Nobody bit this time.'
-              : found
-                ? 'Rival locked on - loading the race…'
-                : inQueue
-                  ? 'Scanning for runners…'
-                  : 'Joining the queue…'}
-          </p>
-          {queuedMode && (
-            <p className="pvp-sub-line">
-              {queuedMode.label} · {queuedMode.queueStake} <Coin /> each ·
-              winner takes the pot
-            </p>
-          )}
-        </div>
+    const matchedRace = found
+      ? challenges.find((c) => c.id === queueEntry.matchedChallengeId)
+      : null
+    const rivalName = matchedRace
+      ? mySide(matchedRace, userId).opponentName
+      : ''
+    body = (
+      <>
         {found ? (
-          <button
-            type="button"
-            className="game-btn game-btn-green game-btn-lg"
+          <div className="pvp-found">
+            <h2 className="pvp-screen-title pvp-display">Rival found!</h2>
+            <VsStage
+              you={youFigure(76)}
+              rival={
+                <RivalFigure name={rivalName} size={76} unknown={!rivalName} />
+              }
+              youLabel={me}
+              rivalLabel={rivalName || 'A rival'}
+            />
+            {queuedMode && (
+              <p className="pvp-pot-line">
+                <Coin />{' '}
+                <span className="pvp-num">{queuedMode.queueStake * 2}</span> to
+                the winner
+              </p>
+            )}
+            <p className="pvp-sentence">Locking in the race…</p>
+          </div>
+        ) : (
+          <div className="pvp-radar-wrap">
+            <div
+              className={`pvp-radar ${expired ? 'is-idle' : ''}`}
+              role="img"
+              aria-label={expired ? 'Search finished' : 'Searching for a rival'}
+            >
+              <span className="pvp-radar-sweep" />
+              <span className="pvp-radar-ring" />
+              <span className="pvp-radar-ring is-2" />
+              <span className="pvp-radar-core">
+                <IconSwords />
+              </span>
+            </div>
+            <h2 className="pvp-screen-title pvp-display">
+              {expired
+                ? 'No rival found'
+                : inQueue
+                  ? 'Finding a rival…'
+                  : 'Joining the search…'}
+            </h2>
+            <p className="pvp-sentence">
+              {expired
+                ? 'Nobody was free this time. Try again, or challenge someone nearby.'
+                : 'Hang tight. We will start the race as soon as someone joins.'}
+            </p>
+            {queuedMode && (
+              <p className="pvp-pot-line">
+                <span className="pvp-num">{queuedMode.label}</span>
+                <span aria-hidden="true">·</span>
+                <Coin />{' '}
+                <span className="pvp-num">{queuedMode.queueStake}</span> each
+                <span aria-hidden="true">·</span>
+                Winner takes the pot
+              </p>
+            )}
+          </div>
+        )}
+        {found ? (
+          <GameButton
+            variant="success"
+            size="lg"
+            className="g-full-width"
             onClick={() => openRace(queueEntry.matchedChallengeId)}
             disabled={!queueEntry.matchedChallengeId}
           >
-            Go to Race
-          </button>
+            Go to the race
+          </GameButton>
         ) : expired ? (
           <div className="pvp-actions-col">
-            <button
-              type="button"
-              className="game-btn game-btn-green game-btn-lg"
+            <GameButton
+              variant="success"
+              size="lg"
+              className="g-full-width"
               onClick={startQuickMatch}
-              disabled={busy === 'queue' || !mode}
+              loading={busy === 'queue'}
+              disabled={!mode}
             >
-              Try Again
-            </button>
-            <button
-              type="button"
-              className="game-btn game-btn-wood"
+              Try again
+            </GameButton>
+            <GameButton
+              variant="secondary"
+              size="lg"
+              className="g-full-width"
               onClick={goNearby}
               disabled={!mode}
             >
-              Challenge Someone Nearby
-            </button>
+              Challenge someone nearby
+            </GameButton>
           </div>
         ) : (
-          <button
-            type="button"
-            className="game-btn game-btn-wood"
+          <GameButton
+            variant="secondary"
+            size="lg"
+            className="g-full-width"
             onClick={cancelQueue}
             disabled={busy === 'queue'}
           >
-            Cancel Search
-          </button>
+            Cancel search
+          </GameButton>
         )}
         {errorLine}
-      </div>
+      </>
     )
   }
 
   // --- 1. Distance ---
-  if (screen === 'distance') {
-    return (
-      <div className="pvp-flow">
-        <StepHeader
-          title="Pick a distance"
-          step={1}
-          onBack={() => setScreen('home')}
-        />
+  else if (screen === 'distance') {
+    step = 1
+    body = (
+      <>
+        <h2 className="pvp-screen-title pvp-display">Pick a distance</h2>
+        <p className="pvp-sentence">Longer races mean bigger pots.</p>
         <div className="pvp-choice-list">
-          {PVP_MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`pvp-choice pvp-mode-${m.id}`}
-              onClick={() => pickMode(m.id)}
-            >
-              <span className="pvp-choice-big">{m.label}</span>
-              <span className="pvp-choice-body">
-                <span className="pvp-choice-title">
-                  {MODE_FLAVOR[m.id]?.tag}
+          {PVP_MODES.map((m) => {
+            const info = modeInfo(m.id)
+            const selected = modeId === m.id
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className={`pvp-tier is-${info.tier}${selected ? ' is-selected' : ''}`}
+                aria-pressed={selected}
+                onClick={() => pickMode(m.id)}
+              >
+                <span className="pvp-tier-badge pvp-display pvp-num">
+                  {m.label}
                 </span>
-                <span className="pvp-choice-line">
-                  {MODE_FLAVOR[m.id]?.line}
+                <span className="pvp-tier-body">
+                  <span className="pvp-tier-name pvp-display">{info.tag}</span>
+                  <span className="pvp-tier-pitch">{info.pitch}</span>
+                  <span className="pvp-tier-meta">
+                    <span className="pvp-tier-fact">
+                      <Coin /> <span className="pvp-num">{m.queueStake}</span>{' '}
+                      stake
+                    </span>
+                    <span className="pvp-tier-fact">
+                      <IconClock /> {estimateLabel(info.estMinutes)}
+                    </span>
+                  </span>
                 </span>
-                <span className="pvp-choice-meta">
-                  Quick match stake {m.queueStake} <Coin />
-                </span>
-              </span>
-              <IconChevronRight />
-            </button>
-          ))}
+                <IconChevronRight className="pvp-tier-go" />
+              </button>
+            )
+          })}
         </div>
-      </div>
+      </>
     )
   }
 
-  // --- 2. Opponent ---
-  if (screen === 'opponent' && mode) {
+  // --- 2. Rival ---
+  else if (screen === 'opponent' && mode) {
+    step = 2
     const short = balance < mode.queueStake
-    return (
-      <div className="pvp-flow">
-        <StepHeader
-          title="Choose your rival"
-          step={2}
-          onBack={() => setScreen('distance')}
-        />
+    const info = modeInfo(mode.id)
+    body = (
+      <>
+        <h2 className="pvp-screen-title pvp-display">Choose your rival</h2>
         <p className="pvp-picked">
-          <span className="pvp-picked-chip">{mode.label}</span>
-          {MODE_FLAVOR[mode.id]?.tag}
+          <span className={`pvp-picked-chip is-${info.tier} pvp-num`}>
+            {mode.label}
+          </span>
+          <span>
+            {info.tag} · {estimateLabel(info.estMinutes)}
+          </span>
         </p>
         <div className="pvp-choice-list">
-          <button
-            type="button"
-            className="pvp-choice"
-            onClick={startQuickMatch}
-            disabled={short || busy === 'queue'}
-          >
-            <span className="pvp-choice-icon tone-gold">
-              <IconBolt />
-            </span>
-            <span className="pvp-choice-body">
-              <span className="pvp-choice-title">Quick Match</span>
-              <span className="pvp-choice-line">
-                Any runner out there, paired automatically.
+          {short ? (
+            <div className="pvp-option is-locked" aria-disabled="true">
+              <span className="pvp-option-icon">
+                <IconLock />
               </span>
-              <span className="pvp-choice-meta">
-                {short ? (
-                  <>
-                    Need {mode.queueStake} <Coin /> - you have {balance}
-                  </>
-                ) : (
-                  <>
-                    Stake {mode.queueStake} <Coin /> each
-                  </>
+              <span className="pvp-option-body">
+                <span className="pvp-option-title pvp-display">
+                  Quick Match
+                </span>
+                <span className="pvp-option-line">
+                  Any runner, matched for you.
+                </span>
+                <span className="pvp-option-need">
+                  <Coin /> {needCoinsLine(mode.queueStake, balance)}
+                </span>
+                {onGetCoins && (
+                  <GameButton
+                    variant="success"
+                    size="sm"
+                    className="pvp-get-coins"
+                    onClick={onGetCoins}
+                  >
+                    Get Fahhcoin
+                  </GameButton>
                 )}
               </span>
-            </span>
-            <IconChevronRight />
-          </button>
-          <button type="button" className="pvp-choice" onClick={goNearby}>
-            <span className="pvp-choice-icon tone-red">
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="pvp-option"
+              onClick={startQuickMatch}
+              disabled={busy === 'queue'}
+            >
+              <span className="pvp-option-icon">
+                <IconBolt />
+              </span>
+              <span className="pvp-option-body">
+                <span className="pvp-option-title pvp-display">
+                  Quick Match
+                </span>
+                <span className="pvp-option-line">
+                  Any runner, matched for you.
+                </span>
+                <span className="pvp-option-meta">
+                  Each of you stakes <Coin />{' '}
+                  <span className="pvp-num">{mode.queueStake}</span>
+                </span>
+              </span>
+              <IconChevronRight className="pvp-tier-go" />
+            </button>
+          )}
+          <button type="button" className="pvp-option" onClick={goNearby}>
+            <span className="pvp-option-icon">
               <IconCrosshairs />
             </span>
-            <span className="pvp-choice-body">
-              <span className="pvp-choice-title">Challenge Nearby</span>
-              <span className="pvp-choice-line">
-                Call out someone around you and set your own stake.
+            <span className="pvp-option-body">
+              <span className="pvp-option-title pvp-display">
+                Challenge nearby
               </span>
-              {!discoverable && (
-                <span className="pvp-choice-meta">
-                  Tip: turn on Visibility in Settings so they can find you too.
-                </span>
-              )}
+              <span className="pvp-option-line">
+                Call out a runner around you and set your own stake.
+              </span>
             </span>
-            <IconChevronRight />
+            <IconChevronRight className="pvp-tier-go" />
           </button>
         </div>
+        {!discoverable && (
+          <Notice>
+            Tip: turn on Visibility in Settings so other runners can find you
+            too.
+          </Notice>
+        )}
         {errorLine}
-      </div>
+      </>
     )
   }
 
-  // --- 3b. Pick a nearby runner ---
-  if (screen === 'nearby' && mode) {
+  // --- 3b. Pick a nearby runner, then the stake ---
+  else if (screen === 'nearby' && mode) {
     const amount = Number(stake)
-    return (
-      <div className="pvp-flow">
-        <StepHeader
-          title={target ? 'Set the stake' : 'Runners near you'}
-          step={3}
-          onBack={() => (target ? setTarget(null) : setScreen('opponent'))}
-        />
-        {target ? (
-          <form className="pvp-stake" onSubmit={sendChallenge}>
-            <div className="pvp-versus is-compact">
-              <span className="pvp-versus-side">You</span>
-              <span className="pvp-versus-vs">VS</span>
-              <span className="pvp-versus-side">{playerNameOf(target)}</span>
-            </div>
-            <p className="pvp-sub-line">
-              {mode.label} race · each of you puts in
-            </p>
-            <div className="pvp-stake-input-row">
-              <span className="game-coin pvp-stake-coin" aria-hidden="true" />
+    const pot = potSummary(stake)
+    const tooMuch = pot && amount > balance
+    const stepSize = Math.max(5, Math.round(mode.queueStake / 2))
+    const bump = (d) =>
+      setStake(String(Math.max(1, (Number.isFinite(amount) ? amount : 0) + d)))
+    if (target) {
+      key = 'stake'
+      step = 3
+      body = (
+        <form className="pvp-stake" onSubmit={sendChallenge}>
+          <h2 className="pvp-screen-title pvp-display">Set the stake</h2>
+          <VsStage
+            compact
+            you={youFigure(56)}
+            rival={
+              <RivalFigure
+                name={playerNameOf(target)}
+                src={resolveFileUrl(target.profilePictureUrl)}
+                size={56}
+              />
+            }
+            youLabel={me}
+            rivalLabel={playerNameOf(target)}
+          />
+          <p className="pvp-sentence">
+            {mode.label} race. Each of you puts in the same amount.
+          </p>
+          <div className="pvp-stepper">
+            <button
+              type="button"
+              className="pvp-step-btn"
+              onClick={() => bump(-stepSize)}
+              aria-label={`Lower the stake by ${stepSize}`}
+              disabled={amount <= 1}
+            >
+              <IconMinus />
+            </button>
+            <label className="pvp-stake-field">
+              <Coin />
               <input
                 type="number"
+                inputMode="numeric"
                 min="1"
                 step="1"
                 max={balance || undefined}
-                className="game-club-input pvp-stake-input"
+                className="pvp-stake-input pvp-display pvp-num"
                 value={stake}
                 onChange={(e) => setStake(e.target.value)}
-                aria-label="Stake in Fahhcoin"
+                onFocus={keepInView}
+                aria-label="Your stake in Fahhcoin"
               />
-            </div>
-            <p className="pvp-sub-line">
-              Winner takes {amount >= 1 ? amount * 2 : '—'} <Coin /> · you have{' '}
-              {balance}
-            </p>
-            <button
-              type="submit"
-              className="game-btn game-btn-green game-btn-lg"
-              disabled={
-                busy === `challenge-${target.userId}` ||
-                !(amount >= 1) ||
-                amount > balance
-              }
-            >
-              {busy === `challenge-${target.userId}`
-                ? 'Sending…'
-                : 'Send Challenge'}
-            </button>
-          </form>
-        ) : (
-          <>
-            {busy === 'nearby' && !nearby ? (
-              <p className="game-menu-empty">Looking around…</p>
-            ) : !nearby || nearby.length === 0 ? (
-              <p className="game-menu-empty">
-                Nobody around (who&apos;s up for it) right now.
-              </p>
-            ) : (
-              <ul className="pvp-runner-list">
-                {nearby.map((p) => (
-                  <li key={p.userId}>
-                    <button
-                      type="button"
-                      className="pvp-runner"
-                      onClick={() => pickTarget(p)}
-                    >
-                      <span className="pvp-runner-info">
-                        <span className="pvp-runner-name">
-                          {playerNameOf(p)}
-                        </span>
-                        <span className="pvp-runner-meta">
-                          {p.level != null ? `Lv ${p.level} · ` : ''}
-                          {p.distanceMeters < 1000
-                            ? `${Math.round(p.distanceMeters)} m away`
-                            : `${(p.distanceMeters / 1000).toFixed(1)} km away`}
-                        </span>
-                      </span>
-                      <span className="game-btn game-btn-green game-btn-sm">
-                        Challenge
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            </label>
             <button
               type="button"
-              className="game-btn game-btn-wood"
-              onClick={pvp.scanNearby}
-              disabled={busy === 'nearby'}
+              className="pvp-step-btn"
+              onClick={() => bump(stepSize)}
+              aria-label={`Raise the stake by ${stepSize}`}
+              disabled={balance > 0 && amount >= balance}
             >
-              {busy === 'nearby' ? 'Scanning…' : 'Scan Again'}
+              <IconPlus />
             </button>
-          </>
-        )}
-        {errorLine}
-      </div>
-    )
+          </div>
+          <div className="pvp-chips" role="group" aria-label="Quick stakes">
+            {[1, 2, 5]
+              .map((m) => mode.queueStake * m)
+              .filter((v) => v <= balance)
+              .map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`pvp-stake-chip${amount === v ? ' is-on' : ''}`}
+                  onClick={() => setStake(String(v))}
+                >
+                  <Coin /> <span className="pvp-num">{v}</span>
+                </button>
+              ))}
+          </div>
+          <div className="pvp-pot">
+            {pot ? (
+              <>
+                <span>
+                  You stake <Coin /> <b className="pvp-num">{pot.stake}</b>
+                </span>
+                <span className="pvp-pot-win">
+                  Winner takes <Coin /> <b className="pvp-num">{pot.pot}</b>
+                </span>
+              </>
+            ) : (
+              <span>Enter a whole number of coins.</span>
+            )}
+          </div>
+          <p className={`pvp-have${tooMuch ? ' is-short' : ''}`}>
+            {tooMuch ? (
+              <>
+                You only have <span className="pvp-num">{balance}</span> coins.
+              </>
+            ) : (
+              <>
+                You have <span className="pvp-num">{balance}</span> coins.
+              </>
+            )}
+          </p>
+          <GameButton
+            type="submit"
+            variant="success"
+            size="lg"
+            className="g-full-width"
+            loading={busy === `challenge-${target.userId}`}
+            disabled={!pot || amount > balance}
+          >
+            Send challenge
+          </GameButton>
+          {errorLine}
+        </form>
+      )
+    } else {
+      step = 2
+      body = (
+        <>
+          <h2 className="pvp-screen-title pvp-display">Runners near you</h2>
+          {busy === 'nearby' && !nearby ? (
+            <p className="pvp-sentence">Looking around…</p>
+          ) : !nearby || nearby.length === 0 ? (
+            <div className="pvp-empty">
+              <ArenaEmptyArt />
+              <h3 className="pvp-empty-title pvp-display">
+                Nobody nearby right now
+              </h3>
+              <p className="pvp-sentence">
+                {discoverable
+                  ? 'Try again in a moment, or use Quick Match.'
+                  : 'Runners can only find each other when Visibility is on. Turn it on in Settings, then scan again.'}
+              </p>
+              {!discoverable && onOpenSettings && (
+                <GameButton
+                  variant="secondary"
+                  size="sm"
+                  className="pvp-empty-btn"
+                  onClick={onOpenSettings}
+                >
+                  Open Settings
+                </GameButton>
+              )}
+            </div>
+          ) : (
+            <ul className="pvp-rival-list">
+              {nearby.map((p) => (
+                <li key={p.userId}>
+                  <button
+                    type="button"
+                    className="pvp-rival"
+                    onClick={() => pickTarget(p)}
+                  >
+                    <Avatar
+                      name={playerNameOf(p)}
+                      src={resolveFileUrl(p.profilePictureUrl)}
+                      size={46}
+                      ring="#4da3ff"
+                    />
+                    <span className="pvp-rival-info">
+                      <span className="pvp-rival-name pvp-display">
+                        {playerNameOf(p)}
+                      </span>
+                      <span className="pvp-rival-meta">
+                        {p.level != null && (
+                          <span className="pvp-level pvp-num">
+                            Lv {p.level}
+                          </span>
+                        )}
+                        <span>{distanceAwayLabel(p.distanceMeters)}</span>
+                      </span>
+                    </span>
+                    <span className="pvp-rival-go">Challenge</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <GameButton
+            variant="secondary"
+            size="lg"
+            className="g-full-width"
+            onClick={pvp.scanNearby}
+            loading={busy === 'nearby'}
+          >
+            Scan again
+          </GameButton>
+          {errorLine}
+        </>
+      )
+    }
   }
 
   // --- 4. Race screen ---
-  if (screen === 'race') {
+  else if (screen === 'race') {
+    step = 4
     if (!race) {
-      return (
-        <div className="pvp-flow">
-          <StepHeader title="Race" step={4} onBack={() => setScreen('home')} />
-          <p className="game-menu-empty">Loading the match…</p>
-        </div>
+      body = (
+        <>
+          <h2 className="pvp-screen-title pvp-display">Your race</h2>
+          <p className="pvp-sentence">Loading the match…</p>
+        </>
+      )
+    } else {
+      const side = mySide(race, userId)
+      const needsMyOk = race.status === 'PENDING' && !side.confirmed
+      const canRun = race.status === 'IN_PROGRESS' && !side.myRunId
+      const done = !isLive(race)
+      const tl = raceStep(race, side)
+      const outcome = raceOutcome(race, userId)
+      const rival = side.opponentName || 'A rival'
+      const note = needsMyOk
+        ? race.source === 'QUEUE'
+          ? 'Rival found! Accept to lock in your stake.'
+          : `${rival} wants to race you.`
+        : race.status === 'PENDING'
+          ? `Waiting for ${rival} to accept…`
+          : canRun
+            ? `Stakes are locked. Run ${modeLabel(race)} before time runs out. The fastest runner wins.`
+            : race.status === 'IN_PROGRESS'
+              ? side.theirRunId
+                ? 'Both runs are in. Results are coming…'
+                : `Your run is in. Waiting for ${rival}…`
+              : null
+      body = (
+        <>
+          {done ? (
+            <ResultHero outcome={outcome} />
+          ) : (
+            <h2 className="pvp-screen-title pvp-display">Your race</h2>
+          )}
+          <VsStage
+            you={youFigure(done ? 56 : 68)}
+            rival={<RivalFigure name={rival} size={done ? 56 : 68} />}
+            youLabel={me}
+            rivalLabel={rival}
+            compact={done}
+          />
+          <div className="pvp-terms">
+            <span className="pvp-term">
+              <span className="pvp-term-label">Distance</span>
+              <span className="pvp-term-value pvp-display pvp-num">
+                {modeLabel(race)}
+              </span>
+            </span>
+            <span className="pvp-term">
+              <span className="pvp-term-label">Pot</span>
+              <span className="pvp-term-value pvp-display pvp-num">
+                <Coin /> {race.stakeAmount * 2}
+              </span>
+            </span>
+            {!done && (
+              <span className="pvp-term">
+                <span className="pvp-term-label">Time left</span>
+                <span className="pvp-term-value pvp-display pvp-num">
+                  {timeLeftLabel(race.expiresAt) || '-'}
+                </span>
+              </span>
+            )}
+          </div>
+
+          {!done && (
+            <ol className="pvp-timeline">
+              {TIMELINE.map((label, i) => (
+                <li
+                  key={label}
+                  className={`${i < tl ? 'is-done' : ''} ${i === tl ? 'is-now' : ''}`}
+                >
+                  <span className="pvp-timeline-dot" />
+                  {label}
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {!done && note && <p className="pvp-sentence is-strong">{note}</p>}
+
+          <div className="pvp-actions-col">
+            {needsMyOk && (
+              <>
+                <GameButton
+                  variant="success"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={() => pvp.review(race, true)}
+                  loading={busy === `review-${race.id}`}
+                >
+                  Accept and lock stake
+                </GameButton>
+                <GameButton
+                  variant="danger"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={() => pvp.review(race, false)}
+                  disabled={busy === `review-${race.id}`}
+                >
+                  Decline
+                </GameButton>
+              </>
+            )}
+            {race.status === 'PENDING' && !needsMyOk && (
+              <GameButton
+                variant="secondary"
+                size="lg"
+                className="g-full-width"
+                onClick={() => pvp.cancel(race)}
+                loading={busy === `cancel-${race.id}`}
+              >
+                Cancel challenge
+              </GameButton>
+            )}
+            {canRun && (
+              <>
+                <GameButton
+                  variant="success"
+                  size="lg"
+                  className="g-full-width pvp-run-btn"
+                  icon={<IconRunning />}
+                  onClick={() => onStartRace(race)}
+                  disabled={racing}
+                >
+                  {racing ? 'Run in progress' : 'Start the race'}
+                </GameButton>
+                {/* Concede: only while live and my run isn't in (server
+                    rule), not mid-run. Two taps. */}
+                <GameButton
+                  variant="danger"
+                  size="lg"
+                  className={`g-full-width pvp-forfeit-btn${confirmForfeitId === race.id ? ' is-confirming' : ''}`}
+                  icon={<IconFlag />}
+                  onClick={() => forfeit(race)}
+                  onBlur={() =>
+                    setConfirmForfeitId((id) => (id === race.id ? null : id))
+                  }
+                  loading={busy === `forfeit-${race.id}`}
+                  disabled={racing}
+                >
+                  {confirmForfeitId === race.id ? (
+                    <>
+                      Give up <Coin /> {race.stakeAmount}?
+                    </>
+                  ) : (
+                    'Forfeit'
+                  )}
+                </GameButton>
+              </>
+            )}
+            {done && (
+              <>
+                {['win', 'loss', 'draw'].includes(outcome.kind) && (
+                  <GameButton
+                    variant="success"
+                    size="lg"
+                    className="g-full-width"
+                    onClick={() => rematch(race)}
+                    loading={busy === `challenge-${rivalId(race, userId)}`}
+                  >
+                    Rematch
+                  </GameButton>
+                )}
+                <GameButton
+                  variant="secondary"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={() => setScreen('home')}
+                >
+                  Done
+                </GameButton>
+              </>
+            )}
+          </div>
+          {errorLine}
+        </>
       )
     }
-    const side = mySide(race, userId)
-    const needsMyOk = race.status === 'PENDING' && !side.confirmed
-    const canRun = race.status === 'IN_PROGRESS' && !side.myRunId
-    const done = !isLive(race)
-    const step = raceStep(race, side)
-    const won = race.winnerId && race.winnerId === userId
-    const lost = race.winnerId && race.winnerId !== userId
-    const note = needsMyOk
-      ? race.source === 'QUEUE'
-        ? 'Rival found! Confirm to lock in your stake.'
-        : `${side.opponentName} wants to race you.`
-      : race.status === 'PENDING'
-        ? `Waiting for ${side.opponentName} to confirm…`
-        : canRun
-          ? `Stakes locked. Run ${modeLabel(race)} before the clock runs out - fastest time wins.`
-          : race.status === 'IN_PROGRESS'
-            ? side.theirRunId
-              ? 'Both runs in - results incoming…'
-              : `Your run is in. Waiting on ${side.opponentName}…`
-            : null
-
-    return (
-      <div className="pvp-flow">
-        <StepHeader title="Race" step={4} onBack={() => setScreen('home')} />
-
-        <div className="pvp-versus">
-          <span className="pvp-versus-side">You</span>
-          <span className="pvp-versus-vs">VS</span>
-          <span className="pvp-versus-side">
-            {side.opponentName || 'a rival'}
-          </span>
-        </div>
-        <div className="pvp-race-terms">
-          <span className="pvp-term">
-            <span className="pvp-term-label">Distance</span>
-            <span className="pvp-term-value">{modeLabel(race)}</span>
-          </span>
-          <span className="pvp-term">
-            <span className="pvp-term-label">Pot</span>
-            <span className="pvp-term-value">
-              {race.stakeAmount * 2} <Coin />
-            </span>
-          </span>
-          {!done && (
-            <span className="pvp-term">
-              <span className="pvp-term-label">Clock</span>
-              <span className="pvp-term-value">{timeLeft(race.expiresAt)}</span>
-            </span>
-          )}
-        </div>
-
-        <ol className="pvp-timeline">
-          {TIMELINE.map((label, i) => (
-            <li
-              key={label}
-              className={`${i < step ? 'is-done' : ''} ${i === step ? 'is-now' : ''}`}
-            >
-              <span className="pvp-timeline-dot" />
-              {label}
-            </li>
-          ))}
-        </ol>
-
-        {done ? (
-          <p className={`pvp-result ${won ? 'is-won' : lost ? 'is-lost' : ''}`}>
-            {resultLine(race, userId)}
-          </p>
-        ) : (
-          note && <p className="pvp-big-line">{note}</p>
-        )}
-
-        <div className="pvp-actions-col">
-          {needsMyOk && (
-            <>
-              <button
-                type="button"
-                className="game-btn game-btn-green game-btn-lg"
-                onClick={() => pvp.review(race, true)}
-                disabled={busy === `review-${race.id}`}
-              >
-                Accept & Lock Stake
-              </button>
-              <button
-                type="button"
-                className="game-btn game-btn-wood"
-                onClick={() => pvp.review(race, false)}
-                disabled={busy === `review-${race.id}`}
-              >
-                Decline
-              </button>
-            </>
-          )}
-          {race.status === 'PENDING' && !needsMyOk && (
-            <button
-              type="button"
-              className="game-btn game-btn-wood"
-              onClick={() => pvp.cancel(race)}
-              disabled={busy === `cancel-${race.id}`}
-            >
-              Cancel Challenge
-            </button>
-          )}
-          {canRun && (
-            <>
-              <button
-                type="button"
-                className="game-btn game-btn-green game-btn-lg pvp-run-btn"
-                onClick={() => onStartRace(race)}
-                disabled={racing}
-              >
-                <IconRunning /> {racing ? 'Run in progress' : 'Start Race Run'}
-              </button>
-              {/* Concede: only while live and my run isn't in (server
-                  rule), not mid-run. Two taps. */}
-              <button
-                type="button"
-                className={`game-btn game-btn-red pvp-forfeit-btn ${confirmForfeitId === race.id ? 'is-confirming' : ''}`}
-                onClick={() => forfeit(race)}
-                onBlur={() =>
-                  setConfirmForfeitId((id) => (id === race.id ? null : id))
-                }
-                disabled={racing || busy === `forfeit-${race.id}`}
-              >
-                <IconFlag />{' '}
-                {busy === `forfeit-${race.id}` ? (
-                  'Forfeiting…'
-                ) : confirmForfeitId === race.id ? (
-                  <>
-                    Give up {race.stakeAmount} <Coin />?
-                  </>
-                ) : (
-                  'Forfeit'
-                )}
-              </button>
-            </>
-          )}
-          {done && (
-            <button
-              type="button"
-              className="game-btn game-btn-green"
-              onClick={() => setScreen('distance')}
-            >
-              Race Again
-            </button>
-          )}
-        </div>
-        {errorLine}
-      </div>
-    )
   }
 
   // --- History ---
-  if (screen === 'history') {
-    return (
-      <div className="pvp-flow">
-        <StepHeader title="Race history" onBack={() => setScreen('home')} />
+  else if (screen === 'history') {
+    body = (
+      <>
+        <h2 className="pvp-screen-title pvp-display">Race history</h2>
         {past.length === 0 ? (
-          <p className="game-menu-empty">No finished races yet.</p>
+          <p className="pvp-sentence">No finished races yet.</p>
         ) : (
-          <ul className="pvp-runner-list">
-            {past.map((c) => {
-              const side = mySide(c, userId)
-              const won = c.winnerId && c.winnerId === userId
-              const lost = c.winnerId && c.winnerId !== userId
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    className="pvp-runner"
-                    onClick={() => openRace(c.id)}
-                  >
-                    <span className="pvp-runner-info">
-                      <span className="pvp-runner-name">
-                        vs {side.opponentName || 'a rival'}
-                      </span>
-                      <span
-                        className={`pvp-runner-meta ${won ? 'pvp-won' : lost ? 'pvp-lost' : ''}`}
-                      >
-                        {modeLabel(c)} · {resultLine(c, userId)}
-                      </span>
-                    </span>
-                    <IconChevronRight />
-                  </button>
-                </li>
-              )
-            })}
+          <ul className="pvp-rival-list">
+            {past.map((c) => (
+              <li key={c.id}>
+                <PastRaceRow c={c} userId={userId} onOpen={openRace} />
+              </li>
+            ))}
           </ul>
         )}
-      </div>
+      </>
     )
   }
 
-  // --- Home ---
-  // Real record, computed from actual match history - every PVP_MODES
-  // backend has no rank/league/rating system at all, so rather than fake
-  // one, this card shows the one thing that IS real: how the player has
-  // actually done. A race only counts once it's genuinely been played out
-  // (resolutionType set) - a declined/cancelled/expired challenge was
-  // never run, so it's not a result either way.
-  const played = challenges.filter((c) => c.resolutionType)
-  const wins = played.filter((c) => c.winnerId === userId).length
-  const losses = played.filter(
-    (c) => c.winnerId && c.winnerId !== userId
-  ).length
-  const draws = played.length - wins - losses
-  const winRate =
-    played.length > 0 ? Math.round((wins / played.length) * 100) : null
+  // --- Hub ---
+  else {
+    // Real record, computed from actual match history - the backend has no
+    // rank/rating system, so this shows the one thing that IS real: how the
+    // player has actually done. A race only counts once it was played out
+    // (resolutionType set); declined/cancelled/expired ones never ran.
+    const played = challenges.filter((c) => c.resolutionType)
+    const wins = played.filter((c) => c.winnerId === userId).length
+    const losses = played.filter(
+      (c) => c.winnerId && c.winnerId !== userId
+    ).length
+    const draws = played.length - wins - losses
+    body = (
+      <>
+        <section className="pvp-banner" aria-label="You against a rival">
+          <VsStage
+            you={youFigure(72)}
+            rival={<RivalFigure unknown size={72} />}
+            youLabel={me}
+            rivalLabel="Your next rival"
+          />
+          <p className="pvp-sentence">
+            Pick a distance, find a rival. The fastest runner takes the pot.
+          </p>
+        </section>
+
+        <div className="pvp-stats">
+          <StatChip
+            icon={<IconTrophy />}
+            label="Record"
+            value={recordLabel(wins, losses, draws)}
+          />
+          <StatChip
+            icon={<IconBolt />}
+            label="Win rate"
+            value={winRateLabel(wins, played.length)}
+            muted={played.length === 0}
+          />
+          <StatChip
+            icon={<IconRunning />}
+            label="Races"
+            value={played.length}
+          />
+        </div>
+
+        <section className="pvp-section">
+          <h2 className="pvp-section-title pvp-display">Active races</h2>
+          {!challengesLoaded ? (
+            <p className="pvp-sentence">Loading races…</p>
+          ) : active.length === 0 ? (
+            <div className="pvp-empty">
+              <ArenaEmptyArt />
+              <h3 className="pvp-empty-title pvp-display">
+                No races on right now
+              </h3>
+              <p className="pvp-sentence">
+                Challenge a runner and settle it on the road.
+              </p>
+              <GameButton
+                variant="secondary"
+                size="sm"
+                className="pvp-empty-btn"
+                onClick={beginNewMatch}
+              >
+                Find a rival
+              </GameButton>
+            </div>
+          ) : (
+            <ul className="pvp-rival-list">
+              {active.map((c) => {
+                const side = mySide(c, userId)
+                const needsMe =
+                  (c.status === 'PENDING' && !side.confirmed) ||
+                  (c.status === 'IN_PROGRESS' && !side.myRunId)
+                const chip = statusChip(c, needsMe)
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      className={`pvp-rival pvp-race${needsMe ? ' needs-me' : ''}`}
+                      onClick={() => openRace(c.id)}
+                    >
+                      <Avatar
+                        name={side.opponentName || 'Rival'}
+                        size={46}
+                        ring="#4da3ff"
+                      />
+                      <span className="pvp-rival-info">
+                        <span className="pvp-rival-name pvp-display">
+                          vs {side.opponentName || 'a rival'}
+                        </span>
+                        <span className="pvp-rival-meta">
+                          <span className="pvp-num">{modeLabel(c)}</span>
+                          <span>
+                            <Coin />{' '}
+                            <span className="pvp-num">{c.stakeAmount * 2}</span>{' '}
+                            pot
+                          </span>
+                          <span>{timeLeftLabel(c.expiresAt)}</span>
+                        </span>
+                      </span>
+                      <StatusChip label={chip.label} tone={chip.tone} />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+
+        {past.length > 0 && (
+          <section className="pvp-section">
+            <div className="pvp-section-head">
+              <h2 className="pvp-section-title pvp-display">Recent races</h2>
+              <button
+                type="button"
+                className="pvp-link"
+                onClick={() => setScreen('history')}
+              >
+                View all ({past.length}) <IconChevronRight />
+              </button>
+            </div>
+            <ul className="pvp-rival-list">
+              {past.slice(0, 3).map((c) => (
+                <li key={c.id}>
+                  <PastRaceRow c={c} userId={userId} onOpen={openRace} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {errorLine}
+      </>
+    )
+  }
+
+  const motionProps = reduceMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 14, scale: 0.98 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -8 },
+        transition: { duration: 0.18, ease: 'easeOut' },
+      }
+
+  const isHub =
+    !queueScreen &&
+    !['distance', 'opponent', 'nearby', 'race', 'history'].includes(screen)
 
   return (
-    <div className="pvp-flow">
-      <div className="pvp-hero">
-        <span className="pvp-hero-emblem" aria-hidden="true">
-          <IconSwords />
-        </span>
-        <p className="pvp-hero-title">Race a real runner</p>
-        <p className="pvp-sub-line">
-          Pick a distance, find a rival - fastest time takes the pot.
-        </p>
-        <button
-          type="button"
-          className="game-btn game-btn-green game-btn-lg pvp-hero-btn"
-          onClick={() => setScreen('distance')}
-        >
-          <IconSwords /> Battle
-        </button>
-      </div>
-
-      <div className="pvp-stat-row">
-        <div className="pvp-stat-card">
-          <span className="pvp-stat-value">
-            {wins}-{losses}
-            {draws > 0 ? `-${draws}` : ''}
-          </span>
-          <span className="pvp-stat-label">Record</span>
+    <div className={`pvp-arena${isHub ? ' has-cta' : ''}`}>
+      {!isHub && <BackRow onBack={goBack} />}
+      {step != null && <StepRail step={step} />}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={key} className="pvp-screen" {...motionProps}>
+          {body}
+        </motion.div>
+      </AnimatePresence>
+      {isHub && (
+        <div className="pvp-cta-bar">
+          <GameButton
+            variant="success"
+            size="lg"
+            className="g-full-width pvp-battle-btn"
+            icon={<IconSwords />}
+            onClick={beginNewMatch}
+          >
+            Battle
+          </GameButton>
         </div>
-        <div className="pvp-stat-card">
-          <span className="pvp-stat-value">
-            {winRate != null ? `${winRate}%` : '—'}
-          </span>
-          <span className="pvp-stat-label">Win rate</span>
-        </div>
-        <div className="pvp-stat-card">
-          <span className="pvp-stat-value">{played.length}</span>
-          <span className="pvp-stat-label">Races run</span>
-        </div>
-      </div>
-
-      <section className="pvp-section-card">
-        <p className="pvp-section-label">Active races</p>
-        {!challengesLoaded ? (
-          <p className="game-menu-empty">Loading races…</p>
-        ) : active.length === 0 ? (
-          <p className="game-menu-empty">No races on right now.</p>
-        ) : (
-          <ul className="pvp-runner-list">
-            {active.map((c) => {
-              const side = mySide(c, userId)
-              const needsMe =
-                (c.status === 'PENDING' && !side.confirmed) ||
-                (c.status === 'IN_PROGRESS' && !side.myRunId)
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    className={`pvp-runner ${needsMe ? 'needs-me' : ''}`}
-                    onClick={() => openRace(c.id)}
-                  >
-                    <span className="pvp-runner-info">
-                      <span className="pvp-runner-name">
-                        vs {side.opponentName || 'a rival'}
-                      </span>
-                      <span className="pvp-runner-meta">
-                        {modeLabel(c)} · pot {c.stakeAmount * 2} <Coin /> ·{' '}
-                        {timeLeft(c.expiresAt)}
-                      </span>
-                    </span>
-                    <span className={`pvp-race-status status-${c.status}`}>
-                      {c.status === 'PENDING'
-                        ? needsMe
-                          ? 'Your call'
-                          : 'Pending'
-                        : needsMe
-                          ? 'Run!'
-                          : 'Live'}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
-      {past.length > 0 && (
-        <section className="pvp-section-card">
-          <div className="pvp-section-head-row">
-            <p className="pvp-section-label">Recent matches</p>
-            <button
-              type="button"
-              className="pvp-history-link"
-              onClick={() => setScreen('history')}
-            >
-              View all ({past.length}) <IconChevronRight />
-            </button>
-          </div>
-          <ul className="pvp-runner-list">
-            {past.slice(0, 3).map((c) => {
-              const side = mySide(c, userId)
-              const won = c.winnerId && c.winnerId === userId
-              const lost = c.winnerId && c.winnerId !== userId
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    className="pvp-runner"
-                    onClick={() => openRace(c.id)}
-                  >
-                    <span className="pvp-runner-info">
-                      <span className="pvp-runner-name">
-                        vs {side.opponentName || 'a rival'}
-                      </span>
-                      <span
-                        className={`pvp-runner-meta ${won ? 'pvp-won' : lost ? 'pvp-lost' : ''}`}
-                      >
-                        {modeLabel(c)} · {resultLine(c, userId)}
-                      </span>
-                    </span>
-                    <IconChevronRight />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
       )}
+    </div>
+  )
+}
 
-      {errorLine}
+// One finished race: rival, distance, the outcome chip and the coins it moved.
+function PastRaceRow({ c, userId, onOpen }) {
+  const side = mySide(c, userId)
+  const o = raceOutcome(c, userId)
+  return (
+    <button type="button" className="pvp-rival" onClick={() => onOpen(c.id)}>
+      <Avatar name={side.opponentName || 'Rival'} size={46} ring="#4da3ff" />
+      <span className="pvp-rival-info">
+        <span className="pvp-rival-name pvp-display">
+          vs {side.opponentName || 'a rival'}
+        </span>
+        <span className="pvp-rival-meta">
+          <span className="pvp-num">{modeLabel(c)}</span>
+          {o.detail && <span>{o.detail}</span>}
+        </span>
+      </span>
+      <span className="pvp-past-end">
+        <span className={`pvp-outcome is-${o.kind}`}>{o.headline}</span>
+        {o.coins !== 0 && (
+          <span className={`pvp-delta ${o.coins > 0 ? 'is-plus' : 'is-minus'}`}>
+            {o.coins > 0 ? '+' : '−'}
+            <span className="pvp-num">{Math.abs(o.coins)}</span> <Coin />
+          </span>
+        )}
+      </span>
+    </button>
+  )
+}
+
+// Result banner: Victory / Defeat / Draw ribbon and the payout counting up.
+function ResultHero({ outcome }) {
+  const coins = Math.abs(outcome.coins)
+  // Count up from 0 to the payout shortly after arriving (the hook skips its
+  // animation on first mount, so it mounts at 0 and is moved once).
+  const [target, setTarget] = useState(0)
+  useEffect(() => {
+    const id = setTimeout(() => setTarget(coins), 250)
+    return () => clearTimeout(id)
+  }, [coins])
+  const counted = useNumberRollup(target, { duration: 700 })
+  return (
+    <div className={`pvp-result is-${outcome.kind}`}>
+      <h2 className="pvp-result-ribbon pvp-display">{outcome.headline}</h2>
+      {outcome.detail && <p className="pvp-sentence">{outcome.detail}</p>}
+      {outcome.coins !== 0 && (
+        <p className="pvp-payout">
+          <span className={outcome.coins > 0 ? 'is-plus' : 'is-minus'}>
+            {outcome.coins > 0 ? '+' : '−'}
+            <span className="pvp-num">{counted}</span>
+          </span>{' '}
+          <Coin />
+        </p>
+      )}
+      {outcome.coins === 0 && outcome.kind === 'draw' && (
+        <p className="pvp-sentence is-strong">Your coins were returned.</p>
+      )}
     </div>
   )
 }

@@ -2,10 +2,53 @@
   position: relative;
   padding: 24px;
   overflow: hidden;
+  /* No card-height cap by default (RunDetailPage is a normal page). Popups
+     opt in below. */
+  --share-card-max-h: none;
+}
+
+/* Popups only (the Me -> History run viewer): cap the card preview at the
+   screen height minus everything else in the popup (--share-chrome = popup
+   padding, carousel padding, label, Download button, dots; native has an
+   extra Share button), so label + Download + dots stay in view on short
+   phones. The end-of-run popup sets its own height in RunRewardsModal.css. */
+.game-run-viewer .share-carousel {
+  --share-chrome: 215px;
+  --share-card-max-h: max(
+    140px,
+    calc(100vh - var(--share-chrome) - var(--safe-top) - var(--safe-bottom))
+  );
+}
+
+.game-run-viewer .share-carousel.is-native {
+  --share-chrome: 275px;
+}
+
+@supports (height: 100dvh) {
+  .game-run-viewer .share-carousel {
+    --share-card-max-h: max(
+      140px,
+      calc(100dvh - var(--share-chrome) - var(--safe-top) - var(--safe-bottom))
+    );
+  }
 }
 
 .share-carousel-viewport {
   overflow: hidden;
+}
+
+/* clip (unlike hidden) doesn't create a scroll container, so the slide
+   footer can stick to the bottom of the popup's scroller on very short
+   screens (see the max-height query below). Older WebViews without it keep
+   overflow: hidden above. */
+@supports (overflow: clip) {
+  .share-carousel {
+    overflow: clip;
+  }
+  .share-carousel-viewport {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
 }
 
 .share-carousel-track {
@@ -43,7 +86,19 @@
   background-size: 20px 20px;
 }
 
+.share-card-canvas-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+/* Fills the card width as before, but never taller than the screen allows -
+   width follows (aspect ratio kept), so the whole card fits without
+   scrolling. Inert on tall screens. */
 .share-card-canvas-wrap canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--share-card-max-h);
   display: block;
   pointer-events: none;
   user-select: none;
@@ -230,7 +285,7 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(24px + var(--safe-bottom));
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -268,4 +323,20 @@
 
 .share-carousel-toast--error .share-carousel-toast-icon {
   background: #d93025;
+}
+
+/* Very short screens (landscape phones): the Download button stays reachable
+   at the bottom of the popup while the card scrolls. */
+@media (max-height: 520px) {
+  .share-carousel-slide-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 12px 0 4px;
+    background: linear-gradient(
+      to top,
+      var(--card, #fff) 75%,
+      rgba(255, 255, 255, 0)
+    );
+  }
 }

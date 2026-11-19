@@ -1,19 +1,31 @@
-/* Custom in-game display font (Passion One, bold slab) - bundled locally
-   rather than loaded from Google Fonts so the game still reads right
-   offline/on a flaky connection. Declared here (not in GamePage.css, where
-   it used to live) so every .game-root consumer gets it, including ones
-   that render without GamePage.jsx ever mounting (e.g. ShopPage). */
+/* In-game type, bundled locally (woff2) so the game reads right offline in
+   Capacitor - no CDN. Both OFL: Lilita One = the ONE heavy rounded display
+   face (titles, numbers, buttons, HUD); Nunito = the ONE clean rounded body
+   face (sentences). Declared here so every .game-root consumer gets them. */
 @font-face {
-  font-family: 'Passion One';
-  src: url('../../assets/fonts/PassionOne-Bold.ttf') format('truetype');
-  font-weight: 400 700;
+  font-family: 'Lilita One';
+  src: url('../../assets/fonts/LilitaOne-Regular.woff2') format('woff2');
+  font-weight: 400 900;
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
-  font-family: 'Passion One';
-  src: url('../../assets/fonts/PassionOne-Black.ttf') format('truetype');
+  font-family: 'Nunito';
+  src: url('../../assets/fonts/Nunito-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('../../assets/fonts/Nunito-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('../../assets/fonts/Nunito-800.woff2') format('woff2');
   font-weight: 800 900;
   font-style: normal;
   font-display: swap;
@@ -42,8 +54,8 @@
      file, so every .game-root consumer (game-auth, the rollout modal/chip,
      ShopPage) uses the same type instead of introducing a different font
      family. */
-  --font-display: 'Passion One', 'Trebuchet MS', sans-serif;
-  --font-body: 'Trebuchet MS', sans-serif;
+  --font-display: 'Lilita One', 'Trebuchet MS', sans-serif;
+  --font-body: 'Nunito', 'Trebuchet MS', sans-serif;
 
   /* Ink - borders (2-3px) on buttons/rows/badges/icons, and darkest text.
      Buttons keep their existing dark outline (this didn't change) - only

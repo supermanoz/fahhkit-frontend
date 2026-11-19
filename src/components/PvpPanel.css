@@ -1,47 +1,1544 @@
-/* PvP tab (PvpPanel.jsx) - a step-by-step flow: home, distance, rival,
-   searching / nearby, race screen, history. */
+/* PvP (PvpPanel.jsx, pvp/*): styled like the other menu sections - the same
+   cream page, white game panels with the ink outline + hard drop shadow, the
+   same fonts and semantic colours: green = go, gold = coins/stakes only,
+   blue = the PvP accent, red only for destructive actions. The ONE dark accent
+   is the blue/indigo VS banner on the hub, so PvP still feels like a duel.
+   Titles + numbers use the display font; sentences the rounded body font with
+   no outline. */
 
-.pvp-race-status {
-  flex-shrink: 0;
-  padding: 3px 10px;
+.game-menu-sheet.is-pvp {
+  /* The sticky Battle bar owns the bottom inset (see .pvp-cta-bar). */
+  padding-bottom: 0;
+}
+
+.pvp-arena {
+  --p-ink: var(--game-ink, #2b2a24);
+  --p-title: var(--text-title-dark, #2b2a24);
+  --p-body: var(--text-body-dark, #3a382f);
+  --p-muted: var(--text-muted-dark, #6b6759);
+  --p-blue: #2f7bff;
+  --p-blue-dark: #1f56c4;
+  --p-blue-soft: #e6efff;
+  --p-gold-text: #8a5a00;
+  --pvp-cta-h: calc(84px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--p-body);
+  font-family: var(--font-body);
+}
+.pvp-arena.has-cta {
+  min-height: calc(100dvh - var(--safe-top) - 96px);
+}
+
+/* The game forces the display font + a white outline on every element
+   (.game-page * / the shared text recipe), so the body font and plain text
+   are re-applied here. Titles / numbers (.pvp-display) and the chunky buttons
+   (.gb) keep their own look. */
+.pvp-arena
+  *:not(.gb):not(.gb *):not(.pvp-display):not(.g-stat-chip-value):not(svg):not(
+    svg *
+  ) {
+  font-family: var(--font-body);
+}
+.pvp-arena .g-stat-chip-value:not(.is-muted) {
+  font-family: var(--font-display);
+}
+.pvp-arena,
+.pvp-arena * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.pvp-arena .gb,
+.pvp-arena .gb * {
+  -webkit-text-stroke: 2px #0a0e28;
+  paint-order: stroke fill;
+}
+.pvp-arena .pvp-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.pvp-arena .pvp-num {
+  font-variant-numeric: tabular-nums;
+}
+/* Secondary = the white game button with dark text. */
+.pvp-arena .gb-secondary,
+.pvp-arena .gb-secondary * {
+  color: #2b2a24;
+  -webkit-text-stroke-width: 0;
+}
+.pvp-arena .gb-secondary {
+  background: #fff;
+}
+.pvp-arena .gb:disabled {
+  filter: grayscale(1);
+  opacity: 0.8;
+}
+.pvp-arena .gb {
+  min-height: 48px;
+}
+.pvp-arena .gb-lg {
+  height: 56px;
+  font-size: 19px;
+  white-space: nowrap;
+}
+.pvp-arena .gb-sm {
+  min-height: 44px;
+}
+
+/* ---------- inline gold coin ---------- */
+.pvp-coin {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 2px;
+  vertical-align: -3px;
+  border-radius: 50%;
+  border: 2px solid #8a5a00;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fff2a8 0 25%,
+    #ffd35a 55%,
+    #e0a014 100%
+  );
+  box-shadow: inset 0 -2px 0 rgba(138, 90, 0, 0.45);
+}
+
+/* ---------- shared pill header (the same one Me / Shop / Mail use) ---------- */
+.game-menu-picker.is-static {
+  display: block;
+}
+.game-menu-picker-current.is-static {
+  cursor: default;
+  /* Leave room for the close (X) that perches on the pill's top-right. */
+  padding-right: 58px;
+}
+.game-menu-picker-current.is-static:active {
+  transform: none;
+  box-shadow: 0 3px 0 var(--game-panel-border-dark);
+}
+.game-menu-picker-current.is-static h1 {
+  margin: 0;
+}
+.pvp-balance-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 10px 0 6px;
   border-radius: 999px;
-  border: 2px solid var(--game-ink);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--game-text);
-  background: var(--game-stone);
+  border: 2px solid #e0b53a;
+  background: #fff6d6;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: #6b4500;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.pvp-balance-chip .pvp-coin {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  vertical-align: baseline;
 }
 
-/* Orange, not red - PvP keeps red for close/danger states only. */
-.pvp-race-status.status-IN_PROGRESS {
-  background: var(--pvp-accent);
-  color: var(--game-cream);
-  animation: pvp-live-pulse 1.6s ease-in-out infinite;
+/* ---------- back + labelled steps ---------- */
+.pvp-back {
+  all: unset;
+  box-sizing: border-box;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 12px 0 6px;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--p-blue-dark);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pvp-back svg {
+  font-size: 20px;
+}
+.pvp-back:active {
+  text-decoration: underline;
+}
+.pvp-back:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+}
+.pvp-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: -6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pvp-steps li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--p-muted);
+}
+.pvp-step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--p-ink);
+  background: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--p-title);
+}
+.pvp-steps li.is-now {
+  color: var(--p-title);
+}
+.pvp-steps li.is-now .pvp-step-dot {
+  background: var(--p-blue);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(47, 123, 255, 0.25);
+}
+.pvp-steps li.is-done .pvp-step-dot {
+  background: #4fc85e;
+  color: #fff;
 }
 
-@keyframes pvp-live-pulse {
+/* ---------- screens + shared text ---------- */
+.pvp-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 1 auto;
+}
+.pvp-screen-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--p-title);
+}
+.pvp-sentence {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--p-body);
+}
+.pvp-sentence.is-strong {
+  font-weight: 800;
+  color: var(--p-title);
+}
+.pvp-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid #9dbcf5;
+  background: var(--p-blue-soft);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--p-title);
+}
+.pvp-notice svg {
+  flex: none;
+  margin-top: 1px;
+  font-size: 18px;
+  color: var(--p-blue-dark);
+}
+.pvp-notice.is-error {
+  background: #fdecea;
+  border-color: #e6a39b;
+}
+.pvp-notice.is-error svg {
+  color: #a82218;
+}
+.pvp-actions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pvp-pot-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--p-title);
+}
+
+/* A white game panel (ink outline + hard shadow), the common surface. */
+.pvp-panel,
+.pvp-tier,
+.pvp-option,
+.pvp-rival,
+.pvp-empty,
+.pvp-pot,
+.pvp-term,
+.pvp-duel {
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+}
+
+/* ---------- VS motif ---------- */
+.pvp-vs-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.pvp-duel {
+  padding: 12px 10px;
+}
+.pvp-vs-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.pvp-vs-name {
+  max-width: 100%;
+  font-size: 15px;
+  color: var(--p-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pvp-vs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 70px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(180deg, #5aa9ff, #2457d6);
+  filter: drop-shadow(0 0 8px rgba(47, 123, 255, 0.45));
+}
+.pvp-vs.is-small {
+  width: 46px;
+  height: 52px;
+}
+.pvp-vs-swords {
+  position: absolute;
+  inset: 8px;
+  width: auto;
+  height: auto;
+  color: rgba(255, 255, 255, 0.3);
+}
+.pvp-vs-text {
+  position: relative;
+  font-size: 20px;
+  color: #fff;
+  -webkit-text-stroke: 2px #0a1a5c;
+  paint-order: stroke fill;
+}
+.pvp-vs.is-small .pvp-vs-text {
+  font-size: 15px;
+}
+.pvp-silhouette {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--s, 72px);
+  height: var(--s, 72px);
+  border-radius: 50%;
+  border: 2px dashed rgba(200, 212, 255, 0.7);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(200, 212, 255, 0.7);
+  font-size: calc(var(--s, 72px) * 0.55);
+}
+.pvp-silhouette-q {
+  position: absolute;
+  font-size: calc(var(--s, 72px) * 0.4);
+  color: #fff;
+  -webkit-text-stroke: 2px #0a0e28;
+  paint-order: stroke fill;
+}
+.pvp-hero-fig {
+  position: relative;
+  display: block;
+  width: var(--s, 96px);
+  height: var(--s, 96px);
+}
+.pvp-hero-stage {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- hub: the dark blue/indigo VS banner (the one dark accent) ---------- */
+.pvp-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px 14px;
+  border-radius: 20px;
+  border: 3px solid #0a0e28;
+  background: radial-gradient(
+    100% 120% at 50% -10%,
+    #3949c9 0%,
+    #1b2478 50%,
+    #0d1242 100%
+  );
+  box-shadow: 0 4px 0 #0a0e28;
+  text-align: center;
+}
+.pvp-banner .pvp-vs-name {
+  color: #fff;
+}
+.pvp-banner .pvp-sentence {
+  color: #d4dcff;
+}
+.pvp-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.pvp-stats .g-stat-chip {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+  row-gap: 2px;
+  padding: 10px 6px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+}
+.pvp-stats .g-stat-chip-icon {
+  grid-row: auto;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  color: var(--p-blue-dark);
+  background: var(--p-blue-soft);
+}
+.pvp-stats .g-stat-chip-value {
+  color: var(--p-title);
+}
+.pvp-stats .g-stat-chip-value.is-muted {
+  color: var(--p-muted);
+}
+.pvp-stats .g-stat-chip-label {
+  color: var(--p-muted);
+}
+.pvp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pvp-section-title {
+  margin: 0;
+  font-size: 19px;
+  color: var(--p-title);
+}
+.pvp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pvp-link {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 6px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--p-blue-dark);
+  cursor: pointer;
+}
+.pvp-link:active {
+  text-decoration: underline;
+}
+.pvp-link:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.pvp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px 16px;
+  border-style: dashed;
+  box-shadow: none;
+  text-align: center;
+}
+.pvp-empty-art {
+  width: 140px;
+  height: auto;
+}
+.pvp-empty-title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--p-title);
+}
+.pvp-empty .pvp-sentence {
+  max-width: 34ch;
+}
+.pvp-empty-btn {
+  min-width: 160px;
+}
+
+/* Sticky Battle button above the home indicator. The bar is 18px + the 56px
+   button + 10px + the inset tall and overlays a matching padding at the end of
+   the screen (negative margin): it floats over content while scrolling, yet
+   the last item can always scroll fully above it. */
+.pvp-arena.has-cta .pvp-screen {
+  padding-bottom: calc(var(--pvp-cta-h) + 14px);
+}
+.pvp-arena:not(.has-cta) {
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+.pvp-cta-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  box-sizing: border-box;
+  height: var(--pvp-cta-h);
+  margin: calc(var(--pvp-cta-h) * -1) -20px 0;
+  padding: 18px 20px calc(var(--safe-bottom) + 10px);
+  background: linear-gradient(
+    0deg,
+    var(--game-panel, #e9e7dd) 62%,
+    rgba(233, 231, 221, 0)
+  );
+}
+.pvp-battle-btn {
+  animation: pvp-glow 2.6s ease-in-out infinite;
+}
+@keyframes pvp-glow {
   50% {
-    box-shadow: 0 0 10px rgba(var(--pvp-accent-rgb), 0.8);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+      0 4px 0 #2b2a24,
+      0 0 20px rgba(79, 200, 94, 0.65);
   }
 }
 
-.pvp-won {
-  color: var(--game-green-light);
+/* ---------- rival / race cards ---------- */
+.pvp-rival-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pvp-rival {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 9px 12px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease;
+}
+.pvp-rival:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--p-ink);
+}
+.pvp-rival:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+}
+.pvp-rival.needs-me {
+  border-color: var(--p-blue-dark);
+  box-shadow:
+    0 3px 0 var(--p-ink),
+    0 0 0 3px rgba(47, 123, 255, 0.3);
+}
+.pvp-rival-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pvp-rival-name {
+  font-size: 17px;
+  line-height: 1.15;
+  color: var(--p-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pvp-rival-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  font-size: 13px;
   font-weight: 700;
+  color: var(--p-muted);
+}
+.pvp-level {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--p-blue-soft);
+  color: var(--p-blue-dark);
+}
+.pvp-rival-go {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #4fc85e;
+  border: 2px solid var(--p-ink);
+  font-size: 14px;
+  font-weight: 800;
+  color: #12341a;
+}
+.pvp-chip {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.pvp-chip.is-gold {
+  background: #fff1c2;
+  border-color: #e0b53a;
+  color: #6b4500;
+}
+.pvp-chip.is-green {
+  background: #dff5e1;
+  border-color: #6fc47d;
+  color: #1f6b2c;
+}
+.pvp-chip.is-blue {
+  background: var(--p-blue-soft);
+  border-color: #8fb4f5;
+  color: var(--p-blue-dark);
+}
+.pvp-chip.is-slate {
+  background: #ecebe4;
+  border-color: #c3c0b2;
+  color: #4d4a3f;
+}
+.pvp-past-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+}
+.pvp-outcome {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--p-muted);
+}
+.pvp-outcome.is-win {
+  color: #1f6b2c;
+}
+.pvp-delta {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--p-muted);
+}
+.pvp-delta.is-plus {
+  color: var(--p-gold-text);
 }
 
-.pvp-lost {
-  color: var(--pvp-accent-text);
+/* ---------- distance tiers ---------- */
+.pvp-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pvp-tier {
+  --tier: #3b82f6;
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 92px;
+  padding: 12px 12px 12px 14px;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--tier) 16%, #fff),
+    #fff 70%
+  );
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
+}
+.pvp-tier.is-green {
+  --tier: #38b560;
+}
+.pvp-tier.is-slate {
+  --tier: #7b88a8;
+}
+.pvp-tier:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--p-ink);
+}
+.pvp-tier:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+}
+.pvp-tier.is-selected {
+  box-shadow:
+    0 3px 0 var(--p-ink),
+    0 0 0 4px var(--tier);
+}
+.pvp-tier-badge {
+  flex: none;
+  min-width: 64px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--tier);
+  border: 2px solid var(--p-ink);
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  -webkit-text-stroke: 1.5px var(--p-ink) !important;
+  paint-order: stroke fill !important;
+}
+.pvp-tier-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pvp-tier-name {
+  font-size: 19px;
+  color: var(--p-title);
+}
+.pvp-tier-pitch {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--p-body);
+}
+.pvp-tier-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--p-title);
+}
+.pvp-tier-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pvp-tier-go {
+  flex: none;
+  font-size: 20px;
+  color: var(--p-muted);
 }
 
-/* Live race strip over the map while a race run is being tracked. Above
-   the full-screen menu sheet (GamePage.css's .game-menu-sheet, z-index
-   1300) - checking Mail or Club mid-race shouldn't hide how the race is
-   going. */
+/* ---------- rival options ---------- */
+.pvp-picked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--p-body);
+}
+.pvp-picked-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #3b82f6;
+  border: 2px solid var(--p-ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: #fff;
+}
+.pvp-picked-chip.is-green {
+  background: #38b560;
+}
+.pvp-picked-chip.is-slate {
+  background: #7b88a8;
+}
+.pvp-option {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 84px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease;
+}
+.pvp-option:active:not(.is-locked) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--p-ink);
+}
+.pvp-option:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+}
+.pvp-option-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--p-blue-soft);
+  color: var(--p-blue-dark);
+  font-size: 24px;
+}
+.pvp-option-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pvp-option-title {
+  font-size: 19px;
+  color: var(--p-title);
+}
+.pvp-option-line {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--p-body);
+}
+.pvp-option-meta {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--p-title);
+}
+/* Locked: readable (full contrast), with a lock and what to do about it. */
+.pvp-option.is-locked {
+  cursor: default;
+  border-style: dashed;
+  box-shadow: none;
+}
+.pvp-option.is-locked .pvp-option-icon {
+  background: #ecebe4;
+  color: #4d4a3f;
+}
+.pvp-option-need {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--p-gold-text);
+}
+.pvp-get-coins {
+  margin-top: 4px;
+}
+
+/* ---------- searching radar ---------- */
+.pvp-radar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+}
+.pvp-radar {
+  position: relative;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 3px solid var(--p-blue);
+  background: radial-gradient(circle, #dbe8ff, #f1f6ff 72%);
+  overflow: hidden;
+}
+.pvp-radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(47, 123, 255, 0.5),
+    rgba(47, 123, 255, 0) 28%
+  );
+  animation: pvp-spin 2.2s linear infinite;
+}
+.pvp-radar-ring {
+  position: absolute;
+  inset: 24%;
+  border-radius: 50%;
+  border: 2px solid rgba(47, 123, 255, 0.5);
+  animation: pvp-ping 2.2s ease-out infinite;
+}
+.pvp-radar-ring.is-2 {
+  animation-delay: 1.1s;
+}
+.pvp-radar-core {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  color: var(--p-blue-dark);
+}
+.pvp-radar.is-idle .pvp-radar-sweep,
+.pvp-radar.is-idle .pvp-radar-ring {
+  animation: none;
+  opacity: 0.3;
+}
+@keyframes pvp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pvp-ping {
+  from {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.pvp-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.pvp-found .pvp-vs-stage {
+  width: 100%;
+  padding: 12px 10px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+  box-sizing: border-box;
+}
+
+/* ---------- stake ---------- */
+.pvp-stake {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pvp-stake .pvp-vs-stage {
+  padding: 10px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+}
+.pvp-stepper {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+  gap: 8px;
+  align-items: center;
+}
+.pvp-step-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  box-shadow: 0 3px 0 var(--p-ink);
+  color: var(--p-title);
+  font-size: 24px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pvp-step-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--p-ink);
+}
+.pvp-step-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pvp-step-btn:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+}
+/* Same inset game-field look as the other sections' inputs. */
+.pvp-stake-field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 2px solid var(--p-ink);
+  box-shadow: inset 0 3px 0 rgba(43, 42, 36, 0.1);
+}
+.pvp-stake-field:focus-within {
+  border-color: var(--p-blue-dark);
+  box-shadow:
+    inset 0 3px 0 rgba(43, 42, 36, 0.1),
+    0 0 0 3px rgba(47, 123, 255, 0.35);
+}
+.pvp-stake-field .pvp-coin {
+  width: 22px;
+  height: 22px;
+}
+.pvp-stake-input {
+  all: unset;
+  width: 100%;
+  min-width: 0;
+  font-size: 26px;
+  text-align: center;
+  color: var(--p-title);
+  -moz-appearance: textfield;
+}
+.pvp-stake-input::-webkit-outer-spin-button,
+.pvp-stake-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pvp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pvp-stake-chip {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--p-ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--p-title);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pvp-stake-chip.is-on {
+  background: #fff1c2;
+  border-color: #b8870a;
+}
+.pvp-stake-chip:focus-visible {
+  outline: 3px solid var(--p-blue);
+  outline-offset: 2px;
+}
+.pvp-pot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--p-body);
+}
+.pvp-pot b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--p-gold-text);
+}
+.pvp-pot-win {
+  color: var(--p-title);
+}
+.pvp-have {
+  margin: -4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--p-muted);
+}
+.pvp-have.is-short {
+  color: #a82218;
+}
+
+/* ---------- race screen ---------- */
+.pvp-arena .pvp-screen > .pvp-vs-stage,
+.pvp-race-card {
+  padding: 12px 10px;
+  background: #fff;
+  border: 3px solid var(--p-ink);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--p-ink);
+}
+.pvp-terms {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.pvp-term {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  text-align: center;
+  box-shadow: 0 2px 0 var(--p-ink);
+  border-width: 2px;
+}
+.pvp-term-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--p-muted);
+}
+.pvp-term-value {
+  font-size: 18px;
+  color: var(--p-title);
+}
+.pvp-timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pvp-timeline li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--p-muted);
+  text-align: center;
+}
+.pvp-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--p-ink);
+  background: #fff;
+}
+.pvp-timeline li.is-done .pvp-timeline-dot {
+  background: #4fc85e;
+}
+.pvp-timeline li.is-now {
+  color: var(--p-title);
+}
+.pvp-timeline li.is-now .pvp-timeline-dot {
+  background: var(--p-blue);
+  box-shadow: 0 0 0 4px rgba(47, 123, 255, 0.28);
+  animation: pvp-dot 1.6s ease-in-out infinite;
+}
+@keyframes pvp-dot {
+  50% {
+    box-shadow: 0 0 0 7px rgba(47, 123, 255, 0.1);
+  }
+}
+
+/* ---------- result ---------- */
+.pvp-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.pvp-result-ribbon {
+  position: relative;
+  margin: 0;
+  padding: 8px 40px;
+  font-size: 32px;
+  line-height: 1.1;
+  color: #fff;
+  -webkit-text-stroke: 2px #0a0e28 !important;
+  paint-order: stroke fill !important;
+  background: linear-gradient(180deg, #7b88a8, #4c577a);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - 18px) 50%,
+    100% 100%,
+    0 100%,
+    18px 50%
+  );
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45));
+}
+.pvp-result.is-win .pvp-result-ribbon {
+  background: linear-gradient(180deg, #5bd16b, #2f9a42);
+}
+.pvp-result.is-loss .pvp-result-ribbon {
+  background: linear-gradient(180deg, #6577b8, #3b4a86);
+}
+.pvp-payout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1;
+}
+.pvp-payout .is-plus {
+  color: var(--p-gold-text);
+}
+.pvp-payout .is-minus {
+  color: var(--p-muted);
+}
+.pvp-payout .pvp-coin {
+  width: 24px;
+  height: 24px;
+}
+.pvp-run-btn svg,
+.pvp-forfeit-btn svg {
+  font-size: 20px;
+}
+
+/* ---------- Visibility / Location popup (PvpGatePrompt.jsx) ---------- */
+.pvp-gate {
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px 16px;
+  background: #fff;
+  border: 3px solid var(--game-ink);
+  border-radius: 20px;
+  box-shadow: 0 5px 0 var(--game-ink);
+  text-align: center;
+  color: var(--text-body-dark);
+  max-height: var(--modal-max-h);
+  overflow-y: auto;
+}
+.pvp-gate,
+.pvp-gate * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.pvp-gate *:not(.gb):not(.gb *):not(.pvp-gate-title):not(svg):not(svg *) {
+  font-family: var(--font-body);
+}
+.pvp-gate .gb,
+.pvp-gate .gb * {
+  -webkit-text-stroke: 2px #0a0e28;
+  paint-order: stroke fill;
+}
+.pvp-gate .gb-secondary,
+.pvp-gate .gb-secondary * {
+  color: #2b2a24;
+  -webkit-text-stroke-width: 0;
+}
+.pvp-gate .gb-lg {
+  height: 56px;
+  font-size: 19px;
+}
+.pvp-gate-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #e6efff;
+  border: 3px solid var(--game-ink);
+  color: #1f56c4;
+  font-size: 28px;
+}
+.pvp-gate-title {
+  margin: 0;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--text-title-dark);
+}
+.pvp-gate-body {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-body-dark);
+}
+.pvp-gate-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #e6efff;
+  border: 2px solid #9dbcf5;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--text-title-dark);
+}
+.pvp-gate-info svg {
+  flex: none;
+  margin-top: 1px;
+  font-size: 18px;
+  color: #1f56c4;
+}
+.pvp-gate-fine {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted-dark);
+}
+.pvp-gate-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fdecea;
+  border: 2px solid #e6a39b;
+  font-size: 14px;
+  font-weight: 700;
+  color: #a82218;
+}
+.pvp-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+/* ---------- incoming challenge pop-up (ChallengePrompt.jsx) ---------- */
+.challenge-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(70px, calc(var(--safe-top) + 60px)) 16px
+    max(16px, calc(var(--safe-bottom) + 12px));
+  overflow-y: auto;
+  background: rgba(10, 8, 6, 0.55);
+}
+.pvp-incoming {
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: auto;
+  padding: 16px 16px 12px;
+  background: #fff;
+  border: 3px solid var(--game-ink);
+  border-radius: 20px;
+  box-shadow: 0 5px 0 var(--game-ink);
+  color: var(--text-body-dark);
+  text-align: center;
+}
+.pvp-incoming,
+.pvp-incoming * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.pvp-incoming
+  *:not(.gb):not(.gb *):not(.pvp-vs-text):not(.pvp-incoming-title):not(
+    .pvp-incoming-value
+  ):not(svg):not(svg *) {
+  font-family: var(--font-body);
+}
+.pvp-incoming .gb,
+.pvp-incoming .gb * {
+  -webkit-text-stroke: 2px #0a0e28;
+  paint-order: stroke fill;
+}
+.pvp-incoming-kicker {
+  margin: 0;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #e6efff;
+  border: 2px solid #9dbcf5;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1f56c4;
+}
+/* The dark VS strip, like the hub banner. */
+.pvp-incoming-duel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  border: 3px solid #0a0e28;
+  background: radial-gradient(
+    100% 120% at 50% -10%,
+    #3949c9,
+    #1b2478 55%,
+    #0d1242
+  );
+}
+.pvp-incoming-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 23px;
+  line-height: 1.15;
+  color: var(--text-title-dark);
+  overflow-wrap: anywhere;
+}
+.pvp-incoming-terms {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+.pvp-incoming-term {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  border: 2px solid var(--game-ink);
+  background: #fff;
+}
+.pvp-incoming-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted-dark);
+}
+.pvp-incoming-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-title-dark);
+}
+.pvp-incoming-value.is-gold {
+  color: #8a5a00;
+}
+.pvp-incoming-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-body-dark);
+}
+.pvp-incoming-note svg {
+  flex: none;
+  color: #1f56c4;
+}
+.pvp-incoming-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.pvp-incoming .gb-lg {
+  height: 56px;
+  font-size: 19px;
+}
+.pvp-incoming .gb-secondary,
+.pvp-incoming .gb-secondary * {
+  color: #2b2a24;
+  -webkit-text-stroke-width: 0;
+}
+.pvp-incoming-error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #a82218;
+}
+.pvp-incoming-later {
+  all: unset;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 800;
+  color: #1f56c4;
+  cursor: pointer;
+}
+.pvp-incoming-later:active {
+  text-decoration: underline;
+}
+.pvp-incoming-later:focus-visible {
+  outline: 3px solid #2f7bff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- live race strip over the map (GamePage) ---------- */
 .pvp-race-hud {
   position: fixed;
   left: 50%;
@@ -49,881 +1546,106 @@
   transform: translateX(-50%);
   z-index: 1350;
   width: min(340px, calc(100vw - 32px));
-  padding: 8px 14px;
-  border-radius: 14px;
-  border: 2.5px solid var(--game-ink);
-  background: var(--game-panel);
-  color: var(--game-cream);
-  box-shadow: 0 4px 0 var(--game-ink);
-  font-size: 13px;
-  font-weight: 700;
+  box-sizing: border-box;
+  padding: 10px 14px 12px;
+  border-radius: 16px;
+  border: 3px solid #0a0e28;
+  background: linear-gradient(180deg, #1c2a86, #0f1646);
+  color: #eef1ff;
+  box-shadow: 0 4px 0 #0a0e28;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
 }
-
+.pvp-race-hud *:not(svg) {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.pvp-race-hud-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pvp-race-hud-line svg {
+  flex: none;
+  font-size: 18px;
+  color: #6aa5ff;
+}
+.pvp-race-hud.is-done .pvp-race-hud-line svg {
+  color: #6fdc82;
+}
 .pvp-race-hud-bar {
-  margin-top: 6px;
-  height: 6px;
+  margin-top: 8px;
+  height: 8px;
   border-radius: 999px;
-  background: rgba(246, 236, 217, 0.18);
+  background: rgba(255, 255, 255, 0.18);
   overflow: hidden;
 }
-
 .pvp-race-hud-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent)
-  );
+  background: linear-gradient(90deg, #6aa5ff, #2f7bff);
   transition: width 0.3s ease;
 }
-
 .pvp-race-hud.is-done .pvp-race-hud-fill {
-  background: linear-gradient(
-    90deg,
-    var(--game-green-light),
-    var(--game-green)
-  );
+  background: linear-gradient(90deg, #6fdc82, #2f9a42);
 }
 
-/* Inline gold coin sitting on the text line. */
-.pvp-coin {
-  width: 14px;
-  height: 14px;
-  margin: 0 1px;
-  vertical-align: -2px;
-}
-
-/* ===================== Step-by-step PvP flow ===================== */
-.pvp-flow {
+/* ---------- pre-run countdown: the VS strip above 3-2-1 ---------- */
+.pvp-countdown-vs {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  /* A bit more breathing room under the Race tab bar above this - it sat
-     right up against it before. */
-  padding: 16px 0 12px;
-  color: var(--game-cream);
-}
-
-/* Back button + title + step dots. */
-.pvp-step-head {
-  display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-/* 44px, not a 36px circle with extra invisible tap padding - simpler, and
-   there's no sibling content here that a bigger circle would crowd. */
-.pvp-back {
-  all: unset;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(180deg, var(--game-wood-light), var(--game-wood));
-  box-shadow:
-    inset 0 -4px 0 var(--game-wood-dark),
-    0 3px 0 var(--game-ink);
-  cursor: pointer;
-}
-
-/* --icon-dark, not the button's own (unset) colour - a plain SVG arrow
-   never picks up the global white-stroke rule the way text does (that's
-   text-shadow, which doesn't touch an SVG path's stroke/fill), so the old
-   var(--game-text) (white) read invisible on this light wood fill. */
-.pvp-back svg {
-  width: 18px;
-  height: 18px;
-  color: var(--icon-dark);
-  stroke-width: 2.5;
-}
-
-.pvp-back:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 -4px 0 var(--game-wood-dark),
-    0 1px 0 var(--game-ink);
-}
-
-.pvp-step-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 20px;
-  color: var(--text-title);
-}
-
-.pvp-step-dots {
-  display: flex;
-  gap: 5px;
-}
-
-.pvp-step-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--game-ink);
-  background: var(--divider);
-}
-
-.pvp-step-dot.is-done {
-  background: var(--game-green);
-}
-
-/* Orange, not the old brown-red (--gold-text) - PvP keeps that colour for
-   the coin icon only now. --pvp-accent-text (#B4420F), not plain
-   --pvp-accent (#DD571C) - plain orange fails WCAG AA at 13px on this
-   card's off-white body (3.1:1, needs 4.5:1); see tokens.css's
-   --pvp-orange-700 comment. Plain solid text - stroke/shadow off, same
-   rule as every other small accent-coloured label in this file. */
-.pvp-section-label {
-  margin: 4px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--pvp-accent-text);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.pvp-big-line {
-  margin: 0;
-  text-align: center;
-  font-size: 17px;
-  color: var(--text-title);
-}
-
-.pvp-sub-line {
-  margin: 0;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.pvp-actions-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.pvp-actions-col .game-btn,
-.pvp-flow > .game-btn {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   gap: 6px;
-}
-
-/* --- Home hero --- */
-.pvp-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 26px 16px 18px;
-  border-radius: 18px;
-  border: 3px solid var(--game-ink);
-  background: var(--game-panel);
-  box-shadow: 0 4px 0 var(--game-ink);
-}
-
-/* Orange, not red - PvP keeps red for close/danger states only. */
-.pvp-hero-emblem {
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent) 50%,
-    var(--pvp-accent-dark)
-  );
+  margin-bottom: 16px;
+  font-family: var(--font-display);
   color: #fff;
-  font-size: 30px;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.4),
-    0 3px 0 var(--game-ink),
-    0 0 20px rgba(var(--pvp-accent-rgb), 0.5);
-}
-
-.pvp-hero-title {
-  margin: 4px 0 0;
-  font-size: 24px;
-  color: var(--text-title);
-}
-
-.pvp-hero-btn {
-  margin-top: 6px;
-  min-width: 200px;
-}
-
-/* --pvp-accent-text, not plain --pvp-accent - plain orange fails WCAG AA
-   at 14px on this card's off-white body (3.1:1, needs 4.5:1); see
-   tokens.css's --pvp-orange-700 comment. Plain solid text - stroke/shadow
-   off, `all: unset` above already drops font-weight, so it's re-set here
-   per the same rule the small accent-coloured text in this file follows. */
-.pvp-history-link {
-  all: unset;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--pvp-accent-text);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-  cursor: pointer;
-}
-
-.pvp-history-link svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* --- Home: stat row (Record/Win rate/Races run - see PvpPanel.jsx, no
-   rank/league exists server-side so this shows the real thing instead)
-   and the section cards below it (Active races/Recent matches/Stakes &
-   rewards) - same carved-wood card language as the rest of the game's
-   HUD/Me tab (.game-card), scoped to pvp- so this file stays self
-   contained. --- */
-.pvp-stat-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.pvp-stat-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 10px 4px;
-  border-radius: 14px;
-  border: 3px solid var(--game-ink);
-  background: var(--row);
-}
-
-.pvp-stat-value {
-  font-size: 19px;
-  color: var(--text-title);
-}
-
-/* --pvp-accent-text, not plain --pvp-accent - plain orange fails WCAG AA
-   at 10.5px on this card's off-white body (3.1:1, needs 4.5:1); see
-   tokens.css's --pvp-orange-700 comment. Plain solid text - stroke/shadow
-   off, same rule as every other small accent-coloured label here. */
-.pvp-stat-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--pvp-accent-text);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.pvp-section-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px 14px;
-  border-radius: 16px;
-  border: 3px solid var(--game-ink);
-  background: var(--game-panel);
-}
-
-.pvp-section-card > .pvp-section-label {
-  margin: 0;
-}
-
-.pvp-section-head-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.pvp-section-head-row .pvp-history-link {
-  align-self: auto;
-  padding: 0;
-}
-
-/* --- Big tappable choice rows (distance / opponent) --- */
-.pvp-choice-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.pvp-choice {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 14px 16px;
-  border-radius: 16px;
-  border: 3px solid var(--game-ink);
-  background: var(--game-panel);
-  box-shadow: 0 4px 0 var(--game-ink);
-  color: var(--game-cream);
-  cursor: pointer;
-  transition: transform 0.08s ease;
-}
-
-.pvp-choice:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--game-ink);
-}
-
-.pvp-choice:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.pvp-choice > svg {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  color: var(--pvp-accent);
-}
-
-.pvp-choice-big {
-  flex-shrink: 0;
-  min-width: 78px;
-  padding: 8px 6px;
   text-align: center;
-  font-size: 22px;
-  color: #fff;
-  border-radius: 12px;
-  border: 3px solid var(--game-ink);
-  -webkit-text-stroke: 1.5px var(--game-ink);
+  -webkit-text-stroke: 2px #0a0e28;
   paint-order: stroke fill;
-  background: linear-gradient(180deg, #7cc6ff, #2f8ee8 55%, #1a5fb4);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
-
-.pvp-mode-ONE_KM .pvp-choice-big {
-  background: linear-gradient(180deg, #a8f07a, #4fc85e 55%, #268a3a);
-}
-
-/* Pinned to literal slate, not var(--pvp-accent) - the brief explicitly
-   keeps the 5 km chip grey-blue as-is while every other PvP accent spot in
-   this file turns orange (see tokens.css's --pvp-orange-* comment), so
-   this one can't ride the --pvp-accent alias like the rest any more. */
-.pvp-mode-FIVE_KM .pvp-choice-big {
-  background: linear-gradient(
-    180deg,
-    var(--slate-300),
-    var(--slate-500) 55%,
-    var(--slate-700)
-  );
-}
-
-.pvp-choice-icon {
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
+.pvp-countdown-vs-names {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  font-size: 24px;
-  color: #fff;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  gap: 10px;
+  font-size: 22px;
 }
-
-/* Orange, not gold - the Quick Match icon badge used the orange gold
-   gradient; PvP keeps gold for the coin icon only now. */
-.pvp-choice-icon.tone-gold {
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent) 55%,
-    var(--pvp-accent-dark)
-  );
-}
-
-/* Orange, not red - PvP keeps red for close/danger states only. */
-.pvp-choice-icon.tone-red {
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent) 55%,
-    var(--pvp-accent-dark)
-  );
-}
-
-.pvp-choice-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-}
-
-.pvp-choice-title {
-  font-size: 19px;
-  color: var(--text-title);
-}
-
-.pvp-choice-line {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* --pvp-accent-text, not plain --pvp-accent - plain orange fails WCAG AA
-   at 12px on this card's off-white body (3.1:1, needs 4.5:1); see
-   tokens.css's --pvp-orange-700 comment. Plain solid text - stroke/shadow
-   off, same rule as every other small accent-coloured text here. */
-.pvp-choice-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--pvp-accent-text);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.pvp-picked {
-  margin: -4px 0 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-/* Orange, not gold - this chip (the picked distance, e.g. "500 M") used the
-   orange gold fill; PvP keeps gold for the coin icon only now. Inherits
-   .pvp-picked's 14px (under 16px) so no stroke, per the slate-text rule. */
-.pvp-picked-chip {
+.pvp-countdown-vs-badge {
   padding: 2px 10px;
-  border-radius: 999px;
-  border: 2px solid var(--game-ink);
-  background: var(--pvp-accent);
-  color: #fff;
-}
-
-/* --- Searching radar --- */
-.pvp-radar-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 0 6px;
-}
-
-.pvp-radar {
-  position: relative;
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: radial-gradient(
-    circle,
-    rgba(79, 200, 94, 0.18) 0%,
-    rgba(20, 40, 20, 0.85) 70%
-  );
-  overflow: hidden;
-  box-shadow:
-    0 0 0 4px rgba(79, 200, 94, 0.25),
-    0 4px 0 var(--game-ink);
-}
-
-.pvp-radar-sweep {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(120, 255, 140, 0.55),
-    rgba(120, 255, 140, 0) 70deg
-  );
-  animation: pvp-sweep 2s linear infinite;
-}
-
-.pvp-radar-ring {
-  position: absolute;
-  inset: 30%;
-  border-radius: 50%;
-  border: 2px solid rgba(160, 255, 170, 0.35);
-}
-
-.pvp-radar-ring.is-2 {
-  inset: 12%;
-}
-
-/* Orange, not red - PvP keeps red for close/danger states only. */
-.pvp-radar-core {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 46px;
-  height: 46px;
-  translate: -50% -50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent) 50%,
-    var(--pvp-accent-dark)
-  );
-  color: #fff;
-  font-size: 22px;
-}
-
-.pvp-radar.is-idle .pvp-radar-sweep {
-  animation: none;
-  opacity: 0.2;
-}
-
-@keyframes pvp-sweep {
-  to {
-    rotate: 360deg;
-  }
-}
-
-/* --- Runner / race rows --- */
-.pvp-runner-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.pvp-runner {
-  all: unset;
-  box-sizing: border-box;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 2px solid var(--border-soft);
-  background: var(--row);
-  cursor: pointer;
-}
-
-.pvp-runner:hover,
-.pvp-runner:focus-visible {
-  background: var(--white);
-}
-
-/* Orange, not gold - PvP keeps gold for the coin icon only now. */
-.pvp-runner.needs-me {
-  border-color: var(--pvp-accent);
-  background: var(--pvp-accent-tint);
-}
-
-.pvp-runner > svg {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: var(--pvp-accent);
-}
-
-.pvp-runner-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.pvp-runner-name {
-  font-size: 17px;
-  color: var(--text-title);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pvp-runner-meta {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.pvp-runner-meta.pvp-won {
-  color: var(--green-text);
-}
-
-/* Orange, not red - PvP keeps red for close/danger states only.
-   --pvp-accent-text, not plain --pvp-accent - plain orange fails WCAG AA
-   at this row's 12px (.pvp-runner-meta's own size) on its off-white
-   background (3.1:1, needs 4.5:1); see tokens.css's --pvp-orange-700
-   comment. Plain solid text - stroke/shadow off, same rule as every other
-   small accent-coloured text in this file. */
-.pvp-runner-meta.pvp-lost {
-  font-weight: 700;
-  color: var(--pvp-accent-text);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-/* --- Race screen --- */
-/* Orange wash on "their" side, not red - PvP keeps red for close/danger
-   states only. */
-.pvp-versus {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 16px 10px;
-  border-radius: 16px;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(
-    90deg,
-    #d9ebfa 0%,
-    var(--row) 45%,
-    var(--row) 55%,
-    var(--pvp-accent-tint) 100%
-  );
-  box-shadow: 0 4px 0 var(--game-ink);
-}
-
-.pvp-versus.is-compact {
-  padding: 10px;
-}
-
-.pvp-versus-side {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
-  font-size: 20px;
-  color: var(--text-title);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Orange, not gold - PvP keeps gold for the coin icon only now. 16px text,
-   so the thin stroke stays per the slate-text rule. */
-.pvp-versus-vs {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent) 55%,
-    var(--pvp-accent-dark)
-  );
-  color: #fff;
+  border-radius: 8px;
+  background: #2f7bff;
   font-size: 16px;
-  -webkit-text-stroke: 1.2px var(--game-ink);
-  paint-order: stroke fill;
+}
+.pvp-countdown-vs-pot {
+  font-size: 16px;
+  color: #ffd35a;
 }
 
-.pvp-race-terms {
-  display: flex;
-  gap: 8px;
-}
-
-.pvp-term {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 4px;
-  border-radius: 12px;
-  border: 2px solid var(--border-soft);
-  background: var(--row);
-}
-
-.pvp-term-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
-.pvp-term-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 17px;
-  color: var(--text-title);
-}
-
-/* Matched → Locked in → Run → Result. */
-.pvp-timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  justify-content: space-between;
-  position: relative;
-}
-
-.pvp-timeline::before {
-  content: '';
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 8px;
-  height: 3px;
-  background: var(--divider);
-}
-
-.pvp-timeline li {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.pvp-timeline-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: var(--divider);
-}
-
-.pvp-timeline li.is-done {
-  color: var(--green-text);
-}
-
-.pvp-timeline li.is-done .pvp-timeline-dot {
-  background: var(--game-green);
-}
-
-.pvp-timeline li.is-now {
-  color: var(--text-title);
-}
-
-/* Orange, not gold - PvP keeps gold for the coin icon only now. */
-.pvp-timeline li.is-now .pvp-timeline-dot {
-  background: var(--pvp-accent);
-  box-shadow: 0 0 10px rgba(var(--pvp-accent-rgb), 0.8);
-}
-
-.pvp-result {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 3px solid var(--game-ink);
-  background: var(--row);
-  font-size: 20px;
-  color: var(--text-title);
-}
-
-.pvp-result.is-won {
-  background: linear-gradient(180deg, #6fd47a, var(--game-green-dark));
-  color: #fff;
-  text-shadow: 0 2px 0 var(--game-ink);
-}
-
-/* Orange, not red - PvP keeps red for close/danger states only. */
-.pvp-result.is-lost {
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent-dark)
-  );
-  color: #fff;
-  text-shadow: 0 2px 0 var(--game-ink);
-}
-
-.pvp-run-btn svg,
-.pvp-forfeit-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.pvp-forfeit-btn.is-confirming {
-  box-shadow:
-    inset 0 -4px 0 #6e130d,
-    0 0 0 3px rgba(255, 90, 77, 0.45);
-}
-
-/* --- Stake step (nearby challenge) --- */
-.pvp-stake {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.pvp-stake-input-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.pvp-stake-coin {
-  width: 28px;
-  height: 28px;
-}
-
-.pvp-stake-input {
-  width: 140px;
-  text-align: center;
-  font-size: 24px;
-}
-
-.pvp-stake .game-btn {
-  width: 100%;
-}
-
+/* ---------- motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .pvp-radar-sweep {
+  .pvp-battle-btn,
+  .pvp-radar-sweep,
+  .pvp-radar-ring,
+  .pvp-timeline li.is-now .pvp-timeline-dot {
     animation: none;
   }
+  .pvp-tier,
+  .pvp-option,
+  .pvp-rival {
+    transition: none;
+  }
 }
 
-/* Match found: radar stops and flashes slate, not gold - PvP keeps gold
-   for the coin icon only now. */
-.pvp-radar.is-found {
-  box-shadow:
-    0 0 0 4px rgba(var(--pvp-accent-rgb), 0.5),
-    0 0 24px rgba(var(--pvp-accent-rgb), 0.6),
-    0 4px 0 var(--game-ink);
-}
-
-.pvp-radar.is-found .pvp-radar-sweep {
-  animation: none;
-  opacity: 0;
+@media (max-width: 350px) {
+  .pvp-vs {
+    width: 52px;
+    height: 58px;
+  }
+  .pvp-tier-badge {
+    min-width: 54px;
+    font-size: 19px;
+  }
 }

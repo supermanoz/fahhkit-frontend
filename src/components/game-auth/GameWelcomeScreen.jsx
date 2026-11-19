@@ -1,5 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import AuthLogo from './AuthLogo'
+import { AuthBanner } from './AuthParts'
+import GameButton from '../../game/ui/GameButton'
 import GoogleSignInButton from '../GoogleSignInButton'
 import AppleSignInButton from '../AppleSignInButton'
 import { isIosAppleSignInEnabled } from '../../utils/appleSignIn'
@@ -26,31 +28,29 @@ export default function GameWelcomeScreen({
       <div className="game-auth-header">
         <h1 className="game-auth-title">Claim the streets</h1>
         <p className="game-auth-subtitle">
-          Sign in to track runs, capture territory, and earn Fahhcoin.
+          Sign in to track runs, capture territory and earn Fahhcoin.
         </p>
       </div>
 
-      {banner && (
-        <p
-          className={`game-auth-banner ${banner.kind}`}
-          role="status"
-          aria-live="polite"
-        >
-          {banner.message}
-        </p>
-      )}
+      <AuthBanner banner={banner} />
 
       <div className="game-auth-welcome-buttons">
-        <button type="button" className="game-auth-submit" onClick={onSignIn}>
+        <GameButton
+          variant="success"
+          size="lg"
+          className="g-full-width"
+          onClick={onSignIn}
+        >
           Sign In
-        </button>
-        <button
-          type="button"
-          className="game-auth-secondary"
+        </GameButton>
+        <GameButton
+          variant="secondary"
+          size="lg"
+          className="g-full-width"
           onClick={onSignUp}
         >
           Create Account
-        </button>
+        </GameButton>
       </div>
 
       {(HAS_GOOGLE || HAS_APPLE) && (
@@ -60,14 +60,15 @@ export default function GameWelcomeScreen({
           </div>
           {HAS_GOOGLE && (
             <GoogleSignInButton
+              appearance="game"
               onCredential={onGoogleCredential}
-              onError={(detail) => onOAuthError('Google', detail)}
+              onError={(message, info) => onOAuthError('Google', message, info)}
             />
           )}
           {HAS_APPLE && (
             <AppleSignInButton
               onCredential={onAppleCredential}
-              onError={() => onOAuthError('Apple')}
+              onError={(message, info) => onOAuthError('Apple', message, info)}
             />
           )}
         </div>

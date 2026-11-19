@@ -197,12 +197,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  padding: max(var(--space-4), var(--overlay-top)) var(--space-4)
+    max(var(--space-4), var(--overlay-bottom));
 }
 /* Applied together with .g-panel in JSX (plain CSS has no `composes`) */
 .g-modal {
   width: min(420px, 100%);
-  max-height: 90vh;
+  max-height: min(
+    90vh,
+    calc(
+      100dvh - max(var(--space-4), var(--overlay-top)) -
+        max(var(--space-4), var(--overlay-bottom))
+    )
+  );
   overflow-y: auto;
   animation: g-modal-in var(--dur-med) var(--ease-pop);
 }
@@ -253,8 +260,9 @@
    aware in case this modal is ever shown full-bleed on a notched phone. */
 .g-modal-close {
   position: absolute;
-  top: max(8px, var(--safe-top));
-  right: max(8px, env(safe-area-inset-right));
+  /* Inside the card: the card itself already starts below the status bar. */
+  top: 8px;
+  right: 8px;
 }
 .g-modal-body {
   padding: var(--space-4);

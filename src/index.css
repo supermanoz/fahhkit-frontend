@@ -11,6 +11,24 @@
      sits: the inset plus the original 16px margin. */
   --safe-top: env(safe-area-inset-top, 0px);
   --hud-top: calc(var(--safe-top) + 16px);
+  /* Bottom safe area: the iOS home indicator (env()). Android's navigation
+     bar is not overlaid by this app (SafeAreaPlugin.java reports only the
+     top), so it is 0 there, and 0 on the web. --native-safe-bottom is just a
+     hook for a future plugin / tests. */
+  --safe-bottom: max(
+    env(safe-area-inset-bottom, 0px),
+    var(--native-safe-bottom, 0px)
+  );
+  /* Where a modal / sheet's edge may start: clear of the status bar and the
+     home indicator, plus a small gap. Pair with max(<own padding>, ...) so
+     the web (safe areas 0) keeps its existing spacing. */
+  --overlay-top: calc(var(--safe-top) + 12px);
+  --overlay-bottom: calc(var(--safe-bottom) + 12px);
+  /* Tallest a centred modal card can be inside an overlay padded by
+     max(20px, --overlay-*): the visible viewport minus both insets. */
+  --modal-max-h: calc(
+    100vh - max(20px, var(--overlay-top)) - max(20px, var(--overlay-bottom))
+  );
   --brand: #e8590c;
   --brand-dark: #c94a08;
   --brand-amber: #ff8a3d;
@@ -162,6 +180,12 @@ button {
   background: var(--error-bg);
   color: var(--error);
   border: 1px solid rgba(192, 57, 43, 0.25);
+}
+
+.banner.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.28);
 }
 
 .banner.success {
@@ -417,4 +441,12 @@ button {
 
 .game-page .btn-outline::before {
   content: none;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --modal-max-h: calc(
+      100dvh - max(20px, var(--overlay-top)) - max(20px, var(--overlay-bottom))
+    );
+  }
 }

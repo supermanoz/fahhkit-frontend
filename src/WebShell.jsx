@@ -31,11 +31,18 @@ import GameMechanicsPage from './pages/GameMechanicsPage'
 import FraudFlagsPage from './pages/FraudFlagsPage'
 import SponsorReportPage from './pages/SponsorReportPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
+import RequireAuth from './components/RequireAuth'
 
 // Every website route (marketing home, events, shop, admin, ...). Lazy-loaded
 // from App.jsx and only on the website build: the native app build
 // (VITE_APP_SHELL) never imports this file, so none of these pages - or
 // their CSS - end up in the Android/iOS bundle.
+// Account-only pages need a session: signed out (no, expired or rejected
+// token) they redirect to /login?next=<page> and come back after signing in.
+// Public: landing, login/register/forgot/update-password, terms, contact,
+// the events list + detail, and /game (which has its own in-game sign in).
+const guard = (page) => <RequireAuth>{page}</RequireAuth>
+
 export default function WebShell() {
   return (
     <>
@@ -51,42 +58,54 @@ export default function WebShell() {
           path="/update-password/:phone/:password"
           element={<UpdatePasswordPage />}
         />
-        <Route path="/profile/edit" element={<EditProfilePage />} />
+        <Route path="/profile/edit" element={guard(<EditProfilePage />)} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/create" element={<CreateEventPage />} />
+        <Route path="/events/create" element={guard(<CreateEventPage />)} />
         <Route path="/events/:id" element={<EventDetailPage />} />
-        <Route path="/events/:id/edit" element={<EditEventPage />} />
+        <Route path="/events/:id/edit" element={guard(<EditEventPage />)} />
         <Route
           path="/events/:id/registrations"
-          element={<EventRegistrantsPage />}
+          element={guard(<EventRegistrantsPage />)}
         />
-        <Route path="/events/:id/report" element={<EventReportPage />} />
+        <Route path="/events/:id/report" element={guard(<EventReportPage />)} />
         <Route
           path="/admin/create-moderator"
-          element={<CreateModeratorPage />}
+          element={guard(<CreateModeratorPage />)}
         />
-        <Route path="/admin/dashboard" element={<DashboardPage />} />
-        <Route path="/admin/moderators" element={<ModeratorsPage />} />
+        <Route path="/admin/dashboard" element={guard(<DashboardPage />)} />
+        <Route path="/admin/moderators" element={guard(<ModeratorsPage />)} />
         <Route
           path="/admin/moderators/:id/edit"
-          element={<EditModeratorPage />}
+          element={guard(<EditModeratorPage />)}
         />
-        <Route path="/athletes" element={<AthleteSearchPage />} />
-        <Route path="/athletes/:userId" element={<AthleteProfilePage />} />
-        <Route path="/athletes/:userId/edit" element={<EditAthletePage />} />
-        <Route path="/history" element={<HistoryPage />} />
+        <Route path="/athletes" element={guard(<AthleteSearchPage />)} />
+        <Route
+          path="/athletes/:userId"
+          element={guard(<AthleteProfilePage />)}
+        />
+        <Route
+          path="/athletes/:userId/edit"
+          element={guard(<EditAthletePage />)}
+        />
+        <Route path="/history" element={guard(<HistoryPage />)} />
         <Route path="/runs" element={<Navigate to="/history" replace />} />
-        <Route path="/runs/track" element={<TrackRunPage />} />
-        <Route path="/runs/:id" element={<RunDetailPage />} />
+        <Route path="/runs/track" element={guard(<TrackRunPage />)} />
+        <Route path="/runs/:id" element={guard(<RunDetailPage />)} />
         <Route path="/contact" element={<ContactPage />} />
-        <Route path="/shop" element={<ShopPage />} />
+        <Route path="/shop" element={guard(<ShopPage />)} />
         <Route path="/game" element={<GamePage />} />
         <Route path="/game/terms" element={<GameLegalPage doc="terms" />} />
         <Route path="/game/privacy" element={<GameLegalPage doc="privacy" />} />
-        <Route path="/admin/game-mechanics" element={<GameMechanicsPage />} />
-        <Route path="/admin/fraud-flags" element={<FraudFlagsPage />} />
-        <Route path="/admin/sponsor-report" element={<SponsorReportPage />} />
-        <Route path="/payment-status" element={<PaymentStatusPage />} />
+        <Route
+          path="/admin/game-mechanics"
+          element={guard(<GameMechanicsPage />)}
+        />
+        <Route path="/admin/fraud-flags" element={guard(<FraudFlagsPage />)} />
+        <Route
+          path="/admin/sponsor-report"
+          element={guard(<SponsorReportPage />)}
+        />
+        <Route path="/payment-status" element={guard(<PaymentStatusPage />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

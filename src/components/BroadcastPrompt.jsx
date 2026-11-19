@@ -15,6 +15,7 @@ import {
 } from './GameIcons'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import { openExternal } from '../utils/externalLink'
+import { safeHref } from '../utils/safeUrl'
 import './BroadcastPrompt.css'
 
 // News/announcement broadcasts, front and center the moment the game opens
@@ -224,7 +225,7 @@ export default function BroadcastPrompt({ notices, onDismiss }) {
           {linkUrl && (
             <a
               className="game-btn game-btn-wood bcast-open"
-              href={linkUrl}
+              href={safeHref(linkUrl)}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => openExternal(linkUrl, e)}

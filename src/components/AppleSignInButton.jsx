@@ -6,6 +6,7 @@ import {
   isAppleCancel,
   isIosAppleSignInEnabled,
 } from '../utils/appleSignIn'
+import { AUTH_FLOW, describeAuthError, logAuthError } from '../utils/authErrors'
 import './AppleSignInButton.css'
 
 const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID || ''
@@ -64,14 +65,13 @@ function AppleSignInButtonNative({ onCredential, onError }) {
         email: result.email,
       })
     } catch (err) {
-      // 1001 = the athlete closed the Apple sheet: not an error.
+      // Console only for developers; the player sees a friendly line, or
+      // nothing when they just closed the Apple sheet (1001).
       if (isAppleCancel(err)) return
-      console.warn('[AppleSignIn] native sign-in failed', err)
-      onError?.(
-        err?.message
-          ? `Apple sign-in failed: ${err.message}`
-          : 'Apple sign-in failed. Please try again.'
-      )
+      logAuthError(AUTH_FLOW.APPLE, err)
+      const info = describeAuthError(err, { flow: AUTH_FLOW.APPLE })
+      if (info.silent) return
+      onError?.(info.message, info)
     } finally {
       setBusy(false)
     }
@@ -128,7 +128,10 @@ function AppleSignInButtonWeb({ onCredential, onError }) {
       const response = await window.AppleID.auth.signIn()
       const identityToken = response?.authorization?.id_token
       if (!identityToken) {
-        handlersRef.current.onError?.()
+        const info = describeAuthError(new Error('no token'), {
+          flow: AUTH_FLOW.APPLE,
+        })
+        handlersRef.current.onError?.(info.message, info)
         return
       }
       const name = response?.user?.name
@@ -136,11 +139,12 @@ function AppleSignInButtonWeb({ onCredential, onError }) {
         ? [name.firstName, name.lastName].filter(Boolean).join(' ')
         : undefined
       handlersRef.current.onCredential(identityToken, fullName)
-    } catch {
-      // Apple rejects the promise both when the popup is blocked and when
-      // the athlete just closes it themselves - same "cancelled or failed"
-      // treatment either way, matching GoogleSignInButton's onError.
-      handlersRef.current.onError?.()
+    } catch (err) {
+      // Apple rejects both when the popup is blocked and when the athlete
+      // closes it themselves; the second is silent, the first a friendly line.
+      logAuthError(AUTH_FLOW.APPLE, err)
+      const info = describeAuthError(err, { flow: AUTH_FLOW.APPLE })
+      if (!info.silent) handlersRef.current.onError?.(info.message, info)
     } finally {
       setBusy(false)
     }

@@ -73,8 +73,8 @@
   height: 100dvh;
   overflow: hidden;
   background: #0a0806;
-  font-family: 'Passion One', 'Trebuchet MS', sans-serif;
-  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
   /* No default text-shadow here any more - it used to put the same dark
      ink outline behind every bit of text, buttons included. That's fine
      for white lettering on a busy wood/stone card (see .game-card-title,
@@ -1588,7 +1588,7 @@
    and anything a library styles on its own (Leaflet/MapLibre controls,
    popups) - so nothing falls back to the site's system font. */
 .game-page *:not(code):not(pre) {
-  font-family: 'Passion One', 'Trebuchet MS', sans-serif;
+  font-family: var(--font-display);
 }
 
 /* Full-viewport flex layer every game popup/toast sits in. inset:0 pins it
@@ -1630,7 +1630,9 @@
   box-sizing: border-box;
   width: min(92vw, 380px);
   max-width: 100%;
-  max-height: calc(100dvh - 32px);
+  max-height: calc(
+    100dvh - max(16px, var(--safe-top)) - max(16px, var(--safe-bottom))
+  );
   overflow-y: auto;
   pointer-events: auto;
   padding: 20px 28px;
@@ -1700,7 +1702,9 @@
   box-sizing: border-box;
   width: min(92vw, 380px);
   max-width: 100%;
-  max-height: calc(100dvh - 32px);
+  max-height: calc(
+    100dvh - max(16px, var(--safe-top)) - max(16px, var(--safe-bottom))
+  );
   overflow-y: auto;
   pointer-events: auto;
   padding: 20px 34px 16px 22px;
@@ -2011,7 +2015,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  /* Clear of the status bar / home indicator (web: still 20px). */
+  padding: max(20px, var(--overlay-top)) 20px max(20px, var(--overlay-bottom));
 }
 
 .game-confirm-card {
@@ -2199,6 +2204,24 @@
   position: relative;
   width: 100%;
   max-width: 380px;
+  /* Auto margins (not align-items: center) centre it when it fits and
+     collapse to the top when it doesn't, so it can never overflow above
+     the top edge. */
+  margin: auto;
+}
+
+/* The run image popup scrolls instead of clipping on short screens: capped
+   to the viewport, safe-area padding top/bottom (extra at the top so the
+   hanging close (X) is never cut off). */
+.game-confirm-overlay.game-run-viewer-overlay {
+  box-sizing: border-box;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  align-items: flex-start;
+  padding: calc(var(--safe-top) + 28px) 20px calc(var(--safe-bottom) + 20px);
 }
 
 /* .game-close-btn owns colour/size/press state; this rule is position
@@ -4277,164 +4300,8 @@
   background: rgba(255, 255, 255, 0.75);
 }
 
-/* --- Incoming PvP challenge prompt (ChallengePrompt). --- */
-.challenge-prompt-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1500;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: calc(70px + var(--safe-top)) 16px 16px;
-  background: rgba(10, 6, 3, 0.55);
-}
-
-.challenge-prompt {
-  position: relative;
-  width: min(360px, 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 34px 18px 14px;
-  text-align: center;
-  border-radius: 20px;
-  border: 3px solid var(--game-ink);
-  background: var(--game-panel);
-  color: var(--game-cream);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.4),
-    0 5px 0 var(--game-ink),
-    0 18px 40px rgba(0, 0, 0, 0.3);
-}
-
-/* Slate, not red - this is an invite, not a danger state; PvP keeps red
-   for close/forfeit/danger buttons only now. */
-.challenge-prompt-emblem {
-  position: absolute;
-  top: -28px;
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid var(--game-ink);
-  background: linear-gradient(
-    180deg,
-    var(--pvp-accent-light),
-    var(--pvp-accent) 50%,
-    var(--pvp-accent-dark)
-  );
-  color: #fff;
-  font-size: 26px;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.4),
-    0 3px 0 var(--game-ink),
-    0 0 18px rgba(var(--pvp-accent-rgb), 0.6);
-  animation: challenge-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes challenge-pulse {
-  50% {
-    transform: scale(1.08);
-  }
-}
-
-.challenge-prompt-kicker {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  /* --pvp-accent-text (#B4420F), not plain --pvp-accent (#DD571C) - that
-     orange fails WCAG AA on this card's off-white body at 13px (3.1:1,
-     needs 4.5:1), same as PvpPanel.css's own small accent-coloured text;
-     see tokens.css's --pvp-orange-700 comment. Stroke/shadow off - this is
-     plain solid text, not stroke-outlined display text, per the same
-     rule. Not red, PvP keeps that for close/forfeit/danger buttons only. */
-  color: var(--pvp-accent-text);
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-}
-
-.challenge-prompt-title {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.1;
-  color: var(--text-title);
-}
-
-.challenge-prompt-terms {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  margin-top: 4px;
-}
-
-.challenge-prompt-term {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 6px;
-  border-radius: 12px;
-  border: 2px solid var(--border-soft);
-  background: var(--row);
-}
-
-.challenge-prompt-term-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
-.challenge-prompt-term-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 20px;
-  color: var(--text-title);
-}
-
-.challenge-prompt-term-value .game-coin {
-  width: 18px;
-  height: 18px;
-}
-
-.challenge-prompt-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.challenge-prompt-actions {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  margin-top: 4px;
-}
-
-.challenge-prompt-actions .game-btn {
-  flex: 1;
-}
-
-.challenge-prompt-later {
-  all: unset;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-muted);
-  text-decoration: underline;
-  padding: 4px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .challenge-prompt-emblem {
-    animation: none;
-  }
-}
+/* Incoming PvP challenge prompt: styled with the arena in
+   components/PvpPanel.css. */
 
 /* Shop section tabs (Heroes / Territory / Trail / Map) - icon-only, so
    centered as a tight group instead of stretching edge to edge. */
@@ -5107,22 +4974,76 @@
    large titles (h3 / .challenge-prompt-title / kicker) are untouched. */
 .game-claim-toast p,
 .game-highlight-toast p,
-.challenge-prompt-term-value,
-.challenge-prompt-term-label,
-.challenge-prompt-note,
-.challenge-prompt-later,
 .game-highlight-toast-owner-label {
   -webkit-text-stroke-width: 0;
   text-shadow: none;
 }
 .game-claim-toast p,
-.game-highlight-toast p,
-.challenge-prompt-term-value {
+.game-highlight-toast p {
   color: var(--text-body-dark);
 }
-.challenge-prompt-term-label,
-.challenge-prompt-note,
-.challenge-prompt-later,
 .game-highlight-toast-owner-label {
   color: var(--text-muted-dark);
+}
+
+/* --- Rollout lock: the player is outside every rolled-out area, so the game
+   is halted (see GamePage.jsx's gameLocked). Only layers on top - nothing
+   here applies inside a rolled-out area. --- */
+.game-rollout-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 450;
+  pointer-events: none; /* the map can still be panned */
+  background: rgba(110, 112, 118, 0.5);
+  -webkit-backdrop-filter: grayscale(1);
+  backdrop-filter: grayscale(1);
+}
+
+.game-rollout-banner {
+  position: absolute;
+  /* Below the transient toast slot (Night run etc.) so it's never covered. */
+  top: calc(var(--hud-top) + 130px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 650;
+  width: min(340px, calc(100% - 32px));
+  box-sizing: border-box;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  border-radius: 14px;
+  background: #d9dadd;
+  border: 2px solid #8e9096;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+  color: #3b3d42;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.game-rollout-banner strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.game-rollout-banner.is-denied {
+  background: var(--game-cream, #f6efe0);
+  border-color: #b9ad94;
+}
+
+.game-rollout-banner,
+.game-rollout-banner * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+/* Locked controls: grey, inert, no press feedback. */
+.game-radial-btn.is-locked,
+.game-menu-tab.is-locked {
+  filter: grayscale(1);
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
 }

@@ -17,6 +17,9 @@ for (const vp of SIZES) {
     await page.goto('/game')
     const logo = page.locator('.game-auth-logo')
     await expect(logo).toBeVisible({ timeout: 30_000 })
+    // Let the screen's own 0.18s entry animation finish, so only the logo
+    // float is being measured.
+    await page.waitForTimeout(500)
     const title = page.locator('.game-auth-title')
     const card = page.locator('.game-auth-card')
     const ty = () =>

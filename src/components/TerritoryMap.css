@@ -741,3 +741,12 @@
   opacity: 0;
   animation-play-state: paused;
 }
+
+.territory-map-locate.is-loading svg {
+  animation: territory-locate-pulse 0.8s ease-in-out infinite;
+}
+@keyframes territory-locate-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}

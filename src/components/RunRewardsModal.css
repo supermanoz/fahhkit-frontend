@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: max(16px, var(--overlay-top)) 16px max(16px, var(--overlay-bottom));
   background: rgba(10, 6, 3, 0.65);
 }
 
@@ -17,6 +17,9 @@
   position: relative;
   width: min(360px, 100%);
   max-height: calc(100vh - 32px);
+  max-height: calc(
+    100dvh - max(16px, var(--overlay-top)) - max(16px, var(--overlay-bottom))
+  );
   overflow-y: auto;
   display: flex;
   flex-direction: column;

@@ -121,7 +121,7 @@ describe('gameAuthReducer', () => {
     expect(next.resendCooldownSeconds).toBe(30)
   })
 
-  it('setting a new password lands back on Sign In with a success banner, not auto-authenticated', () => {
+  it('setting a new password ends the flow on its own success step, not auto-authenticated', () => {
     const submitting = {
       ...initialGameAuthState,
       screen: SCREEN.SET_PASSWORD,
@@ -133,14 +133,54 @@ describe('gameAuthReducer', () => {
       type: 'SET_PASSWORD_DONE',
       mobileNumber: '9800000000',
     })
-    expect(next.screen).toBe(SCREEN.SIGN_IN)
-    expect(next.banner).toEqual({
-      kind: 'success',
-      message: 'Password updated! Sign in with your new password.',
-    })
+    expect(next.screen).toBe(SCREEN.SET_PASSWORD)
+    expect(next.passwordUpdated).toBe(true)
+    expect(next.banner).toBeNull()
     expect(next.forgotSent).toBe(false)
     expect(next.signUpSentEmail).toBeNull()
     expect(next.pendingMobile).toBe('9800000000')
+    // Its Sign In button: leaving the success step resets it.
+    const signIn = gameAuthReducer(next, {
+      type: 'GO_TO',
+      screen: SCREEN.SIGN_IN,
+    })
+    expect(signIn.passwordUpdated).toBe(false)
+    expect(signIn.pendingMobile).toBe('9800000000')
+  })
+
+  it('SUBMIT_ERROR can carry a warning kind (amber) instead of the default error', () => {
+    const next = gameAuthReducer(initialGameAuthState, {
+      type: 'SUBMIT_ERROR',
+      kind: 'warning',
+      message: 'x',
+    })
+    expect(next.banner).toEqual({ kind: 'warning', message: 'x' })
+  })
+
+  it('CLEAR_BANNER dismisses the notice (field edited / retry) and is a no-op without one', () => {
+    const withBanner = {
+      ...initialGameAuthState,
+      banner: { kind: 'error', message: 'x' },
+    }
+    expect(
+      gameAuthReducer(withBanner, { type: 'CLEAR_BANNER' }).banner
+    ).toBeNull()
+    expect(
+      gameAuthReducer(initialGameAuthState, { type: 'CLEAR_BANNER' })
+    ).toBe(initialGameAuthState)
+  })
+
+  it('SUBMIT_CANCELLED returns to idle showing nothing (player closed the Google/Apple sheet)', () => {
+    const next = gameAuthReducer(
+      {
+        ...initialGameAuthState,
+        submitting: true,
+        banner: { kind: 'error', message: 'x' },
+      },
+      { type: 'SUBMIT_CANCELLED' }
+    )
+    expect(next.submitting).toBe(false)
+    expect(next.banner).toBeNull()
   })
 
   it('LOGIN_FAILURE_COOLDOWN records the throttle cooldown', () => {

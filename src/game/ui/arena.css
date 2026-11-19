@@ -1,0 +1,97 @@
+/* Shared pieces first built for the PvP arena (TitleRibbon, StatChip). They
+   take their colours from CSS variables so other screens can theme them. */
+
+.g-title-ribbon {
+  --ribbon-from: #4b8dff;
+  --ribbon-to: #2a58d6;
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0 26px;
+  min-height: 40px;
+  align-items: center;
+  background: linear-gradient(180deg, var(--ribbon-from), var(--ribbon-to));
+  /* Notched ribbon ends. */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - 14px) 50%,
+    100% 100%,
+    0 100%,
+    14px 50%
+  );
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.45));
+}
+.g-title-ribbon.is-green {
+  --ribbon-from: #5bd16b;
+  --ribbon-to: #2f9a42;
+}
+.g-title-ribbon.is-gold {
+  --ribbon-from: #ffd35a;
+  --ribbon-to: #e09a14;
+}
+.g-title-ribbon-text {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff;
+  -webkit-text-stroke: 2px rgba(10, 14, 40, 0.9);
+  paint-order: stroke fill;
+  white-space: nowrap;
+}
+
+.g-stat-chip {
+  --chip-accent: #6aa5ff;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+}
+.g-stat-chip.is-gold {
+  --chip-accent: #ffd35a;
+}
+.g-stat-chip.is-green {
+  --chip-accent: #6fdc82;
+}
+.g-stat-chip-icon {
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 20px;
+  color: var(--chip-accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+.g-stat-chip-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.g-stat-chip-value.is-muted {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #c3cdf5;
+}
+.g-stat-chip-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  color: #aab6e8;
+}

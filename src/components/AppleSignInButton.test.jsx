@@ -113,13 +113,16 @@ describe('native Apple sign-in click', () => {
     expect(onCredential).not.toHaveBeenCalled()
   })
 
-  it('other plugin failures surface a readable message', async () => {
+  it('other plugin failures surface a friendly message (never the plugin text)', async () => {
     plugin.authorize.mockRejectedValue({ code: '1000', message: 'No network' })
     const onError = vi.fn()
     render(<AppleSignInButton onCredential={vi.fn()} onError={onError} />)
     await click()
     await waitFor(() =>
-      expect(onError).toHaveBeenCalledWith('Apple sign-in failed: No network')
+      expect(onError.mock.calls[0][0]).toBe(
+        "Apple sign-in isn't working right now. Try email sign-in or try again later."
+      )
     )
+    expect(onError.mock.calls[0][0]).not.toMatch(/No network|1000/)
   })
 })

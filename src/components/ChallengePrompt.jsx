@@ -1,12 +1,16 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { motion } from 'framer-motion'
-import { IconSwords } from './GameIcons'
+import { motion, useReducedMotion } from 'framer-motion'
+import { IconInfo } from './GameIcons'
 import { getPvpModeByMeters } from '../api/pvp'
 import { playerName } from '../utils/playerName'
+import GameButton from '../game/ui/GameButton'
+import Avatar from '../game/ui/Avatar'
+import { Coin, VsBadge } from './pvp/PvpParts'
+import './PvpPanel.css'
 
 // Incoming PvP challenge: a call-to-arms card that drops in over the map
 // whenever someone challenges the player (socket push or the usePvp poll)
-// and stays until they Accept, Decline, or put it off with "Later".
+// and stays until they Accept, Decline, or put it off with "Decide later".
 export default function ChallengePrompt({
   challenge,
   busy,
@@ -15,9 +19,11 @@ export default function ChallengePrompt({
   onDecline,
   onLater,
 }) {
+  const reduceMotion = useReducedMotion()
   const distance =
     getPvpModeByMeters(challenge.distanceMeters)?.label ||
     `${challenge.distanceMeters} m`
+  const rival = playerName(null, challenge.challengerName) || 'A runner'
 
   return (
     <motion.div
@@ -27,64 +33,80 @@ export default function ChallengePrompt({
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="challenge-prompt"
+        className="challenge-prompt pvp-incoming"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="challenge-prompt-title"
-        initial={{ y: -60, scale: 0.85, opacity: 0 }}
-        animate={{ y: 0, scale: 1, opacity: 1 }}
-        exit={{ y: -40, scale: 0.9, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+        {...(reduceMotion
+          ? {}
+          : {
+              initial: { y: -50, scale: 0.9, opacity: 0 },
+              animate: { y: 0, scale: 1, opacity: 1 },
+              exit: { y: -30, scale: 0.95, opacity: 0 },
+              transition: { type: 'spring', stiffness: 380, damping: 24 },
+            })}
       >
-        <span className="challenge-prompt-emblem" aria-hidden="true">
-          <IconSwords />
-        </span>
-        <p className="challenge-prompt-kicker">Race challenge!</p>
-        <h3 id="challenge-prompt-title" className="challenge-prompt-title">
-          {playerName(null, challenge.challengerName) || 'A runner'} wants to
-          race you
+        <p className="pvp-incoming-kicker">Race challenge</p>
+        <div className="pvp-incoming-duel" aria-hidden="true">
+          <Avatar name={rival} size={56} ring="#4da3ff" />
+          <VsBadge small />
+          <Avatar name="You" size={56} ring="#6fdc82" />
+        </div>
+        <h3 id="challenge-prompt-title" className="pvp-incoming-title">
+          {rival} wants to race you
         </h3>
-        <div className="challenge-prompt-terms">
-          <span className="challenge-prompt-term">
-            <span className="challenge-prompt-term-label">Distance</span>
-            <span className="challenge-prompt-term-value">{distance}</span>
+        <div className="pvp-incoming-terms">
+          <span className="pvp-incoming-term">
+            <span className="pvp-incoming-label">Distance</span>
+            <span className="pvp-incoming-value">{distance}</span>
           </span>
-          <span className="challenge-prompt-term">
-            <span className="challenge-prompt-term-label">Stake</span>
-            <span className="challenge-prompt-term-value">
-              <span className="game-coin" aria-hidden="true" />
-              {challenge.stakeAmount}
+          <span className="pvp-incoming-term">
+            <span className="pvp-incoming-label">You stake</span>
+            <span className="pvp-incoming-value">
+              <Coin /> {challenge.stakeAmount}
+            </span>
+          </span>
+          <span className="pvp-incoming-term">
+            <span className="pvp-incoming-label">Winner takes</span>
+            <span className="pvp-incoming-value is-gold">
+              <Coin /> {challenge.stakeAmount * 2}
             </span>
           </span>
         </div>
-        <p className="challenge-prompt-note">
-          Winner takes the whole pot. Stakes lock in once you accept.
+        <p className="pvp-incoming-note">
+          <IconInfo /> Your coins lock in once you accept.
         </p>
 
-        <div className="challenge-prompt-actions">
-          <button
-            type="button"
-            className="game-btn game-btn-wood"
-            onClick={onDecline}
-            disabled={Boolean(busy)}
-          >
-            {busy === 'decline' ? '…' : 'Decline'}
-          </button>
-          <button
-            type="button"
-            className="game-btn game-btn-green"
+        <div className="pvp-incoming-actions">
+          <GameButton
+            variant="success"
+            size="lg"
+            className="g-full-width"
             onClick={onAccept}
+            loading={busy === 'accept'}
             disabled={Boolean(busy)}
           >
-            {busy === 'accept' ? '…' : 'Accept'}
-          </button>
+            Accept
+          </GameButton>
+          <GameButton
+            variant="danger"
+            size="lg"
+            className="g-full-width"
+            onClick={onDecline}
+            loading={busy === 'decline'}
+            disabled={Boolean(busy)}
+          >
+            Decline
+          </GameButton>
         </div>
         {error && (
-          <p className="game-controls-hint game-controls-hint-error">{error}</p>
+          <p className="pvp-incoming-error" role="alert">
+            {error}
+          </p>
         )}
         <button
           type="button"
-          className="challenge-prompt-later"
+          className="pvp-incoming-later"
           onClick={onLater}
           disabled={Boolean(busy)}
         >

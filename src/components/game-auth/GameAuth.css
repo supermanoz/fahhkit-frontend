@@ -1,8 +1,17 @@
-/* In-game sign-in/sign-up screens. Rendered as a descendant of .game-page,
-   so the --game-* and Frost & Amethyst tokens (tokens.css/GamePage.css)
-   are already in scope - no values duplicated here. Chrome borrowed from
-   .game-confirm-overlay/.game-confirm-card so this reads as "part of the
-   game", not a bolted-on website form. */
+/* In-game auth screens (Welcome, Sign In, Create Account, Forgot / Reset).
+   Rendered inside .game-page / .game-root, so the --game-* / --green-* /
+   --shop-accent-* tokens (src/game/styles/tokens.css) are in scope, and the
+   buttons are the shared GameButton (.gb) - this file only styles the panel,
+   fields, notices, links and the Google / Apple buttons.
+
+   Rules this file follows:
+   - Buttons by meaning: green = proceed (GameButton "success"), cream/white
+     = secondary (GameButton "secondary"), white Google, black Apple, purple
+     links. No orange buttons.
+   - Titles use the display font; everything small (subtitle, labels,
+     helper, legal, notices) is the rounded body font with normal letter
+     spacing and NO stroke/shadow. */
+
 .game-auth-gate {
   position: fixed;
   inset: 0;
@@ -13,37 +22,72 @@
   background: var(--ink);
   padding: max(20px, var(--safe-top)) max(20px, env(safe-area-inset-right))
     max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  box-sizing: border-box;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* The motion.div GameAuthGate wraps each screen in. Without an explicit
    width it shrink-wraps inside the centred flex gate, so each card ended up
-   as wide as its own content (Welcome wider than Sign In). margin:auto
-   rather than align-items centring also stops tall cards (sign-up) being
-   clipped at the top when the gate scrolls. */
+   as wide as its own content. margin:auto rather than align-items centring
+   also stops tall cards (sign-up) being clipped at the top when the gate
+   scrolls (e.g. with the keyboard open). */
 .game-auth-screen {
   width: 100%;
   max-width: 380px;
   margin: auto;
 }
 
+/* Same layered panel as the new popups (.g-panel): ink border, inner divider
+   ring, hard drop edge. */
 .game-auth-card {
   width: 100%;
   max-width: 380px;
   margin: auto;
-  padding: 26px 22px;
-  background: var(--game-panel);
-  border: 3px solid var(--game-ink);
-  border-radius: 22px;
+  box-sizing: border-box;
+  padding: 22px 20px 24px;
+  background: var(--panel);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-lg);
   box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.1),
-    0 6px 0 var(--game-ink);
-  color: var(--game-cream);
+    inset 0 0 0 2px var(--divider),
+    0 6px 0 var(--ink);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  font-family: var(--font-body);
 }
 
+/* The game-wide white-text-with-dark-stroke recipe turns small dark text on
+   this light card into a smear: switch it off for everything in the card,
+   then give it back only to the chunky buttons (.gb). */
+.game-auth-card,
+.game-auth-card * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-auth-card .gb,
+.game-auth-card .gb * {
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+/* Secondary = cream with dark text (no outline recipe, which is white-on-
+   white here). */
+.game-auth-card .gb-secondary {
+  background: #fbf6e9;
+}
+.game-auth-card .gb-secondary,
+.game-auth-card .gb-secondary * {
+  color: var(--ink);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+/* ---- logo (float animation kept) ---- */
 .game-auth-logo-float {
   position: relative;
   /* Same box the bare <img> used to have (width/margin moved here). */
@@ -114,9 +158,6 @@
 
 .game-auth-logo {
   display: block;
-  /* ~62% of the card's own width (the card has 22px side padding): about
-     205px at 360, 225px at 390, 242px on desktop, never over 300px. The
-     artwork is trimmed to its lettering, so there is no dead margin. */
   width: 100%;
   height: auto;
   margin: 0;
@@ -125,327 +166,175 @@
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
 }
 
+/* ---- headings ---- */
 .game-auth-header {
   text-align: center;
 }
 
 .game-auth-title {
-  margin: 0 0 4px;
-  font-size: 24px;
+  margin: 0 0 6px;
   font-family: var(--font-display);
-  font-weight: 600;
-  color: var(--white);
-  text-shadow:
-    -1.5px -1.5px 0 var(--game-ink),
-    1.5px -1.5px 0 var(--game-ink),
-    -1.5px 1.5px 0 var(--game-ink),
-    1.5px 1.5px 0 var(--game-ink);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: var(--ink);
 }
 
 .game-auth-subtitle {
-  margin: 0;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  margin: 0 auto;
+  max-width: 32ch;
   font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  color: var(--text-body-dark);
+  text-wrap: balance;
 }
 
+/* ---- forms / fields ---- */
 .game-auth-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .game-auth-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .game-auth-label {
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
   font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--ink);
 }
 
-/* Native app path - the web GSI button script never runs inside the
-   WebView, so GoogleSignInButton renders a plain button here instead;
-   styled to match the "filled_black pill" look the web GSI button uses. */
-.google-signin-button--native {
-  width: 100%;
-  min-height: 44px;
-  border-radius: 999px;
-  border: none;
-  background: var(--ink);
-  color: var(--white);
-  font-weight: 600;
-  font-family: var(--font-body);
-  cursor: pointer;
-}
-
-.google-signin-button--native:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* 16px font-size keeps iOS Safari from zooming the page on focus; 44px
-   min-height matches the tap-target floor used elsewhere in the game
-   (.google-signin-button). */
+/* Game-style field: inset look, 2px dark border, 14px radius, 52px tall.
+   16px text keeps iOS from zooming the page on focus. */
 .game-auth-input,
-.game-auth-select,
-.game-auth-card .password-field input {
+.game-auth-select {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1.5px solid var(--ink);
+  box-sizing: border-box;
+  min-height: 52px;
+  height: 52px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--ink);
   background: var(--white);
+  box-shadow: inset 0 3px 0 rgba(43, 42, 36, 0.1);
   color: var(--ink);
-  font-size: 16px;
   font-family: var(--font-body);
-  letter-spacing: 0.02em;
-}
-
-/* PasswordField (src/components/PasswordField.jsx) is a shared, non-game
-   component with no background/colour of its own - it just inherits the
-   browser's native input chrome, which left it visibly darker than its
-   .game-auth-input siblings once those became solid white. Matched here
-   instead of in PasswordField.css, which the rest of the site also uses. */
-.game-auth-card .password-field-toggle {
-  color: var(--text-muted);
-}
-.game-auth-card .password-field-toggle:hover {
-  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  min-width: 0;
+  text-overflow: ellipsis;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .game-auth-input::placeholder {
   color: var(--text-placeholder);
+  font-weight: 500;
 }
 
+/* Purple focus ring (shop purple). */
+.game-auth-input:focus,
 .game-auth-input:focus-visible,
-.game-auth-select:focus-visible,
-.game-auth-link:focus-visible,
-.game-auth-icon-btn:focus-visible {
-  outline: 2.5px solid var(--game-gold-light);
-  outline-offset: 2px;
+.game-auth-select:focus,
+.game-auth-select:focus-visible {
+  outline: none;
+  border-color: var(--shop-accent-dark);
+  box-shadow:
+    inset 0 3px 0 rgba(43, 42, 36, 0.1),
+    0 0 0 3px rgba(190, 46, 214, 0.4);
 }
 
-.game-auth-password-row {
-  position: relative;
+/* Clear error state: red border + message under the field. */
+.game-auth-field.has-error .game-auth-input,
+.game-auth-field.has-error .game-auth-select {
+  border-color: var(--red-500);
+}
+.game-auth-field.has-error .game-auth-input:focus,
+.game-auth-field.has-error .game-auth-select:focus {
+  box-shadow:
+    inset 0 3px 0 rgba(43, 42, 36, 0.1),
+    0 0 0 3px rgba(217, 48, 37, 0.3);
+}
+
+.game-auth-field-error {
   display: flex;
-  align-items: center;
-}
-
-.game-auth-password-row .game-auth-input {
-  padding-right: 44px;
-}
-
-.game-auth-icon-btn {
-  position: absolute;
-  right: 4px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-/* Sign-up step fields: one column, with only short pairs (Country/City)
-   going two-up once there's room - see the min-width query at the bottom. */
-.game-auth-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
-}
-
-.game-auth-pair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
-}
-
-/* Short-screen fit: trim the card's own padding/gaps for Create Account. */
-.game-auth-card.game-auth-signup {
-  padding: 12px 18px;
-  gap: 4px;
-}
-.game-auth-signup .game-auth-header {
-  gap: 2px;
-}
-.game-auth-signup .terms-agreement,
-.game-auth-signup [class*='terms-agreement'] {
-  padding: 8px 10px;
-}
-.game-auth-signup .game-auth-title {
-  font-size: 22px;
-}
-.game-auth-signup .game-auth-subtitle {
-  font-size: 13px;
-}
-
-/* Create Account is only 5 fields: tighter rhythm, and the country/date pair
-   side by side, so the whole card fits a 360x640 screen. Each field keeps a
-   one-line slot for its inline validation message so nothing jumps. */
-.game-auth-signup .game-auth-grid {
-  gap: 4px;
-}
-.game-auth-signup .game-auth-pair {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-}
-.game-auth-signup .game-auth-hint {
-  min-height: 14px;
+  align-items: flex-start;
+  gap: 6px;
   margin: 0;
-  line-height: 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--red-text);
+}
+.game-auth-field-error svg {
+  flex: none;
+  margin-top: 1px;
 }
 
-/* Roomier sizing for the long sign-up form only, so Sign In/Forgot keep
-   their current density. */
-.game-auth-signup .game-auth-form {
-  gap: 10px;
+.game-auth-hint {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted-dark);
 }
 
-.game-auth-signup .game-auth-field {
-  gap: 4px;
-}
-
-.game-auth-signup .game-auth-label {
-  font-size: 14px;
-}
-
-.game-auth-signup .game-auth-select {
-  -webkit-appearance: none;
-  appearance: none;
+/* Select arrow (the native one is hidden by appearance: none). */
+.game-auth-select {
   padding-right: 34px;
   background: var(--white)
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232b2a24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     no-repeat right 12px center;
 }
-.game-auth-signup .game-auth-input,
-.game-auth-signup .game-auth-select {
-  min-height: 40px;
-  height: 40px;
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: 100%;
-  text-overflow: ellipsis;
-}
-/* The game-wide white-text-with-black-stroke recipe (tokens.css) turns dark
-   text on this cream card into a heavy smear at small sizes: plain dark text
-   here, no stroke or shadow, for everything under 16px. */
-.game-auth-signup .game-auth-label,
-.game-auth-signup .game-auth-hint,
-.game-auth-signup .game-auth-terms,
-.game-auth-signup .game-auth-terms *,
-.game-auth-signup .game-auth-date-text,
-.game-auth-signup .game-auth-link,
-.game-auth-signup .game-auth-select option {
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
-  paint-order: normal;
-}
-.game-auth-signup .game-auth-subtitle {
-  color: var(--ink);
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
-}
-.game-auth-signup .game-auth-label {
-  color: var(--ink);
-  font-weight: 600;
-}
-.game-auth-signup .game-auth-hint.error {
-  color: #b3261e;
-}
 
-.game-auth-signup .game-auth-hint {
-  font-size: 12px;
-}
-
-.game-auth-progress {
+/* Password field with the show/hide eye. */
+.game-auth-password {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.game-auth-progress-label {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--game-cream);
-  font-family: var(--font-body);
-  text-align: center;
-}
-
-.game-auth-progress-bar {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.game-auth-progress-bar li {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--divider);
-  transition: background 0.2s ease;
-}
-
-.game-auth-progress-bar li.done {
-  background: var(--game-gold);
-}
-
-/* Back + Next/Register side by side; Next alone fills the row on step 1. */
-.game-auth-step-nav {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 10px;
-}
-
-.game-auth-step-nav .game-auth-secondary {
-  width: auto;
-}
-
-/* TermsAgreement is shared with the website, so it's resized here rather
-   than in TermsAgreement.css: the whole label is the tap target (44px+),
-   with a bigger box and body-size text. */
-.game-auth-card .terms-agreement {
   align-items: center;
-  min-height: 44px;
-  margin: 0;
-  padding: 12px 14px;
-  font-size: 14px;
-  line-height: 1.45;
+}
+.game-auth-password .game-auth-input {
+  padding-right: 52px;
+}
+.game-auth-eye {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--text-muted-dark);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.game-auth-eye:active {
+  color: var(--shop-accent-dark);
+}
+.game-auth-eye:focus-visible {
+  outline: 3px solid rgba(190, 46, 214, 0.5);
+  outline-offset: -2px;
 }
 
-.game-auth-card .terms-agreement input {
-  width: 22px;
-  height: 22px;
-  margin: 0;
-}
-
-.game-auth-hint {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  font-family: var(--font-body);
-}
-
-.game-auth-hint.error {
-  color: var(--game-red-light);
-}
-
-/* Live password-requirement checklist, shown while setting a real password
-   (GameSetPasswordScreen) - there's no server-side strength rule to mirror
-   (see useAuthFlow.js), so this is a sensible baseline only. */
+/* Live password requirements (reset screen) - informational only. */
 .game-auth-strength {
   display: flex;
   flex-direction: column;
@@ -453,21 +342,19 @@
   margin: 2px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 11.5px;
   font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
 }
-
 .game-auth-strength li {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-muted);
+  color: var(--text-muted-dark);
 }
-
 .game-auth-strength li.met {
-  color: var(--game-green-light);
+  color: var(--green-text);
 }
-
 .game-auth-strength-dot {
   width: 7px;
   height: 7px;
@@ -476,58 +363,358 @@
   flex: none;
 }
 
+/* ---- notice (replaces the old loud red box) ---- */
+.game-auth-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+.game-auth-notice-icon {
+  flex: none;
+  display: flex;
+  margin-top: 1px;
+}
+.game-auth-notice-text {
+  margin: 0;
+  min-width: 0;
+}
+/* amber: warnings / help */
+.game-auth-notice--warning {
+  background: #fff2cf;
+  border-color: #e0a300;
+  color: #5b3b00;
+}
+/* red tint: only real blocking errors (wrong password...) */
+.game-auth-notice--error {
+  background: var(--red-tint);
+  border-color: #dc8a80;
+  color: var(--red-text);
+}
+.game-auth-notice--success {
+  background: var(--green-tint);
+  border-color: #8cc57c;
+  color: var(--green-text);
+}
+
+/* ---- buttons ---- */
+.game-auth-actions,
+.game-auth-welcome-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.game-auth-actions {
+  margin-top: 2px;
+}
+
+/* Disabled / submitting = grey (with the GameButton spinner), whatever the
+   variant. */
+.game-auth-card .gb:disabled {
+  filter: grayscale(1);
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* Text links: shop purple, 44px tap target, underline on press. */
+.game-auth-link,
+.game-auth-back,
+.game-auth-terms-link {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-family: var(--font-body);
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--shop-accent-dark);
+  text-decoration: none;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.game-auth-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  min-height: 44px;
+  font-size: 15px;
+  text-align: center;
+}
+.game-auth-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -8px 0 -6px -4px;
+  font-size: 15px;
+}
+.game-auth-terms-link {
+  display: inline;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.game-auth-link:active,
+.game-auth-link:hover,
+.game-auth-link:focus-visible,
+.game-auth-back:active,
+.game-auth-back:hover,
+.game-auth-back:focus-visible {
+  text-decoration: underline;
+}
+.game-auth-link:focus-visible,
+.game-auth-back:focus-visible,
+.game-auth-terms-link:focus-visible {
+  outline: 3px solid rgba(190, 46, 214, 0.5);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.game-auth-link:disabled {
+  color: var(--text-muted-dark);
+  opacity: 0.7;
+  cursor: default;
+  text-decoration: none;
+}
+
+/* ---- Google / Apple ---- */
+.game-auth-oauth {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.game-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted-dark);
+}
+.game-auth-divider::before,
+.game-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--divider);
+}
+
+/* Same height / radius / spacing as the GameButtons above. Google: white fill,
+   dark text, clear border, the unmodified multicolour G. Apple: black fill,
+   white logo and text (Apple HIG). */
+.game-auth-card .google-signin-button--native,
+.game-auth-card .apple-signin-button {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(43, 42, 36, 0.45);
+  transition: transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.game-auth-card .google-signin-button--native {
+  background: #fff;
+  color: #1f1f1f;
+  border: 2px solid #747775;
+}
+.game-auth-card .apple-signin-button {
+  background: #000;
+  color: #fff;
+  border: 2px solid #000;
+}
+.game-auth-card .google-signin-button--native:active:not(:disabled),
+.game-auth-card .apple-signin-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 rgba(43, 42, 36, 0.45);
+}
+.game-auth-card .google-signin-button--native:disabled,
+.game-auth-card .apple-signin-button:disabled {
+  background: #cfcdc4;
+  border-color: #a9a69b;
+  color: #6b685d;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.game-auth-card .apple-signin-button:disabled .apple-signin-icon path {
+  fill: #6b685d;
+}
+.game-auth-card .google-signin-logo,
+.game-auth-card .apple-signin-icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.game-auth-card .google-signin-button--native:focus-visible,
+.game-auth-card .apple-signin-button:focus-visible {
+  outline: 3px solid rgba(190, 46, 214, 0.5);
+  outline-offset: 2px;
+}
+/* The web button is Google's own rendered iframe (white "outline" theme with
+   the official G); centred in a same-height slot. */
+.game-auth-card .google-signin-button--game {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- sent / success steps ---- */
+.game-auth-sent-icon {
+  font-size: 44px;
+  line-height: 1;
+  text-align: center;
+}
+
+.game-auth-steps {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.game-auth-steps li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-muted-dark);
+}
+.game-auth-step-dot {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--white);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--ink);
+}
+.game-auth-steps li.current {
+  color: var(--ink);
+}
+.game-auth-steps li.current .game-auth-step-dot {
+  background: var(--shop-accent-dark);
+  border-color: var(--ink);
+  color: #fff;
+}
+.game-auth-steps li.done .game-auth-step-dot {
+  background: var(--green-500);
+  color: #fff;
+}
+
+/* ---- sign-up ---- */
+.game-auth-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.game-auth-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+/* Create Account is the longest form: tighter rhythm so the whole card still
+   fits a 360x640 screen (field errors only take room when shown). */
+.game-auth-card.game-auth-signup {
+  padding: 8px 18px 12px;
+  gap: 6px;
+}
+.game-auth-signup .game-auth-form {
+  gap: 8px;
+}
+.game-auth-signup .game-auth-field {
+  gap: 4px;
+}
+.game-auth-signup .game-auth-title {
+  font-size: 24px;
+  margin-bottom: 2px;
+}
+.game-auth-signup .game-auth-subtitle {
+  font-size: 14px;
+}
+.game-auth-signup .game-auth-actions {
+  gap: 0;
+}
+
+/* Terms: the whole label is the tap target; readable body copy. */
 .game-auth-terms {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--text-muted);
+  min-height: 44px;
+  padding: 4px 0;
   font-family: var(--font-body);
-}
-
-/* Styled checkbox: off-white box, dark border, green fill + white check.
-   Sized to the label's line height (12.5px x 1.4 ~ 18px) and sat on the
-   first line. */
-.game-auth-terms {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
   color: var(--ink);
 }
 .game-auth-checkbox {
   -webkit-appearance: none;
   appearance: none;
   flex: none;
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
   margin: 0;
-  border: 1.5px solid var(--ink);
-  border-radius: 5px;
-  background: #f6f3e8;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--white);
+  box-shadow: inset 0 2px 0 rgba(43, 42, 36, 0.1);
   cursor: pointer;
   display: inline-grid;
   place-content: center;
 }
 .game-auth-checkbox::after {
   content: '';
-  width: 5px;
-  height: 9px;
+  width: 6px;
+  height: 11px;
   border: solid #fff;
-  border-width: 0 2px 2px 0;
+  border-width: 0 2.5px 2.5px 0;
   transform: translateY(-1px) rotate(45deg) scale(0);
 }
 .game-auth-checkbox:checked {
-  background: #2f8f46;
-  border-color: var(--ink);
+  background: var(--green-500);
 }
 .game-auth-checkbox:checked::after {
   transform: translateY(-1px) rotate(45deg) scale(1);
 }
 .game-auth-checkbox:focus-visible {
-  outline: 2.5px solid var(--game-gold-light);
+  outline: 3px solid rgba(190, 46, 214, 0.5);
   outline-offset: 2px;
 }
 
-/* Date of Birth: same box as the Country select. */
+/* Date of Birth: the same box as the Country select - the native date input
+   is see-through and the formatted value is drawn under it, so the platform's
+   own (oversized on iOS) date widget never shows. */
 .game-auth-date {
   position: relative;
   width: 100%;
@@ -535,15 +722,8 @@
   max-width: 100%;
 }
 .game-auth-date-input {
-  -webkit-appearance: none;
-  appearance: none;
   display: block;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
   margin: 0;
-  /* Invisible: the overlay text below is what the player reads. */
   color: transparent;
   -webkit-text-fill-color: transparent;
   background: var(--white);
@@ -575,184 +755,54 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 16px;
   font-family: var(--font-body);
-  letter-spacing: 0.02em;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-placeholder);
+}
+.game-auth-date-text.has-value {
   color: var(--ink);
 }
 
-.game-auth-terms a {
-  color: var(--auth-link);
-  text-decoration: underline;
-}
-
-.game-auth-banner {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  text-align: center;
-}
-
-.game-auth-banner.error {
-  background: var(--red-tint);
-  border: 1px solid var(--game-red);
-  color: var(--red-text);
-}
-
-.game-auth-banner.success {
-  background: var(--green-tint);
-  border: 1px solid var(--game-green);
-  color: var(--green-text);
-}
-
-.game-auth-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-/* Chunky primary button - orange (--auth-primary), not the old gold, with
-   the same dark-outline/inset-highlight/hard-drop-shadow/press-state
-   recipe every other game button (.game-btn & co) uses, rather than the
-   flat border:none + single drop-shadow this had before. Label stays
-   white with the thin dark stroke/shadow every /game text gets by default
-   (not reset here) - unchanged from the gold version. */
-.game-auth-submit {
-  width: 100%;
-  min-height: 48px;
-  border-radius: 14px;
-  border: 3px solid var(--ink);
-  background: linear-gradient(
-    180deg,
-    var(--auth-primary-light),
-    var(--auth-primary) 60%,
-    var(--auth-primary-dark)
-  );
-  color: var(--game-text);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 0.02em;
-  box-shadow:
-    inset 0 -4px 0 var(--auth-primary-dark),
-    0 3px 0 var(--ink);
-  cursor: pointer;
-}
-
-.game-auth-submit:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 -4px 0 var(--auth-primary-dark),
-    0 1px 0 var(--ink);
-}
-
-.game-auth-submit:disabled {
-  opacity: 0.55;
-  cursor: default;
-  box-shadow: none;
-}
-
-.game-auth-secondary {
-  width: 100%;
-  min-height: 48px;
-  border-radius: 14px;
-  border: 2px solid var(--ink);
-  background: var(--white);
-  color: var(--game-text);
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-/* --auth-link (#710913), not the old --green-text - every text link on
-   these screens (Forgot password?, Didn't get it?/Resend, Already got
-   your login email?). Stroke/shadow explicitly off: this is small text,
-   and the global thin-stroke-plus-shadow every /game element gets by
-   default is what made it read as garbled on a plain underline before,
-   not a problem solid colour alone has. Bumped to 15px/700 (from 13px/
-   unset) for legibility at that weight, and to a real 44px tap target
-   (from 32px) - the same floor every other control in this flow uses. */
-.game-auth-link {
-  background: none;
-  border: none;
-  padding: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  color: var(--auth-link);
-  font-size: 15px;
-  font-weight: 700;
-  font-family: var(--font-body);
-  text-decoration: underline;
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-  cursor: pointer;
-  align-self: center;
-}
-
-.game-auth-link:disabled {
-  opacity: 0.5;
-  cursor: default;
-  text-decoration: none;
-}
-
-.game-auth-back {
-  align-self: flex-start;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 4px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-family: var(--font-body);
-  cursor: pointer;
-}
-
-.game-auth-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: var(--font-body);
-}
-
-.game-auth-divider::before,
-.game-auth-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--divider);
-}
-
-.game-auth-oauth {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.game-auth-sent-icon {
-  font-size: 40px;
-  text-align: center;
-}
-
-.game-auth-welcome-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-@media (min-width: 420px) {
+/* Very narrow phones: stack Country / Date of Birth. */
+@media (max-width: 330px) {
   .game-auth-pair {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Short screens (landscape, or the keyboard open): a little tighter. */
+@media (max-height: 560px) {
+  .game-auth-card {
+    gap: 10px;
+    padding-top: 16px;
+    padding-bottom: 18px;
+  }
+  .game-auth-title {
+    font-size: 24px;
+  }
+}
+
+/* The game forces the display font on EVERY element (.game-page
+   *:not(code):not(pre) in GamePage.css, specificity 0,1,2 - children
+   included), so the body font is re-applied here to every descendant with a
+   higher-specificity selector. Titles and the chunky buttons (.gb) keep the
+   display font. */
+.game-auth-card
+  *:not(.gb):not(.gb *):not(.game-auth-title):not(svg):not(svg *) {
+  font-family: var(--font-body);
+}
+.game-auth-card .game-auth-title {
+  font-family: var(--font-display);
+}
+
+/* Every game button in the card is exactly 56px tall (the Google / Apple
+   buttons match). */
+.game-auth-card .gb {
+  height: 56px;
+  min-height: 56px;
+  padding: 0 14px;
+  font-size: 19px;
+  white-space: nowrap;
 }

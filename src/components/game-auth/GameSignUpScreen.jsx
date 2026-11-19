@@ -11,6 +11,9 @@ import {
 } from '../../constants/validation'
 import GameLegalModal from '../game-legal/GameLegalModal'
 import { recordGameTermsAcceptance } from '../../utils/gameTermsAcceptance'
+import GameButton from '../../game/ui/GameButton'
+import { AuthBanner, AuthField } from './AuthParts'
+import { FIELD_MESSAGES } from '../../utils/authErrors'
 
 // POST /v1/athlete/signup (via useAuthFlow.signUpAthlete) has NO password
 // or username field - the server generates a password and emails it (see
@@ -80,8 +83,8 @@ function validate(form) {
   if (!EMAIL_RE.test(form.email.trim())) errors.email = EMAIL_TITLE
   if (!PHONE_RE.test(form.mobileNumber.trim()))
     errors.mobileNumber = PHONE_TITLE
-  if (!form.country) errors.country = 'Pick your country.'
-  if (!form.birthDate) errors.birthDate = 'Enter your date of birth.'
+  if (!form.country) errors.country = FIELD_MESSAGES.countryRequired
+  if (!form.birthDate) errors.birthDate = FIELD_MESSAGES.birthDateRequired
   else if (!isOldEnough(form.birthDate))
     errors.birthDate = `You need to be at least ${MIN_AGE_YEARS} to join.`
   return errors
@@ -90,6 +93,7 @@ function validate(form) {
 export default function GameSignUpScreen({
   onSubmit,
   onBack,
+  onEdit,
   submitting,
   banner,
   sentEmail,
@@ -111,6 +115,7 @@ export default function GameSignUpScreen({
   function handleChange(e) {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
+    onEdit?.()
   }
   function handleBlur(e) {
     const { name } = e.target
@@ -147,17 +152,11 @@ export default function GameSignUpScreen({
     onChange: handleChange,
     onBlur: handleBlur,
     'aria-invalid': (touched[name] && errors[name]) || undefined,
-    'aria-describedby': `ga-${name}-msg`,
+    'aria-describedby':
+      touched[name] && errors[name] ? `ga-${name}-msg` : undefined,
   })
-  const msg = (name) => (
-    <p
-      id={`ga-${name}-msg`}
-      className={`game-auth-hint${touched[name] && errors[name] ? ' error' : ''}`}
-      aria-live="polite"
-    >
-      {touched[name] && errors[name] ? errors[name] : '\u00a0'}
-    </p>
-  )
+  // Inline validation message next to a field - only once it's been touched.
+  const err = (name) => (touched[name] && errors[name]) || null
 
   if (sentEmail) {
     return (
@@ -168,18 +167,19 @@ export default function GameSignUpScreen({
         <div className="game-auth-header">
           <h1 className="game-auth-title">You&apos;re in!</h1>
           <p className="game-auth-subtitle">
-            We&apos;ve sent your login details to <strong>{sentEmail}</strong> —
-            open the email and tap the link to set your own password.
+            We&apos;ve sent your login details to <strong>{sentEmail}</strong>.
+            Open the email and tap the link to set your own password.
           </p>
         </div>
         <div className="game-auth-actions">
-          <button
-            type="button"
-            className="game-auth-submit"
+          <GameButton
+            variant="success"
+            size="lg"
+            className="g-full-width"
             onClick={onHavePassword}
           >
             I have my password
-          </button>
+          </GameButton>
           <button
             type="button"
             className="game-auth-link"
@@ -190,13 +190,14 @@ export default function GameSignUpScreen({
               ? `Resend available in ${resendCooldownSeconds}s`
               : "Didn't get it? Send again"}
           </button>
-          <button
-            type="button"
-            className="game-auth-secondary"
+          <GameButton
+            variant="secondary"
+            size="lg"
+            className="g-full-width"
             onClick={onBack}
           >
             Back
-          </button>
+          </GameButton>
         </div>
       </div>
     )
@@ -205,7 +206,7 @@ export default function GameSignUpScreen({
   return (
     <div className="game-auth-card game-auth-signup">
       <button type="button" className="game-auth-back" onClick={onBack}>
-        ← Back
+        ‹ Back
       </button>
       <div className="game-auth-header">
         <h1 className="game-auth-title">Join Run Conquest</h1>
@@ -214,22 +215,11 @@ export default function GameSignUpScreen({
         </p>
       </div>
 
-      {banner && (
-        <p
-          className={`game-auth-banner ${banner.kind}`}
-          role="status"
-          aria-live="polite"
-        >
-          {banner.message}
-        </p>
-      )}
+      <AuthBanner banner={banner} />
 
       <form className="game-auth-form" onSubmit={handleSubmit} noValidate>
         <div className="game-auth-grid">
-          <div className="game-auth-field">
-            <label className="game-auth-label" htmlFor="ga-fullName">
-              Full Name
-            </label>
+          <AuthField id="ga-fullName" label="Full Name" error={err('fullName')}>
             <input
               {...fieldProps('fullName')}
               ref={firstFieldRef}
@@ -237,25 +227,23 @@ export default function GameSignUpScreen({
               type="text"
               autoComplete="name"
             />
-            {msg('fullName')}
-          </div>
-          <div className="game-auth-field">
-            <label className="game-auth-label" htmlFor="ga-email">
-              Email
-            </label>
+          </AuthField>
+          <AuthField id="ga-email" label="Email" error={err('email')}>
             <input
               {...fieldProps('email')}
               className="game-auth-input"
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
             />
-            {msg('email')}
-          </div>
-          <div className="game-auth-field">
-            <label className="game-auth-label" htmlFor="ga-mobileNumber">
-              Mobile Number
-            </label>
+          </AuthField>
+          <AuthField
+            id="ga-mobileNumber"
+            label="Mobile Number"
+            error={err('mobileNumber')}
+          >
             <input
               {...fieldProps('mobileNumber')}
               className="game-auth-input"
@@ -264,13 +252,9 @@ export default function GameSignUpScreen({
               placeholder="98XXXXXXXX"
               autoComplete="tel"
             />
-            {msg('mobileNumber')}
-          </div>
+          </AuthField>
           <div className="game-auth-pair">
-            <div className="game-auth-field">
-              <label className="game-auth-label" htmlFor="ga-country">
-                Country
-              </label>
+            <AuthField id="ga-country" label="Country" error={err('country')}>
               <select {...fieldProps('country')} className="game-auth-select">
                 <option value="">Select</option>
                 {COUNTRIES_SORTED.map(([code, label]) => (
@@ -279,12 +263,12 @@ export default function GameSignUpScreen({
                   </option>
                 ))}
               </select>
-              {msg('country')}
-            </div>
-            <div className="game-auth-field">
-              <label className="game-auth-label" htmlFor="ga-birthDate">
-                Date of Birth
-              </label>
+            </AuthField>
+            <AuthField
+              id="ga-birthDate"
+              label="Date of Birth"
+              error={err('birthDate')}
+            >
               {/* Native date picker kept (tap opens it); the input itself is
                   see-through and the formatted value / "Select date" text is
                   drawn under it, so iOS/WebView's own date look and
@@ -305,8 +289,7 @@ export default function GameSignUpScreen({
                   {formatBirthDate(form.birthDate) || 'Select date'}
                 </span>
               </div>
-              {msg('birthDate')}
-            </div>
+            </AuthField>
           </div>
         </div>
 
@@ -319,7 +302,10 @@ export default function GameSignUpScreen({
             className="game-auth-checkbox"
             type="checkbox"
             checked={agreedToTerms}
-            onChange={(e) => setAgreedToTerms(e.target.checked)}
+            onChange={(e) => {
+              setAgreedToTerms(e.target.checked)
+              onEdit?.()
+            }}
           />
           <span>
             I am old enough to play and agree to the{' '}
@@ -349,13 +335,16 @@ export default function GameSignUpScreen({
         </label>
 
         <div className="game-auth-actions">
-          <button
+          <GameButton
             type="submit"
-            className="game-auth-submit"
-            disabled={submitting || !agreedToTerms}
+            variant="success"
+            size="lg"
+            className="g-full-width"
+            loading={submitting}
+            disabled={!agreedToTerms}
           >
-            {submitting ? 'Creating…' : 'Create Account'}
-          </button>
+            Create Account
+          </GameButton>
           <button
             type="button"
             className="game-auth-link"

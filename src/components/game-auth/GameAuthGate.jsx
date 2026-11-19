@@ -1,7 +1,12 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useAuthFlow, authErrorMessage } from '../../hooks/useAuthFlow'
-import { describeOAuthServerError } from '../../utils/googleSignInErrors'
+import { useAuthFlow } from '../../hooks/useAuthFlow'
+import {
+  AUTH_FLOW,
+  MESSAGES,
+  describeAuthError,
+  logAuthError,
+} from '../../utils/authErrors'
 import { createAuthThrottle } from '../../utils/authThrottle'
 import {
   SCREEN,
@@ -72,6 +77,26 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
     dispatch({ type: 'GO_TO', screen })
   }
 
+  // The player edited a field (or retried): the notice has done its job.
+  function clearBanner() {
+    dispatch({ type: 'CLEAR_BANNER' })
+  }
+
+  // One place turns any failure into what the player sees: logged for
+  // developers (console only), mapped to a friendly line by
+  // utils/authErrors.js - never a code, a plugin message or server text.
+  // A cancelled Google/Apple sheet shows nothing.
+  function fail(flow, err) {
+    logAuthError(flow, err)
+    const info = describeAuthError(err, { flow })
+    if (info.silent) {
+      dispatch({ type: 'SUBMIT_CANCELLED' })
+      return
+    }
+    dispatch({ type: 'SUBMIT_ERROR', kind: info.kind, message: info.message })
+    return info
+  }
+
   // Shared tail of password/Google/Apple sign-in - same split the website's
   // LoginPage makes: a moderator on their very first login must set a real
   // password before anything else; every other first login (the normal
@@ -102,10 +127,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
         throttleRef.current.cooldownRemainingMs() / 1000
       )
       if (seconds > 0) dispatch({ type: 'LOGIN_FAILURE_COOLDOWN', seconds })
-      dispatch({
-        type: 'SUBMIT_ERROR',
-        message: authErrorMessage(err, 'Sign in failed. Please try again.'),
-      })
+      fail(AUTH_FLOW.SIGN_IN, err)
     }
   }
 
@@ -115,17 +137,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
       const data = await auth.signInWithGoogle(idToken)
       await completeSignIn(data)
     } catch (err) {
-      // 401/403 from POST /v1/auth/google get a specific line (token
-      // audience not allow-listed vs. account refused) - see
-      // utils/googleSignInErrors.js.
-      dispatch({
-        type: 'SUBMIT_ERROR',
-        message: describeOAuthServerError(
-          err,
-          'Google',
-          authErrorMessage(err, 'Google sign-in failed. Please try again.')
-        ),
-      })
+      fail(AUTH_FLOW.GOOGLE, err)
     }
   }
 
@@ -135,24 +147,18 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
       const data = await auth.signInWithApple(identityToken, fullName, extra)
       await completeSignIn(data)
     } catch (err) {
-      dispatch({
-        type: 'SUBMIT_ERROR',
-        message: describeOAuthServerError(
-          err,
-          'Apple',
-          authErrorMessage(err, 'Apple sign-in failed. Please try again.')
-        ),
-      })
+      fail(AUTH_FLOW.APPLE, err)
     }
   }
 
-  // `detail` is the provider-side reason when known (the native Google
-  // button maps Play Services status codes to text); without it, the
-  // generic line.
-  function handleOAuthError(provider, detail) {
+  // The Google/Apple buttons already mapped their own failure (and stay
+  // silent on a cancel); `message` is the friendly line, `info.kind` its
+  // tone. Without one, the generic "isn't working right now" line.
+  function handleOAuthError(provider, message, info) {
     dispatch({
       type: 'SUBMIT_ERROR',
-      message: detail || `${provider} sign-in was cancelled or failed.`,
+      kind: info?.kind || 'warning',
+      message: message || MESSAGES.provider(provider),
     })
   }
 
@@ -166,13 +172,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
         mobileNumber: formValues.mobileNumber,
       })
     } catch (err) {
-      dispatch({
-        type: 'SUBMIT_ERROR',
-        message: authErrorMessage(
-          err,
-          'Registration failed. Please try again.'
-        ),
-      })
+      fail(AUTH_FLOW.SIGN_UP, err)
     }
   }
 
@@ -197,13 +197,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
       await auth.forgotPassword(mobileNumber)
       dispatch({ type: 'FORGOT_SENT', mobileNumber })
     } catch (err) {
-      dispatch({
-        type: 'SUBMIT_ERROR',
-        message: authErrorMessage(
-          err,
-          'Something went wrong. Please try again.'
-        ),
-      })
+      fail(AUTH_FLOW.FORGOT, err)
     }
   }
 
@@ -217,13 +211,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
       })
       dispatch({ type: 'SET_PASSWORD_DONE', mobileNumber })
     } catch (err) {
-      dispatch({
-        type: 'SUBMIT_ERROR',
-        message: authErrorMessage(
-          err,
-          'Could not update password. Please try again.'
-        ),
-      })
+      fail(AUTH_FLOW.SET_PASSWORD, err)
     }
   }
 
@@ -235,6 +223,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
     resendCooldownSeconds,
     signUpSentEmail,
     forgotSent,
+    passwordUpdated,
     pendingMobile,
   } = state
 
@@ -255,6 +244,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
         submitting={submitting}
         cooldownSeconds={cooldownSeconds}
         initialMobileNumber={pendingMobile}
+        onEdit={clearBanner}
         onSubmit={handleSignIn}
         onForgot={() => goTo(SCREEN.FORGOT)}
         onBack={() => goTo(SCREEN.WELCOME)}
@@ -266,6 +256,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
         submitting={submitting}
         sentEmail={signUpSentEmail}
         resendCooldownSeconds={resendCooldownSeconds}
+        onEdit={clearBanner}
         onSubmit={handleSignUp}
         onResend={handleResend}
         onBack={() => {
@@ -280,6 +271,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
         banner={banner}
         submitting={submitting}
         sent={forgotSent}
+        onEdit={clearBanner}
         onSubmit={handleForgot}
         onBack={() => {
           dispatch({ type: 'RESET_FORGOT_SENT' })
@@ -293,14 +285,45 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
         banner={banner}
         submitting={submitting}
         initialMobileNumber={pendingMobile}
+        passwordUpdated={passwordUpdated}
+        onEdit={clearBanner}
+        onSignIn={() => goTo(SCREEN.SIGN_IN)}
         onSubmit={handleSetPassword}
         onBack={() => goTo(SCREEN.SIGN_IN)}
       />
     ),
   }
 
+  // On-screen keyboard: size the gate to the VISIBLE viewport so it simply
+  // scrolls (nothing hides behind the keyboard), and bring the focused field
+  // into view once the keyboard has finished opening.
+  const [viewportH, setViewportH] = useState(null)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return undefined
+    const sync = () => setViewportH(Math.round(vv.height))
+    sync()
+    vv.addEventListener('resize', sync)
+    return () => vv.removeEventListener('resize', sync)
+  }, [])
+  const focusTimer = useRef(null)
+  useEffect(() => () => clearTimeout(focusTimer.current), [])
+  function handleFocus(e) {
+    const el = e.target
+    if (!el?.matches?.('input, select, textarea')) return
+    clearTimeout(focusTimer.current)
+    focusTimer.current = setTimeout(
+      () => el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }),
+      300
+    )
+  }
+
   return (
-    <div className="game-auth-gate">
+    <div
+      className="game-auth-gate"
+      style={viewportH ? { height: viewportH } : undefined}
+      onFocus={handleFocus}
+    >
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}

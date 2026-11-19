@@ -150,7 +150,10 @@ export default function ShareRunCarousel({ run }) {
   }
 
   return (
-    <div className="share-carousel glass-card" ref={containerRef}>
+    <div
+      className={`share-carousel glass-card${isNative ? ' is-native' : ''}`}
+      ref={containerRef}
+    >
       <div className="share-carousel-viewport">
         <motion.div
           className="share-carousel-track"
@@ -303,11 +306,10 @@ function ShareCardPreview({ run, slide }) {
       <span className="share-card-badge">{slide.badge}</span>
       <canvas
         ref={canvasRef}
-        style={{
-          width: '100%',
-          height: 'auto',
-          aspectRatio: `${CARD_W} / ${CARD_H}`,
-        }}
+        // Size comes from ShareRunCarousel.css (fits the card to the screen);
+        // only the aspect ratio is per-slide. The drawn/exported pixels are
+        // untouched - this is display size only.
+        style={{ aspectRatio: `${CARD_W} / ${CARD_H}` }}
       />
     </div>
   )

@@ -1,0 +1,616 @@
+/* Popup / dialog / sheet skin for /game - chunky, layered, readable.
+   Surface = the HUD's navy + cream material (never flat cream boxes):
+   dark navy outer outline, lighter cream inner frame, inner bevel/highlight,
+   soft drop shadow. Titles live on coloured ribbons (white + thin dark
+   outline); text on light surfaces is ink navy (AA). One radius scale.
+
+   Two entry points:
+   - the shared components in GameModal.jsx (.gm-*), and
+   - a retrofit of the legacy popup markup (.game-confirm-card family,
+     .btn/.game-btn buttons inside it, the loop/controls sheet, g-modal)
+     so every popup reads the same without 40 separate rewrites. */
+.game-root {
+  --navy-950: #0f1530;
+  --navy-900: #151c3d;
+  --navy-800: #1e2850;
+  --navy-700: #2c3a6c;
+  --cream-50: #fffaf0;
+  --cream-100: #f7f0dc;
+  --cream-200: #ece1c2;
+  --ink-navy: #1b2347; /* 13:1 on --cream-100 */
+  --ink-navy-soft: #4a5378; /* 6.3:1 on --cream-100 */
+  --tone-info-a: #8f63ea;
+  --tone-info-b: #5d37b8;
+  --tone-success-a: #52cf64;
+  --tone-success-b: #278c3b;
+  --tone-warning-a: #ffc233;
+  --tone-warning-b: #d98a00;
+  --tone-danger-a: #ff6a5c;
+  --tone-danger-b: #c3281f;
+  --gm-r-sm: 12px;
+  --gm-r-md: 18px;
+  --gm-r-lg: 24px;
+}
+
+/* ---------- Overlay ---------- */
+.gm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 18px 18px;
+  background: rgba(10, 14, 36, 0.66);
+  overflow-y: auto;
+}
+.gm-overlay.is-sheet {
+  align-items: flex-end;
+  padding: 36px 0 0;
+}
+
+/* Legacy single-element popups: same layered look with one element - navy
+   outline ring, cream-200 inner frame, cream face, inner bevel. */
+.game-confirm-card {
+  position: relative;
+  border-radius: var(--gm-r-lg);
+  border: 5px solid var(--cream-200);
+  background: linear-gradient(
+    180deg,
+    var(--cream-50) 0%,
+    var(--cream-100) 100%
+  );
+  padding: 20px 18px 18px;
+  box-shadow:
+    0 0 0 3px var(--navy-950),
+    0 8px 0 3px var(--navy-950),
+    0 18px 28px rgba(5, 8, 24, 0.45),
+    inset 0 3px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.06);
+  color: var(--ink-navy);
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+/* ---------- Panel (layered) ---------- */
+.gm-panel {
+  position: relative;
+  border-radius: var(--gm-r-lg);
+  background: var(--navy-900);
+  padding: 4px; /* outline thickness for the inner frame */
+  box-shadow:
+    0 0 0 3px var(--navy-950),
+    0 8px 0 3px var(--navy-950),
+    0 18px 28px rgba(5, 8, 24, 0.45);
+  color: var(--ink-navy);
+}
+.gm-dialog {
+  width: min(360px, 100%);
+  margin-top: 22px; /* room for the ribbon overlap */
+}
+.gm-dialog.is-sheet {
+  width: 100%;
+  max-width: 520px;
+  border-radius: var(--gm-r-lg) var(--gm-r-lg) 0 0;
+  margin-bottom: 0;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+.gm-panel-inner,
+.game-confirm-card > .gm-panel-inner {
+  position: relative;
+  border-radius: calc(var(--gm-r-lg) - 4px);
+  background: linear-gradient(
+    180deg,
+    var(--cream-50) 0%,
+    var(--cream-100) 100%
+  );
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -4px 0 var(--cream-200),
+    inset 0 0 0 2px var(--cream-200);
+  padding: 20px 18px 18px;
+  color: var(--ink-navy);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.35;
+  letter-spacing: normal;
+  text-align: center;
+}
+.gm-panel-inner.has-ribbon {
+  padding-top: 38px;
+}
+
+/* ---------- Ribbon ---------- */
+.gm-ribbon {
+  /* In flow (not absolute) so a two-line title grows the ribbon instead of
+     colliding with the panel text; the negative margins make it overlap the
+     panel's top edge. */
+  position: relative;
+  z-index: 2;
+  width: fit-content;
+  min-width: 62%;
+  max-width: calc(100% + 12px);
+  margin: -36px auto -22px;
+  padding: 7px 24px 9px;
+  border-radius: var(--gm-r-sm);
+  text-align: center;
+  background: linear-gradient(180deg, var(--ribbon-a) 0%, var(--ribbon-b) 100%);
+  box-shadow:
+    0 0 0 3px var(--navy-950),
+    0 4px 0 3px var(--navy-950),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+.gm-ribbon-text {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  color: #fff;
+  -webkit-text-stroke: 4px var(--navy-950);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(15, 21, 48, 0.55);
+  overflow-wrap: anywhere;
+}
+.gm-tone-info {
+  --ribbon-a: var(--tone-info-a);
+  --ribbon-b: var(--tone-info-b);
+}
+.gm-tone-success {
+  --ribbon-a: var(--tone-success-a);
+  --ribbon-b: var(--tone-success-b);
+}
+.gm-tone-warning {
+  --ribbon-a: var(--tone-warning-a);
+  --ribbon-b: var(--tone-warning-b);
+}
+.gm-tone-danger {
+  --ribbon-a: var(--tone-danger-a);
+  --ribbon-b: var(--tone-danger-b);
+}
+
+/* ---------- Stat chips ---------- */
+.gm-stat-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.gm-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px 7px;
+  min-width: 0;
+  border-radius: var(--gm-r-sm);
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 2px var(--cream-200),
+    inset 0 -3px 0 var(--cream-200);
+}
+.gm-stat-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  color: var(--tone-info-b);
+}
+.gm-stat-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.gm-stat-value {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--ink-navy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.gm-stat-label {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-navy-soft);
+}
+
+/* ---------- Actions ---------- */
+.gm-actions,
+.game-confirm-card .game-confirm-actions,
+.game-end-run-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.gm-actions.is-stacked {
+  flex-direction: column;
+}
+.gm-actions > *,
+.game-confirm-actions > *,
+.game-end-run-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ---------- Text inside popups ---------- */
+.gm-panel-inner p,
+.game-confirm-card p:not([class]),
+.game-confirm-card .game-end-run-summary {
+  margin: 0 0 12px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.35;
+  letter-spacing: normal;
+  color: var(--ink-navy);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-confirm-card p.game-controls-hint-warn,
+.gm-panel-inner p.is-warn {
+  color: #8a5300; /* amber on cream, 5.6:1 */
+  background: #fff1cc;
+  border-radius: var(--gm-r-sm);
+  padding: 6px 10px;
+  box-shadow: inset 0 0 0 2px #f5c451;
+}
+.game-confirm-card p.game-controls-hint-error,
+.game-confirm-card p.game-buy-short {
+  color: #a82218;
+}
+/* Legacy card titles: no brown-red - navy ink on cream. */
+.game-confirm-card h3,
+.game-end-run-title,
+.game-confirm-card .game-menu-avatars-title,
+.game-confirm-card .game-buy-redirect-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--ink-navy) !important;
+  -webkit-text-stroke-width: 0 !important;
+  text-shadow: none !important;
+}
+
+/* ---------- Buttons (3D chunky) ---------- */
+.game-confirm-card .btn,
+.game-confirm-card .game-btn,
+.gm-panel .btn,
+.gm-panel .game-btn,
+.g-modal .btn,
+.game-controls .game-btn,
+.game-controls .btn {
+  --btn-a: var(--cream-50);
+  --btn-b: var(--cream-200);
+  --btn-edge: #b9a97c;
+  --btn-ink: var(--ink-navy);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 14px;
+  border-radius: var(--gm-r-md);
+  border: 3px solid var(--navy-950);
+  background: linear-gradient(180deg, var(--btn-a) 0%, var(--btn-b) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    0 4px 0 var(--btn-edge),
+    0 4px 0 3px var(--navy-950);
+  color: var(--btn-ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-align: center;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  cursor: pointer;
+  transform: translateY(0);
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out,
+    filter 120ms;
+}
+.game-confirm-card .btn::before,
+.game-confirm-card .btn::after,
+.gm-panel .btn::before,
+.gm-panel .btn::after {
+  display: none; /* drop the site's shine/gradient overlays */
+}
+.game-confirm-card .btn:active:not(:disabled),
+.game-confirm-card .game-btn:active:not(:disabled),
+.gm-panel .btn:active:not(:disabled),
+.gm-panel .game-btn:active:not(:disabled),
+.game-controls .game-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    0 1px 0 var(--btn-edge),
+    0 1px 0 3px var(--navy-950);
+}
+.game-confirm-card .btn:disabled,
+.game-confirm-card .game-btn:disabled,
+.gm-panel .btn:disabled,
+.game-controls .game-btn:disabled {
+  filter: saturate(0.4) brightness(0.9);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+/* Semantic fills: green primary, red destructive, cream neutral. */
+.game-confirm-card .btn-primary,
+.game-confirm-card .game-btn-green,
+.gm-panel .btn-primary,
+.gm-panel .game-btn-green,
+.game-controls .game-btn-green {
+  --btn-a: var(--tone-success-a);
+  --btn-b: var(--tone-success-b);
+  --btn-edge: #1b6a2c;
+  --btn-ink: #fff;
+  -webkit-text-stroke: 4px var(--navy-950);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(15, 21, 48, 0.5);
+}
+.game-confirm-card .game-btn-red,
+.game-confirm-card .btn-danger,
+.gm-panel .game-btn-red,
+.game-controls .game-btn-red {
+  --btn-a: var(--tone-danger-a);
+  --btn-b: var(--tone-danger-b);
+  --btn-edge: #8f1810;
+  --btn-ink: #fff;
+  -webkit-text-stroke: 4px var(--navy-950);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(15, 21, 48, 0.5);
+}
+.gm-panel .btn-amber,
+.game-confirm-card .btn-amber {
+  --btn-a: var(--tone-warning-a);
+  --btn-b: var(--tone-warning-b);
+  --btn-edge: #9a6200;
+  --btn-ink: var(--navy-950);
+}
+.gm-panel .btn-purple,
+.game-confirm-card .btn-purple {
+  --btn-a: var(--tone-info-a);
+  --btn-b: var(--tone-info-b);
+  --btn-edge: #3f2282;
+  --btn-ink: #fff;
+  -webkit-text-stroke: 4px var(--navy-950);
+  paint-order: stroke fill;
+}
+.game-confirm-card .btn-outline,
+.game-confirm-card .game-btn-wood,
+.gm-panel .btn-outline,
+.game-controls .game-btn-wood {
+  /* neutral cream = the defaults above */
+}
+
+/* ---------- Loop / controls bottom sheet ---------- */
+.game-controls .game-stat-value {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink-navy);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.game-controls .game-stat-label {
+  font-family: var(--font-body);
+  font-weight: 800;
+  color: var(--ink-navy-soft);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.game-controls .game-controls-hint,
+.game-controls .game-controls-confirm-text {
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: 1.35;
+  color: var(--ink-navy);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-controls .game-controls-hint-warn {
+  color: #8a5300;
+}
+
+/* ---------- Legacy shared Modal (g-modal): ribbon -> floating banner ---- */
+.g-panel.g-modal {
+  overflow: visible;
+  margin-top: 22px;
+  max-height: none;
+  background: var(--navy-900);
+  padding: 4px;
+  border: 0;
+  border-radius: var(--gm-r-lg);
+  box-shadow:
+    0 0 0 3px var(--navy-950),
+    0 8px 0 3px var(--navy-950),
+    0 18px 28px rgba(5, 8, 24, 0.45);
+}
+.g-panel.g-modal .g-modal-ribbon {
+  position: relative;
+  z-index: 2;
+  width: fit-content;
+  min-width: 62%;
+  max-width: calc(100% - 20px);
+  margin: -36px auto -22px;
+  padding: 7px 24px 9px;
+  border: 0;
+  border-radius: var(--gm-r-sm);
+  background: linear-gradient(180deg, var(--tone-info-a), var(--tone-info-b));
+  box-shadow:
+    0 0 0 3px var(--navy-950),
+    0 4px 0 3px var(--navy-950),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45);
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  -webkit-text-stroke: 4px var(--navy-950);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.g-panel.g-modal .g-modal-body {
+  border-radius: calc(var(--gm-r-lg) - 4px);
+  background: linear-gradient(180deg, var(--cream-50), var(--cream-100));
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 2px var(--cream-200);
+  padding: 34px 18px 18px;
+  color: var(--ink-navy);
+  text-align: center;
+}
+
+/* ---------- Motion ---------- */
+.game-confirm-card {
+  animation: gm-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes gm-pop {
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-confirm-card,
+  .g-modal {
+    animation: none;
+  }
+  .game-confirm-card .btn,
+  .game-confirm-card .game-btn,
+  .gm-panel .btn,
+  .gm-panel .game-btn {
+    transition: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .gm-panel-inner {
+    padding: 18px 14px 14px;
+  }
+  .gm-panel-inner.has-ribbon {
+    padding-top: 36px;
+  }
+  .gm-ribbon-text {
+    font-size: 20px;
+  }
+  .gm-stat-value {
+    font-size: 21px;
+  }
+  .game-confirm-card .btn,
+  .game-confirm-card .game-btn {
+    font-size: 18px;
+  }
+}
+
+/* The legacy Modal's scrim used --z-modal (30), which sits UNDER the rollout
+   tint (450) and the HUD toasts - the rollout popup rendered greyed out.
+   Same layer as every other popup. */
+.g-modal-scrim {
+  z-index: 1400;
+  background: rgba(10, 14, 36, 0.66);
+}
+.g-panel.g-modal .g-modal-close {
+  top: -12px;
+  right: -8px;
+  z-index: 3;
+}
+
+/* ---------- Broadcast popup: same layered panel + chunky buttons ------- */
+.bcast-card {
+  border: 5px solid var(--cream-200);
+  background: linear-gradient(180deg, var(--cream-50), var(--cream-100));
+  box-shadow:
+    0 0 0 3px var(--navy-950),
+    0 8px 0 3px var(--navy-950),
+    0 18px 28px rgba(5, 8, 24, 0.45),
+    inset 0 3px 0 rgba(255, 255, 255, 0.9);
+}
+.bcast-banner {
+  border-bottom: 3px solid var(--navy-950);
+  background: linear-gradient(180deg, var(--tone-info-a), var(--tone-info-b));
+}
+.bcast-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink-navy);
+}
+.bcast-body,
+.bcast-when,
+.bcast-counter {
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: 1.4;
+  color: var(--ink-navy);
+}
+.bcast-when,
+.bcast-counter {
+  color: var(--ink-navy-soft);
+}
+.bcast-card .game-btn,
+.bcast-card .btn {
+  --btn-a: var(--cream-50);
+  --btn-b: var(--cream-200);
+  --btn-edge: #b9a97c;
+  min-height: 52px;
+  border-radius: var(--gm-r-md);
+  border: 3px solid var(--navy-950);
+  background: linear-gradient(180deg, var(--btn-a), var(--btn-b));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    0 4px 0 var(--btn-edge),
+    0 4px 0 3px var(--navy-950);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+  letter-spacing: 0.02em;
+  color: var(--ink-navy);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out;
+}
+.bcast-card .game-btn-green {
+  --btn-a: var(--tone-success-a);
+  --btn-b: var(--tone-success-b);
+  --btn-edge: #1b6a2c;
+  color: #fff;
+  -webkit-text-stroke: 4px var(--navy-950);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(15, 21, 48, 0.5);
+}
+.bcast-card .game-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    0 1px 0 var(--btn-edge),
+    0 1px 0 3px var(--navy-950);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bcast-card,
+  .bcast-got-it {
+    animation: none;
+  }
+}

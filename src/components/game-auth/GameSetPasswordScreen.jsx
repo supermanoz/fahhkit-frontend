@@ -1,6 +1,14 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useRef, useState } from 'react'
-import PasswordField from '../PasswordField'
+import GameButton from '../../game/ui/GameButton'
+import {
+  AuthBanner,
+  AuthField,
+  AuthPasswordInput,
+  AuthSteps,
+} from './AuthParts'
+import { RESET_STEPS } from './resetSteps'
+import { FIELD_MESSAGES } from '../../utils/authErrors'
 
 // There's no password-strength rule anywhere on the backend today
 // (PasswordChangeRequest.java has zero validation annotations) - this
@@ -25,92 +33,133 @@ const REQUIREMENTS = [
 export default function GameSetPasswordScreen({
   onSubmit,
   onBack,
+  onEdit,
+  onSignIn,
   submitting,
   banner,
+  passwordUpdated,
   initialMobileNumber,
 }) {
   const [mobileNumber, setMobileNumber] = useState(initialMobileNumber || '')
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [errors, setErrors] = useState({})
   const firstFieldRef = useRef(null)
-  const mismatch =
-    confirmNewPassword !== '' && newPassword !== confirmNewPassword
 
   useEffect(() => {
-    firstFieldRef.current?.focus()
-  }, [])
+    if (!passwordUpdated) firstFieldRef.current?.focus()
+  }, [passwordUpdated])
+
+  function edit(field, setter) {
+    return (e) => {
+      setter(e.target.value)
+      setErrors((prev) => (prev[field] ? { ...prev, [field]: null } : prev))
+      onEdit?.()
+    }
+  }
 
   function handleSubmit(e) {
     e.preventDefault()
-    const confirmInput = e.target.elements.confirmNewPassword
-    confirmInput.setCustomValidity(mismatch ? 'Passwords do not match.' : '')
-    if (!e.target.reportValidity()) return
-    onSubmit({ mobileNumber, oldPassword, newPassword })
+    const next = {}
+    if (!mobileNumber.trim()) next.mobile = FIELD_MESSAGES.identifierRequired
+    if (!oldPassword) next.old = FIELD_MESSAGES.emailedPasswordRequired
+    if (!newPassword) next.new = FIELD_MESSAGES.newPasswordRequired
+    if (!confirmNewPassword) next.confirm = FIELD_MESSAGES.confirmRequired
+    else if (newPassword !== confirmNewPassword)
+      next.confirm = FIELD_MESSAGES.confirmMismatch
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
+    onSubmit({
+      mobileNumber: mobileNumber.trim(),
+      oldPassword,
+      newPassword,
+    })
+  }
+
+  // Final step - success, with the way back in.
+  if (passwordUpdated) {
+    return (
+      <div className="game-auth-card">
+        <AuthSteps current={4} labels={RESET_STEPS} />
+        <div className="game-auth-sent-icon" aria-hidden="true">
+          ✅
+        </div>
+        <div className="game-auth-header">
+          <h1 className="game-auth-title">Password updated!</h1>
+          <p className="game-auth-subtitle">
+            You&apos;re all set. Sign in with your new password to get back to
+            running.
+          </p>
+        </div>
+        <div className="game-auth-actions">
+          <GameButton
+            variant="success"
+            size="lg"
+            className="g-full-width"
+            onClick={onSignIn}
+          >
+            Sign In
+          </GameButton>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="game-auth-card">
       <button type="button" className="game-auth-back" onClick={onBack}>
-        ← Back
+        ‹ Back
       </button>
+      <AuthSteps current={3} labels={RESET_STEPS} />
       <div className="game-auth-header">
         <h1 className="game-auth-title">Set Your Password</h1>
         <p className="game-auth-subtitle">
-          Enter the password we emailed you, then choose a new one
+          Enter the password we emailed you, then choose a new one.
         </p>
       </div>
 
-      {banner && (
-        <p
-          className={`game-auth-banner ${banner.kind}`}
-          role="status"
-          aria-live="polite"
-        >
-          {banner.message}
-        </p>
-      )}
+      <AuthBanner banner={banner} />
 
       <form className="game-auth-form" onSubmit={handleSubmit} noValidate>
-        <div className="game-auth-field">
-          <label className="game-auth-label" htmlFor="ga-sp-mobile">
-            Mobile Number or Email
-          </label>
+        <AuthField
+          id="ga-sp-mobile"
+          label="Mobile Number or Email"
+          error={errors.mobile}
+        >
           <input
             ref={firstFieldRef}
             id="ga-sp-mobile"
             className="game-auth-input"
             type="text"
             autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={mobileNumber}
-            onChange={(e) => setMobileNumber(e.target.value)}
-            required
+            onChange={edit('mobile', setMobileNumber)}
+            aria-invalid={errors.mobile ? true : undefined}
+            aria-describedby={errors.mobile ? 'ga-sp-mobile-msg' : undefined}
           />
-        </div>
-        <div className="game-auth-field">
-          <label className="game-auth-label" htmlFor="ga-sp-old">
-            Emailed Password
-          </label>
-          <PasswordField
+        </AuthField>
+        <AuthField id="ga-sp-old" label="Emailed Password" error={errors.old}>
+          <AuthPasswordInput
             id="ga-sp-old"
             name="oldPassword"
             autoComplete="current-password"
             value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            required
+            onChange={edit('old', setOldPassword)}
+            error={errors.old}
           />
-        </div>
-        <div className="game-auth-field">
-          <label className="game-auth-label" htmlFor="ga-sp-new">
-            New Password
-          </label>
-          <PasswordField
+        </AuthField>
+        <AuthField id="ga-sp-new" label="New Password" error={errors.new}>
+          <AuthPasswordInput
             id="ga-sp-new"
             name="newPassword"
             autoComplete="new-password"
             value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
+            onChange={edit('new', setNewPassword)}
+            error={errors.new}
           />
           <ul className="game-auth-strength">
             {REQUIREMENTS.map((req) => {
@@ -123,38 +172,32 @@ export default function GameSetPasswordScreen({
               )
             })}
           </ul>
-        </div>
-        <div className="game-auth-field">
-          <label className="game-auth-label" htmlFor="ga-sp-confirm">
-            Confirm New Password
-          </label>
-          <PasswordField
+        </AuthField>
+        <AuthField
+          id="ga-sp-confirm"
+          label="Confirm New Password"
+          error={errors.confirm}
+        >
+          <AuthPasswordInput
             id="ga-sp-confirm"
             name="confirmNewPassword"
             autoComplete="new-password"
             value={confirmNewPassword}
-            onChange={(e) => {
-              e.target.setCustomValidity('')
-              setConfirmNewPassword(e.target.value)
-            }}
-            aria-invalid={mismatch || undefined}
-            required
+            onChange={edit('confirm', setConfirmNewPassword)}
+            error={errors.confirm}
           />
-          {mismatch && (
-            <p className="game-auth-hint error" aria-live="polite">
-              Passwords do not match.
-            </p>
-          )}
-        </div>
+        </AuthField>
 
         <div className="game-auth-actions">
-          <button
+          <GameButton
             type="submit"
-            className="game-auth-submit"
-            disabled={submitting}
+            variant="success"
+            size="lg"
+            className="g-full-width"
+            loading={submitting}
           >
-            {submitting ? 'Updating…' : 'Update Password'}
-          </button>
+            Save New Password
+          </GameButton>
         </div>
       </form>
     </div>

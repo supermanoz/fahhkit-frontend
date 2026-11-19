@@ -146,9 +146,17 @@ test.describe('Game Create Account', () => {
       expect(body).not.toContain(`name="${gone}"`)
   })
 
-  for (const [what, message] of [
-    ['email', 'An account with this email already exists.'],
-    ['mobile number', 'An account with this mobile number already exists.'],
+  for (const [what, message, shown] of [
+    [
+      'email',
+      'An account with this email already exists.',
+      'This email already has an account. Sign in with email instead.',
+    ],
+    [
+      'mobile number',
+      'An account with this mobile number already exists.',
+      'That mobile number is already registered. Try signing in instead.',
+    ],
   ]) {
     test(`backend 409 for an existing ${what} is shown and the form stays`, async ({
       mockedPage: page,
@@ -165,7 +173,8 @@ test.describe('Game Create Account', () => {
       await page
         .getByRole('button', { name: 'Create Account', exact: true })
         .click()
-      await expect(page.getByText(message)).toBeVisible()
+      await expect(page.getByText(shown)).toBeVisible()
+      await expect(page.locator('body')).not.toContainText(message)
       await expect(page.locator('#ga-email')).toHaveValue('sita@example.com')
     })
   }

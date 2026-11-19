@@ -1,7 +1,17 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom'
 import { useAuthFlow, authErrorMessage } from '../hooks/useAuthFlow'
-import { describeOAuthServerError } from '../utils/googleSignInErrors'
+import {
+  AUTH_FLOW,
+  MESSAGES,
+  describeAuthError,
+  logAuthError,
+} from '../utils/authErrors'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PasswordField from '../components/PasswordField'
@@ -9,6 +19,7 @@ import GoogleSignInButton from '../components/GoogleSignInButton'
 import AppleSignInButton from '../components/AppleSignInButton'
 import './LoginPage.css'
 import { playerNameOf } from '../utils/playerName'
+import { nextMessage, sanitizeNext } from '../utils/safeNext'
 
 const INITIAL_FORM = { mobileNumber: '', password: '' }
 
@@ -17,11 +28,21 @@ export default function LoginPage() {
   const [form, setForm] = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
   const location = useLocation()
-  const [banner, setBanner] = useState(
-    location.state?.message
-      ? { kind: 'success', message: location.state.message }
-      : null
+  const [searchParams] = useSearchParams()
+  // Where to go after signing in: ?next= (set by RequireAuth / a rejected
+  // session) or the older router state `from`. Validated - a same-site path
+  // only, never another host - and the query string is kept (e.g. payment
+  // parameters).
+  const next = sanitizeNext(
+    searchParams.get('next') ?? location.state?.from,
+    null
   )
+  const [banner, setBanner] = useState(() => {
+    if (location.state?.message)
+      return { kind: 'success', message: location.state.message }
+    const hint = nextMessage(next)
+    return hint ? { kind: 'info', message: hint } : null
+  })
   const navigate = useNavigate()
 
   function handleChange(e) {
@@ -61,14 +82,9 @@ export default function LoginPage() {
   // the user, and head back to wherever sent them here.
   async function completeSignIn(data) {
     const user = await auth.finishSignIn(data)
-    // Pages that gate on sign-in pass `state.from` so the user lands back
-    // where they were. Only same-origin paths - never a `//host` redirect.
-    const from = location.state?.from
-    const redirectTo =
-      typeof from === 'string' && from.startsWith('/') && !from.startsWith('//')
-        ? from
-        : '/'
-    navigate(redirectTo, {
+    // Back to where they were headed (validated above), else the home page.
+    navigate(next ?? '/', {
+      replace: true,
       state: {
         message: `Welcome back, ${playerNameOf(user) || 'athlete'}! You're signed in.`,
       },
@@ -82,13 +98,10 @@ export default function LoginPage() {
       const data = await auth.signInWithGoogle(idToken)
       await completeSignIn(data)
     } catch (err) {
+      logAuthError(AUTH_FLOW.GOOGLE, err)
       setBanner({
         kind: 'error',
-        message: describeOAuthServerError(
-          err,
-          'Google',
-          authErrorMessage(err, 'Google sign-in failed. Please try again.')
-        ),
+        message: describeAuthError(err, { flow: AUTH_FLOW.GOOGLE }).message,
       })
     } finally {
       setSubmitting(false)
@@ -102,12 +115,10 @@ export default function LoginPage() {
       const data = await auth.signInWithApple(identityToken, fullName)
       await completeSignIn(data)
     } catch (err) {
+      logAuthError(AUTH_FLOW.APPLE, err)
       setBanner({
         kind: 'error',
-        message: authErrorMessage(
-          err,
-          'Apple sign-in failed. Please try again.'
-        ),
+        message: describeAuthError(err, { flow: AUTH_FLOW.APPLE }).message,
       })
     } finally {
       setSubmitting(false)
@@ -180,8 +191,7 @@ export default function LoginPage() {
             onError={(provider, detail) =>
               setBanner({
                 kind: 'error',
-                message:
-                  detail || `${provider} sign-in was cancelled or failed.`,
+                message: detail || MESSAGES.provider(provider),
               })
             }
           />

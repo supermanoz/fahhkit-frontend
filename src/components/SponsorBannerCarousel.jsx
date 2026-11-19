@@ -6,6 +6,7 @@ import {
   trackPartnerClick,
 } from '../api/sponsorPartners'
 import { openExternal } from '../utils/externalLink'
+import { safeHref } from '../utils/safeUrl'
 import SeasonBanner from './SeasonBanner'
 import PrizeInfoPopup from './PrizeInfoPopup'
 import './SponsorBannerCarousel.css'
@@ -94,7 +95,7 @@ function PartnerBannerSlide({ partner: p, isSeasonPartner }) {
   return p.socialLink1 ? (
     <a
       className="sponsor-banner-card"
-      href={p.socialLink1}
+      href={safeHref(p.socialLink1)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`Sponsor: ${p.name}`}
