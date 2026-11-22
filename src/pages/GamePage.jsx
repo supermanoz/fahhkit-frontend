@@ -2804,10 +2804,10 @@ function GamePageInner() {
     const previous = routeDraftWaypoints[routeDraftWaypoints.length - 1]
     setRouteSnapBusy(true)
     try {
-      const { points, snapped } = await snapSegment(previous, point)
+      const { points, snapped, disabled } = await snapSegment(previous, point)
       setRouteDraftWaypoints((prev) => [...prev, point])
       setRouteDraftSegments((prev) => [...prev, points])
-      if (!snapped) {
+      if (!snapped && !disabled) {
         setRouteDraftError(
           "Couldn't snap that stretch to a road — drew a straight line instead."
         )
@@ -3667,7 +3667,7 @@ function GamePageInner() {
   }, [raceProgress, raceChallenge, tracker.status])
 
   const currentAvatar = getAvatarById(avatarId)
-  const currentMapStyle = getMapStyleById(mapStyleId)
+  const currentMapStyle = getMapStyleById(mapStyleId) || MAP_STYLES[0]
   const avatarSrc =
     (equippedHero && resolveFileUrl(equippedHero.storeItem.assetUrl)) ||
     currentAvatar?.src ||

@@ -1,5 +1,6 @@
 import { formatDistance, formatDurationLabel, formatPace } from './run'
 import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
+import { mapConfig } from '../config/mapProvider'
 
 // Fixed logical card size (9:16, matches an Instagram Story frame so the
 // download drops straight into a story with no cropping/letterboxing).
@@ -734,11 +735,7 @@ export async function drawShareCard(
     ctx.globalAlpha = 0.7
     ctx.fillStyle = '#ffffff'
     ctx.font = '600 9px -apple-system, sans-serif'
-    ctx.fillText(
-      '© OpenStreetMap contributors · OpenMapTiles · OpenFreeMap',
-      padding,
-      height - 14
-    )
+    ctx.fillText(mapConfig.creditLine, padding, height - 14)
     ctx.restore()
   }
 }

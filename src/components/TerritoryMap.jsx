@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -10,6 +11,7 @@ import {
 import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
 import MapAttribution from './MapAttribution'
+import { mapConfig } from '../config/mapProvider'
 import { nextSpriteFacing } from '../utils/spriteFacing'
 import {
   MapContainer,
@@ -55,7 +57,7 @@ import './TerritoryMap.css'
 // and the specific big-places-only cut we want. Fallback only - GamePage.jsx
 // always passes mapStyleUrl (see constants/mapStyles.js, MAP_STYLES[0] is
 // the actual default, currently "Positron").
-const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
+const BASEMAP_STYLE_URL = mapConfig.defaultStyleUrl
 
 // OpenMapTiles-schema styles put every label AND every POI icon on "symbol"
 // type layers — hiding just that one layer type strips all text/pins while
@@ -166,6 +168,7 @@ function PokemonStyleBaseLayer({ styleUrl, onReady, glMapRef }) {
   useEffect(() => {
     const glLayer = new SmoothMaplibreGL({
       style: styleUrl || BASEMAP_STYLE_URL,
+      transformRequest: mapConfig.transformRequest,
       // Extra off-screen margin so a zoom-out animation (which shrinks the
       // canvas until the redraw) doesn't expose bare edges mid-gesture.
       padding: 0.3,
@@ -1386,6 +1389,7 @@ function TerritoryGlobe({
     const glMap = new MapLibreMap({
       container: containerRef.current,
       style: styleUrl || BASEMAP_STYLE_URL,
+      transformRequest: mapConfig.transformRequest,
       center: [camera.lng, camera.lat],
       zoom: camera.zoom,
       minZoom: 0,
@@ -2033,24 +2037,19 @@ export default function TerritoryMap({
           native compact attribution control) one. */}
       {!globeVisible && (
         <MapAttribution className="territory-map-attribution-anchor">
-          <a href="https://openfreemap.org" target="_blank" rel="noreferrer">
-            OpenFreeMap
-          </a>{' '}
-          <a
-            href="https://www.openmaptiles.org/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            © OpenMapTiles
-          </a>{' '}
-          Data from{' '}
-          <a
-            href="https://www.openstreetmap.org/copyright"
-            target="_blank"
-            rel="noreferrer"
-          >
-            OpenStreetMap
-          </a>
+          {mapConfig.attribution.links.map((credit, i) => (
+            <Fragment key={credit.label}>
+              {i > 0 && ' '}
+              {credit.prefix}
+              {credit.href ? (
+                <a href={credit.href} target="_blank" rel="noreferrer">
+                  {credit.label}
+                </a>
+              ) : (
+                credit.label
+              )}
+            </Fragment>
+          ))}
         </MapAttribution>
       )}
     </div>

@@ -25,7 +25,8 @@
     "android:dev": "npx cap run android -l --host=$HOST_IP",
     "ios:dev": "npx cap run ios -l --host=$HOST_IP",
     "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
-    "android:release": "npm run cap:sync && cd android && ./gradlew bundleRelease"
+    "android:release": "npm run cap:sync && cd android && ./gradlew bundleRelease",
+    "postinstall": "patch-package"
   },
   "lint-staged": {
     "*.{js,jsx}": [
@@ -96,6 +97,7 @@
     "husky": "^9.1.7",
     "jsdom": "^25.0.1",
     "lint-staged": "^15.5.2",
+    "patch-package": "^8.0.1",
     "prettier": "^3.9.6",
     "sharp": "^0.32.6",
     "vite": "^6.0.0",

@@ -11,6 +11,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import MapAttribution from './MapAttribution'
 import './RunMap.css'
+import { mapConfig } from '../config/mapProvider'
 
 // Plain CSS dots instead of leaflet's default marker images, which 404 under
 // Vite unless the icon URLs are manually reconfigured.
@@ -56,8 +57,8 @@ export default function RunMap({ points }) {
         attributionControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={mapConfig.rasterTiles.attributionHtml}
+          url={mapConfig.rasterTiles.url}
         />
         <Polyline
           positions={positions}

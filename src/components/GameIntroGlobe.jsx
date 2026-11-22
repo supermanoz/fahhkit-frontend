@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './GameIntroGlobe.css'
+import { mapConfig } from '../config/mapProvider'
 
 // One-shot "satellite view" reveal, played once at the end of the loading
 // screen (see GamePage's introPlaying): starts pulled back in globe
@@ -21,7 +22,8 @@ export default function GameIntroGlobe({ center, styleUrl, onDone }) {
 
     const glMap = new MapLibreMap({
       container: containerRef.current,
-      style: styleUrl || 'https://tiles.openfreemap.org/styles/positron',
+      style: styleUrl || mapConfig.defaultStyleUrl,
+      transformRequest: mapConfig.transformRequest,
       center: [center.lng, center.lat],
       zoom: 1,
       bearing: 0,

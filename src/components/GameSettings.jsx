@@ -23,6 +23,7 @@ import {
 } from './GameIcons'
 import MapStylePicker from './MapStylePicker'
 import NotificationsSection from './NotificationsSection'
+import { mapConfig } from '../config/mapProvider'
 import { RowLabel, SettingsCard, SwitchRow } from './SettingsParts'
 import './GameSettings.css'
 
@@ -287,9 +288,7 @@ export default function GameSettings({
         {/* No dedicated About page exists in this app - this is the closest
             real equivalent to the "Settings/About page" the map tile credits
             need to show up on. */}
-        <p className="game-settings-credits">
-          Map data © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap
-        </p>
+        <p className="game-settings-credits">{mapConfig.creditText}</p>
       </SettingsCard>
 
       <GameModal
