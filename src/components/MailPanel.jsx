@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import {
   IconChevronRight,
@@ -11,10 +11,22 @@ import {
   IconUsers,
 } from './GameIcons'
 import { useToast } from '../game/ui/Toast'
-import mailInboxIcon from '../assets/ui/mail_inbox.png'
-import MailBadgeIcon from './MailBadgeIcon'
+import Tabs from '../game/ui/Tabs'
+import MailDetail from './MailDetail'
+import { MailEmpty, MailError, MailSkeleton } from './MailStates'
 import './MailPanel.css'
-import { playerName } from '../utils/playerName'
+import {
+  formatMailDate,
+  formatRelativeMailDate,
+  groupMailByDate,
+  mailPreview,
+} from '../utils/mailView'
+import {
+  MAIL_ACTIONS,
+  MAIL_STATUS_LABEL,
+  MAIL_TABS,
+  NEWS_TAG,
+} from '../constants/mailCopy'
 
 const TYPE_ICON = {
   NOTICE: IconEnvelope,
@@ -22,63 +34,12 @@ const TYPE_ICON = {
   STORE_ITEM_GRANT: IconGift,
 }
 
-const STATUS_LABEL = {
-  CLAIMED: 'Claimed',
-  DECLINED: 'Declined',
-}
-
-function formatMailDate(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-// "2d ago" style, for the inbox row's own right-aligned date (News/
-// broadcasts keep the absolute formatMailDate above - not asked to change).
-function formatRelativeMailDate(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000)
-  if (diffMin < 1) return 'Just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
-  const diffDay = Math.floor(diffHr / 24)
-  if (diffDay < 7) return `${diffDay}d ago`
-  return formatMailDate(value)
-}
-
-// Today / Yesterday / Earlier, by local calendar day - not a rolling 24h
-// window, so a message from 11pm yesterday reads as "Yesterday" even if
-// it's only been a couple hours.
-function mailDateGroup(value) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Earlier'
-  const now = new Date()
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  )
-  const startOfYesterday = new Date(startOfToday)
-  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
-  if (date >= startOfToday) return 'Today'
-  if (date >= startOfYesterday) return 'Yesterday'
-  return 'Earlier'
-}
-
-function isResolved(item) {
-  return item.status === 'CLAIMED' || item.status === 'DECLINED'
-}
-
 // Neither list has its own scroll box - the whole menu sheet scrolls (see
 // GamePage.css's .game-menu-sheet) - so this watches a sentinel row at the
 // bottom of the list instead of a scroll-position listener. Fires
-// onLoadMore once the sentinel comes within 200px of the viewport; onLoadMore
-// itself (useMailbox's loadMoreMail/loadMoreBroadcasts) already no-ops while
-// a previous page is still loading, so re-firing mid-load is harmless.
+// onLoadMore once the sentinel comes within 200px of the viewport;
+// onLoadMore itself (useMailbox's loadMoreBroadcasts) already no-ops while a
+// previous page is still loading, so re-firing mid-load is harmless.
 function useLoadMoreSentinel(hasMore, onLoadMore) {
   const sentinelRef = useRef(null)
   useEffect(() => {
@@ -96,17 +57,40 @@ function useLoadMoreSentinel(hasMore, onLoadMore) {
   return sentinelRef
 }
 
+// A message that arrives live (the socket pushes it to the top of the list)
+// must not shove what the player is reading off screen. If they are scrolled
+// down and new items appear ABOVE the ones that were first, the scroll
+// position is moved by exactly the height that was added. At the very top the
+// list just grows, so the new message is seen. (The sheet turns off the
+// browser's own scroll anchoring on purpose - see .game-menu-sheet.)
+function useKeepScrollOnPrepend(containerRef, ids) {
+  const last = useRef({ firstId: null, scrollHeight: 0 })
+  useLayoutEffect(() => {
+    const sheet = containerRef.current?.closest('.game-menu-sheet')
+    if (!sheet) return
+    const prev = last.current
+    const firstId = ids[0] ?? null
+    const prependedCount =
+      prev.firstId != null && firstId !== prev.firstId
+        ? ids.indexOf(prev.firstId)
+        : -1
+    if (prependedCount > 0 && sheet.scrollTop > 8) {
+      const added = sheet.scrollHeight - prev.scrollHeight
+      if (added > 0) sheet.scrollTop += added
+    }
+    last.current = { firstId, scrollHeight: sheet.scrollHeight }
+  })
+}
+
 // The in-game inbox. Personal mail and broadcasts (announcements every
-// player sees) are separate lists server-side, so they're separate sub-tabs
-// here too. Tapping a row expands it and marks it read; claimable mail
-// (club invites, gifted items) gets its action buttons in the expanded view.
-export default function MailPanel({ mailbox, onClaimed }) {
+// player sees) are separate lists server-side, so they're separate tabs
+// here too. Tapping a row opens it (and marks it read); claimable mail (club
+// invites, gifted items) gets its action buttons in the opened view.
+export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
   const [view, setView] = useState('inbox')
   const [openId, setOpenId] = useState(null)
   // Pending confirm popup - { kind: 'single', item } or
-  // { kind: 'bulk', count }, null when no popup is showing. One piece of
-  // state covers both call sites (the per-row Delete button and the list
-  // header's Delete read button) since only one can ever be open at once.
+  // { kind: 'bulk', count }, null when no popup is showing.
   const [confirmDelete, setConfirmDelete] = useState(null)
   const { push: pushToast } = useToast()
   const {
@@ -122,6 +106,7 @@ export default function MailPanel({ mailbox, onClaimed }) {
     remove,
     removeAllRead,
     openBroadcast,
+    refresh,
     mailPage,
     mailTotalPages,
     loadingMail,
@@ -134,10 +119,32 @@ export default function MailPanel({ mailbox, onClaimed }) {
   const unreadInbox = mail.filter((m) => m.status === 'UNREAD').length
   const unreadNews = broadcasts.filter((b) => !b.readAt).length
   // How many of the CURRENT page's rows the bulk delete would touch - the
-  // real backend op is scoped to the whole inbox (every page), not just
-  // this one, so this is a floor, not the exact count; the confirm popup
-  // says so explicitly rather than implying it's exact.
+  // real backend op is scoped to the whole inbox (every page), so this is a
+  // floor, and the confirm popup says so.
   const readOnPage = mail.filter((m) => m.status !== 'UNREAD').length
+
+  const rootRef = useRef(null)
+  const headRef = useRef(null)
+  const inboxRef = useRef(null)
+  const newsRef = useRef(null)
+  // The date labels stick just under the sticky head; tell the CSS how tall
+  // that head is right now (it changes with the action row / badges).
+  useLayoutEffect(() => {
+    const head = headRef.current
+    const root = rootRef.current
+    if (!head || !root) return undefined
+    const apply = () =>
+      root.style.setProperty('--mail-head-h', `${head.offsetHeight}px`)
+    apply()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(apply)
+    observer.observe(head)
+    return () => observer.disconnect()
+  }, [])
+  useKeepScrollOnPrepend(
+    view === 'inbox' ? inboxRef : newsRef,
+    view === 'inbox' ? mail.map((m) => m.id) : broadcasts.map((b) => b.id)
+  )
 
   useEffect(() => {
     if (!confirmDelete) return undefined
@@ -171,32 +178,21 @@ export default function MailPanel({ mailbox, onClaimed }) {
     }
   }
 
-  // Today/Yesterday/Earlier sections for the inbox list - only ever
-  // grouping the current (server-paged) page, same scope "Mark all read"
-  // below already operates within.
-  const mailGroups = useMemo(() => {
-    const buckets = { Today: [], Yesterday: [], Earlier: [] }
-    for (const item of mail) buckets[mailDateGroup(item.createdDate)].push(item)
-    return ['Today', 'Yesterday', 'Earlier']
-      .filter((label) => buckets[label].length > 0)
-      .map((label) => ({ label, items: buckets[label] }))
-  }, [mail])
+  const mailGroups = useMemo(() => groupMailByDate(mail), [mail])
 
   const newsSentinelRef = useLoadMoreSentinel(
     broadcastHasMore,
     loadMoreBroadcasts
   )
 
-  function toggle(item) {
-    const next = openId === item.id ? null : item.id
-    setOpenId(next)
-    if (next) open(item)
+  function openMail(item) {
+    setOpenId(item.id)
+    open(item)
   }
 
-  function toggleBroadcast(item) {
-    const next = openId === item.id ? null : item.id
-    setOpenId(next)
-    if (next) openBroadcast(item)
+  function openNews(item) {
+    setOpenId(item.id)
+    openBroadcast(item)
   }
 
   async function handleClaim(item) {
@@ -204,121 +200,113 @@ export default function MailPanel({ mailbox, onClaimed }) {
     if (updated) onClaimed?.(updated)
   }
 
-  // Only a per-item read endpoint exists server-side (see api/mail.js) -
-  // no bulk "mark all read" call to make instead, so this is exactly what
-  // tapping into every unread row one at a time would do, just fired
-  // together. Scoped to the current page, same as the rest of this file's
-  // pagination already is.
+  // Only a per-item read endpoint exists server-side (see api/mail.js) - no
+  // bulk "mark all read" call - so this is what tapping into every unread row
+  // one at a time would do, just fired together (current page only).
   function handleMarkAllRead() {
     mail.filter((m) => m.status === 'UNREAD').forEach((item) => open(item))
   }
 
-  return (
-    <div className="mail-panel game-cards">
-      <section className="game-card game-card-dark mail-panel-card">
-        {/* One sticky block (not the header/tabs pinned separately at two
-            guessed top offsets) - the menu sheet this lives in is the
-            actual scroll container (see useLoadMoreSentinel's own comment
-            on why - no list here owns its own scrollbar), and sticky still
-            pins against that outer scroll as long as nothing in between
-            clips overflow. */}
-        <div className="mail-panel-sticky-head">
-          <div className="mail-panel-header">
-            {view === 'inbox' && readOnPage > 0 && (
-              <button
-                type="button"
-                className="mail-delete-read-btn"
-                onClick={() =>
-                  setConfirmDelete({ kind: 'bulk', count: readOnPage })
-                }
-              >
-                <IconTrash aria-hidden="true" /> Delete read
-              </button>
-            )}
-            {view === 'inbox' && unreadInbox > 0 && (
-              <button
-                type="button"
-                className="mail-mark-all-btn"
-                onClick={handleMarkAllRead}
-              >
-                Mark all read
-              </button>
-            )}
-          </div>
+  // The open item always comes from the live lists, so a claim/read shows up
+  // in the popup the moment the list updates.
+  const openMailItem =
+    view === 'inbox' ? mail.find((m) => m.id === openId) : null
+  const openNewsItem =
+    view === 'news' ? broadcasts.find((b) => b.id === openId) : null
 
-          <div className="mail-tabs" role="tablist" aria-label="Mail">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'inbox'}
-              className={`mail-tab ${view === 'inbox' ? 'active' : ''}`}
-              onClick={() => setView('inbox')}
-            >
-              <span
-                className="mail-tab-icon"
-                aria-hidden="true"
-                style={{
-                  WebkitMaskImage: `url(${mailInboxIcon})`,
-                  maskImage: `url(${mailInboxIcon})`,
-                }}
-              />
-              Inbox
+  function switchView(next) {
+    setView(next)
+    setOpenId(null)
+  }
+
+  const showingInbox = view === 'inbox'
+
+  return (
+    <div className="mail-panel game-cards" ref={rootRef}>
+      <section className="game-card game-card-dark mail-panel-card">
+        {/* One sticky block (header actions + tabs): the menu sheet this
+            lives in is the scroll container, and sticky pins against it. */}
+        <div className="mail-panel-sticky-head" ref={headRef}>
+          {showingInbox && (readOnPage > 0 || unreadInbox > 0) && (
+            <div className="mail-panel-header">
+              {readOnPage > 0 && (
+                <button
+                  type="button"
+                  className="mail-delete-read-btn"
+                  onClick={() =>
+                    setConfirmDelete({ kind: 'bulk', count: readOnPage })
+                  }
+                >
+                  <IconTrash aria-hidden="true" /> {MAIL_ACTIONS.deleteRead}
+                </button>
+              )}
               {unreadInbox > 0 && (
-                <span className="mail-tab-badge">{unreadInbox}</span>
+                <button
+                  type="button"
+                  className="mail-mark-all-btn"
+                  onClick={handleMarkAllRead}
+                >
+                  {MAIL_ACTIONS.markAllRead}
+                </button>
               )}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'news'}
-              className={`mail-tab ${view === 'news' ? 'active' : ''}`}
-              onClick={() => setView('news')}
-            >
-              <MailBadgeIcon size={22} className="mail-tab-icon-img" />
-              News
-              {unreadNews > 0 && (
-                <span className="mail-tab-badge">{unreadNews}</span>
-              )}
-            </button>
-          </div>
+            </div>
+          )}
+
+          {/* One style for both tabs: the same icon family, the shop purple
+              for the selected one, and the unread count on each. */}
+          <Tabs
+            className="mail-tabs"
+            accent="shop"
+            ariaLabel="Mail"
+            value={view}
+            onChange={switchView}
+            tabs={[
+              {
+                id: 'inbox',
+                label: MAIL_TABS.inbox,
+                icon: <IconEnvelope aria-hidden="true" />,
+                badge: unreadInbox > 0 ? unreadInbox : undefined,
+              },
+              {
+                id: 'news',
+                label: MAIL_TABS.news,
+                icon: <IconMegaphone aria-hidden="true" />,
+                badge: unreadNews > 0 ? unreadNews : undefined,
+              },
+            ]}
+          />
         </div>
 
         {error ? (
-          <p className="game-menu-empty">{error}</p>
+          <MailError message={error} onRetry={refresh} />
         ) : !loaded ? (
-          <p className="game-menu-empty">Checking the mailbox…</p>
-        ) : view === 'inbox' ? (
+          <MailSkeleton kind={view} />
+        ) : showingInbox ? (
           mail.length === 0 ? (
-            <p className="game-menu-empty">
-              Inbox zero. Suspiciously peaceful out here. 🕊️
-            </p>
+            <MailEmpty kind="inbox" />
           ) : (
-            <>
+            <div ref={inboxRef}>
               {mailGroups.map((group) => (
                 <div key={group.label} className="mail-date-group">
                   <p className="mail-date-group-label">{group.label}</p>
                   <ul className="mail-list">
                     {group.items.map((item) => {
+                      const unread = item.status === 'UNREAD'
                       const Icon =
-                        item.status === 'UNREAD'
-                          ? TYPE_ICON[item.type] || IconEnvelope
-                          : item.type === 'NOTICE'
-                            ? IconEnvelopeOpen
-                            : TYPE_ICON[item.type] || IconEnvelope
-                      const expanded = openId === item.id
-                      const busy = busyId === item.id
-                      const claimable =
-                        item.type !== 'NOTICE' && !isResolved(item)
+                        !unread && item.type === 'NOTICE'
+                          ? IconEnvelopeOpen
+                          : TYPE_ICON[item.type] || IconEnvelope
+                      const preview = mailPreview(toClubRoleWords(item.body))
                       return (
                         <li
                           key={item.id}
-                          className={`mail-item ${item.status === 'UNREAD' ? 'is-unread' : 'is-read'}`}
+                          className={`mail-item ${unread ? 'is-unread' : 'is-read'}`}
                         >
                           <button
                             type="button"
                             className="mail-item-row"
-                            onClick={() => toggle(item)}
-                            aria-expanded={expanded}
+                            onClick={() => openMail(item)}
+                            aria-haspopup="dialog"
                           >
                             <span
                               className={`mail-item-icon type-${item.type}`}
@@ -327,7 +315,7 @@ export default function MailPanel({ mailbox, onClaimed }) {
                             </span>
                             <span className="mail-item-main">
                               <span className="mail-item-title-row">
-                                {item.status === 'UNREAD' && (
+                                {unread && (
                                   <span
                                     className="mail-item-dot"
                                     aria-label="Unread"
@@ -337,82 +325,28 @@ export default function MailPanel({ mailbox, onClaimed }) {
                                   {toClubRoleWords(item.title)}
                                 </span>
                               </span>
-                              <span className="mail-item-source">
-                                {playerName(null, item.senderName) ||
-                                  'Run Conquest'}
-                                {STATUS_LABEL[item.status]
-                                  ? ` · ${STATUS_LABEL[item.status]}`
-                                  : ''}
-                              </span>
+                              {preview && (
+                                <span className="mail-item-preview">
+                                  {preview}
+                                </span>
+                              )}
                             </span>
                             <span className="mail-item-side">
                               <span className="mail-item-date">
                                 {formatRelativeMailDate(item.createdDate)}
                               </span>
-                              <IconChevronRight
-                                className="mail-item-chevron"
-                                aria-hidden="true"
-                              />
+                              {MAIL_STATUS_LABEL[item.status] ? (
+                                <span className="mail-item-status">
+                                  {MAIL_STATUS_LABEL[item.status]}
+                                </span>
+                              ) : (
+                                <IconChevronRight
+                                  className="mail-item-chevron"
+                                  aria-hidden="true"
+                                />
+                              )}
                             </span>
                           </button>
-
-                          {expanded && (
-                            <div className="mail-item-body">
-                              {item.body && <p>{toClubRoleWords(item.body)}</p>}
-                              <div className="mail-item-actions">
-                                {claimable && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    onClick={() => handleClaim(item)}
-                                    disabled={busy}
-                                  >
-                                    {busy
-                                      ? 'Working…'
-                                      : item.type === 'CLUB_INVITE'
-                                        ? 'Join Club'
-                                        : 'Claim Gift'}
-                                  </button>
-                                )}
-                                {claimable && item.type === 'CLUB_INVITE' && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline"
-                                    onClick={() => decline(item)}
-                                    disabled={busy}
-                                  >
-                                    Decline
-                                  </button>
-                                )}
-                                {/* Always shown once resolvable - the backend's
-                                  own rule is purely "not UNREAD" (see
-                                  api/mail.js's deleteMail comment), with no
-                                  special case for an unclaimed club invite/
-                                  gift: deleting never claims or declines it,
-                                  so showing Delete alongside Join Club/
-                                  Decline once the invite's been read is
-                                  correct, not a shortcut around them.
-                                  Disabled (not hidden) with a tooltip while
-                                  still UNREAD - open it first. */}
-                                <button
-                                  type="button"
-                                  className="mail-delete-btn"
-                                  onClick={() =>
-                                    setConfirmDelete({ kind: 'single', item })
-                                  }
-                                  disabled={busy || item.status === 'UNREAD'}
-                                  title={
-                                    item.status === 'UNREAD'
-                                      ? 'Open this mail first'
-                                      : undefined
-                                  }
-                                  aria-label="Delete mail"
-                                >
-                                  <IconTrash aria-hidden="true" /> Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </li>
                       )
                     })}
@@ -420,10 +354,8 @@ export default function MailPanel({ mailbox, onClaimed }) {
                 </div>
               ))}
               {/* Same pager control the Me tab uses for My Territories/My
-                  Routes (.game-route-pager) - reused here rather than
-                  rebuilt, per the brief. 15 mail per page, server-paged
-                  (see findMyMail in src/api/mail.js) - each tap replaces
-                  the list with that exact page instead of accumulating. */}
+                  Routes (.game-route-pager) - 15 mail per page, server-paged
+                  (see findMyMail in src/api/mail.js). */}
               {mailTotalPages > 1 && (
                 <div className="game-route-pager">
                   <button
@@ -449,63 +381,15 @@ export default function MailPanel({ mailbox, onClaimed }) {
                   </button>
                 </div>
               )}
-            </>
+            </div>
           )
         ) : broadcasts.length === 0 ? (
-          <p className="game-menu-empty">No announcements right now.</p>
+          <MailEmpty kind="news" />
         ) : (
-          <ul className="news-card-list">
-            {broadcasts.map((item) => {
-              const expanded = openId === item.id
-              return (
-                <li
-                  key={item.id}
-                  className={`news-card ${!item.readAt ? 'is-unread' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="news-card-trigger"
-                    onClick={() => toggleBroadcast(item)}
-                    aria-expanded={expanded}
-                  >
-                    {item.imageUrl ? (
-                      <span className="news-card-image">
-                        <img
-                          src={resolveFileUrl(item.imageUrl)}
-                          alt=""
-                          onError={(e) => {
-                            e.currentTarget.parentElement.style.display = 'none'
-                          }}
-                        />
-                      </span>
-                    ) : (
-                      <span className="news-card-image is-placeholder">
-                        <IconMegaphone />
-                      </span>
-                    )}
-                    <span className="news-card-content">
-                      <span className="news-card-head">
-                        <span className="news-card-title">
-                          {toClubRoleWords(item.title)}
-                        </span>
-                        {!item.readAt && (
-                          <span className="mail-item-dot" aria-label="Unread" />
-                        )}
-                      </span>
-                      <span className="news-card-meta">
-                        <IconMegaphone aria-hidden="true" /> Admin ·{' '}
-                        {formatMailDate(item.publishedAt)}
-                      </span>
-                    </span>
-                  </button>
-                  {expanded && item.body && (
-                    <div className="news-card-body">
-                      <p>{toClubRoleWords(item.body)}</p>
-                    </div>
-                  )}
-                </li>
-              )
-            })}
+          <ul className="news-card-list" ref={newsRef}>
+            {broadcasts.map((item) => (
+              <NewsCard key={item.id} item={item} onOpen={openNews} />
+            ))}
             {broadcastHasMore && (
               <li ref={newsSentinelRef} className="mail-list-sentinel">
                 {loadingMoreBroadcasts ? 'Loading more…' : ''}
@@ -521,13 +405,31 @@ export default function MailPanel({ mailbox, onClaimed }) {
         )}
       </section>
 
-      {/* Delete confirm - same shared overlay/card/actions recipe every
-          other confirm step in /game uses (see GamePage.jsx's own), just
-          without the motion.div entrance (this file doesn't otherwise use
-          framer-motion, and the brief only asked for "a small solid
-          popup"). Esc cancels (see the keydown effect above); clicking the
-          overlay itself also cancels, the card stops that click from
-          bubbling there. */}
+      {/* The opened message / news post. Escape or the scrim closes it - unless
+          the delete confirm is up, which is closed first. */}
+      {openMailItem && (
+        <MailDetail
+          kind="mail"
+          item={openMailItem}
+          busy={busyId === openMailItem.id}
+          resolveStoreItem={resolveStoreItem}
+          onClose={() => !confirmDelete && setOpenId(null)}
+          onClaim={handleClaim}
+          onDecline={decline}
+          onDelete={(item) => setConfirmDelete({ kind: 'single', item })}
+        />
+      )}
+      {openNewsItem && (
+        <MailDetail
+          kind="news"
+          item={openNewsItem}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+
+      {/* Delete confirm - same shared overlay/card/actions recipe every other
+          confirm step in /game uses. Rendered after the detail popup so it
+          sits on top of it. Esc cancels; clicking the overlay cancels. */}
       {confirmDelete && (
         <div
           className="game-confirm-overlay"
@@ -583,5 +485,53 @@ export default function MailPanel({ mailbox, onClaimed }) {
         </div>
       )}
     </div>
+  )
+}
+
+// One news post: banner on top (fixed ratio, with a graceful fallback), tag,
+// title, a two-line summary and the date. Tapping it opens the full post.
+// There is no link field on a broadcast, so there is no "Read more" link.
+function NewsCard({ item, onOpen }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const unread = !item.readAt
+  const tag = NEWS_TAG[item.type]
+  const summary = toClubRoleWords(item.body || '')
+  return (
+    <li className={`news-card ${unread ? 'is-unread' : ''}`}>
+      <button
+        type="button"
+        className="news-card-trigger"
+        onClick={() => onOpen(item)}
+        aria-haspopup="dialog"
+      >
+        <span className="news-card-media">
+          {item.imageUrl && !imageFailed ? (
+            <img
+              src={resolveFileUrl(item.imageUrl)}
+              alt=""
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <span className="news-card-fallback" aria-hidden="true">
+              <IconMegaphone />
+            </span>
+          )}
+          {tag && <span className="news-card-tag">{tag}</span>}
+        </span>
+        <span className="news-card-content">
+          <span className="news-card-head">
+            {unread && <span className="mail-item-dot" aria-label="Unread" />}
+            <span className="news-card-title">
+              {toClubRoleWords(item.title)}
+            </span>
+          </span>
+          {summary && <span className="news-card-summary">{summary}</span>}
+          <span className="news-card-meta">
+            {formatMailDate(item.publishedAt)}
+          </span>
+        </span>
+      </button>
+    </li>
   )
 }

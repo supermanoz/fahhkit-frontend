@@ -1,3 +1,4 @@
+import { ApiError } from '../api/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -120,9 +121,45 @@ describe('native Apple sign-in click', () => {
     await click()
     await waitFor(() =>
       expect(onError.mock.calls[0][0]).toBe(
-        "Apple sign-in isn't working right now. Try email sign-in or try again later."
+        'Something went wrong. Please try again.'
       )
     )
     expect(onError.mock.calls[0][0]).not.toMatch(/No network|1000/)
+  })
+
+  it('backend missing / not configured: "not available" line, no raw error', async () => {
+    for (const status of [404, 405, 501, 503]) {
+      const onError = vi.fn()
+      plugin.authorize.mockResolvedValue({
+        response: { identityToken: 'id.token.jwt', authorizationCode: 'c' },
+      })
+      const onCredential = vi
+        .fn()
+        .mockRejectedValue(new ApiError('Whitelabel Error Page', status))
+      const { unmount } = render(
+        <AppleSignInButton onCredential={onCredential} onError={onError} />
+      )
+      await click()
+      await waitFor(() => expect(onError).toHaveBeenCalled())
+      expect(onError.mock.calls[0][0]).toBe(
+        "Apple sign-in isn't available right now. Please use another method."
+      )
+      expect(onError.mock.calls[0][0]).not.toMatch(/Whitelabel|id\.token/)
+      unmount()
+    }
+  })
+
+  it('a server 500 on the token exchange is the generic line', async () => {
+    const onError = vi.fn()
+    plugin.authorize.mockResolvedValue({
+      response: { identityToken: 'id.token.jwt', authorizationCode: 'c' },
+    })
+    const onCredential = vi.fn().mockRejectedValue(new ApiError('boom', 500))
+    render(<AppleSignInButton onCredential={onCredential} onError={onError} />)
+    await click()
+    await waitFor(() => expect(onError).toHaveBeenCalled())
+    expect(onError.mock.calls[0][0]).toBe(
+      'Something went wrong. Please try again.'
+    )
   })
 })

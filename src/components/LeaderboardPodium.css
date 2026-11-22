@@ -1,396 +1,410 @@
-/* Lives inside .game-page, so it reuses the --game-* palette tokens. */
+/* Leaderboard list: podium + rows. Lives inside .game-page, so it reuses the
+   --game-* tokens. Text is plain ink (no white outline); gold/silver/bronze
+   appear on ranks 1-3 only; selection/"You" is the shop purple. */
 .lb {
-  --lb-gold: var(--game-gold, #ff7a29);
-  --lb-gold-light: var(--game-gold-light, #ffb15c);
-  --lb-cream: var(--game-cream, #fff6e6);
+  --lb-ink: var(--text-title-dark, #2b2a24);
+  --lb-muted: var(--text-muted-dark, #6b6759);
+  --lb-line: var(--divider, #d6d2c3);
+  --lb-purple: var(--shop-accent, #be2ed6);
+  --lb-purple-dark: var(--shop-accent-dark, #8f1fa3);
+  --lb-you-bg: #f6e6fa;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  font-family: var(--font-body);
 }
-
-/* Club leaderboard's trophy count, and the Solo board's flag+area stat
-   (IconFlag + formatArea - same span, shared colour) - the game's own
-   flat icons instead of a realistic emoji, to match the rest of the icon
-   set. Plain solid amber text, no stroke/shadow: this inherited the
-   global white-stroke-text rule (tokens.css's .game-text/:where() rule)
-   like every other small /game text does, which reads fine on white but
-   turned this specifically into a muddy, heavy smear against its own
-   amber fill - the same double-stroke bug class as the leaderboard scope
-   tabs (see GamePage.css's .game-menu-subtab-scope-label for the fuller
-   writeup). The icon isn't touched here on purpose: it's a plain SVG with
-   stroke="currentColor" (GameIcons.jsx's GameIcon), so it already always
-   matches whatever colour this rule sets, with nothing extra needed to
-   keep it in sync. */
-.lb-trophy-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: #b45309;
-  font-weight: 700;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
+/* No white outline / shadow on any small text in the list. */
+.lb *,
+.lb-state * {
   text-shadow: none;
   -webkit-text-stroke-width: 0;
 }
 
-/* --- Podium: 2 · 1 · 3, winner raised --- */
+/* Territory / trophy stat: ink text, muted icon, tabular numbers. (The
+   spans themselves are built in GamePage.jsx.) */
+.lb-trophy-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lb-ink, #2b2a24);
+  font-weight: 800;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+.lb-trophy-stat svg {
+  flex-shrink: 0;
+  color: var(--lb-muted, #6b6759);
+}
+
+.lb-sub {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lb-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.lb-you-tag {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--lb-purple-dark);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+/* ---------------- Podium: 2 · 1 · 3, rank 1 largest ---------------- */
 .lb-podium {
-  display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
-  align-items: start;
-  column-gap: 6px;
-  padding: 34px 0 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 4px;
 }
 
 .lb-podium-spot {
   all: unset;
   box-sizing: border-box;
+  flex: 1 1 0;
   min-width: 0;
+  min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  cursor: pointer;
+  padding: 12px 6px 12px;
+  border-radius: 16px;
+  border: 2.5px solid var(--game-ink);
+  background: #fffdf8;
+  box-shadow: 0 3px 0 var(--game-ink);
   text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-
 .lb-podium-spot:disabled {
   cursor: default;
 }
-
-.lb-podium-spot.place-2,
-.lb-podium-spot.place-3 {
-  padding-top: 48px;
+.lb-podium-spot:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--game-ink);
+}
+.lb-podium-spot:focus-visible,
+.lb-row:focus-visible {
+  outline: 3px solid var(--lb-purple-dark);
+  outline-offset: 2px;
+}
+/* With fewer than 3 entries the cards that exist stay a sensible width. */
+.lb-podium[data-count='1'] .lb-podium-spot {
+  flex: 0 1 220px;
+}
+.lb-podium[data-count='2'] .lb-podium-spot {
+  flex: 0 1 170px;
 }
 
-/* Faint warm gold edge around the #1 spot, to go with its rank badge -
-   static (no animation), so it doesn't add to that badge's own animated-
-   element budget. */
 .lb-podium-spot.place-1 {
-  border-radius: 20px;
+  flex-grow: 1.25;
+  padding-top: 8px;
+  background: #fff4d6;
+  border-color: #b8860b;
   box-shadow:
-    0 0 0 1.5px rgba(255, 177, 92, 0.4),
-    0 0 16px rgba(255, 147, 41, 0.22);
+    0 3px 0 var(--game-ink),
+    0 0 0 3px #f2c14e;
+}
+.lb-podium-spot.place-2 {
+  background: #f0f2f5;
+  border-color: #7d8793;
+}
+.lb-podium-spot.place-3 {
+  background: #fbeadb;
+  border-color: #a8662f;
+}
+.lb-podium-spot.is-player {
+  background-image: linear-gradient(var(--lb-you-bg), var(--lb-you-bg));
 }
 
-/* The badge image IS the podium spot's content now - no avatar/club-badge/
-   crown/rays/frame behind it any more (see git history for that version;
-   PodiumSpot in LeaderboardPodium.jsx no longer renders any of them).
-   Sizing/fill/animation otherwise live on RankBadge itself (RankBadge.css);
-   this just sets how big that art reads at this one call site - height-
-   constrained (not width) since each badge's own aspect ratio differs
-   slightly, same reasoning as RankBadge.css's own default sizing, just
-   bigger: this IS the podium spot's main visual now, not a small corner
-   medal next to one. `.rank-badge` in the selector (not just the class
-   this component passes in) beats RankBadge.css's own same-specificity
-   .rank-badge-2/.rank-badge-3 default-size rules regardless of CSS import
-   order. */
-/* clamp(), not a fixed px or a breakpoint step - phones from 360-430px
-   (the brief's own stated range) get a size that tapers smoothly across
-   that whole span instead of jumping at one width, and the vw coefficient
-   is picked so the clamp's min/max bounds are actually what's visible at
-   360/430px (verified, not just asserted - see the min/max comments
-   below) rather than both ends sitting outside the real 360-430 viewport
-   range and the badge just rendering at one flat size the whole time. */
+/* Existing TOP 1 badge art, kept as the winner's crest above the avatar. */
 .rank-badge.lb-podium-badge-img {
-  /* 64px at <=360px (17vw=61.2, clamped up to the 64px floor), ~68px at
-     400px, 72px at >=430px (17vw=73.1, clamped down to the 72px ceiling). */
-  height: clamp(64px, 17vw, 72px);
+  height: clamp(64px, 18vw, 76px);
   max-width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: -4px;
 }
 
-.place-1 .rank-badge.lb-podium-badge-img {
-  /* 84px at <=360px (21.5vw=77.4, clamped up to the 84px floor), ~89px at
-     400px, 92px at >=430px (21.5vw=92.5, clamped down to the 92px ceiling). */
-  height: clamp(84px, 21.5vw, 92px);
+.lb-podium-face {
+  position: relative;
+  display: inline-flex;
+}
+.lb-podium-face .lb-avatar,
+.lb-podium-face .lb-emblem {
+  box-shadow: 0 0 0 3px var(--lb-ring, #d6d2c3);
+}
+.lb-podium-spot.place-1 .lb-podium-face {
+  --lb-ring: #f2c14e;
+}
+.lb-podium-spot.place-2 .lb-podium-face {
+  --lb-ring: #aab2bd;
+}
+.lb-podium-spot.place-3 .lb-podium-face {
+  --lb-ring: #cd8a4b;
+}
+.lb-podium-face .lb-emblem {
+  box-shadow: none;
 }
 
-@media (min-width: 768px) {
-  .rank-badge.lb-podium-badge-img {
-    height: 125px;
-  }
-
-  .place-1 .rank-badge.lb-podium-badge-img {
-    height: 150px;
-  }
+.lb-medal {
+  position: absolute;
+  right: -8px;
+  bottom: -6px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--game-ink);
+  color: #1b1512;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1;
+}
+.lb-medal-2 {
+  background: radial-gradient(circle at 35% 30%, #f4f6f8, #b3bcc6);
+}
+.lb-medal-3 {
+  background: radial-gradient(circle at 35% 30%, #f0b883, #c47a38);
 }
 
-/* Wraps to 2 lines (word-break so one long unbroken word still fits
-   inside the column instead of overflowing it) and ellipsizes only past
-   that - no fixed height, so the button just grows the little extra it
-   needs for a second line instead of clipping a long name to one.
-   Plain solid dark ink, stroke/shadow both explicitly off: the global
-   white-fill+black-outline treatment every other /game label gets reads
-   as a muddy, garbled smear at this size/weight on this light card - the
-   same failure mode already fixed on .lb-trophy-stat above, now also
-   fixed here (previously this inherited the outline unchanged). */
+.lb-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(var(--lb-face, 40px) * 0.9);
+  height: calc(var(--lb-face, 40px) * 1.12);
+}
+
 .lb-podium-name {
   max-width: 100%;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  color: var(--game-ink);
+  overflow-wrap: anywhere;
+  margin-top: 6px;
+  color: var(--lb-ink);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
 }
-
-.lb-podium-area {
-  color: var(--lb-gold-light);
+.lb-podium-spot.place-1 .lb-podium-name {
   font-size: 15px;
+}
+.lb-podium-area {
+  color: var(--lb-ink);
+  font-size: 13px;
   font-weight: 800;
 }
 
-/* --gold-text (#A83D00), not --lb-gold-light - that one's a bright pastel
-   tuned for dark panels/strokeed text; plain and unstroked (as above) on
-   this light card it's under 3:1, nearly as hard to read as the white it
-   replaced. --gold-text is the same AA-safe amber --lb-trophy-stat/
-   --gold-text pairs already use site-wide for exactly this light-panel
-   case. */
-.lb-podium-spot.is-player .lb-podium-name {
-  color: var(--gold-text);
-}
-
-/* Small "You" tag next to the real name (podium spot and list row both) -
-   the name itself stays the player's actual name now instead of being
-   overwritten with the literal word "You" (see GamePage.jsx). */
-.lb-you-tag {
-  display: inline-block;
-  margin-left: 5px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--lb-gold);
-  color: #2b1a00;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.4;
-  text-shadow: none;
-  -webkit-text-stroke-width: 0;
-  vertical-align: middle;
-}
-
-/* --- Rank 4+ list --- */
+/* ---------------- Rank 4+ list ---------------- */
 .lb-list-head,
 .lb-row {
   display: grid;
-  grid-template-columns: 34px 40px 1fr auto;
+  grid-template-columns: 30px 40px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 10px;
 }
-
 .lb-list-head {
   padding: 0 14px;
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--lb-muted);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-
+.lb-list-head .lb-col-rank {
+  text-align: center;
+}
 .lb-list-head .lb-col-name {
   grid-column: 2 / 4;
+}
+.lb-list-head .lb-col-area {
+  text-align: right;
 }
 
 .lb-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 2.5px solid var(--game-ink);
+  background: #fffdf8;
+  box-shadow: 0 3px 0 var(--game-ink);
+}
+.lb-list > li + li {
+  border-top: 1px solid var(--lb-line);
+}
+.lb-list > li:nth-child(even) .lb-row:not(.is-player) {
+  background: rgba(43, 42, 36, 0.035);
 }
 
 .lb-row {
   all: unset;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 34px 40px 1fr auto;
+  grid-template-columns: 30px 40px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 10px;
   width: 100%;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    rgba(246, 236, 217, 0.12) 0%,
-    rgba(246, 236, 217, 0.04) 100%
-  );
-  border: 2.5px solid var(--game-ink);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.12),
-    0 3px 0 var(--game-ink);
+  min-height: 56px;
+  padding: 8px 14px;
+  color: var(--lb-ink);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-
 .lb-row:disabled {
   cursor: default;
 }
-
-.lb-row:hover:not(:disabled) {
-  background: linear-gradient(
-    180deg,
-    rgba(246, 236, 217, 0.18) 0%,
-    rgba(246, 236, 217, 0.08) 100%
-  );
+.lb-row:hover:not(:disabled),
+.lb-row:active:not(:disabled) {
+  background: rgba(43, 42, 36, 0.07);
 }
 
+/* "You": purple tint, a purple edge bar and the "You" chip. */
 .lb-row.is-player {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 173, 92, 0.3) 0%,
-    rgba(255, 122, 41, 0.14) 100%
-  );
-  border-color: var(--lb-gold);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.2),
-    0 3px 0 var(--game-ink),
-    0 0 0 2px var(--lb-gold-light);
+  background: var(--lb-you-bg);
+  box-shadow: inset 4px 0 0 var(--lb-purple);
+}
+.lb-row.is-player:hover:not(:disabled) {
+  background: #efd3f6;
 }
 
-/* Rank number gets its own little bevelled chip, like the podium medals
-   above it - a plain number read as an afterthought next to those. */
-.lb-row .lb-col-rank {
+.lb-col-rank {
+  color: var(--lb-ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.lb-col-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lb-col-name {
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--row);
-  border: 2px solid var(--game-ink);
-  color: var(--lb-cream);
+  gap: 6px;
+  color: var(--lb-ink);
+  font-size: 15px;
   font-weight: 800;
-  font-size: 14px;
+  line-height: 1.3;
 }
-
-.lb-row .lb-col-name {
+.lb-col-name-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--lb-cream);
-  font-weight: 700;
-  font-size: 15px;
-  /* Room inside the clip box for the text stroke + drop shadow. */
-  line-height: 1.3;
-  padding: 1px 1px 2px;
 }
-
-.lb-row .lb-col-area {
-  color: var(--text-body);
-  font-weight: 700;
+.lb-col-area {
+  justify-self: end;
   font-size: 14px;
-}
-
-.lb-row-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--game-ink);
-  box-shadow: 0 0 0 2px rgba(246, 236, 217, 0.35);
-}
-
-.lb-avatar.g-avatar-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
   font-weight: 800;
-  font-size: 15px;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+  font-variant-numeric: tabular-nums;
 }
 
-.lb-row-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
+.lb-avatar {
+  border-color: var(--game-ink);
+}
+.lb-avatar.g-avatar-fallback {
+  color: #1b1512;
+  font-weight: 800;
 }
 
-.lb-row-badge .club-badge {
-  width: 32px;
-  height: auto;
-}
-
-/* Pinned duplicate of the player's own row (see LeaderboardPodium.jsx) -
-   only rendered once their real row (podium spot or list row) scrolls out
-   of view. Sticky, not fixed: its containing block is the nearest
-   scrolling ancestor, which is GamePage.css's .game-menu-sheet (this
-   panel always lives inside it), so it reliably sticks to the bottom of
-   THAT scroll view without needing to know this panel's own padding/safe-
-   area here. The drop shadow (box-shadow would get lost under the
-   following list content otherwise) is what reads it as "floating above"
-   rather than just another row. */
+/* ---------------- "Your rank" bar (sticky, above the safe area) --------
+   Only rendered once the player's own row has scrolled out of view, from
+   data already in the list. Sticky inside .game-menu-sheet, which pads its
+   bottom by the safe-area inset, so it stays clear of the home indicator. */
 .lb-pinned-you {
   position: sticky;
   bottom: 8px;
   z-index: 5;
-  margin-top: 4px;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+  overflow: hidden;
+  border-radius: 16px;
+  border: 2.5px solid var(--lb-purple-dark);
+  background: var(--lb-you-bg);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
 }
-
+.lb-pinned-label {
+  display: block;
+  padding: 6px 14px 0;
+  color: var(--lb-purple-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .lb-pinned-you .lb-row {
-  width: 100%;
+  min-height: 52px;
+  box-shadow: none;
 }
 
-/* --- Loading skeleton (see LeaderboardPodium.jsx's LeaderboardSkeleton) --- */
+/* ---------------- Loading skeleton ---------------- */
 .lb-skeleton-block {
   display: block;
   border-radius: 10px;
   background: linear-gradient(
     100deg,
-    rgba(246, 236, 217, 0.08) 30%,
-    rgba(246, 236, 217, 0.18) 50%,
-    rgba(246, 236, 217, 0.08) 70%
+    rgba(43, 42, 36, 0.06) 30%,
+    rgba(43, 42, 36, 0.14) 50%,
+    rgba(43, 42, 36, 0.06) 70%
   );
   background-size: 200% 100%;
   animation: lb-skeleton-shimmer 1.4s ease-in-out infinite;
 }
-
-/* Roughly matches the real rank badge's own footprint (see
-   .lb-podium-badge-img above) so the skeleton-to-real swap doesn't jump in
-   size once data loads. */
+.lb-skeleton .lb-podium-spot {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
 .lb-skeleton-podium {
-  width: 85px;
-  height: 100px;
-  border-radius: 14px;
-  margin: 0 auto;
-}
-
-.place-1 .lb-skeleton-podium {
-  width: 102px;
+  width: 100%;
   height: 120px;
+  border-radius: 16px;
 }
-
+.place-1 .lb-skeleton-podium {
+  height: 156px;
+}
 .lb-skeleton-row {
   pointer-events: none;
 }
-
 .lb-skeleton-chip {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 22px;
+  height: 18px;
+  justify-self: center;
 }
-
 .lb-skeleton-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
 }
-
 .lb-skeleton-name {
-  flex: 1;
+  grid-column: 3 / 5;
   height: 14px;
-  margin-right: 40px;
+  width: 60%;
 }
-
 @keyframes lb-skeleton-shimmer {
   0% {
     background-position: 200% 0;
@@ -399,30 +413,86 @@
     background-position: -200% 0;
   }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .lb-skeleton-block {
     animation: none;
   }
 }
 
-/* Narrow phones - trim the podium/row chrome a touch so three columns of
-   medals and the rank/avatar/name/stat grid both keep breathing room
-   instead of crowding or wrapping. */
-@media (max-width: 360px) {
+/* ---------------- Empty + error states ---------------- */
+.lb-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 18px;
+  border-radius: 16px;
+  border: 2.5px solid var(--game-ink);
+  background: #fffdf8;
+  box-shadow: 0 3px 0 var(--game-ink);
+  text-align: center;
+  font-family: var(--font-body);
+}
+.lb-state-art {
+  width: 44px;
+  height: 44px;
+  color: var(--lb-purple-dark, #8f1fa3);
+}
+.lb-state-title {
+  margin: 0;
+  color: var(--text-title-dark, #2b2a24);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.lb-state-hint {
+  margin: 0;
+  color: var(--text-muted-dark, #6b6759);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.lb-error {
+  gap: 10px;
+}
+
+/* ---------------- Narrow phones (360) ---------------- */
+@media (max-width: 380px) {
+  .lb-podium {
+    gap: 6px;
+  }
+  .lb-podium-spot {
+    padding-inline: 4px;
+  }
   .lb-row,
   .lb-list-head {
-    grid-template-columns: 26px 34px 1fr auto;
+    grid-template-columns: 26px 36px minmax(0, 1fr) auto;
     column-gap: 8px;
   }
-
   .lb-row {
-    padding: 8px 10px;
+    padding-inline: 10px;
   }
+  .lb-list-head {
+    padding-inline: 10px;
+  }
+  .lb-col-name {
+    font-size: 14px;
+  }
+}
 
-  .lb-row-avatar,
-  .lb-row-badge {
-    width: 34px;
-    height: 34px;
-  }
+/* Leaderboard selectors (shared Tabs, see game/ui/Tabs.jsx): Players | Clubs
+   is the primary row, Global | District the smaller second row. */
+.lb-mode-tabs {
+  margin-bottom: 8px;
+}
+.lb-scope-tabs {
+  margin-bottom: 14px;
+}
+.game-leaderboard-notice {
+  margin: -4px 2px 12px;
+  color: var(--text-muted-dark, #6b6759);
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }

@@ -152,8 +152,9 @@ test('Settings contact block links to Instagram in a new tab', async ({
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   const block = page.locator('.game-settings-contact')
   await block.scrollIntoViewIfNeeded()
-  await expect(block).toContainText('Issues? Reach out to us at @run_conquest')
-  const link = block.getByRole('link', { name: '@run_conquest' })
+  await expect(block).toContainText('Contact us on Instagram')
+  await expect(block).toContainText('@runconquest.game')
+  const link = block.getByRole('link', { name: /Instagram/ })
   await expect(link).toHaveAttribute(
     'href',
     'https://www.instagram.com/runconquest.game/'

@@ -29,7 +29,15 @@ export function TitleRibbon({ tone = 'info', children, className = '' }) {
   )
 }
 
-export function StatChip({ icon = null, value, label, className = '' }) {
+// `unit` (optional) is a small suffix on its own line under the value
+// ("/km", "km") so a long value never has to share a line with it.
+export function StatChip({
+  icon = null,
+  value,
+  unit = null,
+  label,
+  className = '',
+}) {
   return (
     <div className={`gm-stat ${className}`}>
       {icon && (
@@ -38,6 +46,7 @@ export function StatChip({ icon = null, value, label, className = '' }) {
         </span>
       )}
       <span className="gm-stat-value">{value}</span>
+      {unit && <span className="gm-stat-unit">{unit}</span>}
       <span className="gm-stat-label">{label}</span>
     </div>
   )

@@ -11,49 +11,44 @@
 // plays, so a future effect just needs a new entry in SFX_PLAYERS below to
 // get muting, persistence and "stop what's currently playing" for free,
 // per the brief this was built against.
-const SFX_MUTED_KEY = 'fahhkit_territory_sfx_muted'
+import {
+  getAudioContext,
+  getBus,
+  getBusVolume,
+  resumeAudio,
+  routeElement,
+  setBusVolume,
+} from './audioGraph'
+import { saveVolume } from './audioSettings'
 
-// Read once at module load (not inside a component effect) - this has to
-// be settled before the very first playSfx() call anywhere in the app can
-// happen, which a per-component useState initializer can't guarantee as
-// reliably as a module-level read does.
-let sfxMuted = false
-try {
-  sfxMuted = localStorage.getItem(SFX_MUTED_KEY) === 'true'
-} catch {
-  // No storage access - starts unmuted (the documented default) and just
-  // won't remember a future choice either.
+// The Sound setting is a 0-100 volume now (see utils/audioSettings.js; the
+// old on/off flag is migrated there). Every effect ends up in the shared
+// "sfx" bus (utils/audioGraph.js), so the one slider scales all of them live,
+// including on iOS where an <audio> element's own .volume does nothing.
+// 0 = muted: playSfx returns before anything is created.
+export function getSfxVolume() {
+  return getBusVolume('sfx')
 }
 
 export function isSfxMuted() {
-  return sfxMuted
+  return getSfxVolume() <= 0
 }
 
-// GamePage.jsx's Settings row calls this from its own toggle handler (same
-// shape as the Music row's toggleMusicMuted) - this is what actually
-// persists the choice and, turning Sound off, cuts off whatever's mid-
-// effect right now rather than letting it ring out.
-export function setSfxMuted(muted) {
-  sfxMuted = muted
-  try {
-    localStorage.setItem(SFX_MUTED_KEY, String(muted))
-  } catch {
-    // Preference just won't persist past reload.
-  }
-  if (muted) stopActiveSfx()
+// Settings' Sound slider calls this on every change: persists, applies live
+// and - at 0 - cuts off whatever is mid-effect right now.
+export function setSfxVolume(value) {
+  const v = saveVolume('sfx', value)
+  setBusVolume('sfx', v)
+  if (v <= 0) stopActiveSfx()
+  return v
 }
-
-let ctx = null
 
 // Browsers refuse to start (or auto-resume) an AudioContext before a user
-// gesture, so this is only ever created lazily from inside a click handler.
+// gesture; the shared graph resumes it on the first one (see audioGraph.js).
 function getContext() {
-  if (typeof window === 'undefined') return null
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext
-  if (!AudioContextClass) return null
-  if (!ctx) ctx = new AudioContextClass()
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
-  return ctx
+  const c = getAudioContext()
+  if (c) resumeAudio()
+  return c
 }
 
 // Every oscillator/noise source node currently sounding - tracked so
@@ -96,7 +91,7 @@ function tone({ freq, duration, startAt = 0, type = 'sine', peakGain = 0.1 }) {
   gain.gain.linearRampToValueAtTime(peakGain, now + 0.008)
   gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
   osc.connect(gain)
-  gain.connect(audioCtx.destination)
+  gain.connect(getBus('sfx') || audioCtx.destination)
   osc.start(now)
   osc.stop(now + duration + 0.02)
   registerActive(osc)
@@ -135,7 +130,7 @@ function noiseBurst({
 
   noise.connect(filter)
   filter.connect(gain)
-  gain.connect(audioCtx.destination)
+  gain.connect(getBus('sfx') || audioCtx.destination)
   noise.start(now)
   noise.stop(now + duration + 0.02)
   registerActive(noise)
@@ -151,7 +146,7 @@ function getMenuAudio() {
   if (typeof window === 'undefined') return null
   if (!menuAudio) {
     menuAudio = new Audio(MENU_SOUND_URL)
-    menuAudio.volume = 0.5
+    menuAudio.volume = 0.5 // replaced by the bus gain once routed
   }
   return menuAudio
 }
@@ -169,7 +164,7 @@ function getPopAudio() {
   if (!popPool) {
     popPool = Array.from({ length: POP_POOL_SIZE }, () => {
       const a = new Audio(MENU_SOUND_URL)
-      a.volume = 0.5
+      a.volume = 0.5 // replaced by the bus gain once routed
       a.preload = 'auto'
       return a
     })
@@ -211,6 +206,7 @@ const SFX_PLAYERS = {
     const audio = getPopAudio()
     if (!audio) return
     clearTimeout(audio._popStop)
+    routeElement(audio, 'sfx', 0.5)
     audio.currentTime = 0
     audio.play().catch(() => {})
     audio._popStop = setTimeout(() => audio.pause(), POP_PLAY_MS)
@@ -218,8 +214,14 @@ const SFX_PLAYERS = {
   menu() {
     const audio = getMenuAudio()
     if (!audio) return
+    routeElement(audio, 'sfx', 0.5)
     audio.currentTime = 0
     audio.play().catch(() => {})
+  },
+  // A short pitched blip: the sample the Sound slider plays on release so
+  // the player hears the level they picked.
+  tick() {
+    tone({ freq: 1320, duration: 0.07, type: 'triangle', peakGain: 0.3 })
   },
   // A brighter rising two-note chime, reused for every "something just
   // happened" alert: a run's 1km distance milestones, a club-war phase
@@ -243,6 +245,6 @@ const SFX_PLAYERS = {
 // check. Unknown names are silently ignored (same "missing sound is not a
 // crash" posture play() calls elsewhere in this file already take).
 export function playSfx(name) {
-  if (sfxMuted) return
+  if (isSfxMuted()) return
   SFX_PLAYERS[name]?.()
 }

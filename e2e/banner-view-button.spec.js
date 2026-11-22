@@ -3,8 +3,9 @@ import { test, expect, seedSession } from './fixtures/base.js'
 import { ok } from './fixtures/mockApi.js'
 import { VETERAN } from './mocks/personas.js'
 
-// Leaderboard banner carousel: the "View" button sits clear of the bottom
-// edge and the pagination dots, for banners of different aspect ratios.
+// Leaderboard banner carousel: the small "View >" pill sits in the
+// bottom-right corner, clear of the dots (a dark pill, bottom centre) and of
+// the middle of the image, for banners of different aspect ratios.
 const OUT = 'screenshots/banner-view-button'
 const art = (w, h, label) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="#2d6a4f"/><text x="50%" y="50%" font-size="${h / 6}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="sans-serif">${label}</text></svg>`
@@ -24,7 +25,7 @@ const PARTNERS = [
   _i: i,
 }))
 
-test('View button clears the bottom edge and the dots', async ({
+test('View pill sits bottom-right and clears the dots and the image middle', async ({
   mockedPage: page,
   context,
 }, testInfo) => {
@@ -71,18 +72,30 @@ test('View button clears the bottom edge and the dots', async ({
       const d = document.querySelector('.sponsor-banner-dots')
       const c = card.getBoundingClientRect()
       const b = btn.getBoundingClientRect()
+      const centre = document.elementFromPoint(
+        c.left + c.width / 2,
+        c.top + c.height / 2
+      )
       return {
         cardH: c.height,
         bottomGap: c.bottom - b.bottom,
-        dotsGap: d.getBoundingClientRect().top - b.bottom,
-        topPct: (b.top - c.top) / c.height,
-        botPct: (b.bottom - c.top) / c.height,
+        rightGap: c.right - b.right,
+        cx: (b.left + b.width / 2 - c.left) / c.width,
+        dotsOverlap: !(
+          d.getBoundingClientRect().right <= b.left ||
+          d.getBoundingClientRect().left >= b.right
+        ),
+        middleCovered: Boolean(
+          centre?.closest('.sponsor-banner-view-btn, .sponsor-banner-dots')
+        ),
       }
     })
     if (m) {
-      // Box-to-box gap; the button's hard shadow adds 3px on top of this.
-      expect(m.bottomGap).toBeGreaterThanOrEqual(28)
-      expect(m.dotsGap - 3).toBeGreaterThanOrEqual(9)
+      expect(m.bottomGap).toBeLessThanOrEqual(16)
+      expect(m.rightGap).toBeLessThanOrEqual(16)
+      expect(m.cx).toBeGreaterThan(0.7)
+      expect(m.dotsOverlap).toBe(false)
+      expect(m.middleCovered).toBe(false)
     }
     const name = i === 0 ? 'season-banner' : PARTNERS[i - 1].id
     console.log(testInfo.project.name, name, JSON.stringify(m))

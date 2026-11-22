@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(RunNotificationPlugin.class);
         registerPlugin(AppSettingsPlugin.class);
         registerPlugin(SafeAreaPlugin.class);
+        registerPlugin(GallerySavePlugin.class);
         super.onCreate(savedInstanceState);
         // Chrome's WebView blocks audio.play() with sound until a user
         // gesture by default, same as a mobile browser tab - but this is a

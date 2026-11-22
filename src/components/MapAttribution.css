@@ -63,3 +63,9 @@
 .map-attribution-panel a:focus {
   text-decoration: none;
 }
+
+/* Keyboard focus ring (invisible unless focused by keyboard). */
+.map-attribution-toggle:focus-visible {
+  outline: 3px solid var(--game-ink, #2b2a24);
+  outline-offset: 2px;
+}

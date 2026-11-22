@@ -76,7 +76,50 @@ describe('Google / Apple setup or token problems', () => {
       expect(r.message).not.toMatch(/code|\d{2,}/i)
     }
     const apple = describeAuthError(plugin(1000), { flow: AUTH_FLOW.APPLE })
-    expect(apple.message).toBe(MESSAGES.provider('Apple'))
+    // Apple: a plugin failure is the generic line, never provider wording.
+    expect(apple.message).toBe(MESSAGES.unknown)
+  })
+  it('Apple: missing endpoint or unconfigured provider is "not available"', () => {
+    for (const status of [404, 405, 501, 503]) {
+      const r = describeAuthError(new ApiError('Not Found', status), {
+        flow: AUTH_FLOW.APPLE,
+      })
+      expect(r.reason).toBe(REASON.UNAVAILABLE)
+      expect(r.message).toBe(MESSAGES.appleUnavailable)
+    }
+    for (const msg of [
+      'Apple client id is not configured',
+      'apple.oauth.client.ids not set',
+      'OAuth provider is not configured!',
+    ]) {
+      const r = describeAuthError(new ApiError(msg, 400), {
+        flow: AUTH_FLOW.APPLE,
+      })
+      expect(r.message).toBe(MESSAGES.appleUnavailable)
+      expect(r.message).not.toMatch(/client|oauth|configured/i)
+    }
+  })
+  it('Apple: other failures are generic and never leak server text or tokens', () => {
+    const leaky = new ApiError(
+      'java.lang.NullPointerException at x.y eyJhbGciOi.eyJzdWIi.sig',
+      500
+    )
+    const r = describeAuthError(leaky, { flow: AUTH_FLOW.APPLE })
+    expect(r.reason).toBe(REASON.UNKNOWN)
+    expect(r.message).toBe(MESSAGES.unknown)
+    expect(r.message).not.toMatch(/java|eyJ|NullPointer/)
+  })
+  it('Apple: a cancelled sheet is silent', () => {
+    const r = describeAuthError(plugin(1001), { flow: AUTH_FLOW.APPLE })
+    expect(r.silent).toBe(true)
+    expect(r.message).toBeNull()
+  })
+  it('Google keeps its own provider line', () => {
+    expect(
+      describeAuthError(new ApiError('Not Found', 404), {
+        flow: AUTH_FLOW.GOOGLE,
+      }).message
+    ).toBe(MESSAGES.provider('Google'))
   })
   it('server rejecting the token (401/403/400/500) is the same friendly line', () => {
     for (const status of [400, 401, 403, 500]) {

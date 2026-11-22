@@ -1,9 +1,10 @@
 import { test, expect, seedSession } from './fixtures/base.js'
 import { VETERAN } from './mocks/personas.js'
 
-// Music + Sound default ON for a first launch (nothing in storage), a saved
-// "off" choice stays off, both toggles work live, and the single global
-// handler (utils/uiSounds.js) plays exactly one click sound per tap.
+// Music + Sound default ON for a first launch (nothing in storage: sliders at
+// 35 / 100), an old saved "off" choice migrates to 0 and stays silent, the
+// speaker buttons mute / restore live, and the single global handler
+// (utils/uiSounds.js) plays exactly one click sound per tap.
 //
 // Sounds are observed by spying on the audio APIs before the app loads:
 //  - a click "tap" = one noise-burst buffer source (gameSound.js 'tap')
@@ -67,7 +68,7 @@ async function openGame(page, { stored } = {}) {
 async function openSettings(page) {
   await page.locator('.game-menu-btn').click()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('switch', { name: /music/i })).toBeVisible()
+  await expect(page.getByRole('slider', { name: 'Music' })).toBeVisible()
 }
 
 test.describe('Audio defaults and the global click sound', () => {
@@ -96,17 +97,17 @@ test.describe('Audio defaults and the global click sound', () => {
     const before = await taps(page)
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     expect(await taps(page)).toBe(before + 1)
-    await expect(page.getByRole('switch', { name: /music/i })).toHaveAttribute(
-      'aria-checked',
-      'true'
+    // Defaults unchanged: music 35 (the old fixed volume), effects 100.
+    await expect(page.getByRole('slider', { name: 'Music' })).toHaveAttribute(
+      'aria-valuenow',
+      '35'
     )
-    await expect(page.getByRole('switch', { name: /sound/i })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
+    await expect(
+      page.getByRole('slider', { name: 'Sound effects' })
+    ).toHaveAttribute('aria-valuenow', '100')
   })
 
-  test('saved-off choices stay off; toggles work live', async ({
+  test('saved-off choices migrate to 0 and stay off; the speakers work live', async ({
     mockedPage: page,
   }) => {
     await openGame(page, { stored: { [MUSIC_KEY]: 'true', [SFX_KEY]: 'true' } })
@@ -119,19 +120,27 @@ test.describe('Audio defaults and the global click sound', () => {
         () => document.querySelector('audio[src*="territory-theme"]').paused
       )
     ).toBe(true)
-    await expect(page.getByRole('switch', { name: /music/i })).toHaveAttribute(
-      'aria-checked',
-      'false'
+    await expect(page.getByRole('slider', { name: 'Music' })).toHaveAttribute(
+      'aria-valuenow',
+      '0'
     )
-    await expect(page.getByRole('switch', { name: /sound/i })).toHaveAttribute(
-      'aria-checked',
-      'false'
-    )
+    await expect(
+      page.getByRole('slider', { name: 'Sound effects' })
+    ).toHaveAttribute('aria-valuenow', '0')
 
-    // Sound ON (live): the next tap is audible; music stays off.
-    await page.getByRole('switch', { name: /sound/i }).click()
+    // Sound back on (live, to the default level): the next tap is audible;
+    // music stays off.
+    await page.getByRole('button', { name: 'Unmute Sound effects' }).click()
+    await expect(
+      page.getByRole('slider', { name: 'Sound effects' })
+    ).toHaveAttribute('aria-valuenow', '100')
+    await page.waitForTimeout(150) // clear the 60ms gate the last tap claimed
     const t0 = await taps(page)
-    await page.getByRole('switch', { name: /music/i }).click() // a tap + music on
+    await page.getByRole('button', { name: 'Unmute Music' }).click() // a tap + music on
+    await expect(page.getByRole('slider', { name: 'Music' })).toHaveAttribute(
+      'aria-valuenow',
+      '35'
+    )
     expect(await taps(page)).toBe(t0 + 1)
     await expect
       .poll(() =>
@@ -140,8 +149,8 @@ test.describe('Audio defaults and the global click sound', () => {
         )
       )
       .toBe(true)
-    // Music OFF (live) pauses it but leaves Sound alone.
-    await page.getByRole('switch', { name: /music/i }).click()
+    // Music muted (live) pauses it but leaves Sound alone.
+    await page.getByRole('button', { name: 'Mute Music' }).click()
     await expect
       .poll(() =>
         page.evaluate(

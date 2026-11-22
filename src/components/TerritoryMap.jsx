@@ -1258,6 +1258,8 @@ function PlayerMarker({ playerLocation, icon, heading, emote, snap }) {
         position={initialPositionRef.current}
         icon={icon}
         zIndexOffset={1000}
+        // Leaflet makes markers focusable buttons - give this one a name.
+        title="You"
         // Tapping your own avatar shows nothing - interactive so the tap
         // doesn't fall through to a territory badge/polygon it happens to be
         // sitting on and pop that up instead.
@@ -1601,6 +1603,8 @@ function LocateButton({ map, location, hasFix, onLocated }) {
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         aria-label="Recenter on my location"
+        title="Recenter"
+        data-tour="recenter"
       >
         <IconCrosshairs />
       </button>
@@ -1951,6 +1955,7 @@ export default function TerritoryMap({
             <Marker
               position={[routeAnchorPoint.lat, routeAnchorPoint.lng]}
               icon={routeAnchorIcon}
+              title="Route start"
               zIndexOffset={900}
               eventHandlers={{
                 click: (e) => L.DomEvent.stopPropagation(e),

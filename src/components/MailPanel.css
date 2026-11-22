@@ -1,178 +1,142 @@
-/* --- Header: clear title + Mark all read, pinned above the tabs/list -
-   the menu sheet itself is the real scroll container (see
-   MailPanel.jsx's useLoadMoreSentinel comment), so sticky positioning
-   still pins this against that outer scroll. An opaque background (not
-   the card's own translucent one) so scrolled-under rows don't show
-   through it. --- */
+/* Mail page (Inbox / News). Copy: constants/mailCopy.js. Tabs are the shared
+   Tabs (shop purple when selected); rows and news posts are clean cards with
+   plain ink text in the readable body font - no white outlines. */
+
+/* /game forces the display font on everything via
+   `.game-page :not(code):not(pre)` (specificity 0,3,0); the Mail text uses the
+   readable body font, so these selectors out-rank it. */
+.game-page.game-root
+  .mail-panel
+  :where(
+    .mail-item-title,
+    .mail-item-preview,
+    .mail-item-date,
+    .mail-item-status,
+    .mail-date-group-label,
+    .mail-mark-all-btn,
+    .mail-delete-read-btn,
+    .news-card-title,
+    .news-card-summary,
+    .news-card-meta,
+    .news-card-tag,
+    .mail-state-title,
+    .mail-state-hint
+  ),
+.game-page.game-root
+  .mail-detail
+  :where(
+    .mail-detail-text,
+    .mail-detail-link,
+    .mail-chip,
+    .mail-reward-chip,
+    .mail-delete-btn
+  ) {
+  font-family: var(--font-body);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.mail-panel {
+  --mail-head-h: 56px;
+  --mail-ink: var(--text-title-dark, #2b2a24);
+  --mail-muted: var(--text-muted-dark, #6b6759);
+  --mail-line: var(--divider, #d6d2c3);
+  --mail-purple: var(--shop-accent, #be2ed6);
+  --mail-purple-dark: var(--shop-accent-dark, #8f1fa3);
+}
+
 .mail-panel-card {
   position: relative;
 }
 
-/* Header + tabs pinned together as one sticky block - sticky lives on
-   this shared wrapper (not on the header and tabs separately, which would
-   need a hard-coded top offset per element to stack without overlapping). */
+/* Header actions + tabs pinned together as one sticky block; the menu sheet
+   is the scroll container. An opaque background so rows scrolled under it
+   don't show through. */
 .mail-panel-sticky-head {
   position: sticky;
   top: 0;
-  z-index: 2;
-  margin: -4px -4px 12px;
-  padding: 4px 4px 0;
+  z-index: 3;
+  margin: -4px -4px 10px;
+  padding: 4px 4px 8px;
   background: var(--game-panel);
 }
 
-/* Inbox/News (below) now carry the section title - this row just gives
-   "Mark all read"/"Delete read" a place to sit, so it collapses to nothing
-   instead of a stray gap when there's nothing for either to act on. */
-.mail-panel-header:has(.mail-mark-all-btn, .mail-delete-read-btn) {
+.mail-panel-header {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
-
-.mail-mark-all-btn {
-  all: unset;
-  box-sizing: border-box;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--text-body);
-  background: var(--row);
-  border: 1.5px solid var(--border-soft);
-  cursor: pointer;
-}
-
-.mail-mark-all-btn:hover {
-  background: var(--white);
-}
-
-/* "Delete read" bulk action - same size/shape as Mark all read next to it,
-   red-tinted since this one's destructive. Only ever removes READ/CLAIMED/
-   DECLINED mail (see useMailbox.js's removeAllRead/deleteAllReadMail in
-   api/mail.js) - the backend scopes it to the caller's whole inbox, not
-   just the page this button's count is drawn from, which the confirm
-   popup itself spells out rather than implying an exact count. */
+.mail-mark-all-btn,
 .mail-delete-read-btn {
   all: unset;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 11px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
   font-weight: 800;
-  color: var(--red-text);
-  background: var(--red-tint);
-  border: 1.5px solid var(--game-red);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-
+.mail-mark-all-btn {
+  color: var(--mail-ink);
+  background: #fffdf8;
+  border: 2px solid var(--mail-line);
+}
+.mail-delete-read-btn {
+  color: #a12b1e;
+  background: #fdecea;
+  border: 2px solid #d9958c;
+}
 .mail-delete-read-btn svg {
-  font-size: 13px;
+  font-size: 14px;
+}
+.mail-mark-all-btn:active,
+.mail-delete-read-btn:active {
+  transform: translateY(1px);
+}
+.mail-mark-all-btn:focus-visible,
+.mail-delete-read-btn:focus-visible,
+.mail-item-row:focus-visible,
+.news-card-trigger:focus-visible,
+.mail-delete-btn:focus-visible {
+  outline: 3px solid var(--mail-purple-dark);
+  outline-offset: 2px;
 }
 
-.mail-delete-read-btn:hover {
-  background: var(--white);
-}
-
-/* --- Inbox/News segmented tabs - a fill + underline active state and an
-   unread-count badge, instead of the old inline "(3)" text. Its own
-   classes (not the shared .game-menu-subtab other screens use) so this
-   doesn't touch the Leaderboard's/Club's own tab rows. --- */
 .mail-tabs {
-  display: flex;
-  gap: 4px;
-  margin: 0 -4px;
-  padding: 0 4px 10px;
-  border-bottom: 2px solid var(--divider);
+  align-self: stretch;
+}
+/* Unread count on each tab (the shared Tabs badge). */
+.mail-tabs .g-tab-badge {
+  top: -7px;
+  right: -2px;
 }
 
-.mail-tab {
-  all: unset;
-  box-sizing: border-box;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 10px;
-  border-radius: 10px 10px 0 0;
-  font-weight: 800;
-  font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -12px;
-}
-
-.mail-tab.active {
-  color: var(--text-title);
-  background: var(--row);
-  border-bottom-color: var(--game-gold);
-}
-
-/* Inbox tab icon (src/assets/ui/mail_inbox.png) - a flat black silhouette,
-   .mail-tabs/.mail-tab already give the 6px gap and vertical centering, so
-   this is sizing + the mask that turns the PNG's alpha shape into a solid
-   --icon-dark fill (not currentColor - reads the same dark in both the
-   active and inactive tab). Left alone, per the brief - this one's mask
-   was never the broken one. */
-.mail-tab-icon {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  background-color: var(--icon-dark);
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-}
-
-/* News tab icon - the real mail_icon.png/.webp asset (see MailIcon.jsx),
-   plain, in its own original red - not a mask or a currentColor fill like
-   the Inbox icon above. Sizing comes from MailIcon's own size prop (22);
-   .mail-tabs/.mail-tab already give the 6px gap and vertical centering. */
-.mail-tab-icon-img {
-  flex-shrink: 0;
-}
-
-.mail-tab-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--game-text);
-  background: var(--game-gold);
-  border: 1.5px solid var(--game-ink);
-}
-
-/* --- Date groups (Today / Yesterday / Earlier) --- */
+/* ---------------- Inbox: date groups + message cards ---------------- */
 .mail-date-group + .mail-date-group {
-  margin-top: 14px;
+  margin-top: 6px;
 }
-
 .mail-date-group-label {
-  margin: 0 0 6px 2px;
-  font-size: 11px;
+  position: sticky;
+  top: var(--mail-head-h);
+  z-index: 2;
+  margin: 0;
+  padding: 8px 4px 6px;
+  background: var(--game-panel);
+  color: var(--mail-muted);
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
 }
 
-/* In-game inbox rows - no longer riding on the shared .game-menu-list
-   look (that stayed a flat one-weight row no matter read/unread state) -
-   its own layout: icon, title+source column, date+chevron on the right. */
 .mail-list {
   list-style: none;
   margin: 0;
@@ -183,220 +147,499 @@
 }
 
 .mail-item {
-  border-radius: 12px;
-  border: 2px solid var(--border-soft);
-  background: var(--row);
+  border-radius: 16px;
+  border: 2px solid var(--mail-line);
+  background: #faf8f2;
   overflow: hidden;
-  transition: background 0.12s ease;
 }
-
+/* Unread: white card, purple edge, bolder title and a purple dot. */
 .mail-item.is-unread {
-  border-color: var(--gold-500);
-  background: var(--gold-tint);
-}
-
-/* Read rows dim - deliberately lower-contrast than unread so the two
-   states are tellable apart at a glance, not just by the title weight. */
-.mail-item.is-read {
-  background: var(--row);
-  opacity: 0.68;
+  background: #fff;
+  border-color: #d9a7e6;
+  box-shadow: inset 4px 0 0 var(--mail-purple);
 }
 
 .mail-item-row {
   all: unset;
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 12px;
   width: 100%;
-  /* 56px minimum tap/row height, per the brief. */
-  min-height: 56px;
-  padding: 9px 12px;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 10px 12px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-
+.mail-item-row:hover {
+  background: rgba(43, 42, 36, 0.05);
+}
 .mail-item-row:active {
-  background: var(--white);
+  background: rgba(43, 42, 36, 0.1);
 }
 
+/* Type icon in a coloured circle (real mail types only). */
 .mail-item-icon {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--game-ink);
-  background: var(--game-stone);
-  color: var(--game-ink);
-  font-size: 16px;
+  border-radius: 50%;
+  background: #2f6fb5; /* NOTICE */
+  color: #fff;
+  font-size: 22px;
+  border: 2px solid rgba(43, 42, 36, 0.35);
 }
-
 .mail-item-icon.type-CLUB_INVITE {
-  background: var(--game-green);
+  background: #2e7d32;
 }
-
 .mail-item-icon.type-STORE_ITEM_GRANT {
-  background: var(--game-gold);
+  background: #c2570c;
 }
-
-.mail-item-icon.type-BROADCAST {
-  background: var(--game-wood);
+.mail-item.is-read .mail-item-icon {
+  opacity: 0.8;
 }
 
 .mail-item-main {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  text-align: left;
 }
-
 .mail-item-title-row {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 7px;
 }
-
 .mail-item-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-title);
-  font-size: 14px;
-  /* Room inside the clip box for the text stroke + drop shadow. */
+  color: var(--mail-ink);
+  font-size: 15px;
   line-height: 1.3;
-  padding: 1px 1px 2px;
 }
-
-/* Unread titles are bold; read ones step down to a regular weight - the
-   shared list style this used to borrow from (.game-menu-list-area) was
-   always 800 regardless of read state. */
 .mail-item.is-unread .mail-item-title {
   font-weight: 800;
 }
-
 .mail-item.is-read .mail-item-title {
-  font-weight: 500;
+  font-weight: 600;
 }
-
-.mail-item-source {
+.mail-item-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mail-purple-dark);
+}
+.mail-item-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mail-muted);
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-muted);
   line-height: 1.3;
-  overflow-wrap: anywhere;
 }
 
 .mail-item-side {
-  flex-shrink: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 4px;
 }
-
 .mail-item-date {
-  font-size: 11px;
+  color: var(--mail-muted);
+  font-size: 12px;
   font-weight: 700;
-  color: var(--text-muted);
   white-space: nowrap;
 }
-
 .mail-item-chevron {
-  font-size: 12px;
-  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
+  color: var(--mail-muted);
+}
+.mail-item-status {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e1f3e5;
+  color: #17602a;
+  font-size: 11px;
+  font-weight: 800;
 }
 
-.mail-item-dot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--game-red);
-  box-shadow: 0 0 6px rgba(255, 90, 77, 0.8);
-}
-
-/* Invisible trigger row watched by MailPanel's IntersectionObserver - only
-   rendered while there's another page to fetch, so it never shows as a
-   dead-end empty row once the list is exhausted. */
 .mail-list-sentinel {
+  padding: 8px;
   text-align: center;
-  color: var(--text-muted);
-  font-size: 12px;
-  padding: 8px 0;
+  color: var(--mail-muted);
+  font-size: 13px;
 }
 
-.mail-item-body {
-  padding: 0 12px 10px 58px;
-  font-size: 13px;
-  color: var(--text-body);
-  white-space: pre-line;
+/* ---------------- News: cards with a banner ---------------- */
+.news-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.news-card {
+  border-radius: 16px;
+  border: 2px solid var(--mail-line);
+  background: #faf8f2;
+  overflow: hidden;
+}
+.news-card.is-unread {
+  background: #fff;
+  border-color: #d9a7e6;
+  box-shadow: 0 0 0 2px rgba(190, 46, 214, 0.18);
+}
+.news-card-trigger {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.news-card-trigger:active {
+  background: rgba(43, 42, 36, 0.06);
+}
+.news-card-media {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: linear-gradient(135deg, #5b2a8a, var(--mail-purple-dark));
+}
+.news-card-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.news-card-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 44px;
+}
+.news-card-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(20, 16, 44, 0.9);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+.news-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px 12px;
+}
+.news-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.news-card-title {
+  min-width: 0;
+  color: var(--mail-ink);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
-
-.mail-item-body p {
-  margin: 0 0 8px;
+.news-card-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--mail-muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.news-card-meta {
+  color: var(--mail-muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.mail-item-actions {
+/* ---------------- States: skeleton, empty, error ---------------- */
+.mail-skeleton {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
+}
+.mail-skel-block {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(
+    100deg,
+    rgba(43, 42, 36, 0.06) 30%,
+    rgba(43, 42, 36, 0.14) 50%,
+    rgba(43, 42, 36, 0.06) 70%
+  );
+  background-size: 200% 100%;
+  animation: mail-skel-shimmer 1.4s ease-in-out infinite;
+}
+.mail-skel-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 2px solid var(--mail-line);
+  background: #faf8f2;
+}
+.mail-skel-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.mail-skel-lines {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
-
-.mail-item-actions .btn {
-  padding: 7px 14px;
-  font-size: 12px;
+.mail-skel-line {
+  height: 12px;
+}
+.mail-skel-line.is-short {
+  width: 60%;
+}
+.mail-skel-news {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-radius: 16px;
+  border: 2px solid var(--mail-line);
+  background: #faf8f2;
+  overflow: hidden;
+}
+.mail-skel-banner {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+.mail-skel-news .mail-skel-line {
+  margin: 0 12px;
+}
+@keyframes mail-skel-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mail-skel-block {
+    animation: none;
+  }
 }
 
-/* Delete - red secondary style (not the .btn family above - this is
-   destructive, so it reads distinctly from Join Club/Decline/Claim Gift
-   next to it), a real 44px tap target per the brief even though the row's
-   other action buttons are shorter. Disabled (not hidden) with its own
-   title tooltip while the mail's still UNREAD - see MailPanel.jsx's own
-   comment on why that's the backend's actual rule, not a special case for
-   claimable mail specifically. */
+.mail-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 18px;
+  text-align: center;
+}
+.mail-illustration {
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f4e3f8;
+  border: 3px solid var(--game-ink);
+  box-shadow: 0 3px 0 var(--game-ink);
+}
+.mail-illustration-art {
+  width: 64px;
+  height: 64px;
+  background-color: var(--mail-purple-dark);
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+.mail-state-title {
+  margin: 0;
+  color: var(--mail-ink);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.mail-state-hint {
+  margin: 0;
+  color: var(--mail-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---------------- Opened message / news post (popup) ---------------- */
+.mail-detail-overlay {
+  /* Clear of the status bar / home indicator. */
+  padding: max(20px, var(--overlay-top)) 18px max(20px, var(--overlay-bottom));
+}
+.mail-detail.gm-dialog {
+  width: min(420px, 100%);
+}
+.mail-detail-banner {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e9e4d6;
+}
+.mail-detail-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.mail-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.mail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--mail-line);
+  background: #fff;
+  color: var(--mail-ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.mail-chip svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.mail-chip.is-type {
+  background: #f4e3f8;
+  border-color: #d9a7e6;
+  color: #6a1480;
+}
+.mail-chip.is-status {
+  background: #e1f3e5;
+  border-color: #9cd0a8;
+  color: #17602a;
+}
+.mail-detail-body {
+  /* Long messages scroll here; the actions below stay in view. */
+  max-height: 40dvh;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  text-align: left;
+}
+.mail-detail .mail-detail-text {
+  margin: 0 0 10px;
+  color: var(--mail-ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mail-detail .mail-detail-text:last-child {
+  margin-bottom: 0;
+}
+.mail-detail .mail-detail-link {
+  color: #5b21b6;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.mail-detail-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mail-reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 2px solid #e0a355;
+  background: #fff4d6;
+  color: var(--mail-ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+.mail-reward-chip svg {
+  width: 18px;
+  height: 18px;
+  color: #c2570c;
+}
+
+/* ---------------- Delete ---------------- */
 .mail-delete-btn {
   all: unset;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   min-height: 44px;
   padding: 0 14px;
   border-radius: 10px;
-  border: 1.5px solid var(--game-red);
-  background: var(--red-tint);
-  color: var(--red-text);
-  font-size: 12px;
+  color: #a12b1e;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
 }
-
 .mail-delete-btn svg {
-  font-size: 15px;
+  font-size: 16px;
 }
-
 .mail-delete-btn:hover:not(:disabled) {
-  background: var(--white);
+  background: #fdecea;
 }
-
 .mail-delete-btn:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
 }
 
-/* Confirm popup's own Delete button - pill-shaped like the shared
-   .btn/.btn-primary every other /game confirm dialog uses for its
-   confirm action (see GamePage.jsx's own game-confirm-actions call
-   sites), just red instead of that family's brand gradient - there's no
-   shared red variant of .btn to reuse site-wide without risking the
-   website's own pages, which also read .btn/.btn-primary/.btn-outline
-   from index.css, so this stays its own scoped class instead. */
+/* Confirm popup's red Delete (same shape as the other confirm actions). */
 .mail-confirm-delete-btn {
   all: unset;
   box-sizing: border-box;
@@ -412,128 +655,9 @@
   font-weight: 700;
   cursor: pointer;
 }
-
 .mail-confirm-delete-btn:hover {
   background: var(--game-red-dark);
 }
-
 .mail-confirm-delete-btn:active {
   transform: translateY(1px);
-}
-
-/* News (broadcasts) - event-card treatment (thumbnail + gold header strip)
-   instead of the inbox's plain icon rows, so an announcement reads as
-   something worth tapping into rather than another envelope in a list. */
-.news-card-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.news-card {
-  border-radius: 14px;
-  border: 2px solid var(--game-ink);
-  border-top: 4px solid var(--game-gold);
-  background: var(--game-panel);
-  overflow: hidden;
-  box-shadow: 0 2px 0 var(--game-ink);
-}
-
-.news-card.is-unread {
-  border-color: var(--game-gold);
-  box-shadow:
-    0 0 0 1px var(--gold-500),
-    0 2px 0 var(--game-ink);
-}
-
-.news-card-trigger {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px;
-  cursor: pointer;
-}
-
-.news-card-image {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
-  border: 2px solid var(--game-ink);
-  overflow: hidden;
-  background: var(--game-wood);
-}
-
-.news-card-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.news-card-image.is-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--gold-text);
-  font-size: 20px;
-}
-
-.news-card-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.news-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.news-card-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  color: var(--text-title);
-}
-
-.news-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--gold-text);
-}
-
-.news-card-meta svg {
-  font-size: 11px;
-}
-
-.news-card-body {
-  padding: 0 14px 14px 78px;
-  font-size: 13px;
-  color: var(--text-body);
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
-
-.news-card-body p {
-  margin: 0;
 }

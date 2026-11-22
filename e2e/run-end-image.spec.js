@@ -3,7 +3,7 @@ import { test, expect, seedSession } from './fixtures/base.js'
 import { VETERAN } from './mocks/personas.js'
 import { ok } from './fixtures/mockApi.js'
 
-// End of a run: rewards sequence -> "Your run" image step (the same
+// End of a run: rewards sequence -> run image step (dialog "Your run") (the same
 // ShareRunCarousel Me -> History uses) -> Done. Mocked run response, route
 // and XP. Screenshots: ./screenshots/run-end-image/. (No 03-perk: the perk
 // needs a score push over the websocket, which can't be mocked here.)
@@ -97,7 +97,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS)) {
       // Territory/PvP result toast first, then the rewards sequence.
       const card = page.locator('.run-rewards-card')
       const toastBtn = page
-        .locator('.game-claim-toast')
+        .locator('.run-result-card')
         .getByRole('button', { name: /^(Nice|OK|Got it|Close)/ })
       await expect(toastBtn.or(card).first()).toBeVisible({ timeout: 60_000 })
       if (!(await card.isVisible())) await toastBtn.click()
@@ -105,13 +105,13 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS)) {
       const dir = `${OUT}/${mode}-${vpName}`
       fs.mkdirSync(dir, { recursive: true })
       await page.screenshot({ path: `${dir}/01-stats.png` })
-      await expect(page.locator('.run-rewards-total')).toBeVisible()
+      await expect(
+        page.getByRole('button', { name: 'Next', exact: true })
+      ).toBeVisible()
       await page.screenshot({ path: `${dir}/02-xp-and-points.png` })
 
       await page.getByRole('button', { name: 'Next', exact: true }).click()
-      await expect(
-        page.getByRole('heading', { name: 'Your run' })
-      ).toBeVisible()
+      await expect(page.getByRole('dialog', { name: 'Your run' })).toBeVisible()
       await expect(
         page.locator('.run-rewards-image-step canvas').first()
       ).toBeVisible()

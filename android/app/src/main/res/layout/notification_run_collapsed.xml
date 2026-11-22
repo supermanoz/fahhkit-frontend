@@ -1,104 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Collapsed state of the persistent run-tracking notification. Compact
-     single-row header + stats, swapped for notification_run_expanded.xml
-     when the user drags the notification open. See RunNotificationPlugin. -->
+<!-- Collapsed run notification: same look as notification_run_expanded.xml,
+     compacted to two tight rows. Android gives collapsed custom content only
+     ~48dp of height, so paddings are small and font padding is off. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
-
-    <TextView
-        android:id="@+id/run_notif_header"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/run_notification_header_running"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:text="Running"
-        android:textColor="#FFFFFF"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+    android:background="@drawable/run_notification_bg"
+    android:orientation="vertical"
+    android:paddingStart="10dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/run_notification_body_bg"
-        android:baselineAligned="false"
-        android:orientation="horizontal"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_run_notif_runner" />
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Run Conquest"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/run_notif_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/run_notification_pill"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:maxWidth="110dp"
+            android:paddingStart="7dp"
+            android:paddingTop="1dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="1dp"
+            android:text="Running"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
-        <LinearLayout
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="bottom"
+        android:orientation="horizontal">
+        <Chronometer
+            android:id="@+id/run_notif_value_time"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/run_notif_value_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/passion_one_bold"
-                android:text="0:00"
-                android:textColor="@color/runNotifValue"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Time"
-                android:textColor="@color/runNotifLabel"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
+            android:fontFamily="@font/passion_one_bold"
+            android:includeFontPadding="false"
+            android:textColor="@color/runNotifValue"
+            android:textSize="20sp" />
+        <TextView
+            android:id="@+id/run_notif_value_distance"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/run_notif_value_pace"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/passion_one_bold"
-                android:text="--"
-                android:textColor="@color/runNotifValue"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Avg. pace (/km)"
-                android:textColor="@color/runNotifLabel"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
+            android:fontFamily="@font/passion_one_bold"
+            android:includeFontPadding="false"
+            android:text="0.00"
+            android:textColor="@color/runNotifValue"
+            android:textSize="15sp" />
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/run_notif_value_distance"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/passion_one_bold"
-                android:text="0.00"
-                android:textColor="@color/runNotifValue"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Distance (km)"
-                android:textColor="@color/runNotifLabel"
-                android:textSize="9sp" />
-        </LinearLayout>
+            android:layout_marginStart="2dp"
+            android:includeFontPadding="false"
+            android:text="km"
+            android:textColor="@color/runNotifLabel"
+            android:textSize="9sp" />
+        <TextView
+            android:id="@+id/run_notif_value_pace"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:fontFamily="@font/passion_one_bold"
+            android:includeFontPadding="false"
+            android:text="--"
+            android:textColor="@color/runNotifValue"
+            android:textSize="15sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="2dp"
+            android:includeFontPadding="false"
+            android:text="min/km"
+            android:textColor="@color/runNotifLabel"
+            android:textSize="9sp" />
     </LinearLayout>
 </LinearLayout>

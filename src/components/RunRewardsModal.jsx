@@ -2,9 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { levelProgress } from '../utils/territoryGame'
-import { formatDistance, formatDuration, formatPace } from '../utils/run'
 import HeroFigure from './HeroFigure'
 import ShareRunCarousel from './ShareRunCarousel'
+import { CompletedRunStats } from './RunResultCard'
+import { TitleRibbon } from '../game/ui/GameModal'
 import { IconClose } from './GameIcons'
 import './RunRewardsModal.css'
 import { formatNumber } from '../utils/format'
@@ -18,6 +19,9 @@ import { formatNumber } from '../utils/format'
 // here together instead of by two separate components). TrackRunPanel's
 // Boss Fight save flow is a separate, admin/moderator-only staging surface
 // with no reward UI today - deliberately out of scope here.
+// Accessible name of the run-image step (there is no visible title on it).
+export const IMAGE_STEP_LABEL = 'Your run'
+
 const BAR_MS = 900
 const LEVEL_UP_HOLD_MS = 900
 const SCORE_MS = 700
@@ -25,7 +29,7 @@ const PERK_HOLD_MS = 450
 
 const TITLES = {
   territory: 'Run Complete',
-  training: 'Training Complete',
+  training: 'Run saved',
   club_war: 'War Run Complete',
   pvp: 'PvP Result',
 }
@@ -65,8 +69,10 @@ export default function RunRewardsModal({
   onDismiss,
 }) {
   const hasImage = (run?.points?.length || 0) >= 2
-  const [step, setStep] = useState('rewards') // 'rewards' | 'image'
   const hasXp = Boolean(xpReward)
+  // Every run with a route opens on the stats card first (a run with no XP
+  // says so), then the image slide - Training included.
+  const [step, setStep] = useState('rewards') // 'rewards' | 'image'
   const xpGained = hasXp
     ? Math.max(0, Math.round(xpReward.afterXp - xpReward.beforeXp))
     : 0
@@ -99,6 +105,14 @@ export default function RunRewardsModal({
   const [barPct, setBarPct] = useState(beforeProgress?.pct ?? 0)
   const [displayLevel, setDisplayLevel] = useState(xpReward?.beforeLevel ?? 1)
   const [xpCount, setXpCount] = useState(0)
+  // "XP 340 / 500": progress inside the level being shown. Starts at the OLD
+  // value (the bar fills from there) and ends at the NEW one.
+  const [xpInto, setXpInto] = useState(beforeProgress?.into ?? 0)
+  const [xpSpan, setXpSpan] = useState(
+    (leveledUp ? beforeProgress?.span : afterProgress?.span) ?? 1
+  )
+  // The bar snaps (no slide) when it resets to empty after a level-up.
+  const [barSnap, setBarSnap] = useState(false)
   const [scoreCount, setScoreCount] = useState(0)
 
   const skippedRef = useRef(false)
@@ -118,7 +132,10 @@ export default function RunRewardsModal({
     if (skippedRef.current) return
     skippedRef.current = true
     clearAllTimers()
+    setBarSnap(true)
     setBarPct(afterProgress?.pct ?? 0)
+    setXpInto(afterProgress?.into ?? 0)
+    setXpSpan(afterProgress?.span ?? 1)
     setDisplayLevel(xpReward?.afterLevel ?? xpReward?.beforeLevel ?? 1)
     setXpCount(xpGained)
     setScoreCount(hasScore ? Math.round(totalScore) : 0)
@@ -136,25 +153,37 @@ export default function RunRewardsModal({
       timersRef.current.push(id)
     }
 
+    // Counts a number from -> to over `ms` (same easing-free count the XP
+    // number always used).
+    function tween(from, to, ms, set) {
+      const start = performance.now()
+      function tick(ts) {
+        if (skippedRef.current) return
+        const t = Math.min(1, (ts - start) / ms)
+        set(Math.round(from + (to - from) * t))
+        if (t < 1) framesRef.current.push(requestAnimationFrame(tick))
+      }
+      framesRef.current.push(requestAnimationFrame(tick))
+    }
+
     // Stats row is already visible (initial phase); XP starts almost
     // immediately so the card doesn't sit static for a beat first.
     after(250, () => {
       if (skippedRef.current) return
       setPhase('xp')
       requestAnimationFrame(() => {
-        if (skippedRef.current) return
+        if (skippedRef.current || !hasXp) return
         setBarPct(leveledUp ? 1 : (afterProgress?.pct ?? 0))
-        const start = performance.now()
-        function tick(ts) {
-          if (skippedRef.current) return
-          const t = Math.min(1, (ts - start) / BAR_MS)
-          setXpCount(Math.round(t * xpGained))
-          if (t < 1) framesRef.current.push(requestAnimationFrame(tick))
-        }
-        framesRef.current.push(requestAnimationFrame(tick))
+        tween(0, xpGained, BAR_MS, setXpCount)
+        tween(
+          beforeProgress.into,
+          leveledUp ? beforeProgress.span : afterProgress.into,
+          BAR_MS,
+          setXpInto
+        )
       })
 
-      let xpPhaseMs = BAR_MS
+      let xpPhaseMs = hasXp ? BAR_MS : 0
       if (leveledUp) {
         xpPhaseMs = BAR_MS + LEVEL_UP_HOLD_MS + BAR_MS
         after(BAR_MS, () => {
@@ -165,10 +194,16 @@ export default function RunRewardsModal({
         after(BAR_MS + LEVEL_UP_HOLD_MS, () => {
           if (skippedRef.current) return
           setPhase('xp-new')
+          setBarSnap(true)
           setBarPct(0)
+          setXpInto(0)
+          setXpSpan(afterProgress.span)
           requestAnimationFrame(() =>
             requestAnimationFrame(() => {
-              if (!skippedRef.current) setBarPct(afterProgress?.pct ?? 0)
+              if (skippedRef.current) return
+              setBarSnap(false)
+              setBarPct(afterProgress.pct)
+              tween(0, afterProgress.into, BAR_MS, setXpInto)
             })
           )
         })
@@ -223,6 +258,16 @@ export default function RunRewardsModal({
 
   const title = TITLES[mode] || TITLES.territory
   const pointsLabel = POINTS_LABEL[mode] || POINTS_LABEL.territory
+  const animating = !reached('total') && (hasXp || hasScore)
+  const levelUpShown = leveledUp && reached('level-up')
+  const noRewards = !hasXp && !hasScore
+
+  // "Skip" only fast-forwards the animation (every number jumps to its final
+  // value); the run image still follows - it is never skipped.
+  function skipToNext() {
+    skip()
+    if (hasImage) setStep('image')
+  }
 
   return (
     <motion.div
@@ -233,7 +278,12 @@ export default function RunRewardsModal({
       onClick={skip}
     >
       <motion.div
-        className="run-rewards-card"
+        className={`run-rewards-card${step === 'image' ? ' is-image-step' : ' is-rewards-step'}`}
+        // The image step has no visible heading any more, so the dialog is
+        // named directly (the rewards step is named after its own title).
+        role="dialog"
+        aria-modal="true"
+        aria-label={step === 'image' ? IMAGE_STEP_LABEL : title}
         initial={{ scale: 0.9, opacity: 0, y: 10 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.92, opacity: 0 }}
@@ -262,7 +312,6 @@ export default function RunRewardsModal({
             >
               <IconClose />
             </button>
-            <h3 className="run-rewards-title">Your run</h3>
             <ShareRunCarousel run={shareRun} />
             <button
               type="button"
@@ -273,120 +322,137 @@ export default function RunRewardsModal({
             </button>
           </motion.div>
         )}
-        <div className="run-rewards-main" hidden={step === 'image'}>
-          <h3 className="run-rewards-title">{title}</h3>
+        <div
+          className="gm-panel run-rewards-panel"
+          data-tone="info"
+          hidden={step === 'image'}
+        >
+          <TitleRibbon tone="info">
+            <span role="heading" aria-level={3}>
+              {title}
+            </span>
+          </TitleRibbon>
+          <div className="gm-panel-inner has-ribbon run-rewards-main">
+            <CompletedRunStats run={stats} />
 
-          {stats && (
-            <div className="run-rewards-stats">
-              <span className="run-rewards-stat">
-                <span className="run-rewards-stat-value">
-                  {formatDistance(stats.distance)}
-                </span>
-                <span className="run-rewards-stat-label">Distance</span>
-              </span>
-              <span className="run-rewards-stat">
-                <span className="run-rewards-stat-value">
-                  {formatDuration(stats.duration)}
-                </span>
-                <span className="run-rewards-stat-label">Time</span>
-              </span>
-              <span className="run-rewards-stat">
-                <span className="run-rewards-stat-value">
-                  {formatPace(stats.avgPace)}
-                </span>
-                <span className="run-rewards-stat-label">Pace</span>
-              </span>
-            </div>
-          )}
+            {noRewards && (
+              <p className="run-rewards-note">
+                No XP this time. Run a bit longer to earn XP.
+              </p>
+            )}
 
-          {hasXp && reached('xp') && (
-            <div className="run-rewards-section">
-              <p className="run-rewards-xp-gained">+{xpCount} XP</p>
-              <div className="run-rewards-level-row">
-                <span className="run-rewards-level-badge">
-                  <span className="run-rewards-level-num">{displayLevel}</span>
-                </span>
-                <div className="run-rewards-bar-track">
-                  <div
-                    className="run-rewards-bar-fill"
-                    style={{ width: `${Math.round(barPct * 100)}%` }}
-                  />
+            {hasXp && reached('xp') && (
+              <div className="run-rewards-section run-rewards-xp">
+                <p className="run-rewards-xp-chip run-rewards-xp-gained">
+                  +{formatNumber(xpCount)} XP
+                </p>
+                <div className="run-rewards-level-row">
+                  <motion.span
+                    className={`run-rewards-level-badge${levelUpShown ? ' is-up' : ''}`}
+                    key={displayLevel}
+                    initial={
+                      levelUpShown && !reduceMotionRef.current
+                        ? { scale: 0.6 }
+                        : false
+                    }
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 520, damping: 12 }}
+                  >
+                    <span className="run-rewards-level-num">
+                      {displayLevel}
+                    </span>
+                    {levelUpShown && (
+                      <span className="run-rewards-sparkles" aria-hidden="true">
+                        <i>✦</i>
+                        <i>✦</i>
+                        <i>✦</i>
+                        <i>✦</i>
+                      </span>
+                    )}
+                  </motion.span>
+                  <div className="run-rewards-bar-col">
+                    <div
+                      className={`run-rewards-bar-track${barSnap ? ' is-snap' : ''}`}
+                      role="progressbar"
+                      aria-label="XP progress"
+                      aria-valuemin={0}
+                      aria-valuemax={xpSpan}
+                      aria-valuenow={xpInto}
+                    >
+                      <div
+                        className="run-rewards-bar-fill"
+                        style={{
+                          width: `${Math.round(barPct * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="run-rewards-bar-text">
+                      XP {formatNumber(xpInto)} / {formatNumber(xpSpan)}
+                    </p>
+                  </div>
                 </div>
+                {levelUpShown && (
+                  <motion.p
+                    className="run-rewards-level-up"
+                    initial={
+                      reduceMotionRef.current
+                        ? false
+                        : { scale: 0.6, opacity: 0 }
+                    }
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+                  >
+                    Level {xpReward.afterLevel}!
+                  </motion.p>
+                )}
               </div>
-              {phase === 'level-up' && (
-                <motion.p
-                  className="run-rewards-level-up"
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-                >
-                  Level up!
-                </motion.p>
-              )}
-            </div>
-          )}
+            )}
 
-          {hasScore && reached('score') && (
-            <div className="run-rewards-section run-rewards-score-row">
-              <span className="run-rewards-score-label">{pointsLabel}</span>
-              <span className="run-rewards-score-value">
-                +{formatNumber(scoreCount)}
-              </span>
-            </div>
-          )}
+            {hasScore && reached('score') && (
+              <div className="run-rewards-section run-rewards-score-row">
+                <span className="run-rewards-score-label">{pointsLabel}</span>
+                <span className="run-rewards-score-value">
+                  +{formatNumber(scoreCount)}
+                </span>
+              </div>
+            )}
 
-          {heroBonus && reached('perk') && (
-            <motion.div
-              className="run-rewards-perk-card"
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 24 }}
-            >
-              <span className="run-rewards-perk-icon">
-                <HeroFigure hero={{ name: heroBonus.heroName }} height={44} />
-              </span>
-              <span className="run-rewards-perk-text">
-                <strong>{heroBonus.heroName}</strong>&apos;s perk added +
-                {Math.round(heroBonus.totalBonus)} {pointsLabel.toLowerCase()}
-              </span>
-            </motion.div>
-          )}
+            {heroBonus && reached('perk') && (
+              <motion.div
+                className="run-rewards-perk-card"
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+              >
+                <span className="run-rewards-perk-icon">
+                  <HeroFigure hero={{ name: heroBonus.heroName }} height={40} />
+                </span>
+                <span className="run-rewards-perk-text">
+                  <strong>{heroBonus.heroName}</strong>&apos;s perk added +
+                  {Math.round(heroBonus.totalBonus)} {pointsLabel.toLowerCase()}
+                </span>
+              </motion.div>
+            )}
 
-          {reached('total') && (hasXp || hasScore) && (
-            <motion.p
-              className="run-rewards-total"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              Total:{hasXp && <> +{formatNumber(xpGained)} XP</>}
-              {hasXp && hasScore && ' · '}
-              {hasScore && (
-                <>
-                  {' '}
-                  +{formatNumber(totalScore)} {pointsLabel}
-                </>
-              )}
-            </motion.p>
-          )}
-
-          {reached('total') && (
-            <button
-              type="button"
-              className="game-btn game-btn-green run-rewards-action"
-              onClick={hasImage ? () => setStep('image') : onDismiss}
-            >
-              {hasImage ? 'Next' : 'Continue'}
-            </button>
-          )}
-          {reached('total') && hasImage && (
-            <button
-              type="button"
-              className="run-rewards-skip"
-              onClick={onDismiss}
-            >
-              Skip
-            </button>
-          )}
+            {reached('total') && (
+              <button
+                type="button"
+                className="game-btn game-btn-green run-rewards-action"
+                onClick={hasImage ? () => setStep('image') : onDismiss}
+              >
+                {hasImage ? 'Next' : 'Continue'}
+              </button>
+            )}
+            {animating && (
+              <button
+                type="button"
+                className="run-rewards-skip"
+                onClick={skipToNext}
+              >
+                Skip
+              </button>
+            )}
+          </div>
         </div>
       </motion.div>
     </motion.div>

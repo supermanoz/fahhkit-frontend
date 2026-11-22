@@ -1,0 +1,239 @@
+/* First-time walkthrough overlay (components/GameTour.jsx). Sits above every
+   popup (broadcast 1500, popup layer 1200) but is paused/hidden while one is
+   open, so it never stacks. The root swallows all taps. */
+.game-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  box-sizing: border-box;
+  padding: max(12px, var(--safe-top)) max(12px, env(safe-area-inset-right))
+    max(12px, var(--safe-bottom)) max(12px, env(safe-area-inset-left));
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* ~70% dark. With a target, the dimming comes from the spotlight's own
+   shadow (so there is a real hole); without one, this layer dims. */
+.game-tour-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 6, 22, 0.7);
+}
+.game-tour-scrim.has-hole {
+  background: transparent;
+}
+.game-tour-spot {
+  position: fixed;
+  box-sizing: border-box;
+  pointer-events: none;
+  box-shadow: 0 0 0 100vmax rgba(8, 6, 22, 0.7);
+  outline: 3px solid #fff;
+  outline-offset: 0;
+  animation: game-tour-pulse 1.6s ease-in-out infinite;
+}
+@keyframes game-tour-pulse {
+  0%,
+  100% {
+    outline-color: rgba(255, 255, 255, 0.95);
+    transform: scale(1);
+  }
+  50% {
+    outline-color: rgba(255, 255, 255, 0.45);
+    transform: scale(1.04);
+  }
+}
+
+.game-tour-card {
+  position: fixed;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.game-tour-card > .game-tour-panel {
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+.game-tour-arrow {
+  position: absolute;
+  left: var(--tour-arrow-x, 50%);
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  background: var(--cream-100, #fbf3e0);
+  box-shadow: 0 0 0 3px var(--navy-950, #0b1030);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.game-tour-card.is-below .game-tour-arrow {
+  top: -7px;
+}
+.game-tour-card.is-above .game-tour-arrow {
+  bottom: -7px;
+}
+
+.game-tour-panel .gm-panel-inner {
+  padding: 10px 14px 14px;
+}
+.game-tour-inner {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+.game-tour-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.game-tour-dots {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.game-tour-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(40, 30, 80, 0.25);
+}
+.game-tour-dots i.is-done {
+  background: #6d4bb5;
+}
+.game-tour-dots i.is-on {
+  width: 20px;
+  border-radius: 6px;
+  background: #be2ed6;
+}
+.game-tour-skip {
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px -6px -8px 0;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: #5b21b6;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.game-tour-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.game-tour-speaker {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #efe3ff;
+  box-shadow: inset 0 0 0 3px #be2ed6;
+}
+.game-tour-title,
+.game-tour-body {
+  margin: 0;
+}
+.game-tour-title {
+  font-size: 20px;
+  line-height: 1.15;
+  color: #2b1c57;
+}
+.game-tour-body {
+  margin-top: 4px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #2b2540;
+}
+
+.game-tour-modes {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.game-tour-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(40, 30, 80, 0.07);
+  font-size: 14px;
+  line-height: 1.25;
+  color: #2b2540;
+}
+.game-tour-mode-text {
+  min-width: 0;
+}
+.game-tour-mode-text b {
+  font-weight: 800;
+}
+.game-tour-mode-text b::after {
+  content: ':';
+}
+.game-tour-mode-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+}
+.game-tour-mode-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.game-tour-mode.is-training .game-tour-mode-icon {
+  background: #b45309;
+}
+.game-tour-mode.is-conquer .game-tour-mode-icon {
+  background: #15803d;
+}
+.game-tour-mode.is-pvp .game-tour-mode-icon {
+  background: #b91c1c;
+}
+
+.game-tour-nav {
+  display: flex;
+  gap: 10px;
+}
+.game-tour-nav .gb {
+  flex: 1;
+  min-height: 48px;
+}
+.game-tour .gb {
+  min-height: 48px;
+}
+
+/* Body font for everything readable (the /game page forces the display font
+   on all text, see GamePage.css). */
+.game-page.game-root .game-tour .game-tour-body,
+.game-page.game-root .game-tour .game-tour-mode,
+.game-page.game-root .game-tour .game-tour-mode-text,
+.game-page.game-root .game-tour .game-tour-mode-text span,
+.game-page.game-root .game-tour .game-tour-mode-text b {
+  font-family: var(--font-body);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.game-page.game-root .game-tour .game-tour-skip {
+  font-family: var(--font-body);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-tour-spot {
+    animation: none;
+  }
+}

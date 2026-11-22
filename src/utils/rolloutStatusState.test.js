@@ -141,6 +141,19 @@ describe('rolloutStatusReducer', () => {
     expect(shouldShowRolloutModal(failed)).toBe(true)
   })
 
+  it('RESET (a different player signed in) forgets the previous result and dismissal', () => {
+    let state = rolloutStatusReducer(initialRolloutState, {
+      type: 'CHECK_SUCCESS',
+      rolledOut: false,
+      alreadyRequested: true,
+      cityName: 'Pokhara',
+    })
+    state = rolloutStatusReducer(state, { type: 'DISMISS' })
+    expect(rolloutStatusReducer(state, { type: 'RESET' })).toBe(
+      initialRolloutState
+    )
+  })
+
   it('an unknown action is a no-op', () => {
     expect(
       rolloutStatusReducer(initialRolloutState, { type: 'NOT_REAL' })

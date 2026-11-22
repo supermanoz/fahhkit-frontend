@@ -1,0 +1,520 @@
+/* Club section skin: light cream cards like Me / Shop / Mail / Settings, the
+   shop-purple selected state, and ONE dark indigo accent (the war banner,
+   like the PvP hub). Imported after ClubPanel.css so it wins on equal
+   specificity; structure and behaviour live in the .jsx files. Body font and
+   plain dark ink everywhere (no outline text) - /game forces the display font
+   and a stroke on everything, hence the .game-root prefixes. */
+
+.club-page {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  gap: 14px;
+  padding: 4px 2px 0;
+  box-sizing: border-box;
+}
+.club-page .club-section-tabs {
+  width: 100%;
+}
+
+/* --- Cards ------------------------------------------------------------- */
+.club-page .club-card,
+.club-page .game-card-dark:not(.club-war-banner) {
+  min-width: 0;
+  background: var(--white);
+  color: var(--text-body-dark);
+  border: 2px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: 0 3px 0 var(--border-soft);
+}
+.game-root .club-page .game-card-title,
+.game-root .club-page .game-card-title-sm,
+.game-root .club-page .club-card .game-row-name,
+.game-root .club-page .game-card-dark:not(.club-war-banner) .game-row-name {
+  font-family: var(--font-body);
+  color: var(--text-title-dark);
+  letter-spacing: 0;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .club-page .game-card-title {
+  font-size: 22px;
+  font-weight: 900;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.game-root .club-page .game-card-title-sm {
+  font-size: 17px;
+}
+.game-root .club-page .game-row-meta,
+.game-root .club-page .game-card-empty,
+.game-root .club-page .club-blurb,
+.game-root .club-page .club-perks li,
+.game-root .club-page .club-description,
+.game-root .club-page .club-treasury-value,
+.game-root .club-page .game-menu-section-title {
+  font-family: var(--font-body);
+  color: var(--text-body-dark);
+  letter-spacing: 0;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .club-page .game-row-meta {
+  color: var(--text-muted-dark);
+  font-weight: 700;
+  font-size: 14px;
+}
+.game-root .club-page .game-row-name {
+  font-weight: 800;
+  font-size: 16px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rows: 56px+, hairline separated. */
+.club-page .game-rows {
+  gap: 0;
+}
+.club-page .club-card .game-row,
+.club-page .game-card-dark:not(.club-war-banner) .game-row {
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 8px 6px;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.club-page .game-rows > li + li {
+  border-top: 1px solid var(--divider);
+}
+.club-page .game-row-clickable:active {
+  background: var(--row);
+}
+.club-page .game-row.is-me {
+  background: #f6e3fa;
+  box-shadow: inset 0 0 0 2px var(--shop-accent);
+}
+.club-page .game-row:focus-visible {
+  outline: 3px solid var(--shop-accent-dark);
+  outline-offset: -3px;
+}
+.club-page .game-btn-sm {
+  min-height: 44px;
+}
+
+/* --- Banner (my club / other club) ------------------------------------- */
+.club-page .club-banner {
+  align-items: stretch;
+  text-align: left;
+  gap: 12px;
+}
+.club-page .club-banner-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.club-page .club-banner-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.club-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.club-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: var(--row);
+  border: 2px solid var(--border-soft);
+  min-width: 0;
+}
+.club-stat-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--text-title-dark);
+  font-variant-numeric: tabular-nums;
+}
+.game-root .club-stat-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .club-page .club-description {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.game-root .club-page .club-description-empty {
+  color: var(--text-muted-dark);
+  font-style: italic;
+}
+.club-page .club-desc-edit-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2px solid var(--border-soft);
+  background: var(--white);
+  color: var(--text-body-dark);
+  font-weight: 800;
+  font-size: 14px;
+}
+.game-root .club-page .club-desc-edit-btn {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+
+/* Role chips: calm, distinct, never relying on colour alone (text inside). */
+.game-root .club-role {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: 0;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .club-role.role-leader {
+  background: #fff1c9;
+  border-color: #e0b64a;
+  color: #6b4a00;
+}
+.game-root .club-role.role-co_leader {
+  background: #f1dcf7;
+  border-color: #cf8ee0;
+  color: #6c1b80;
+}
+.game-root .club-role.role-member {
+  background: var(--row);
+  border-color: var(--border-soft);
+  color: var(--text-body-dark);
+}
+.game-root .club-you-tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--shop-accent);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 800;
+  vertical-align: middle;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-root .club-page .club-rank {
+  min-width: 22px;
+  text-align: center;
+  font-family: var(--font-display);
+  color: var(--text-muted-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.club-page .club-row-more {
+  margin-left: auto;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted-dark);
+  font-size: 22px;
+}
+
+/* --- Treasury ----------------------------------------------------------- */
+.club-page .club-treasury {
+  border-top: 1px solid var(--divider);
+  padding-top: 12px;
+}
+.club-page .club-donate {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.club-page .game-club-input {
+  min-height: 48px;
+  box-sizing: border-box;
+  background: var(--white);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+}
+.game-root .club-page .game-club-input {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+.club-page .game-club-input:focus {
+  outline: none;
+  border-color: var(--shop-accent-dark);
+  box-shadow: 0 0 0 3px rgba(190, 46, 214, 0.4);
+}
+
+/* --- Leave --------------------------------------------------------------- */
+.club-page .club-leave {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+.club-leave-btn {
+  min-height: 48px;
+  border: 2px solid var(--red-700);
+  border-radius: 14px;
+  background: var(--white);
+  color: var(--red-text);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.club-leave-btn:active {
+  background: var(--red-tint);
+}
+.game-root .club-leave-btn,
+.game-root .club-confirm-text,
+.game-root .club-counter,
+.game-root .club-hint {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.club-confirm-text {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-body-dark);
+}
+
+/* --- Create / browse ----------------------------------------------------- */
+.club-page .club-create {
+  gap: 12px;
+}
+.club-counter {
+  margin: 0;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted-dark);
+}
+.club-hint {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted-dark);
+}
+.club-page .club-create .club-need-coins .game-card-empty {
+  margin: 0;
+}
+.club-need-coins {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.club-page .club-create-btn {
+  position: sticky;
+  bottom: 8px;
+}
+.club-page .club-search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* --- States -------------------------------------------------------------- */
+.club-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  text-align: center;
+}
+.game-root .club-state-title {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--text-title-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.game-root .club-state-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-body-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.club-sk-tabs {
+  display: block;
+  height: 44px;
+  border-radius: 14px;
+}
+.club-sk-banner {
+  display: block;
+  height: 150px;
+  border-radius: 18px;
+}
+.club-sk-row {
+  display: block;
+  height: 56px;
+  border-radius: 14px;
+  margin: 6px 0;
+}
+
+/* --- Club War: the one dark indigo accent -------------------------------- */
+.club-page .club-war-banner {
+  background: linear-gradient(180deg, #38337f 0%, #25225c 100%);
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 3px 0 var(--ink);
+  color: #fff;
+}
+.game-root .club-page .club-war-banner .game-row-name,
+.game-root .club-page .club-war-banner .game-card-title,
+.game-root .club-page .club-war-banner .game-row-meta,
+.game-root .club-page .club-war-banner .club-war-score {
+  font-family: var(--font-body);
+  color: #fff;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .club-page .club-war-banner .game-row-meta {
+  color: #d9d6ff;
+}
+.game-root .club-page .club-war-banner .club-war-score {
+  font-family: var(--font-display);
+  font-size: 28px;
+}
+.club-page .club-war-vs {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+.club-page .club-war-vs-badge {
+  background: #fff;
+  border-color: var(--ink);
+  color: #25225c;
+}
+.game-root .club-page .club-war-phase {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+.game-root .club-page .club-war-phase.phase-completed.is-won {
+  background: var(--green-500, #3aa84a);
+  border-color: var(--green-700, #268a3a);
+  font-size: 16px;
+  padding: 6px 20px;
+}
+.game-root .club-page .club-war-phase.phase-completed.is-lost {
+  background: var(--red-500, #d93025);
+  border-color: var(--red-700, #a82218);
+  font-size: 16px;
+  padding: 6px 20px;
+}
+.game-root .club-page .club-war-phase.phase-completed.is-draw {
+  background: #6b6759;
+  border-color: #4a473d;
+  font-size: 16px;
+  padding: 6px 20px;
+}
+.club-page .club-war-score-bar {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #ff8a80;
+  border: 2px solid var(--ink);
+  overflow: hidden;
+}
+.club-page .club-war-score-bar-fill {
+  height: 100%;
+  background: #7be08a;
+  transition: width 0.4s ease;
+}
+.club-page .club-war-banner .game-btn-wood {
+  min-height: 44px;
+}
+
+/* Matchup rosters sit on cream cards under the banner. */
+.game-root .club-page .club-war-matchup-col-name,
+.game-root .club-page .club-war-matchup-col-trophies,
+.game-root .club-page .club-war-points,
+.game-root .club-page .club-war-prep-progress {
+  font-family: var(--font-body);
+  color: var(--text-title-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.club-page .club-war-history-btn {
+  min-height: 56px;
+}
+
+/* History cards. */
+.game-root .club-page .club-war-history-name,
+.game-root .club-page .club-war-history-hero,
+.game-root .club-page .club-war-history-points,
+.game-root .club-page .club-war-history-result {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .club-page .club-war-history-name {
+  color: var(--text-title-dark);
+}
+.game-root .club-page .club-war-history-hero {
+  color: var(--text-muted-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .club-page .club-war-score-bar-fill {
+    transition: none;
+  }
+}

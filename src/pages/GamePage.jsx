@@ -9,13 +9,17 @@ import {
   useState,
 } from 'react'
 import { getRunMode, getRunModeLabel } from '../utils/runModeLabel'
+import RunResultCard from '../components/RunResultCard'
+import {
+  CHEAT_COPY_NEUTRAL,
+  checksTerritory,
+  postRunModeOf,
+  shouldShowRunRewards,
+  showsRejection,
+} from '../utils/postRun'
 import {
   IconCheck,
   IconChevronDown,
-  IconChevronRight,
-  IconInstagram,
-  IconCopy,
-  IconLock,
   IconClose,
   IconCrosshairs,
   IconEnvelope,
@@ -23,11 +27,8 @@ import {
   IconFlagCheckered,
   IconFlagScope,
   IconHelmet,
-  IconLogout,
   IconMenuOrb,
   IconBolt,
-  IconClock,
-  IconMusicNote,
   IconPause,
   IconPlay,
   IconRunning,
@@ -37,8 +38,6 @@ import {
   IconTrophy,
   IconUser,
   IconUsers,
-  IconVolumeMute,
-  IconVolumeUp,
 } from '../components/GameIcons'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -52,7 +51,6 @@ import { useAuthFlow } from '../hooks/useAuthFlow'
 import { useDailyNudge } from '../hooks/useDailyNudge'
 import { scheduleDailyNudge } from '../utils/dailyNudge'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import NotificationsSection from '../components/NotificationsSection'
 import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
 // Dynamically imported (not bundled with the rest of the game) - a logged-
 // in player never triggers this import at all, so it doesn't add to the
@@ -139,16 +137,10 @@ import {
   haversineDistance,
   toLocalDateTimeString,
 } from '../utils/run'
-import {
-  SHARE_VARIANTS,
-  downloadBlob,
-  exportShareCardBlob,
-} from '../utils/shareCanvas'
-import {
-  isSfxMuted,
-  playSfx,
-  setSfxMuted as persistSfxMuted,
-} from '../utils/gameSound'
+import { playSfx } from '../utils/gameSound'
+import { resumeAudio, routeElement } from '../utils/audioGraph'
+import { useAudioVolumes } from '../hooks/useAudioVolumes'
+import GameSettings from '../components/GameSettings'
 import { installUiSounds } from '../utils/uiSounds'
 import useDefaultHeroBootstrap from '../hooks/useDefaultHeroBootstrap'
 import { isCometHero, isPlaceholderHero } from '../utils/hero'
@@ -189,6 +181,9 @@ import EmoteShowcase from '../components/EmoteShowcase'
 import MedalGrid from '../components/MedalGrid'
 import ChallengePrompt from '../components/ChallengePrompt'
 import BroadcastPrompt from '../components/BroadcastPrompt'
+import GameTour from '../components/GameTour'
+import { useGameTour } from '../hooks/useGameTour'
+import { tourWaitReason } from '../utils/tour'
 import GameLegalModal from '../components/game-legal/GameLegalModal'
 import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
 import RunRewardsModal from '../components/RunRewardsModal'
@@ -204,8 +199,7 @@ import {
   iosShopRedirectBlocked,
   openShopPack,
 } from '../utils/siteUrl'
-import { copyText, openExternal, openMailto } from '../utils/externalLink'
-import { GAME_CONTACT_EMAIL } from '../constants/gameLegal'
+import { openExternal } from '../utils/externalLink'
 import { App as CapacitorApp } from '@capacitor/app'
 import { isNative } from '../utils/geo'
 import HeroDetailModal from '../components/HeroDetailModal'
@@ -213,10 +207,12 @@ import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
 import GameLoadingBackdrop from '../components/GameLoadingBackdrop'
 import MailBadgeIcon from '../components/MailBadgeIcon'
-import MapStylePicker from '../components/MapStylePicker'
 import LeaderboardPodium, {
+  LeaderboardEmpty,
+  LeaderboardError,
   LeaderboardSkeleton,
 } from '../components/LeaderboardPodium'
+import Tabs from '../game/ui/Tabs'
 import SponsorBannerCarousel from '../components/SponsorBannerCarousel'
 import RouteTurnIndicator from '../components/RouteTurnIndicator'
 import { getRouteGuidance } from '../utils/routeNav'
@@ -241,7 +237,7 @@ import '../game/styles/tokens.css'
 import './GamePage.css'
 import '../components/GameCards.css'
 import '../game/ui/gameSkin.css'
-import { GameModal, GameActions, StatChip, StatRow } from '../game/ui/GameModal'
+import { GameModal, GameActions } from '../game/ui/GameModal'
 
 function formatMeters(meters) {
   if (!meters) return '0 m'
@@ -446,7 +442,6 @@ const PVP_ALERT_COPY = {
 const IDLE_NUDGE_MS = 7 * 1000
 const IDLE_NUDGE_SNOOZE_MS = 3 * 60 * 1000
 
-const MUSIC_MUTED_KEY = 'fahhkit_territory_music_muted'
 const MILESTONE_METERS = 1000
 const ROUTES_PAGE_SIZE = 5
 const MY_RUNS_PAGE_SIZE = 5
@@ -613,11 +608,23 @@ function GamePageInner() {
   // check needs, since a denied/unavailable location should fail the check
   // open (nothing shown), not silently check Kathmandu's rollout status.
   // See hooks/useRolloutStatus.js.
-  const rolloutStatus = useRolloutStatus(liveLocation)
+  // resumeTick: bumped when the app returns from the background, so the
+  // check runs again on the next fresh fix. userId: a different player
+  // signing in starts from a clean slate.
+  const [resumeTick, setResumeTick] = useState(0)
+  const rolloutStatus = useRolloutStatus(liveLocation, {
+    userId: user?.id ?? null,
+    resumeTick,
+  })
   // Location permission denied (watchPosition error code 1) - its own
   // message, deliberately NOT the "not rolled out" lock: we can't tell where
   // the player is, so nothing is locked (unknown rollout state = available).
   const [locationDenied, setLocationDenied] = useState(false)
+  const locationDeniedRef = useRef(false)
+  locationDeniedRef.current = locationDenied
+  // Bumped to restart the standing GPS watch (permission granted after the
+  // watch already started, or the player came back from Settings).
+  const [gpsRestartTick, setGpsRestartTick] = useState(0)
   // Positively outside a rolled-out area -> the whole game is halted and
   // greyed out. Settings/Profile(Me)/Shop stay usable. Never applies mid-run
   // (a run already underway is never yanked away).
@@ -757,6 +764,7 @@ function GamePageInner() {
   const [openClubId, setOpenClubId] = useState(null)
   const [storeCatalog, setStoreCatalog] = useState([])
   const [shopSection, setShopSection] = useState('heroes')
+
   // The Territory / Trail preview sheet: which item (by id) and which shelf.
   const [colorPreview, setColorPreview] = useState(null)
   // Buy confirm pop-up: request in flight / its own error line.
@@ -838,8 +846,19 @@ function GamePageInner() {
   // cycle, and the back-button layer below reads it fresh on every actual
   // button press rather than whatever it was at GamePage's last render.
   const authBackRef = useRef(null)
+  // The first-time tour (see useGameTour below): Back = previous step, or
+  // close (same as Skip) on the first one. A ref so this earlier hook always
+  // reads the tour's latest state.
+  const tourBackRef = useRef({ active: false, close: () => {} })
+  // True while the tour is showing or about to - the idle nudge (written
+  // earlier in this component than the tour hook) holds off for it.
+  const tourBusyRef = useRef(false)
   const backButton = useAndroidBackButton({
     layers: [
+      {
+        isOpen: () => tourBackRef.current.active,
+        close: () => tourBackRef.current.close(),
+      },
       // A cloud transition in progress: Back cancels it cleanly.
       {
         isOpen: () => portalActiveRef.current,
@@ -892,7 +911,6 @@ function GamePageInner() {
   // has no points, so this is built from the local pendingRun data plus the
   // id/avgPace the backend hands back.
   const [completedRun, setCompletedRun] = useState(null)
-  const [downloadingMap, setDownloadingMap] = useState(false)
   // The score breakdown the backend already pushes over the socket for
   // every scored run (RunScoreBreakdownResponse, see onRunProcessed below)
   // - previously only read to pick a rejection message, never to show the
@@ -901,26 +919,13 @@ function GamePageInner() {
   // push at all for that mode - see TerritoryProcessingServiceImpl).
   const [runScoreBreakdown, setRunScoreBreakdown] = useState(null)
 
-  // Background music mute, remembered across sessions like the avatar
-  // choice — nobody wants the game to start blaring music again after they
-  // muted it and closed the tab.
-  const [musicMuted, setMusicMuted] = useState(() => {
-    try {
-      return localStorage.getItem(MUSIC_MUTED_KEY) === 'true'
-    } catch {
-      return false
-    }
-  })
+  // Music + Sound-effects volume sliders (Settings > Sound): 0-100, saved on
+  // every change, applied live and restored on launch (hooks/useAudioVolumes).
+  // 0 = muted - the old on/off meaning - so the music effect below still just
+  // pauses the track then. Old on/off values are migrated in utils/audioSettings.
+  const volumes = useAudioVolumes()
+  const { musicMuted } = volumes
   const musicRef = useRef(null)
-  // Sound effects mute (the Settings row below Music) - independent of
-  // musicMuted above, same "remembered across sessions" reasoning. Default
-  // unmuted (isSfxMuted() reads gameSound.js's own module-level flag,
-  // itself already synced from localStorage at import time - see that
-  // file's own comment on why that has to happen before any component
-  // mounts, not inside this initializer). React state only exists here so
-  // toggling the Settings row re-renders; gameSound.js's playSfx is what
-  // actually checks the flag on every play.
-  const [sfxMuted, setSfxMutedState] = useState(() => isSfxMuted())
   // The game starts itself (globe dive, then music - see the music effect
   // further down) the instant gameReady flips true - no "tap anywhere to
   // begin" gesture to wait on.
@@ -1147,6 +1152,9 @@ function GamePageInner() {
           // Kept (like useRunTracker's points) so the heading cone and
           // Blaze's run animation also work outside a tracked run.
           accuracy: position.coords.accuracy,
+          // When the OS took this fix - the rollout check ignores a stale
+          // (cached) one, see utils/gpsFix.js.
+          timestamp: position.timestamp,
           speed: position.coords.speed ?? null,
           heading: position.coords.heading ?? null,
         }
@@ -1179,6 +1187,47 @@ function GamePageInner() {
       clearTimeout(timeout)
       navigator.geolocation.clearWatch(watchId)
     }
+  }, [isAuthed, gpsRestartTick])
+
+  // Location permission asked AFTER login: the watch above started before the
+  // player answered the prompt, so when the answer is "allow" restart it and
+  // the first fix flows straight into the rollout check.
+  useEffect(() => {
+    if (!isAuthed || !navigator.permissions?.query) return undefined
+    let status = null
+    let cancelled = false
+    navigator.permissions
+      .query({ name: 'geolocation' })
+      .then((result) => {
+        if (cancelled) return
+        status = result
+        status.onchange = () => {
+          if (status.state !== 'granted') return
+          setLocationDenied(false)
+          setGpsRestartTick((n) => n + 1)
+        }
+      })
+      .catch(() => {
+        // Permissions API unsupported here - the watch's own callbacks cover it.
+      })
+    return () => {
+      cancelled = true
+      if (status) status.onchange = null
+    }
+  }, [isAuthed])
+
+  // Back from the background: re-check the rollout status on the next fresh
+  // fix, and if location was denied meanwhile (the player may have switched
+  // it on in Settings) start the GPS watch again.
+  useEffect(() => {
+    if (!isAuthed) return undefined
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      setResumeTick((n) => n + 1)
+      if (locationDeniedRef.current) setGpsRestartTick((n) => n + 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [isAuthed])
 
   // Territory-capture rollout request (see api/territoryRollout.js) - the
@@ -1260,13 +1309,24 @@ function GamePageInner() {
   // The run whose result toast is currently showing; once its outcome is
   // known, the territory-event poll for it stops early.
   const watchedRunIdRef = useRef(null)
+  // Mode of the run being watched (utils/postRun.js) - decides whether a
+  // server outcome may show territory wording at all.
+  const watchedModeRef = useRef(null)
   const settledRunIdRef = useRef(null)
 
   function showRunOutcome(outcome) {
+    // Only a Conquer run is judged on territory: Training / PvP / Club War
+    // never open a "loop not closed" style popup (a cheat flag still does,
+    // with copy that doesn't talk about territory).
+    const mode = watchedModeRef.current
+    if (!showsRejection(mode, outcome)) return false
     const rejection = describeRunRejection(outcome)
     if (!rejection) return false
     settledRunIdRef.current = outcome.runId
-    setRunResult({ phase: 'rejected', ...rejection })
+    setRunResult({
+      phase: 'rejected',
+      ...(checksTerritory(mode) ? rejection : CHEAT_COPY_NEUTRAL),
+    })
     // Still worth checking for XP - a rejected loop (didn't close, or a
     // rival contested it) still earns the run's effort-based distance XP;
     // only CHEAT_DETECTED skips XP entirely, which this naturally shows as
@@ -1897,12 +1957,28 @@ function GamePageInner() {
     return () => clearInterval(check)
   }, [playerMoving])
 
+  const [xpReward, setXpReward] = useState(null)
+  // Post-run sequence bookkeeping: the run whose reward lookup has finished,
+  // and the run whose rewards/image step the player already dismissed (so it
+  // can never re-open for the same run).
+  const [rewardsSettledRunId, setRewardsSettledRunId] = useState(null)
+  const [postRunDismissedId, setPostRunDismissedId] = useState(null)
+  // The rewards / run-image sequence is on screen (same rule that mounts it).
+  const runRewardsOpen = shouldShowRunRewards({
+    resultOpen: Boolean(runResult),
+    run: completedRun,
+    dismissedId: postRunDismissedId,
+    settledId: rewardsSettledRunId,
+    hasXp: Boolean(xpReward),
+    hasScore: runScoreBreakdown?.totalScore != null,
+  })
   const [idleNudgeOpen, setIdleNudgeOpen] = useState(false)
   const idleDelayRef = useRef(IDLE_NUDGE_MS)
   // Only nag when it makes sense: game on screen, nothing running or
   // waiting to submit, no menu/sheet/toast in the way.
   const canNudge =
     gameReady &&
+    !tourBusyRef.current &&
     !introPlaying &&
     tracker.status !== 'tracking' &&
     !tracker.pendingRun &&
@@ -1911,6 +1987,7 @@ function GamePageInner() {
     !coinShopOpen &&
     !viewingProfile &&
     !runResult &&
+    !runRewardsOpen &&
     !saveError &&
     !playerMoving
   useEffect(() => {
@@ -2015,19 +2092,25 @@ function GamePageInner() {
   // race/war run just logged) to drive the XP reward popup. Cleared after
   // use, and on a failed submit, so it never pairs with some later run.
   const runXpBeforeRef = useRef(null)
-  const [xpReward, setXpReward] = useState(null)
   async function refreshProfileAfterRun() {
+    const runId = watchedRunIdRef.current
     const before = runXpBeforeRef.current
     runXpBeforeRef.current = null
-    const after = await refreshProfile()
-    if (!before || !after) return
-    if (after.xp > before.xp || after.level > before.level) {
-      setXpReward({
-        beforeLevel: before.level,
-        beforeXp: before.xp,
-        afterLevel: after.level,
-        afterXp: after.xp,
-      })
+    try {
+      const after = await refreshProfile()
+      if (!before || !after) return
+      if (after.xp > before.xp || after.level > before.level) {
+        setXpReward({
+          beforeLevel: before.level,
+          beforeXp: before.xp,
+          afterLevel: after.level,
+          afterXp: after.xp,
+        })
+      }
+    } finally {
+      // The reward lookup is over (XP found or not) - the post-run sequence
+      // can now fall back to the run image alone for a run with no rewards.
+      setRewardsSettledRunId(runId)
     }
   }
 
@@ -2150,7 +2233,10 @@ function GamePageInner() {
     if (!gameReady) return
     const audio = musicRef.current
     if (!audio) return
-    audio.volume = 0.35
+    // Level comes from the Music slider through a gain node (utils/audioGraph)
+    // - an <audio> element's own .volume is ignored on iOS. The element still
+    // loops/plays/pauses exactly as before, it just feeds the graph.
+    routeElement(audio, 'music', 1)
 
     // Actually paused when muted (not just audio.muted = true) - a muted-
     // but-still-playing element doesn't make sound either way, but the
@@ -2164,6 +2250,7 @@ function GamePageInner() {
     let retrying = false
 
     function tryPlay() {
+      resumeAudio()
       audio
         .play()
         .then(() => {
@@ -2234,30 +2321,6 @@ function GamePageInner() {
     if (!gameReady) return undefined
     return installUiSounds()
   }, [gameReady])
-
-  function toggleMusicMuted() {
-    setMusicMuted((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem(MUSIC_MUTED_KEY, String(next))
-      } catch {
-        // Preference just won't persist past reload.
-      }
-      return next
-    })
-  }
-
-  // Same shape as toggleMusicMuted above, just delegating the actual
-  // persistence (and cutting off any effect mid-play) to gameSound.js's
-  // setSfxMuted, which is also what playSfx itself reads - this is purely
-  // the React side of that one shared flag.
-  function toggleSfxMuted() {
-    setSfxMutedState((prev) => {
-      const next = !prev
-      persistSfxMuted(next)
-      return next
-    })
-  }
 
   // Plays a rising chime every time a tracked run crosses a new 1km
   // multiple — lastMilestoneRef resets to 0 whenever tracking (re)starts so
@@ -3088,60 +3151,6 @@ function GamePageInner() {
     tracker.clearPendingRun()
   }
 
-  // Exports and saves the map-snapshot share card straight to the device —
-  // no picker screen first. Athletes just finished a run and want the file,
-  // not another UI to navigate; the other share-card styles (transparent
-  // route, brand gradient) still live on the run's detail page for anyone
-  // who wants to post it.
-  // Distance/pace/time strip shown on every phase of the post-run toast —
-  // the run's own stats, independent of whatever the territory-processing
-  // phase (still checking / done / timed out) has to say.
-  // Distance/pace/time only - the score breakdown that used to render
-  // right under this (RunScoreCard) now lives in the unified post-run
-  // RunRewardsModal instead, shown once this toast is dismissed (see the
-  // AnimatePresence block near the end of this render).
-  function renderCompletedRunStats() {
-    if (!completedRun) return null
-    return (
-      <StatRow>
-        <StatChip
-          icon={<IconRunning />}
-          value={formatDistance(completedRun.distance)}
-          label="Distance"
-        />
-        <StatChip
-          icon={<IconBolt />}
-          value={formatPace(completedRun.avgPace)}
-          label="Pace"
-        />
-        <StatChip
-          icon={<IconClock />}
-          value={formatDuration(completedRun.duration)}
-          label="Time"
-        />
-      </StatRow>
-    )
-  }
-
-  async function handleDownloadMap() {
-    if (!completedRun) return
-    setDownloadingMap(true)
-    try {
-      const blob = await exportShareCardBlob({
-        points: completedRun.points,
-        distance: completedRun.distance,
-        duration: completedRun.duration,
-        pace: completedRun.avgPace,
-        variant: SHARE_VARIANTS.MAP,
-        mimeType: 'image/jpeg',
-        quality: 0.92,
-      })
-      downloadBlob(blob, `fahhkit-run-${completedRun.id}-map.jpg`)
-    } finally {
-      setDownloadingMap(false)
-    }
-  }
-
   async function attemptSubmit(pendingRun) {
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
@@ -3193,6 +3202,7 @@ function GamePageInner() {
       // territory-event poll), so this needs to be set for every mode, not
       // only the territory-capture one.
       watchedRunIdRef.current = created.id
+      watchedModeRef.current = postRunModeOf(pendingRun)
       settledRunIdRef.current = null
       setCompletedRun({
         id: created.id,
@@ -3207,12 +3217,11 @@ function GamePageInner() {
       })
       discardDraft()
       setSaving(false)
-      // Territory is only ever closed off a plain draw run - a PvP race or
-      // Club War entry logs the run for its own scoring and has nothing to
-      // do with claiming ground, so it skips the territory check/poll
+      // Territory is only ever evaluated for a plain Conquer run. A PvP
+      // race, Club War entry or Training run skips the territory poll
       // entirely instead of showing "Checking your territory…" for a check
-      // that was never going to happen.
-      if (isRace || isWar) {
+      // that was never going to happen (Training: "Run saved!").
+      if (!checksTerritory(postRunModeOf(pendingRun))) {
         setRunResult({ phase: 'submitted' })
         // Club War/Boss Fight runs DO get a score push (pace + base effort
         // only, no territory - see TerritoryProcessingServiceImpl); a PvP
@@ -3790,6 +3799,67 @@ function GamePageInner() {
     saveMapStyleId(style.id)
   }
 
+  // ---- First-time walkthrough (utils/tour.js has the rules) -------------
+  const tourWait = tourWaitReason({
+    gameReady,
+    introPlaying,
+    running: tracker.status === 'tracking' || startCountdown != null,
+    rolloutPopup: rolloutStatus.showModal,
+    broadcast: announcementNotices.queue.length > 0,
+    challenge: Boolean(incomingChallenge),
+    nudge: idleNudgeOpen,
+    modalOpen: Boolean(
+      coinShopOpen ||
+      viewingProfile ||
+      viewingRun ||
+      viewingRoute ||
+      runResult ||
+      saveError ||
+      legalDoc ||
+      pendingRun ||
+      completedRun ||
+      confirmAction ||
+      pvpGate ||
+      weatherHype ||
+      storeChoice ||
+      avatarChoice ||
+      routeNamePromptOpen ||
+      xpReward ||
+      tracker.status === 'permission-denied' ||
+      backButton.exitConfirmOpen
+    ),
+    menuOpen,
+  })
+  const tour = useGameTour({
+    userId: isAuthed ? (user?.id ?? null) : null,
+    user,
+    profile,
+    parcelCount: myParcels.length,
+    locked: gameLocked,
+    wait: tourWait,
+    running: tracker.status === 'tracking',
+  })
+  tourBusyRef.current = tour.active || tour.pending
+  tourBackRef.current = {
+    active: tour.active && !tour.paused,
+    close: tour.index > 0 ? tour.back : tour.skip,
+  }
+  // The tour drives the Play menu (its targets only exist while it is open).
+  const tourRadial = tour.step?.radial
+  const tourActive = tour.active
+  useEffect(() => {
+    if (!tourActive) return undefined
+    setRadialMode('main')
+    setRadialOpen(tourRadial === 'main')
+    return () => setRadialOpen(false)
+  }, [tourActive, tourRadial])
+
+  function startTrainingFromTour() {
+    tour.finish()
+    setRadialOpen(false)
+    handleStartTraining()
+  }
+
   // Territories, runs, and Fahhcoin are all tied to a real account server-side
   // — nothing here works signed out, so the game itself never renders until
   // login is confirmed. userLoading gates this so a page refresh with a still-
@@ -3830,7 +3900,7 @@ function GamePageInner() {
 
   return (
     <div
-      className={`game-page game-root${gameLocked ? ' is-rollout-locked' : ''}`}
+      className={`game-page game-root${gameLocked ? ' is-rollout-locked' : ''}${radialOpen ? ' is-radial-open' : ''}`}
       style={{ '--sheet-h': `${controlsHeight}px` }}
     >
       <audio
@@ -4186,6 +4256,22 @@ function GamePageInner() {
         )}
       </AnimatePresence>
 
+      {tour.active && (
+        <GameTour
+          step={tour.step}
+          index={tour.index}
+          count={tour.steps.length}
+          paused={tour.paused}
+          canStartTraining={!gameLocked}
+          speaker={<HeroSprite size={72} hero={activeHeroName} />}
+          onNext={tour.next}
+          onBack={tour.back}
+          onSkip={tour.skip}
+          onMissing={tour.skipMissing}
+          onStartTraining={startTrainingFromTour}
+        />
+      )}
+
       {legalDoc && (
         <GameLegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
       )}
@@ -4309,6 +4395,7 @@ function GamePageInner() {
                         }}
                         aria-label={item.label}
                         title={item.label}
+                        data-tour={`radial-${item.tab}`}
                       >
                         <item.Icon />
                         {badge > 0 && (
@@ -4850,151 +4937,39 @@ function GamePageInner() {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="game-claim-toast game-claim-toast-center glass-card game-confirm-card"
+              className="run-result-motion"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
             >
-              {/* By the time any phase below renders, attemptSubmit() has
-                  already created the run server-side - whatever the
-                  territory outcome turns out to be, the run itself is
-                  already safely in the athlete's history. */}
-              {/* A PvP race or Club War entry never checks territory - it's
-                  logged for its own scoring and done, so this is a single
-                  terminal phase instead of a processing/done pair. */}
-              {runResult.phase === 'submitted' && (
-                <>
-                  <h3>Run submitted!</h3>
-                  {renderCompletedRunStats()}
-                  {completedRun?.isRace && (
-                    <p className="game-controls-hint">
-                      🏁 Race time logged. Check the PvP tab once your rival
-                      runs too.
-                    </p>
-                  )}
-                  {completedRun?.isWar && (
-                    <p className="game-controls-hint">
-                      ⚔️ War run logged. Check Club Wars once the battle ends.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setRunResult(null)}
-                  >
-                    Nice
-                  </button>
-                </>
-              )}
-              {runResult.phase === 'processing' && (
-                <>
-                  <h3>Run submitted!</h3>
-                  {renderCompletedRunStats()}
-                  <p>Checking your territory…</p>
-                </>
-              )}
-              {runResult.phase === 'rejected' && (
-                <>
-                  <h3>{runResult.title}</h3>
-                  {renderCompletedRunStats()}
-                  <p>{runResult.message}</p>
-                  {runResult.isRolloutRejection && (
-                    <>
-                      {rolloutRequestResult?.alreadyRolledOut && (
-                        <p className="game-settings-row-requested">
-                          Looks like it&apos;s already live here - try your next
-                          run!
-                        </p>
-                      )}
-                      {rolloutRequestResult &&
-                        !rolloutRequestResult.alreadyRolledOut && (
-                          <p className="game-settings-row-requested">
-                            Requested - thanks for letting us know!
-                          </p>
-                        )}
-                      {rolloutRequestError && (
-                        <p className="game-controls-hint game-controls-hint-error">
-                          {rolloutRequestError}
-                        </p>
-                      )}
-                      {!rolloutRequestResult && (
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          disabled={rolloutRequestBusy}
-                          onClick={handleRequestRollout}
-                        >
-                          {rolloutRequestBusy ? 'Sending…' : 'Request Rollout'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => {
-                      setRunResult(null)
-                      setRolloutRequestResult(null)
-                      setRolloutRequestError(null)
-                    }}
-                  >
-                    Got it
-                  </button>
-                </>
-              )}
-              {runResult.phase === 'done' &&
-                (() => {
-                  const { title, totalArea } = summarizeRunEvents(
-                    runResult.events
-                  )
-                  return (
-                    <>
-                      <h3>{title}</h3>
-                      {renderCompletedRunStats()}
-                      <p>
-                        {formatArea(totalArea)} affected across{' '}
-                        {runResult.events.length} update
-                        {runResult.events.length === 1 ? '' : 's'}
-                      </p>
-                      <div className="game-claim-toast-actions">
-                        {completedRun && (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={handleDownloadMap}
-                            disabled={downloadingMap}
-                          >
-                            {downloadingMap ? 'Preparing...' : 'Download Map'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => setRunResult(null)}
-                        >
-                          Nice
-                        </button>
-                      </div>
-                    </>
-                  )
-                })()}
-              {runResult.phase === 'timeout' && (
-                <>
-                  <h3>Still checking your territory…</h3>
-                  {renderCompletedRunStats()}
-                  <p>
-                    Taking a bit longer than usual to confirm whether your loop
-                    closed — check back in a bit if it doesn’t show up here.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setRunResult(null)}
-                  >
-                    OK
-                  </button>
-                </>
-              )}
+              {/* One card for every mode (RunResultCard): Training says "Run
+                  saved!" and never mentions territory; only a Conquer run
+                  ever shows "Checking your territory...". Copy lives in
+                  utils/postRun.js. By the time any phase renders,
+                  attemptSubmit() has already created the run server-side. */}
+              <RunResultCard
+                runResult={runResult}
+                run={completedRun}
+                warPoints={runScoreBreakdown?.totalScore ?? null}
+                summary={
+                  runResult.phase === 'done'
+                    ? summarizeRunEvents(runResult.events)
+                    : null
+                }
+                onClose={() => {
+                  setRunResult(null)
+                  if (runResult.phase === 'rejected') {
+                    setRolloutRequestResult(null)
+                    setRolloutRequestError(null)
+                  }
+                }}
+                rollout={{
+                  result: rolloutRequestResult,
+                  error: rolloutRequestError,
+                  busy: rolloutRequestBusy,
+                  onRequest: handleRequestRollout,
+                }}
+              />
             </motion.div>
           </motion.div>
         )}
@@ -5010,34 +4985,38 @@ function GamePageInner() {
             stats row and the mode (training/club_war/pvp vs plain
             territory); TrackRunPanel's Boss Fight flow is a separate,
             admin-only staging surface this never touches. */}
-        {!runResult &&
-          completedRun &&
-          (xpReward || runScoreBreakdown?.totalScore != null) && (
-            <RunRewardsModal
-              key={completedRun.id}
-              mode={
-                completedRun.isWar
-                  ? 'club_war'
-                  : completedRun.isRace
-                    ? 'pvp'
-                    : completedRun.isTraining
-                      ? 'training'
-                      : 'territory'
-              }
-              stats={completedRun}
-              run={completedRun}
-              xpReward={xpReward}
-              scoreBreakdown={runScoreBreakdown}
-              onDismiss={() => {
-                // Both are checked in the gate above - dismissing must
-                // clear both, or a score-only run (no xpReward) would
-                // leave runScoreBreakdown truthy and the modal would just
-                // re-show itself on the very next render.
-                setXpReward(null)
-                setRunScoreBreakdown(null)
-              }}
-            />
-          )}
+        {/* After the result popup: rewards (XP/score) and then the run
+            image - for EVERY mode with a route. A run with no XP and no
+            score (PvP without XP, a rejected/timed-out Conquer, ...) skips
+            straight to the image once the reward lookup has finished. Once
+            dismissed it never re-opens for the same run. */}
+        {runRewardsOpen && (
+          <RunRewardsModal
+            key={completedRun.id}
+            mode={
+              completedRun.isWar
+                ? 'club_war'
+                : completedRun.isRace
+                  ? 'pvp'
+                  : completedRun.isTraining
+                    ? 'training'
+                    : 'territory'
+            }
+            stats={completedRun}
+            run={completedRun}
+            xpReward={xpReward}
+            scoreBreakdown={runScoreBreakdown}
+            onDismiss={() => {
+              // Both are checked in the gate above - dismissing must
+              // clear both, or a score-only run (no xpReward) would
+              // leave runScoreBreakdown truthy and the modal would just
+              // re-show itself on the very next render.
+              setXpReward(null)
+              setRunScoreBreakdown(null)
+              setPostRunDismissedId(completedRun.id)
+            }}
+          />
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -5211,7 +5190,7 @@ function GamePageInner() {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className={`game-menu-sheet${menuTab === 'race' ? ' is-pvp' : ''}`}
+            className={`game-menu-sheet${menuTab === 'race' ? ' is-pvp' : ''}${menuTab === 'settings' ? ' is-fixed-head' : ''}`}
             ref={menuSheetRef}
             // Opened through the cloud portal: appear in place (the clouds
             // cover it), no slide-up flash.
@@ -5383,135 +5362,91 @@ function GamePageInner() {
               <div className="game-menu-panel game-cards">
                 <SponsorBannerCarousel />
                 <section className="game-card game-card-dark">
-                  <div
-                    className="game-menu-subtabs game-shop-tabs game-leaderboard-mode"
-                    role="tablist"
-                    aria-label="Leaderboard"
-                  >
-                    {/* IconUser/IconUsers reused exactly as-is from the Me/
-                        Club nav tabs and radial menu buttons (RADIAL_ITEMS
-                        above) rather than inventing a separate icon
-                        language just for this tab row. IconTrophy (this
-                        tab's old icon) stays dropped for Players
-                        specifically - it already means "score/rank"
-                        elsewhere on this same screen (the podium medals,
-                        the stat chips), so reusing it here too for "this
-                        is the Players section" reads as the wrong concept.
-                        Label text is back next to the icon (short "Players"/
-                        "Clubs" swapped in under 360px via CSS, see
-                        .game-leaderboard-mode .game-menu-subtab-label in
-                        GamePage.css) - game-shop-tabs' icon-only squircle
-                        sizing is overridden just for this row there too, so
-                        Shop's section tabs stay icon-only.
-                        game-leaderboard-mode only still exists to keep this
-                        row's active state slate instead of the shop's
-                        green, see GamePage.css. */}
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={leaderboardMode === 'individual'}
-                      aria-label="Top Players"
-                      title="Top Players"
-                      className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
-                      onClick={() => switchLeaderboardMode('individual')}
-                    >
-                      <IconUser />
-                      <span className="game-menu-subtab-label">
-                        <span className="label-full">Top Players</span>
-                        <span className="label-short">Players</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={leaderboardMode === 'club'}
-                      aria-label="Top Clubs"
-                      title="Top Clubs"
-                      className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
-                      onClick={() => switchLeaderboardMode('club')}
-                    >
-                      <IconUsers />
-                      <span className="game-menu-subtab-label">
-                        <span className="label-full">Top Clubs</span>
-                        <span className="label-short">Clubs</span>
-                      </span>
-                    </button>
-                  </div>
-
+                  {/* Two selectors, one selection style (shop purple fill +
+                      white text; the rest cream + dark text): Players |
+                      Clubs on top, Global | District/Country under it.
+                      Same state + handlers as before. */}
+                  <Tabs
+                    className="lb-mode-tabs"
+                    accent="shop"
+                    ariaLabel="Leaderboard"
+                    value={leaderboardMode}
+                    onChange={switchLeaderboardMode}
+                    tabs={[
+                      {
+                        id: 'individual',
+                        label: 'Players',
+                        ariaLabel: 'Top Players',
+                        icon: <IconUser aria-hidden="true" />,
+                      },
+                      {
+                        id: 'club',
+                        label: 'Clubs',
+                        ariaLabel: 'Top Clubs',
+                        icon: <IconUsers aria-hidden="true" />,
+                      },
+                    ]}
+                  />
                   {leaderboardMode === 'individual' ? (
-                    <div
-                      className="game-menu-subtabs game-menu-subtabs-scope"
-                      role="tablist"
-                      aria-label="Scope"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={individualScope === 'global'}
-                        className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
-                        onClick={() => switchIndividualScope('global')}
-                      >
-                        <img
-                          src={globeScopeIcon}
-                          alt=""
-                          className="game-menu-subtab-scope-icon"
-                        />
-                        <span className="game-menu-subtab-scope-label">
-                          Global
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={individualScope === 'city'}
-                        className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
-                        onClick={() => switchIndividualScope('city')}
-                      >
-                        <IconFlagScope className="game-menu-subtab-scope-icon" />
-                        <span className="game-menu-subtab-scope-label">
-                          {(individualScope === 'city' &&
-                            leaderboard[0]?.cityName) ||
-                            'District'}
-                        </span>
-                      </button>
-                    </div>
+                    <Tabs
+                      className="lb-scope-tabs"
+                      accent="shop"
+                      size="sm"
+                      ariaLabel="Scope"
+                      value={individualScope}
+                      onChange={switchIndividualScope}
+                      tabs={[
+                        {
+                          id: 'global',
+                          label: 'Global',
+                          icon: (
+                            <img
+                              src={globeScopeIcon}
+                              alt=""
+                              aria-hidden="true"
+                            />
+                          ),
+                        },
+                        {
+                          id: 'city',
+                          label:
+                            (individualScope === 'city' &&
+                              leaderboard[0]?.cityName) ||
+                            'District',
+                          icon: <IconFlagScope aria-hidden="true" />,
+                        },
+                      ]}
+                    />
                   ) : (
-                    <div
-                      className="game-menu-subtabs game-menu-subtabs-scope"
-                      role="tablist"
-                      aria-label="Scope"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={clubScope === 'global'}
-                        className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
-                        onClick={() => switchClubScope('global')}
-                      >
-                        <img
-                          src={globeScopeIcon}
-                          alt=""
-                          className="game-menu-subtab-scope-icon"
-                        />
-                        <span className="game-menu-subtab-scope-label">
-                          Global
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={clubScope === 'national'}
-                        className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
-                        onClick={() => switchClubScope('national')}
-                      >
-                        <IconFlagScope className="game-menu-subtab-scope-icon" />
-                        <span className="game-menu-subtab-scope-label">
-                          {(clubScope === 'national' &&
-                            clubLeaderboard[0]?.countryName) ||
-                            'Country'}
-                        </span>
-                      </button>
-                    </div>
+                    <Tabs
+                      className="lb-scope-tabs"
+                      accent="shop"
+                      size="sm"
+                      ariaLabel="Scope"
+                      value={clubScope}
+                      onChange={switchClubScope}
+                      tabs={[
+                        {
+                          id: 'global',
+                          label: 'Global',
+                          icon: (
+                            <img
+                              src={globeScopeIcon}
+                              alt=""
+                              aria-hidden="true"
+                            />
+                          ),
+                        },
+                        {
+                          id: 'national',
+                          label:
+                            (clubScope === 'national' &&
+                              clubLeaderboard[0]?.countryName) ||
+                            'Country',
+                          icon: <IconFlagScope aria-hidden="true" />,
+                        },
+                      ]}
+                    />
                   )}
 
                   {leaderboardMode === 'individual' &&
@@ -5530,15 +5465,21 @@ function GamePageInner() {
 
                   {leaderboardMode === 'individual' ? (
                     leaderboardError ? (
-                      <p className="game-menu-empty">{leaderboardError}</p>
+                      <LeaderboardError
+                        message={leaderboardError}
+                        onRetry={() => loadLeaderboard()}
+                      />
                     ) : leaderboardLoading && leaderboard.length === 0 ? (
                       <LeaderboardSkeleton />
                     ) : leaderboard.length === 0 ? (
-                      <p className="game-menu-empty">
-                        {individualScope === 'city'
-                          ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
-                          : 'No territory claimed yet — be the first.'}
-                      </p>
+                      <LeaderboardEmpty
+                        message="No runners here yet. Claim territory to get on the board."
+                        hint={
+                          individualScope === 'city'
+                            ? 'District rankings only refresh about once an hour, so a very recent run may not show up yet.'
+                            : undefined
+                        }
+                      />
                     ) : (
                       <LeaderboardPodium
                         nameLabel="Runner"
@@ -5546,6 +5487,8 @@ function GamePageInner() {
                           key: entry.userId,
                           rank: entry.rank,
                           name: playerNameOf(entry),
+                          // Club tag, only when the row already carries one.
+                          sub: entry.clubName || null,
                           // Same "icon + stat" treatment as the Club board's
                           // trophy count below - territory is this board's
                           // equivalent score.
@@ -5574,15 +5517,20 @@ function GamePageInner() {
                       />
                     )
                   ) : leaderboardError ? (
-                    <p className="game-menu-empty">{leaderboardError}</p>
+                    <LeaderboardError
+                      message={leaderboardError}
+                      onRetry={() => loadClubLeaderboard()}
+                    />
                   ) : leaderboardLoading && clubLeaderboard.length === 0 ? (
                     <LeaderboardSkeleton />
                   ) : clubLeaderboard.length === 0 ? (
-                    <p className="game-menu-empty">
-                      {clubScope === 'national'
-                        ? 'No club has claimed territory in your country yet.'
-                        : 'No club has claimed territory yet.'}
-                    </p>
+                    <LeaderboardEmpty
+                      message={
+                        clubScope === 'national'
+                          ? 'No club has claimed territory in your country yet.'
+                          : 'No clubs here yet. Claim territory with your club to get on the board.'
+                      }
+                    />
                   ) : (
                     <LeaderboardPodium
                       nameLabel="Club"
@@ -5591,7 +5539,14 @@ function GamePageInner() {
                         key: entry.clubId,
                         rank: entry.rank,
                         name: entry.clubName,
-                        badge: <ClubBadge name={entry.clubName} size={40} />,
+                        badge: (size) => (
+                          <ClubBadge name={entry.clubName} size={size} />
+                        ),
+                        // Member count, only when the row already has it.
+                        sub:
+                          typeof entry.memberCount === 'number'
+                            ? `${entry.memberCount} ${entry.memberCount === 1 ? 'member' : 'members'}`
+                            : null,
                         area: (
                           <span className="lb-trophy-stat">
                             <ClubTrophyIcon size={26} />
@@ -5627,6 +5582,7 @@ function GamePageInner() {
                   openClubId={openClubId}
                   onOpenClubHandled={() => setOpenClubId(null)}
                   onViewRoute={handleViewRoute}
+                  onGetCoins={openCoinShop}
                 />
               </div>
             )}
@@ -5657,7 +5613,16 @@ function GamePageInner() {
 
             {menuTab === 'mail' && (
               <div className="game-menu-panel">
-                <MailPanel mailbox={mailbox} onClaimed={handleMailClaimed} />
+                <MailPanel
+                  mailbox={mailbox}
+                  onClaimed={handleMailClaimed}
+                  // Names a gifted item from the catalog when it is already
+                  // loaded (no extra request); otherwise the chip says "Gift
+                  // item".
+                  resolveStoreItem={(id) =>
+                    id ? storeCatalog.find((item) => item.id === id) : null
+                  }
+                />
               </div>
             )}
 
@@ -6003,315 +5968,25 @@ function GamePageInner() {
             )}
 
             {menuTab === 'settings' && (
-              <div className="game-menu-panel game-menu-settings game-cards">
-                {/* TEMP: free Avatar picker hidden - it duplicated the Heroes
-                    (now in the Shop tab). Its images back the matching heroes
-                    instead (see HeroFigure). Restore from git to bring it
-                    back. */}
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={!musicMuted}
-                  className="game-settings-row"
-                  onClick={toggleMusicMuted}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        <IconMusicNote />
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Music
-                      <span className="game-settings-row-sub">
-                        {musicMuted
-                          ? 'Background music off'
-                          : 'Background music on'}
-                      </span>
-                    </span>
-                  </span>
-                  <span
-                    className={`game-switch ${musicMuted ? '' : 'is-on'}`}
-                    aria-hidden="true"
-                  >
-                    <span className="game-switch-knob" />
-                  </span>
-                </button>
-
-                {/* Sound effects - independent of Music above (own state,
-                    own localStorage key, see gameSound.js). Every tap/
-                    menu-pop/milestone-chime effect routes through that
-                    file's playSfx(), which is what actually checks this
-                    setting before playing - toggling it here is just
-                    gameSound.js's setSfxMuted plus this row's own
-                    re-render, same split toggleMusicMuted/the music effect
-                    above already has. */}
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={!sfxMuted}
-                  className="game-settings-row"
-                  onClick={toggleSfxMuted}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        {sfxMuted ? <IconVolumeMute /> : <IconVolumeUp />}
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Sound
-                      <span className="game-settings-row-sub">
-                        Popups and effects
-                      </span>
-                    </span>
-                  </span>
-                  <span
-                    className={`game-switch ${sfxMuted ? '' : 'is-on'}`}
-                    aria-hidden="true"
-                  >
-                    <span className="game-switch-knob" />
-                  </span>
-                </button>
-
-                {/* Every notification control (permission, game alerts) lives
-                    in this one collapsible section. */}
-                <NotificationsSection push={push} />
-
-                <MapStylePicker
-                  styles={MAP_STYLES}
-                  selectedId={mapStyleId}
-                  onSelect={handleChooseMapStyle}
-                />
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={pvp.discoverable}
-                  className="game-settings-row"
-                  onClick={() => {
-                    const next = !pvp.discoverable
-                    // Turning Visibility on = open to challenges, so ask
-                    // (once) to notify them while the app is in the background.
-                    if (
-                      next &&
-                      typeof Notification !== 'undefined' &&
-                      Notification.permission === 'default'
-                    ) {
-                      Notification.requestPermission().catch(() => {})
-                    }
-                    pvp.toggleDiscoverable(next)
-                  }}
-                  disabled={pvp.busy === 'discoverable'}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        <IconCrosshairs />
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Visibility
-                      <span className="game-settings-row-sub">
-                        {pvp.discoverable
-                          ? 'Nearby runners can find & challenge you'
-                          : 'Hidden from nearby runners'}
-                      </span>
-                    </span>
-                  </span>
-                  <span
-                    className={`game-switch ${pvp.discoverable ? 'is-on' : ''}`}
-                    aria-hidden="true"
-                  >
-                    <span className="game-switch-knob" />
-                  </span>
-                </button>
-                {pvp.error && (
-                  <p className="game-controls-hint game-controls-hint-error">
-                    {pvp.error}
-                  </p>
-                )}
-
-                <button
-                  type="button"
-                  className="game-settings-row"
-                  onClick={() => {
-                    // Website-only page: native opens it in the system browser.
-                    if (isNative) openExternal(getSiteUrl('/profile/edit'))
-                    else navigate('/profile/edit')
-                  }}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        <IconUser />
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Edit Profile
-                      <span className="game-settings-row-sub">
-                        You&apos;ll be redirected to your FahhKit account
-                      </span>
-                    </span>
-                  </span>
-                  <IconChevronRight
-                    className="game-settings-row-chevron"
-                    aria-hidden="true"
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  className="game-settings-row"
-                  onClick={() => setLegalDoc('terms')}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        <IconLock />
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Terms &amp; Conditions
-                      <span className="game-settings-row-sub">
-                        The rules of Run Conquest
-                      </span>
-                    </span>
-                  </span>
-                  <IconChevronRight
-                    className="game-settings-row-chevron"
-                    aria-hidden="true"
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  className="game-settings-row"
-                  onClick={() => setLegalDoc('privacy')}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        <IconLock />
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Privacy Policy
-                      <span className="game-settings-row-sub">
-                        What we collect and why
-                      </span>
-                    </span>
-                  </span>
-                  <IconChevronRight
-                    className="game-settings-row-chevron"
-                    aria-hidden="true"
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  className="game-settings-row game-settings-row-danger"
-                  onClick={handleLogout}
-                >
-                  <span className="game-settings-row-label">
-                    <span className="game-settings-row-icon">
-                      <span
-                        className="game-settings-row-icon-badge"
-                        aria-hidden="true"
-                      >
-                        <IconLogout />
-                      </span>
-                    </span>
-                    <span className="game-settings-row-text">
-                      Log Out
-                      <span className="game-settings-row-sub">
-                        Clears your session and returns to the sign-in screen
-                      </span>
-                    </span>
-                  </span>
-                </button>
-
-                <div className="game-settings-contact">
-                  <div className="game-settings-contact-row">
-                    <span
-                      className="game-settings-row-icon-badge"
-                      aria-hidden="true"
-                    >
-                      <IconInstagram />
-                    </span>
-                    <p className="game-settings-contact-text">
-                      Issues? Reach out to us at{' '}
-                      <a
-                        href={INSTAGRAM_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => openExternal(INSTAGRAM_URL, e)}
-                      >
-                        @run_conquest
-                      </a>
-                    </p>
-                  </div>
-                  <div className="game-settings-contact-row">
-                    <span
-                      className="game-settings-row-icon-badge"
-                      aria-hidden="true"
-                    >
-                      <IconEnvelope />
-                    </span>
-                    <p className="game-settings-contact-text">
-                      <a
-                        href={`mailto:${GAME_CONTACT_EMAIL}`}
-                        onClick={(e) => openMailto(GAME_CONTACT_EMAIL, e)}
-                      >
-                        {GAME_CONTACT_EMAIL.split('@')[0]}
-                        <wbr />@{GAME_CONTACT_EMAIL.split('@')[1]}
-                      </a>
-                    </p>
-                    <button
-                      type="button"
-                      className="game-settings-contact-copy"
-                      aria-label="Copy email address"
-                      onClick={async () => {
-                        const ok = await copyText(GAME_CONTACT_EMAIL)
-                        toast.push(
-                          ok
-                            ? 'Copied'
-                            : "Couldn't copy - long-press the address",
-                          { type: ok ? 'success' : 'error', duration: 2000 }
-                        )
-                      }}
-                    >
-                      <IconCopy />
-                    </button>
-                  </div>
-                </div>
-
-                {/* No dedicated About page exists in this app - this is
-                    the closest real equivalent to the "Settings/About
-                    page" the map tile credits need to show up on. */}
-                <p className="game-settings-credits">
-                  Map data © OpenStreetMap contributors, OpenMapTiles,
-                  OpenFreeMap
-                </p>
-              </div>
+              <GameSettings
+                audio={volumes}
+                push={push}
+                mapStyles={MAP_STYLES}
+                mapStyleId={mapStyleId}
+                onSelectMapStyle={handleChooseMapStyle}
+                pvp={pvp}
+                onEditProfile={() => {
+                  // Website-only page: native opens it in the system browser.
+                  if (isNative) openExternal(getSiteUrl('/profile/edit'))
+                  else navigate('/profile/edit')
+                }}
+                onHowToPlay={() => {
+                  setMenuOpen(false)
+                  tour.replay()
+                }}
+                onOpenLegal={setLegalDoc}
+                onLogout={handleLogout}
+              />
             )}
 
             {menuTab === 'shop' && (
@@ -7194,9 +6869,6 @@ function GamePageInner() {
 
 // Minimum gap between foreground catch-up syncs (see syncOnForeground).
 const FOREGROUND_SYNC_MIN_GAP_MS = 20000
-
-// Support contact shown in Settings.
-const INSTAGRAM_URL = 'https://www.instagram.com/runconquest.game/'
 
 export default function GamePage() {
   return (

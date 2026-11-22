@@ -175,12 +175,16 @@
 /* ---------- Stat chips ---------- */
 .gm-stat-row {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  /* Three chips side by side while each can stay >= 76px wide; on a narrower
+     popup (or a huge system font) they wrap instead of squeezing. */
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   gap: 8px;
   margin: 0 0 14px;
 }
 .gm-stat {
+  /* The value sizes itself from THIS chip's width (cqi), so it shrinks
+     instead of overflowing. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -205,7 +209,7 @@
 }
 .gm-stat-value {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: clamp(14px, 21cqi, 24px);
   line-height: 1.1;
   color: var(--ink-navy);
   font-variant-numeric: tabular-nums;
@@ -214,8 +218,23 @@
   text-shadow: none;
   max-width: 100%;
   white-space: nowrap;
+  /* Last resort for an extreme value / huge system font: stay inside the
+     tile (never spill outside it). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gm-stat-unit {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-navy-soft);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
 }
 .gm-stat-label {
+  -webkit-text-stroke: 0;
+  text-shadow: none;
   font-family: var(--font-body);
   font-weight: 800;
   font-size: 11px;

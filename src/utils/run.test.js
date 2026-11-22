@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { computeRunDurationSeconds, formatDurationLabel } from './run'
+import {
+  computeRunDurationSeconds,
+  formatDurationLabel,
+  splitUnit,
+} from './run'
 
 describe('computeRunDurationSeconds', () => {
   it('equals plain elapsed time when pausedMs is 0 (every run before pause existed)', () => {
@@ -55,5 +59,18 @@ describe('formatDurationLabel', () => {
     for (const bad of [null, undefined, NaN, 'abc', -5, Infinity]) {
       expect(formatDurationLabel(bad)).toBe('0s')
     }
+  })
+})
+
+describe('splitUnit', () => {
+  it('moves the unit to its own part', () => {
+    expect(splitUnit('13:13 /km')).toEqual({ value: '13:13', unit: '/km' })
+    expect(splitUnit('125:30 /km')).toEqual({ value: '125:30', unit: '/km' })
+    expect(splitUnit('12.34 km')).toEqual({ value: '12.34', unit: 'km' })
+  })
+  it('leaves unit-less values alone', () => {
+    expect(splitUnit('1:05:09')).toEqual({ value: '1:05:09', unit: null })
+    expect(splitUnit('--')).toEqual({ value: '--', unit: null })
+    expect(splitUnit(null)).toEqual({ value: '--', unit: null })
   })
 })

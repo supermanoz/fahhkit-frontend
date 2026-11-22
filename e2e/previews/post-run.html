@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Post-run preview</title>
+  </head>
+  <body>
+    <!-- Test harness for e2e/post-run.spec.js: mounts the REAL RunResultCard
+         (the post-run popup) and RunRewardsModal / ShareRunCarousel (the run
+         image slide + download buttons) with props handed over via
+         window.__result(props) / window.__image(props). -->
+    <div id="root" class="game-page game-root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import '/src/index.css'
+      import '/src/game/styles/tokens.css'
+      import '/src/pages/GamePage.css'
+      import '/src/game/ui/components.css'
+      import '/src/components/RunRewardsModal.css'
+      import RunResultCard from '/src/components/RunResultCard.jsx'
+      import RunRewardsModal from '/src/components/RunRewardsModal.jsx'
+      import {
+        exportShareCardBlob,
+        cardSize,
+        EXPORT_SCALE,
+      } from '/src/utils/shareCanvas.js'
+
+      const root = createRoot(document.getElementById('root'))
+      let renders = 0
+      // The popup, inside the same layer GamePage puts it in.
+      window.__result = ({ runResult, run, warPoints, summary }) => {
+        root.render(
+          React.createElement(
+            'div',
+            { className: 'game-popup-layer' },
+            React.createElement(
+              'div',
+              { className: 'run-result-motion' },
+              React.createElement(RunResultCard, {
+                key: renders++,
+                runResult,
+                run,
+                warPoints,
+                summary,
+                onClose() {
+                  window.__closed = (window.__closed || 0) + 1
+                },
+                rollout: null,
+              })
+            )
+          )
+        )
+      }
+      // The reward sequence (it opens straight on the image when there is no
+      // XP and no score).
+      window.__image = ({ run, xpReward, scoreBreakdown, mode }) => {
+        root.render(
+          React.createElement(RunRewardsModal, {
+            key: renders++,
+            mode: mode || 'training',
+            stats: run,
+            run,
+            xpReward: xpReward || null,
+            scoreBreakdown: scoreBreakdown || null,
+            onDismiss() {
+              window.__dismissed = (window.__dismissed || 0) + 1
+              root.render(null)
+            },
+          })
+        )
+      }
+      // What a download really produces: size + whether it has an alpha channel.
+      window.__exportInfo = async (variant, run, mime = 'image/png') => {
+        const blob = await exportShareCardBlob({
+          points: run.points,
+          distance: run.distance,
+          duration: run.duration,
+          pace: run.avgPace,
+          variant,
+          mimeType: mime,
+          size: variant === 'overlay' ? 'portrait' : undefined,
+        })
+        const bytes = new Uint8Array(await blob.arrayBuffer())
+        // PNG: IHDR colour type at byte 25 (6 = RGBA).
+        const colorType = bytes[25]
+        const bmp = await createImageBitmap(blob)
+        const c = document.createElement('canvas')
+        c.width = bmp.width
+        c.height = bmp.height
+        const ctx = c.getContext('2d')
+        ctx.drawImage(bmp, 0, 0)
+        const px = ctx.getImageData(2, 2, 1, 1).data
+        const exp = cardSize(
+          variant,
+          variant === 'overlay' ? 'portrait' : undefined
+        )
+        return {
+          type: blob.type,
+          width: bmp.width,
+          height: bmp.height,
+          colorType,
+          cornerAlpha: px[3],
+          expectW: Math.round(exp.w * EXPORT_SCALE),
+          expectH: Math.round(exp.h * EXPORT_SCALE),
+        }
+      }
+      window.__ready = true
+    </script>
+  </body>
+</html>

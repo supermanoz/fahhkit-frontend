@@ -15,12 +15,22 @@
 .sponsor-report-export {
   padding: 9px 18px;
   border-radius: 999px;
-  border: 1.5px solid var(--primary, #e8590c);
+  border: 1.5px solid var(--admin-accent);
   background: transparent;
-  color: var(--primary, #e8590c);
+  color: var(--admin-accent);
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
+}
+.sponsor-report-export:hover:not(:disabled) {
+  background: var(--brand-light);
+}
+.sponsor-report-export:focus-visible,
+.sponsor-report-preset:focus-visible,
+.sponsor-report-custom input:focus-visible,
+.sponsor-report-table th button:focus-visible {
+  outline: 3px solid var(--admin-accent);
+  outline-offset: 2px;
 }
 .sponsor-report-export:disabled {
   opacity: 0.45;
@@ -44,17 +54,20 @@
 .sponsor-report-preset {
   padding: 7px 16px;
   border-radius: 999px;
-  border: 1.5px solid var(--border, #ddd);
+  border: 1.5px solid var(--border);
   background: transparent;
-  color: var(--text, inherit);
+  color: var(--text);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
+.sponsor-report-preset:hover:not(.active) {
+  background: var(--brand-light);
+}
 .sponsor-report-preset.active {
-  background: var(--primary, #e8590c);
-  border-color: var(--primary, #e8590c);
-  color: #fff;
+  background: var(--admin-accent-fill);
+  border-color: var(--admin-accent-fill);
+  color: var(--admin-on-accent);
 }
 
 .sponsor-report-custom {
@@ -62,6 +75,7 @@
   flex-wrap: wrap;
   gap: 12px;
   font-size: 14px;
+  color: var(--text);
 }
 .sponsor-report-custom label {
   display: flex;
@@ -71,12 +85,14 @@
 .sponsor-report-custom input {
   padding: 6px 8px;
   border-radius: 8px;
-  border: 1.5px solid var(--border, #ddd);
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--text);
   font-size: 14px;
 }
 
 .sponsor-report-error {
-  color: #c0392b;
+  color: var(--error);
   font-size: 14px;
 }
 
@@ -88,9 +104,10 @@
 }
 
 .sponsor-report-stat {
-  border: 1.5px solid var(--border, #e4e4e4);
+  border: 1.5px solid var(--admin-line);
   border-radius: 14px;
-  background: var(--surface, #fff);
+  background: var(--admin-card);
+  color: var(--admin-ink);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -98,22 +115,34 @@
 }
 .sponsor-report-stat span {
   font-size: 14px;
-  opacity: 0.75;
+  font-weight: 600;
+  color: var(--admin-muted);
 }
 .sponsor-report-stat strong {
-  font-size: 26px;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--admin-ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .sponsor-report-card {
-  border: 1.5px solid var(--border, #e4e4e4);
+  border: 1.5px solid var(--admin-line);
   border-radius: 14px;
-  background: var(--surface, #fff);
+  background: var(--admin-card);
+  color: var(--admin-ink);
   padding: 16px;
   margin-bottom: 20px;
 }
 .sponsor-report-card h2 {
   margin: 0 0 12px;
   font-size: 18px;
+  color: var(--admin-ink);
+}
+/* Shared helper text (.moderators-muted) uses the page's --muted, which is
+   made for the page background, not for a white card. */
+.sponsor-report-card .moderators-muted {
+  color: var(--admin-muted);
 }
 
 .sponsor-report-chart {
@@ -134,20 +163,60 @@
 .sponsor-report-table td {
   padding: 9px 10px;
   text-align: left;
-  border-bottom: 1px solid var(--border, #eee);
+  border-bottom: 1px solid var(--admin-line);
+  color: var(--admin-ink);
+}
+.sponsor-report-table th {
+  padding-top: 6px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
 }
 .sponsor-report-table .num {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .sponsor-report-table th button {
   all: unset;
+  box-sizing: border-box;
   cursor: pointer;
   font-weight: 700;
   white-space: nowrap;
+  color: inherit;
+  border-radius: 6px;
+}
+.sponsor-report-table th button:hover,
+.sponsor-report-table th[aria-sort='ascending'] button,
+.sponsor-report-table th[aria-sort='descending'] button {
+  color: var(--admin-ink);
+}
+.sponsor-report-table tbody tr:hover,
+.sponsor-report-table tbody tr:focus-within {
+  background: var(--admin-hover);
+}
+.sponsor-report-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sponsor-report-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #ece8e4;
+  color: #4a433d;
+}
+.sponsor-report-chip.on {
+  background: #e1f3e5;
+  color: #17602a;
 }
 
 .sponsor-report-note {
   margin: 12px 0 0;
   font-size: 14px;
-  opacity: 0.75;
+  color: var(--admin-muted);
 }

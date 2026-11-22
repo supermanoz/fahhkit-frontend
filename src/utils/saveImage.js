@@ -1,13 +1,18 @@
 // Saving a run image on the phone. A blob URL + <a download> does nothing
 // inside the Capacitor WebView, so the native app writes the PNG/JPG to a
 // cache file and hands it to the OS instead:
-//   - "Save to Photos": @capacitor-community/media savePhoto (Capacitor 6,
-//     Android + iOS) - the "Run Conquest" album on Android, the camera roll
-//     on iOS (add-only permission; picking an album there would need
-//     getAlbums(), i.e. full photo-library access, so it is skipped).
+//   - "Save to Photos":
+//       Android - our own GallerySave plugin (GallerySavePlugin.java): a
+//       MediaStore insert into Pictures/Run Conquest on Android 10+ with NO
+//       storage permission (a legacy storage permission is requested only on
+//       Android 9 and below).
+//       iOS - @capacitor-community/media savePhoto into the camera roll
+//       (add-only permission; picking an album there would need getAlbums(),
+//       i.e. full photo-library access, so it is skipped).
 //   - "Share": @capacitor/share with the file (the fallback, and its own
 //     button) - the user can pick "Save Image" there.
 // The web keeps using downloadBlob() in shareCanvas.js, untouched.
+import { registerPlugin } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Media } from '@capacitor-community/media'
 import { Share } from '@capacitor/share'
@@ -17,8 +22,12 @@ import {
   IOSSettings,
 } from 'capacitor-native-settings'
 import { platform } from './geo'
+import { EXPORT_MESSAGES } from '../hooks/useExportAction'
 
 export const ALBUM_NAME = 'Run Conquest'
+
+// Android gallery save (android/.../GallerySavePlugin.java).
+const GallerySave = registerPlugin('GallerySave')
 
 export const SAVE_STATUS = Object.freeze({
   SAVED: 'saved',
@@ -48,25 +57,17 @@ async function writeCacheFile(blob, filename) {
   return uri
 }
 
+function mimeTypeOf(blob, filename) {
+  if (blob?.type) return blob.type
+  return /\.jpe?g$/i.test(filename) ? 'image/jpeg' : 'image/png'
+}
+
 function isPermissionError(err) {
   return /denied|permission|authori[sz]/i.test(String(err?.message ?? err))
 }
 
 function isCancelled(err) {
   return /cancel/i.test(String(err?.message ?? err))
-}
-
-// Android's albums are plain folders under Pictures; createAlbum() makes the
-// folder (it rejects when it already exists, which is fine) and the folder
-// path is the album identifier savePhoto wants.
-async function androidAlbumIdentifier() {
-  const { path } = await Media.getAlbumsPath()
-  try {
-    await Media.createAlbum({ name: ALBUM_NAME })
-  } catch (err) {
-    if (!/exist/i.test(String(err?.message ?? err))) throw err
-  }
-  return `${path.replace(/\/+$/, '')}/${ALBUM_NAME}`
 }
 
 // Share sheet with the image file. `cancelled` when the user backs out.
@@ -87,14 +88,17 @@ export async function shareImageFile(blob, filename) {
 export async function saveImageToPhotos(blob, filename) {
   const uri = await writeCacheFile(blob, filename)
   try {
-    const options = {
-      path: uri,
-      fileName: filename.replace(/\.[^.]+$/, ''),
-    }
+    const fileName = filename.replace(/\.[^.]+$/, '')
     if (platform === 'android') {
-      options.albumIdentifier = await androidAlbumIdentifier()
+      await GallerySave.saveImage({
+        path: uri,
+        fileName,
+        mimeType: mimeTypeOf(blob, filename),
+        album: ALBUM_NAME,
+      })
+    } else {
+      await Media.savePhoto({ path: uri, fileName })
     }
-    await Media.savePhoto(options)
   } catch (err) {
     if (isPermissionError(err)) {
       return { status: SAVE_STATUS.PERMISSION_DENIED }
@@ -115,4 +119,26 @@ export function openAppSettings() {
     optionAndroid: AndroidSettings.ApplicationDetails,
     optionIOS: IOSSettings.App,
   })
+}
+
+// What a save/share result means for the export button (see
+// hooks/useExportAction.js): the message to show, or `silent` when the user
+// just closed the share sheet, or `permissionDenied` (the button offers Open
+// Settings).
+export function outcomeFromSave(result, platformName = platform) {
+  switch (result?.status) {
+    case SAVE_STATUS.CANCELLED:
+      return { silent: true }
+    case SAVE_STATUS.PERMISSION_DENIED:
+      return { permissionDenied: true }
+    case SAVE_STATUS.SHARED:
+      return { message: EXPORT_MESSAGES.shared }
+    default:
+      return {
+        message:
+          platformName === 'android'
+            ? EXPORT_MESSAGES.savedGallery
+            : EXPORT_MESSAGES.saved,
+      }
+  }
 }

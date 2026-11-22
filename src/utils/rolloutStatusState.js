@@ -73,6 +73,11 @@ export function rolloutStatusReducer(state, action) {
       }
       return { ...initialRolloutState, phase: PHASE.FAILED }
 
+    // A different player signed in (or the session ended): nothing known
+    // about the previous player's area/request carries over.
+    case 'RESET':
+      return initialRolloutState
+
     case 'DISMISS':
       if (state.phase !== PHASE.NEEDS_REQUEST) return state
       return { ...state, dismissed: true }

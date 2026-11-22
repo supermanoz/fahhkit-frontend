@@ -1,0 +1,323 @@
+/* Settings screen: grouped white cards on the cream sheet, a small section
+   header per group, 56px+ rows with hairlines, shop-purple controls, red only
+   for Log out. Body font, plain dark text (no outline) throughout. */
+
+/* --- Fixed header, scrolling body ---------------------------------------
+   While Settings is open the sheet stops scrolling as a whole: the close X
+   and the section picker stay put and only the cards scroll underneath. */
+.game-menu-sheet.is-fixed-head {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.game-menu-sheet.is-fixed-head > .game-menu-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+/* --- Page + cards ------------------------------------------------------- */
+.game-cards.set-page {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  gap: 18px;
+  padding: 6px 2px 0;
+  box-sizing: border-box;
+}
+
+.set-card {
+  min-width: 0;
+  background: var(--white);
+  border: 2px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: 0 3px 0 var(--border-soft);
+}
+.set-card-title {
+  margin: 0;
+  padding: 12px 16px 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-body-dark);
+}
+.game-root .set-card-title {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.set-card-body > * + *,
+.game-settings-contact > * + * {
+  border-top: 1px solid var(--divider);
+}
+.set-card-body > :first-child {
+  border-top: 1px solid var(--divider);
+}
+
+/* --- Rows (shared by every setting, incl. Notifications / Map style) ---- */
+.set-card .game-settings-row {
+  box-sizing: border-box;
+  min-height: 56px;
+  padding: 8px 16px;
+  border-bottom: 0;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.set-card
+  .game-settings-row:active:not(:disabled):not(.set-static-row):not(
+    .set-email-row
+  ) {
+  background: var(--row);
+}
+.set-card .game-settings-row:focus-visible,
+.set-card .set-logout-btn:focus-visible,
+.set-card .set-email-link:focus-visible {
+  outline: 3px solid var(--shop-accent-dark);
+  outline-offset: -3px;
+}
+.set-card .game-settings-row:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.set-static-row,
+.set-email-row {
+  cursor: default;
+}
+
+/* Titles and helper lines: readable body font, plain dark ink. */
+.game-root .set-card .game-settings-row-text {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-title-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .set-card .game-settings-row-sub {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-muted-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-root .set-card .game-settings-row-icon {
+  width: 44px;
+}
+
+/* Collapsible sections inside a card: their header IS a row; the opened body
+   drops the nested card chrome. */
+.set-card .notif-card {
+  margin: 0;
+  padding: 0 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.set-card .notif-card .game-settings-row {
+  padding-left: 24px;
+}
+.game-root .set-card .notif-group-title {
+  margin: 10px 0 2px;
+  padding: 0 16px;
+  font-family: var(--font-body);
+  color: var(--text-body-dark);
+}
+.set-card .notif-permission-note {
+  padding-left: 60px;
+}
+.set-card .map-style-picker-option {
+  padding-left: 76px;
+  min-height: 52px;
+}
+.game-root .set-card .map-style-picker-name,
+.game-root .set-card .map-style-picker-state,
+.game-root .set-card .notif-permission-btn,
+.game-root .set-card .notif-permission-note {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.set-card .notif-permission-btn {
+  min-height: 44px;
+  border-color: var(--shop-accent-dark);
+  background: var(--shop-accent);
+}
+
+/* --- Switch: purple when on, with the state as text ---------------------- */
+.set-switch {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.set-switch-text {
+  min-width: 26px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-muted-dark);
+}
+.set-switch-text.is-on {
+  color: var(--shop-accent-dark);
+}
+.game-root .set-switch-text {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.set-switch .game-switch.is-on {
+  background: var(--shop-accent);
+  box-shadow:
+    inset 0 3px 0 var(--shop-accent-dark),
+    0 0 10px rgba(190, 46, 214, 0.35);
+}
+
+/* --- Sound sliders ------------------------------------------------------- */
+.set-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px 12px;
+}
+.set-slider-row .game-settings-row-text {
+  padding-left: 4px;
+}
+
+/* --- Help: contact group ------------------------------------------------- */
+.game-settings-contact {
+  display: block;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--divider);
+}
+.game-settings-contact > :first-child {
+  border-top: 0;
+}
+.set-email-row .game-settings-row-label {
+  min-width: 0;
+}
+.game-root .set-email-link {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--shop-accent-dark);
+  text-decoration: underline;
+  /* May only wrap at the @ (a <wbr> before it), never mid-word. */
+  overflow-wrap: normal;
+  word-break: normal;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.game-settings-contact-copy {
+  all: unset;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin: -4px -6px -4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-body-dark);
+  font-size: 22px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.game-settings-contact-copy:active {
+  background: var(--row);
+}
+.game-settings-contact-copy:focus-visible {
+  outline: 3px solid var(--shop-accent-dark);
+}
+.game-settings-contact-copy svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* --- Account: Log out (destructive secondary) ---------------------------- */
+.set-logout-wrap {
+  padding: 12px 16px 14px;
+}
+.set-logout-btn {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 2px solid var(--red-700);
+  border-radius: 14px;
+  background: var(--white);
+  color: var(--red-text);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease;
+}
+.set-logout-btn:active {
+  background: var(--red-tint);
+}
+.set-logout-btn svg {
+  font-size: 20px;
+}
+.game-root .set-logout-btn,
+.game-root .set-confirm-text,
+.game-root .set-static-value {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.set-confirm-text {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-body-dark);
+}
+
+/* --- About --------------------------------------------------------------- */
+.set-static-value {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-muted-dark);
+}
+.set-card .game-settings-credits {
+  margin: 0;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--divider);
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-muted-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.set-error {
+  margin: 0;
+  padding: 8px 16px 12px;
+}

@@ -55,32 +55,29 @@ export function requestRollout(lat, lng) {
 export const ALREADY_ROLLED_OUT_MESSAGE =
   'The game is already rolled out in your city.'
 
-// --- Passive status check - NOT YET IMPLEMENTED on the backend as of this
-// writing. useRolloutStatus.js calls this once per game open to decide
-// silently (no popup, no chip) vs. "show the Request Rollout popup" vs.
-// "show the already-requested chip", WITHOUT creating a request row the way
-// requestRollout() above does - that's the whole reason this needs to be a
-// separate read-only endpoint rather than reusing requestRollout() for the
-// check itself.
-//
-// Backend spec to hand over (read-only GET, composes entirely out of
-// methods CityRolloutRequestServiceImpl already has - isTerritoryCaptureEnabled,
-// existsByUserAndCity, countByCity - plus the existing GeoLocationResolverService):
+// --- Passive status check - read-only, side-effect free (no request row is
+// created), implemented server-side in CityRolloutRequestController
+// (GET /v1/rollout-request/status, backend commit 66e740b on
+// feature/territory-game). useRolloutStatus.js calls it on the first usable GPS
+// fix (and again after moving > 1 km / returning from the background) to decide
+// silently vs. "show the Request Rollout popup" vs. "already requested" chip.
 //
 //   GET /v1/rollout-request/status?lat={lat}&lng={lng}
-//   Auth: logged-in athlete (same as POST /v1/rollout-request)
-//   200 response body (GeneralResponse<CityRolloutStatusResponse>):
+//   Auth: logged-in player (same as POST /v1/rollout-request).
+//   200 body (GeneralResponse<CityRolloutStatusResponse>):
 //     {
-//       cityId: number,
-//       cityName: string,
-//       countryName: string,
-//       rolledOut: boolean,        // territoryRolloutService.isTerritoryCaptureEnabled(city)
-//       alreadyRequested: boolean, // requestRepository.existsByUserAndCity(user, city)
-//       requestCount: number       // requestRepository.countByCity(city) - omit/0 when rolledOut
+//       rolledOut: boolean,        // a rolled-out city's centre is within the
+//                                  // server's match radius (15 km) of lat/lng -
+//                                  // the SAME rule the run gate uses
+//       alreadyRequested: boolean, // this player already asked for the nearest city
+//       cityId: number|null,       // the rolled-out city, else the nearest city
+//       cityName: string|null,
+//       countryName: string|null,
+//       requestCount: number       // 0 when rolledOut
 //     }
-//   Error: LOCATION_NOT_RESOLVED (same code as POST) if lat/lng resolves to no city.
-//   Must NOT insert a CityRolloutRequest row - read-only, side-effect-free, safe to call on
-//   every game open.
+//   An unresolvable location is NOT an error: it comes back as rolledOut:false
+//   with null city fields and requestCount 0 ("not rolled out", like the run
+//   gate). The client treats that like any other "not rolled out" answer.
 export function getRolloutStatus(lat, lng) {
   const query = new URLSearchParams({ lat: String(lat), lng: String(lng) })
   return getJson(`/v1/rollout-request/status?${query}`)

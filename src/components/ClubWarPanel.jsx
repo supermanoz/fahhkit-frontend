@@ -15,6 +15,7 @@ import ClubBadge from './ClubBadge'
 import ClubWarMemberAvatar from './ClubWarMemberAvatar'
 import ClubWarHistory from './ClubWarHistory'
 import ClubWarHeroPicker from './ClubWarHeroPicker'
+import { ClubError } from './ClubStates'
 import { ApiError } from '../api/client'
 import {
   CLUB_WAR_BATTLE_HOURS,
@@ -332,7 +333,7 @@ export default function ClubWarPanel({
     )
   }
   if (loadError) {
-    return <p className="game-menu-empty">{loadError}</p>
+    return <ClubError message={loadError} onRetry={refresh} />
   }
   if (historyOpen) {
     return (
@@ -542,7 +543,9 @@ export default function ClubWarPanel({
     return (
       <div className="game-cards">
         <section className="game-card game-card-dark club-war-banner">
-          <span className={`club-war-phase phase-${war.status.toLowerCase()}`}>
+          <span
+            className={`club-war-phase phase-${war.status.toLowerCase()} ${completed ? (won ? 'is-won' : lost ? 'is-lost' : 'is-draw') : ''}`}
+          >
             {completed
               ? won
                 ? 'Victory!'

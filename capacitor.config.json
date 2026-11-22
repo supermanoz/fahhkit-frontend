@@ -14,8 +14,9 @@
   "plugins": {
     "GoogleAuth": {
       "scopes": ["profile", "email"],
+      "iosClientId": "373328807298-u3i1175icm5sf0t5btqll3q76eg97s9n.apps.googleusercontent.com",
       "androidClientId": "797208432008-o19nbtt7bst014jm3i8efn9gv81n4prd.apps.googleusercontent.com",
-      "serverClientId": "797208432008-o19nbtt7bst014jm3i8efn9gv81n4prd.apps.googleusercontent.com",
+      "serverClientId": "373328807298-0mqn6fo31b2dl9pegngj9l31jqlb501r.apps.googleusercontent.com",
       "forceCodeForRefreshToken": true
     },
     "LocalNotifications": {

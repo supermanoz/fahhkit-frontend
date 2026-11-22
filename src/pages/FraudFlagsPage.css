@@ -22,18 +22,26 @@
 .fraud-status-tab {
   padding: 7px 16px;
   border-radius: 999px;
-  border: 1.5px solid var(--border, #ddd);
+  border: 1.5px solid var(--border);
   background: transparent;
-  color: var(--text, inherit);
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .fraud-status-tab.active {
-  background: var(--primary, #e8590c);
-  border-color: var(--primary, #e8590c);
-  color: #fff;
+  background: var(--admin-accent-fill);
+  border-color: var(--admin-accent-fill);
+  color: var(--admin-on-accent);
+}
+.fraud-status-tab:focus-visible,
+.fraud-flag-main:focus-visible,
+.fraud-run-row:focus-visible,
+.fraud-back-link:focus-visible,
+.fraud-ban-btn:focus-visible {
+  outline: 3px solid var(--admin-accent);
+  outline-offset: 2px;
 }
 
 .fraud-flag-list {
@@ -46,10 +54,11 @@
 }
 
 .fraud-flag-card {
-  border: 1.5px solid var(--border, #e4e4e4);
+  border: 1.5px solid var(--admin-line);
   border-radius: 14px;
   overflow: hidden;
-  background: var(--surface, #fff);
+  background: var(--admin-card);
+  color: var(--admin-ink);
 }
 
 .fraud-flag-main {
@@ -61,6 +70,10 @@
   gap: 12px;
   padding: 14px 16px;
   cursor: pointer;
+  color: var(--admin-ink);
+}
+.fraud-flag-main:hover {
+  background: var(--admin-hover);
 }
 
 .fraud-flag-avatar {
@@ -71,8 +84,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary, #e8590c);
-  color: #fff;
+  background: var(--admin-accent-fill);
+  color: var(--admin-on-accent);
   font-weight: 700;
   font-size: 16px;
 }
@@ -92,7 +105,7 @@
 
 .fraud-flag-reason {
   font-size: 13px;
-  color: var(--text, inherit);
+  color: var(--admin-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -100,7 +113,7 @@
 
 .fraud-flag-meta {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--admin-muted);
 }
 
 .fraud-status-pill {
@@ -111,23 +124,23 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: var(--border, #eee);
-  color: var(--muted);
+  background: #ece8e4;
+  color: #4a433d;
 }
 
 .fraud-status-pill.status-pending {
   background: #fff3cd;
-  color: #8a6400;
+  color: #7a5700;
 }
 
 .fraud-status-pill.status-confirmed {
-  background: var(--error-bg, #fdecea);
-  color: var(--error, #c0392b);
+  background: #fdecea;
+  color: #a12b1e;
 }
 
 .fraud-status-pill.status-dismissed {
-  background: #e6f6ea;
-  color: #1e7a3c;
+  background: #e1f3e5;
+  color: #17602a;
 }
 
 .fraud-flag-actions {
@@ -140,6 +153,27 @@
   flex: 1;
   padding: 8px 10px;
   font-size: 13px;
+}
+.fraud-flag-actions .btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--admin-accent);
+  color: var(--admin-accent-on-card);
+}
+.fraud-flag-actions .btn-outline:hover {
+  background: var(--admin-hover);
+}
+.fraud-flag-actions .btn:focus-visible {
+  outline: 3px solid var(--admin-accent-on-card);
+  outline-offset: 2px;
+}
+
+/* The site-wide orange gradient button is ~3.6:1 with white text; on the admin
+   review queue use the AA-safe solid accent. */
+.fraud-flag-actions .btn-primary {
+  background: var(--admin-accent-fill);
+  background-image: none;
+  border-color: var(--admin-accent-fill);
+  color: var(--admin-on-accent);
 }
 
 .fraud-pager {
@@ -161,7 +195,7 @@
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary, #e8590c);
+  color: var(--admin-accent);
   cursor: pointer;
 }
 
@@ -185,7 +219,7 @@
 
 .fraud-ban-btn.is-confirming {
   background: var(--error, #c0392b);
-  color: #fff;
+  color: var(--admin-on-error);
 }
 
 .fraud-ban-btn:disabled {
@@ -226,9 +260,13 @@
   gap: 10px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1.5px solid var(--border, #e4e4e4);
-  background: var(--surface, #fff);
+  border: 1.5px solid var(--admin-line);
+  background: var(--admin-card);
+  color: var(--admin-ink);
   cursor: pointer;
+}
+.fraud-run-row:hover {
+  background: var(--admin-hover);
 }
 
 .fraud-run-row.is-flagged {
@@ -248,7 +286,7 @@
 
 .fraud-run-meta {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--admin-muted);
 }
 
 .fraud-run-flagged-pill {
@@ -257,8 +295,8 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  background: var(--error-bg, #fdecea);
-  color: var(--error, #c0392b);
+  background: #fdecea;
+  color: #a12b1e;
 }
 
 .fraud-run-detail {
@@ -280,18 +318,20 @@
   gap: 2px;
   padding: 12px 6px;
   border-radius: 12px;
-  border: 1.5px solid var(--border, #e4e4e4);
-  background: var(--surface, #fff);
+  border: 1.5px solid var(--admin-line);
+  background: var(--admin-card);
+  color: var(--admin-ink);
 }
 
 .fraud-run-stat-value {
   font-weight: 800;
   font-size: 15px;
+  color: var(--admin-ink);
 }
 
 .fraud-run-stat-label {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--admin-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

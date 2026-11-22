@@ -37,12 +37,19 @@ import { findIndividualLeaderboard } from '../api/territory'
 import { findPlayerByNickname } from '../api/user'
 import { findNearbyPlayers } from '../api/pvp'
 import { findClubRoutes } from '../api/routes'
+import { resolveFileUrl } from '../api/client'
 import { formatDistance } from '../utils/run'
+import Tabs from '../game/ui/Tabs'
+import Avatar from '../game/ui/Avatar'
+import { GameActions, GameModal } from '../game/ui/GameModal'
 import ClubWarPanel from './ClubWarPanel'
+import { ClubError } from './ClubStates'
 import ClubBadge from './ClubBadge'
 import { playerName, playerNameOf } from '../utils/playerName'
 import './GameCards.css'
+import './game-auth/GameAuth.css'
 import './ClubPanel.css'
+import './ClubRedesign.css'
 
 // How much of the season leaderboard the invite search scans. Name search
 // filters leaderboard pages client-side (/v1/athlete/find and /v1/user/find
@@ -56,6 +63,26 @@ const ROLE_LABEL = {
   LEADER: 'Captain',
   CO_LEADER: 'Vice-Captain',
   MEMBER: 'Member',
+}
+
+function ClubSkeleton() {
+  return (
+    <div className="game-cards club-page" aria-hidden="true">
+      <span className="g-skeleton club-sk-tabs" />
+      <span className="g-skeleton club-sk-banner" />
+      <span className="g-skeleton club-sk-row" />
+      <span className="g-skeleton club-sk-row" />
+      <span className="g-skeleton club-sk-row" />
+    </div>
+  )
+}
+
+function RoleChip({ role }) {
+  return (
+    <span className={`club-role role-${role.toLowerCase()}`}>
+      {ROLE_LABEL[role]}
+    </span>
+  )
 }
 
 function errorText(err, fallback) {
@@ -85,6 +112,8 @@ export default function ClubPanel({
   // Tapping a shared route row - GamePage fetches the full point list and
   // draws it on the map (see Me > My Routes, same callback shape).
   onViewRoute,
+  // Opens the existing Fahhcoin shop (same flow as the PvP screen).
+  onGetCoins,
   // Set by GamePage when a leaderboard club row is tapped - jumps straight
   // to that club's info (own club: its normal "mine" view; any other club:
   // the same public info/roster view browsing uses). Cleared right away via
@@ -545,10 +574,19 @@ export default function ClubPanel({
   }
 
   if (loadingMyClub) {
-    return <p className="game-menu-empty">Loading your club…</p>
+    return <ClubSkeleton />
   }
   if (myClubError) {
-    return <p className="game-menu-empty">{myClubError}</p>
+    return (
+      <ClubError
+        message={myClubError}
+        onRetry={() =>
+          loadMyClub().then((club) => {
+            if (!club) loadClubs('')
+          })
+        }
+      />
+    )
   }
 
   // Guarded by !viewingClub: tapping a club leaderboard row (or any other
@@ -566,43 +604,39 @@ export default function ClubPanel({
     const donateValue = Math.floor(Number(donateAmount))
 
     return (
-      <div className="game-cards">
-        <div className="game-menu-subtabs club-section-tabs">
-          <button
-            type="button"
-            className={`game-menu-subtab ${clubSection === 'mine' ? 'active' : ''}`}
-            onClick={() => setClubSection('mine')}
-          >
-            My Club
-          </button>
-          <button
-            type="button"
-            className={`game-menu-subtab ${clubSection === 'wars' ? 'active' : ''}`}
-            onClick={() => setClubSection('wars')}
-          >
-            Club Wars
-          </button>
-          <button
-            type="button"
-            className={`game-menu-subtab ${clubSection === 'routes' ? 'active' : ''}`}
-            onClick={() => setClubSection('routes')}
-          >
-            Shared Routes
-          </button>
-        </div>
+      <div className="game-cards club-page">
+        <Tabs
+          accent="shop"
+          className="club-section-tabs"
+          ariaLabel="Club sections"
+          value={clubSection}
+          onChange={setClubSection}
+          tabs={[
+            { id: 'mine', label: 'My Club' },
+            { id: 'wars', label: 'Club Wars' },
+            { id: 'routes', label: 'Shared Routes' },
+          ]}
+        />
 
         {clubSection === 'routes' ? (
-          <section className="game-card game-card-dark">
+          <section className="game-card club-card">
             <h3 className="game-card-title game-card-title-sm">
               Shared Routes
             </h3>
             {sharedRoutesError ? (
-              <p className="game-card-empty">{sharedRoutesError}</p>
+              <ClubError
+                message={sharedRoutesError}
+                onRetry={() => {
+                  setSharedRoutesError(null)
+                  setSharedRoutesLoaded(false)
+                }}
+              />
             ) : !sharedRoutesLoaded ? (
-              <p className="game-card-empty">Loading…</p>
+              <span className="g-skeleton club-sk-row" aria-hidden="true" />
             ) : sharedRoutes.length === 0 ? (
-              <p className="game-card-empty">
-                No one&apos;s shared a route with the club yet.
+              <p className="club-state-text">
+                No one&apos;s shared a route with the club yet. Share one from
+                Me → My Routes and it shows up here.
               </p>
             ) : (
               <ul className="game-rows club-shared-route-list">
@@ -650,20 +684,33 @@ export default function ClubPanel({
           />
         ) : (
           <div className="game-cards">
-            <section className="game-card game-card-dark club-banner">
+            <section className="game-card club-card club-banner">
               <div className="club-banner-top">
-                <ClubBadge name={myClub.name} size={56} />
+                <ClubBadge name={myClub.name} size={72} />
                 <div className="club-banner-info">
                   <h3 className="game-card-title">{myClub.name}</h3>
                   <p className="game-row-meta">
-                    {myClub.memberCount} / {CLUB_MAX_MEMBERS} members · Captain{' '}
-                    {playerName(null, myClub.leaderName)}
+                    Captain {playerName(null, myClub.leaderName)}
                   </p>
                   {myRole && (
                     <span className={`club-role role-${myRole.toLowerCase()}`}>
                       You: {ROLE_LABEL[myRole]}
                     </span>
                   )}
+                </div>
+              </div>
+              <div className="club-stats">
+                <div className="club-stat">
+                  <span className="club-stat-value">
+                    {myClub.memberCount}/{CLUB_MAX_MEMBERS}
+                  </span>
+                  <span className="club-stat-label">Members</span>
+                </div>
+                <div className="club-stat">
+                  <span className="club-stat-value">
+                    {treasury ? treasury.balance : '—'}
+                  </span>
+                  <span className="club-stat-label">Treasury</span>
                 </div>
               </div>
               {descDraft !== null ? (
@@ -780,7 +827,7 @@ export default function ClubPanel({
             </section>
 
             {canManage && joinRequests.length > 0 && (
-              <section className="game-card game-card-dark">
+              <section className="game-card club-card">
                 <h3 className="game-card-title game-card-title-sm">
                   Join Requests ({joinRequests.length})
                 </h3>
@@ -855,7 +902,7 @@ export default function ClubPanel({
             )}
 
             {canManage && (
-              <section className="game-card game-card-dark">
+              <section className="game-card club-card">
                 <h3 className="game-card-title game-card-title-sm">
                   Invite Players
                 </h3>
@@ -973,12 +1020,15 @@ export default function ClubPanel({
               </section>
             )}
 
-            <section className="game-card game-card-dark">
+            <section className="game-card club-card">
               <h3 className="game-card-title game-card-title-sm">
                 Members ({roster.length})
               </h3>
               {rosterError ? (
-                <p className="game-card-empty">{rosterError}</p>
+                <ClubError
+                  message={rosterError}
+                  onRetry={() => loadClubDetails(myClub.id)}
+                />
               ) : (
                 <ul className="game-rows club-member-rows">
                   {roster.map((member, index) => {
@@ -1012,16 +1062,20 @@ export default function ClubPanel({
                           }}
                         >
                           <span className="club-rank">{index + 1}</span>
+                          <Avatar
+                            src={resolveFileUrl(member.profilePictureUrl)}
+                            name={playerNameOf(member)}
+                            size={40}
+                          />
                           <span className="game-row-info">
                             <span className="game-row-name">
-                              {isMe ? 'You' : playerNameOf(member)}
+                              {playerNameOf(member)}
+                              {isMe && (
+                                <span className="club-you-tag">You</span>
+                              )}
                             </span>
                             <span className="game-row-meta">
-                              <span
-                                className={`club-role role-${member.role.toLowerCase()}`}
-                              >
-                                {ROLE_LABEL[member.role]}
-                              </span>
+                              <RoleChip role={member.role} />
                             </span>
                           </span>
                           {actions.length > 0 && (
@@ -1044,52 +1098,65 @@ export default function ClubPanel({
 
             <div className="club-leave">
               {leaderMustTransfer ? (
-                <p className="game-card-empty">
+                <p className="club-state-text">
                   You&apos;re the captain - promote a member to vice-captain
                   (they take over when you leave) or make someone captain before
                   leaving.
                 </p>
-              ) : confirmingLeave ? (
-                <>
-                  <p className="club-leave-prompt">
-                    {isLeader && roster.length === 1
-                      ? `You're the only member - leaving disbands ${myClub.name}.`
-                      : `Leave ${myClub.name}?`}
-                  </p>
-                  <span className="game-row-actions">
-                    <button
-                      type="button"
-                      className="game-btn game-btn-red"
-                      onClick={handleLeave}
-                      disabled={leaving}
-                    >
-                      {leaving ? 'Leaving…' : 'Yes, leave'}
-                    </button>
-                    <button
-                      type="button"
-                      className="game-btn game-btn-wood"
-                      onClick={() => setConfirmingLeave(false)}
-                      disabled={leaving}
-                    >
-                      Stay
-                    </button>
-                  </span>
-                </>
               ) : (
                 <button
                   type="button"
-                  className="game-btn game-btn-red"
+                  className="club-leave-btn"
                   onClick={() => setConfirmingLeave(true)}
                 >
                   Leave Club
                 </button>
               )}
-              {leaveError && (
+              {leaveError && !confirmingLeave && (
                 <p className="game-controls-hint game-controls-hint-error">
                   {leaveError}
                 </p>
               )}
             </div>
+            <GameModal
+              open={confirmingLeave && !leaderMustTransfer}
+              onClose={() => !leaving && setConfirmingLeave(false)}
+              tone="danger"
+              title={
+                isLeader && roster.length === 1
+                  ? 'Disband club?'
+                  : 'Leave club?'
+              }
+            >
+              <p className="club-confirm-text">
+                {isLeader && roster.length === 1
+                  ? `You're the only member - leaving disbands ${myClub.name}.`
+                  : `Leave ${myClub.name}?`}
+              </p>
+              {leaveError && (
+                <p className="game-controls-hint game-controls-hint-error">
+                  {leaveError}
+                </p>
+              )}
+              <GameActions>
+                <button
+                  type="button"
+                  className="game-btn game-btn-wood"
+                  onClick={() => setConfirmingLeave(false)}
+                  disabled={leaving}
+                >
+                  Stay
+                </button>
+                <button
+                  type="button"
+                  className="game-btn game-btn-red"
+                  onClick={handleLeave}
+                  disabled={leaving}
+                >
+                  {leaving ? 'Leaving…' : 'Yes, leave'}
+                </button>
+              </GameActions>
+            </GameModal>
           </div>
         )}
       </div>
@@ -1100,7 +1167,7 @@ export default function ClubPanel({
     const requested = joinedRequestIds.includes(viewingClub.id)
     const full = viewingClub.memberCount >= CLUB_MAX_MEMBERS
     return (
-      <div className="game-cards">
+      <div className="game-cards club-page">
         <button
           type="button"
           className="game-btn game-btn-wood club-back"
@@ -1109,17 +1176,24 @@ export default function ClubPanel({
           ‹ All Clubs
         </button>
 
-        <section className="game-card game-card-dark club-banner">
+        <section className="game-card club-card club-banner">
           <div className="club-banner-top">
-            <ClubBadge name={viewingClub.name} size={56} />
+            <ClubBadge name={viewingClub.name} size={72} />
             <div className="club-banner-info">
               <h3 className="game-card-title">{viewingClub.name}</h3>
-              <p className="game-row-meta">
-                {viewingClub.memberCount} / {CLUB_MAX_MEMBERS} members
-                {viewingClub.leaderName
-                  ? ` · Captain ${playerName(null, viewingClub.leaderName)}`
-                  : ''}
-              </p>
+              {viewingClub.leaderName && (
+                <p className="game-row-meta">
+                  Captain {playerName(null, viewingClub.leaderName)}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="club-stats">
+            <div className="club-stat">
+              <span className="club-stat-value">
+                {viewingClub.memberCount}/{CLUB_MAX_MEMBERS}
+              </span>
+              <span className="club-stat-label">Members</span>
             </div>
           </div>
           {viewingClub.description && (
@@ -1146,14 +1220,17 @@ export default function ClubPanel({
           )}
         </section>
 
-        <section className="game-card game-card-dark">
+        <section className="game-card club-card">
           <h3 className="game-card-title game-card-title-sm">
             Members ({viewingRoster.length || viewingClub.memberCount})
           </h3>
           {viewingError ? (
-            <p className="game-card-empty">{viewingError}</p>
+            <ClubError
+              message={viewingError}
+              onRetry={() => openClubInfo(viewingClub)}
+            />
           ) : viewingRoster.length === 0 ? (
-            <p className="game-card-empty">Loading members…</p>
+            <span className="g-skeleton club-sk-row" aria-hidden="true" />
           ) : (
             <ul className="game-rows club-member-rows">
               {viewingRoster.map((member, index) => {
@@ -1180,16 +1257,17 @@ export default function ClubPanel({
                       }}
                     >
                       <span className="club-rank">{index + 1}</span>
+                      <Avatar
+                        src={resolveFileUrl(member.profilePictureUrl)}
+                        name={playerNameOf(member)}
+                        size={40}
+                      />
                       <span className="game-row-info">
                         <span className="game-row-name">
                           {playerNameOf(member)}
                         </span>
                         <span className="game-row-meta">
-                          <span
-                            className={`club-role role-${member.role.toLowerCase()}`}
-                          >
-                            {ROLE_LABEL[member.role]}
-                          </span>
+                          <RoleChip role={member.role} />
                         </span>
                       </span>
                     </div>
@@ -1204,9 +1282,9 @@ export default function ClubPanel({
   }
 
   return (
-    <div className="game-cards">
+    <div className="game-cards club-page">
       <div className="club-cards">
-        <section className="game-card game-card-dark">
+        <section className="game-card club-card">
           <span className="club-emblem club-emblem-lg">
             <IconUsers />
           </span>
@@ -1245,27 +1323,44 @@ export default function ClubPanel({
           </ul>
         </section>
 
-        <section className="game-card game-card-light">
+        <section className="game-card club-card club-create-card">
           <h3 className="game-card-title game-card-title-sm club-create-title">
             Create a Club
           </h3>
           <form className="club-create" onSubmit={handleCreate}>
-            <input
-              type="text"
-              className="game-club-input club-input-light"
-              placeholder="Club name"
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-              maxLength={60}
-            />
-            <input
-              type="text"
-              className="game-club-input club-input-light"
-              placeholder="Description (optional)"
-              value={createDescription}
-              onChange={(e) => setCreateDescription(e.target.value)}
-              maxLength={200}
-            />
+            <div className="game-auth-field">
+              <label className="game-auth-label" htmlFor="club-create-name">
+                Club name
+              </label>
+              <input
+                id="club-create-name"
+                type="text"
+                className="game-auth-input"
+                placeholder="e.g. Night Owls"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                maxLength={60}
+              />
+              <p className="club-counter">{createName.length}/60</p>
+            </div>
+            <div className="game-auth-field">
+              <label className="game-auth-label" htmlFor="club-create-desc">
+                Description (optional)
+              </label>
+              <input
+                id="club-create-desc"
+                type="text"
+                className="game-auth-input"
+                placeholder="A short battle cry for your crew"
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
+                maxLength={200}
+              />
+              <p className="club-counter">{createDescription.length}/200</p>
+            </div>
+            {!createName.trim() && (
+              <p className="club-hint">Give your club a name to continue.</p>
+            )}
             <button
               type="submit"
               className="game-btn game-btn-green game-btn-lg club-create-btn"
@@ -1284,10 +1379,21 @@ export default function ClubPanel({
               )}
             </button>
             {balance < CLUB_CREATION_COST && (
-              <p className="game-card-empty">
-                Starting a club costs {CLUB_CREATION_COST} Fahhcoin - you have{' '}
-                {balance}.
-              </p>
+              <div className="club-need-coins">
+                <p className="game-card-empty">
+                  Starting a club costs {CLUB_CREATION_COST} Fahhcoin - you have{' '}
+                  {balance}.
+                </p>
+                {onGetCoins && (
+                  <button
+                    type="button"
+                    className="game-btn game-btn-wood game-btn-sm"
+                    onClick={onGetCoins}
+                  >
+                    Get Fahhcoin
+                  </button>
+                )}
+              </div>
             )}
             {createError && (
               <p className="game-controls-hint game-controls-hint-error">
@@ -1298,7 +1404,7 @@ export default function ClubPanel({
         </section>
       </div>
 
-      <section className="game-card game-card-dark">
+      <section className="game-card club-card">
         <h3 className="game-card-title game-card-title-sm">Browse Clubs</h3>
         <div className="club-search">
           <IconSearch className="club-search-icon" />
@@ -1323,11 +1429,19 @@ export default function ClubPanel({
         </div>
 
         {browseError ? (
-          <p className="game-card-empty">{browseError}</p>
+          <ClubError
+            message={browseError}
+            onRetry={() => loadClubs(searchText.trim())}
+          />
         ) : loadingClubs ? (
-          <p className="game-card-empty">Loading clubs…</p>
+          <>
+            <span className="g-skeleton club-sk-row" aria-hidden="true" />
+            <span className="g-skeleton club-sk-row" aria-hidden="true" />
+          </>
         ) : clubs.length === 0 ? (
-          <p className="game-card-empty">No clubs found — be the first.</p>
+          <p className="club-state-text">
+            No clubs found - try another name, or start your own above.
+          </p>
         ) : (
           <ul className="game-rows">
             {clubs.map((club) => {
@@ -1349,7 +1463,7 @@ export default function ClubPanel({
                       }
                     }}
                   >
-                    <ClubBadge name={club.name} size={34} />
+                    <ClubBadge name={club.name} size={44} />
                     <span className="game-row-info">
                       <span className="game-row-name">{club.name}</span>
                       <span className="game-row-meta">

@@ -10,10 +10,13 @@ const media = vi.hoisted(() => ({
   getAlbumsPath: vi.fn(),
   createAlbum: vi.fn(),
 }))
+const gallery = vi.hoisted(() => ({ saveImage: vi.fn() }))
 const share = vi.hoisted(() => ({ share: vi.fn() }))
 const settings = vi.hoisted(() => ({ open: vi.fn() }))
 const geo = vi.hoisted(() => ({ platform: 'android' }))
 
+// Android's own GallerySave plugin (registerPlugin('GallerySave')).
+vi.mock('@capacitor/core', () => ({ registerPlugin: () => gallery }))
 vi.mock('@capacitor/filesystem', () => ({
   Filesystem: fs,
   Directory: { Cache: 'CACHE' },
@@ -53,6 +56,9 @@ beforeEach(() => {
   media.getAlbumsPath.mockResolvedValue({ path: '/storage/Pictures/' })
   media.createAlbum.mockResolvedValue()
   media.savePhoto.mockResolvedValue({ filePath: 'x' })
+  gallery.saveImage.mockResolvedValue({
+    uri: 'content://media/external/images/1',
+  })
   share.share.mockResolvedValue({})
 })
 
@@ -63,7 +69,7 @@ describe('blobToBase64', () => {
 })
 
 describe('saveImageToPhotos', () => {
-  it('Android: writes the cache file, makes the album, saves into it', async () => {
+  it('Android: writes the cache file and saves through the GallerySave plugin', async () => {
     const r = await saveImageToPhotos(blob, FILE)
     expect(r).toEqual({ status: SAVE_STATUS.SAVED })
     expect(fs.writeFile).toHaveBeenCalledWith({
@@ -71,25 +77,27 @@ describe('saveImageToPhotos', () => {
       data: 'iVBORw==',
       directory: 'CACHE',
     })
-    expect(media.createAlbum).toHaveBeenCalledWith({ name: 'Run Conquest' })
-    expect(media.savePhoto).toHaveBeenCalledWith({
+    expect(gallery.saveImage).toHaveBeenCalledWith({
       path: `file:///cache/${FILE}`,
       fileName: 'run-conquest-run-7-transparent',
-      albumIdentifier: '/storage/Pictures/Run Conquest',
+      mimeType: 'image/png',
+      album: 'Run Conquest',
     })
     expect(fs.deleteFile).toHaveBeenCalled()
   })
 
-  it('Android: an album that already exists is fine', async () => {
-    media.createAlbum.mockRejectedValue(new Error('Album already exists'))
-    const r = await saveImageToPhotos(blob, FILE)
-    expect(r.status).toBe(SAVE_STATUS.SAVED)
+  it('Android: never goes through the community media plugin (no album lookup, no photos permission)', async () => {
+    await saveImageToPhotos(blob, FILE)
+    expect(media.savePhoto).not.toHaveBeenCalled()
+    expect(media.getAlbumsPath).not.toHaveBeenCalled()
+    expect(media.createAlbum).not.toHaveBeenCalled()
   })
 
-  it('iOS: saves to the camera roll with no album lookup (add-only)', async () => {
+  it('iOS: unchanged - saves to the camera roll with the community plugin (add-only)', async () => {
     geo.platform = 'ios'
     const r = await saveImageToPhotos(blob, FILE)
     expect(r.status).toBe(SAVE_STATUS.SAVED)
+    expect(gallery.saveImage).not.toHaveBeenCalled()
     expect(media.getAlbumsPath).not.toHaveBeenCalled()
     expect(media.createAlbum).not.toHaveBeenCalled()
     expect(media.savePhoto).toHaveBeenCalledWith({
@@ -98,7 +106,19 @@ describe('saveImageToPhotos', () => {
     })
   })
 
-  it('a denied permission is reported, not shared', async () => {
+  it('Android: a denied (Android 9 and below) storage permission is reported, not shared', async () => {
+    gallery.saveImage.mockRejectedValue(
+      Object.assign(new Error('Storage permission denied'), {
+        code: 'PERMISSION_DENIED',
+      })
+    )
+    const r = await saveImageToPhotos(blob, FILE)
+    expect(r.status).toBe(SAVE_STATUS.PERMISSION_DENIED)
+    expect(share.share).not.toHaveBeenCalled()
+  })
+
+  it('iOS: a denied photos permission is reported, not shared', async () => {
+    geo.platform = 'ios'
     media.savePhoto.mockRejectedValue(
       new Error('Unable to access media, user denied permission request')
     )
@@ -108,7 +128,9 @@ describe('saveImageToPhotos', () => {
   })
 
   it('any other save failure falls back to the share sheet', async () => {
-    media.savePhoto.mockRejectedValue(new Error('Error occurred: disk full'))
+    gallery.saveImage.mockRejectedValue(
+      new Error('Could not save image: disk full')
+    )
     const r = await saveImageToPhotos(blob, FILE)
     expect(r.status).toBe(SAVE_STATUS.SHARED)
     expect(share.share).toHaveBeenCalledWith({
@@ -117,11 +139,21 @@ describe('saveImageToPhotos', () => {
     })
   })
 
-  it('keeps the JPG extension for the map card', async () => {
-    await saveImageToPhotos(blob, 'run-conquest-run-7-map.jpg')
-    expect(media.savePhoto.mock.calls[0][0].fileName).toBe(
-      'run-conquest-run-7-map'
-    )
+  it('keeps the JPG extension and mime type for the map card', async () => {
+    const jpg = new Blob([new Uint8Array([255, 216])], { type: 'image/jpeg' })
+    await saveImageToPhotos(jpg, 'run-conquest-run-7-map.jpg')
+    expect(gallery.saveImage.mock.calls[0][0]).toMatchObject({
+      fileName: 'run-conquest-run-7-map',
+      mimeType: 'image/jpeg',
+    })
+  })
+
+  it('falls back to the file extension when the blob has no type', async () => {
+    const untyped = { arrayBuffer: async () => new Uint8Array([1]).buffer }
+    await saveImageToPhotos(untyped, 'a.jpg')
+    expect(gallery.saveImage.mock.calls[0][0].mimeType).toBe('image/jpeg')
+    await saveImageToPhotos(untyped, 'a.png')
+    expect(gallery.saveImage.mock.calls[1][0].mimeType).toBe('image/png')
   })
 })
 

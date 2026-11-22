@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark card behind the custom run notification (matches the iOS Live Activity). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/runNotifBg" />
+    <corners android:radius="14dp" />
+</shape>

@@ -167,3 +167,13 @@ export function toLocalDateTimeString(date) {
     `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
   )
 }
+
+// "1.25 km" -> { value: '1.25', unit: 'km' }; "13:13 /km" -> { value: '13:13',
+// unit: '/km' }; "1:05:09" or "--" -> no unit. Lets a stat tile show the unit
+// small on its own line so a long value never has to share a row with it.
+export function splitUnit(text) {
+  const m = /^(.+?)\s+(\/?km)$/.exec(String(text ?? ''))
+  return m
+    ? { value: m[1], unit: m[2] }
+    : { value: String(text ?? '--'), unit: null }
+}

@@ -305,7 +305,13 @@ export default function SponsorReportPage() {
                       {rows.map((r) => (
                         <tr key={r.key}>
                           <td>{r.banner}</td>
-                          <td>{r.status}</td>
+                          <td>
+                            <span
+                              className={`sponsor-report-chip ${r.status === 'Active' ? 'on' : ''}`}
+                            >
+                              {r.status}
+                            </span>
+                          </td>
                           <td className="num">{formatNumber(r.clicks)}</td>
                           <td className="num">
                             {formatNumber(r.uniqueClickers)}

@@ -9,10 +9,13 @@ export const EXPORT_STATE = Object.freeze({
 })
 
 export const EXPORT_MESSAGES = Object.freeze({
-  saved: 'Saved to Photos',
-  downloaded: 'Downloaded',
+  saved: 'Saved to Photos', // iPhone
+  savedGallery: 'Saved to Gallery', // Android
+  downloaded: 'Downloaded', // web
   shared: 'Shared',
-  failed: "Couldn't save. Try again",
+  failed: "Couldn't save. Check Photos permission and try again.",
+  failedShort: "Couldn't save", // the toast; the full sentence sits under the button
+  permissionDenied: 'Photos access is off',
 })
 
 export class ExportTimeoutError extends Error {
@@ -33,6 +36,17 @@ export function withTimeout(promise, ms) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// Resolves after the browser has painted the current state (the spinner), so
+// the heavy canvas/PNG work that follows can't delay it.
+const nextPaint = () =>
+  new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => setTimeout(resolve, 0))
+    } else {
+      setTimeout(resolve, 16)
+    }
+  })
+
 // One behaviour for every "make an image and save/share it" button:
 // idle -> loading (>= minLoadingMs, so the spinner is always seen) -> success
 // (~1.5s, then back to idle) or error (button re-enabled). Re-taps while
@@ -46,7 +60,7 @@ export function useExportAction(
   {
     minLoadingMs = 600,
     timeoutMs = 15000,
-    successMs = 1500,
+    successMs = 2000,
     onNotify,
     sound = true,
   } = {}
@@ -79,7 +93,8 @@ export function useExportAction(
     const startedAt = Date.now()
     let outcome
     try {
-      const job = Promise.resolve().then(() => runRef.current())
+      // Loading state first, painted, THEN the export work.
+      const job = nextPaint().then(() => runRef.current())
       outcome = {
         ok: true,
         result: await (timeoutMs ? withTimeout(job, timeoutMs) : job),
@@ -113,7 +128,9 @@ export function useExportAction(
     setState(EXPORT_STATE.ERROR)
     notifyRef.current?.({
       type: 'error',
-      message: denied ? 'Photos access is off' : EXPORT_MESSAGES.failed,
+      message: denied
+        ? EXPORT_MESSAGES.permissionDenied
+        : EXPORT_MESSAGES.failedShort,
     })
   }, [minLoadingMs, timeoutMs, successMs, sound])
 

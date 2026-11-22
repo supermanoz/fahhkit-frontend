@@ -128,10 +128,11 @@ test.describe('Settings > Notifications', () => {
     await expect(page.getByTestId('notif-clubWarEnabled')).toHaveCount(1)
     await expect(page.getByTestId('notif-reminders')).toHaveCount(0)
     await expect(page.getByText('Run reminders')).toHaveCount(0)
-    // Music + Sound stay outside the section.
+    // Music + Sound stay outside the section (their own card, as sliders).
     await expect(
-      page.locator('.game-menu-settings > button', { hasText: 'Music' })
+      page.locator('.game-menu-settings').getByRole('slider', { name: 'Music' })
     ).toHaveCount(1)
+    await expect(page.getByTestId('notif-section')).toHaveCount(1)
     await expectNoOverflow(page)
     await shot(page, testInfo, 'granted')
   })

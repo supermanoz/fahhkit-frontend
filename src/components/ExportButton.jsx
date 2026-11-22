@@ -52,8 +52,10 @@ export default function ExportButton({
     label = message
     glyph = <span aria-hidden="true">✓</span>
   } else if (state === EXPORT_STATE.ERROR) {
-    label = message
-    glyph = <span aria-hidden="true">✕</span>
+    // The button becomes "Retry"; the plain-language reason sits under it
+    // (a denied permission gets its own message + Open settings below).
+    label = 'Retry'
+    glyph = <span aria-hidden="true">↻</span>
   }
 
   return (
@@ -72,6 +74,11 @@ export default function ExportButton({
           {label}
         </span>
       </button>
+      {state === EXPORT_STATE.ERROR && !permissionDenied && (
+        <p className="export-btn-error" role="alert">
+          {message}
+        </p>
+      )}
       {children?.({ permissionDenied })}
     </>
   )

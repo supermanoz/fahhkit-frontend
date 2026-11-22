@@ -24,6 +24,10 @@ test('helper line spacing under Create Club', async ({
   await page.getByRole('button', { name: 'Club', exact: true }).click()
   const hint = page.locator('.club-create .game-card-empty')
   await expect(hint).toBeVisible()
+  // The Create button is sticky; measure once everything is on screen so it
+  // sits in its natural spot rather than pinned to the bottom edge.
+  await hint.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(200)
   const m = await page.evaluate(() => {
     const btn = document
       .querySelector('.club-create-btn')

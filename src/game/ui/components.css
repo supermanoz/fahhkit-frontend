@@ -309,6 +309,56 @@
 .g-tab-premium[aria-selected='true'] {
   background: var(--white);
 }
+.g-tabs-shop {
+  background: #fff6e6;
+  padding: 3px;
+  gap: 3px;
+}
+.g-tabs-shop .g-tab {
+  background: transparent;
+  color: var(--text-title-dark);
+  min-width: 0;
+  /* Icon + word must fit a third of a 320-360px panel without truncating. */
+  padding-inline: 4px;
+  gap: 4px;
+}
+.g-tabs-shop .g-tab[aria-selected='true'] {
+  background: var(--shop-accent);
+  color: #fff;
+  box-shadow: 0 2px 0 var(--shop-accent-dark);
+}
+/* Labels are plain dark/white text: no outline or shadow from the global
+   game text rule. */
+.g-tabs-shop .g-tab,
+.g-tabs-shop .g-tab * {
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+.g-tabs-shop .g-tab:focus-visible {
+  outline-color: var(--shop-accent-dark);
+}
+.g-tab > svg,
+.g-tab > img {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+.g-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-tabs-sm .g-tab {
+  min-height: 40px;
+  font-size: 13px;
+}
+.g-tabs-sm .g-tab > svg,
+.g-tabs-sm .g-tab > img {
+  width: 16px;
+  height: 16px;
+}
+
 .g-tab:focus-visible {
   outline: 3px solid var(--green-500);
   outline-offset: 2px;

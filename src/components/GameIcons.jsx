@@ -192,6 +192,18 @@ export function IconVolumeUp(props) {
   )
 }
 
+export function IconVolumeLow(props) {
+  return (
+    <GameIcon {...props}>
+      <path
+        d="M3.5 9.5v5a1 1 0 0 0 1 1h3l4.5 4v-15l-4.5 4h-3a1 1 0 0 0-1 1z"
+        {...TINT}
+      />
+      <path d="M15.5 9a4 4 0 0 1 0 6" />
+    </GameIcon>
+  )
+}
+
 export function IconVolumeMute(props) {
   return (
     <GameIcon {...props}>

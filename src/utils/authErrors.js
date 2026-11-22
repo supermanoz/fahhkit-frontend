@@ -33,6 +33,7 @@ export const REASON = Object.freeze({
   CANCELLED: 'cancelled',
   NETWORK: 'network',
   PROVIDER: 'provider',
+  UNAVAILABLE: 'unavailable',
   CONFLICT: 'conflict',
   CREDENTIALS: 'credentials',
   OLD_PASSWORD: 'oldPassword',
@@ -52,6 +53,8 @@ export const MESSAGES = Object.freeze({
   network: "Can't reach the game. Check your connection and try again.",
   provider: (provider) =>
     `${provider} sign-in isn't working right now. Try email sign-in or try again later.`,
+  appleUnavailable:
+    "Apple sign-in isn't available right now. Please use another method.",
   conflict: 'This email already has an account. Sign in with email instead.',
   credentials: "Email or password doesn't match. Try again.",
   oldPassword:
@@ -121,6 +124,19 @@ function isNetwork(err) {
   )
 }
 
+// The Apple endpoint isn't there (404/405/501/503) or the server says the
+// Apple client id / provider isn't configured.
+const APPLE_UNAVAILABLE_STATUS = new Set([404, 405, 501, 503])
+const APPLE_NOT_CONFIGURED =
+  /(apple|client[ _-]?id|provider|oauth)[^\n]{0,60}(not (been )?(set|configured|enabled)|missing|unavailable|disabled)|(not (set|configured)|missing)[^\n]{0,40}(apple|client[ _-]?id|provider)/i
+function appleUnavailable(err) {
+  if (!(err instanceof ApiError)) return false
+  return (
+    APPLE_UNAVAILABLE_STATUS.has(err.status) ||
+    APPLE_NOT_CONFIGURED.test(err.message)
+  )
+}
+
 const text = (err) => (err instanceof ApiError ? err.message : '')
 
 function result(reason, message, kind = 'warning') {
@@ -149,6 +165,14 @@ export function describeAuthError(err, { flow = AUTH_FLOW.SIGN_IN } = {}) {
       /already exists with this email|already (registered|exists)/i.test(server)
     ) {
       return result(REASON.CONFLICT, MESSAGES.conflict)
+    }
+    if (flow === AUTH_FLOW.APPLE) {
+      // Endpoint missing / provider not set up on the server: one calm line.
+      if (appleUnavailable(err)) {
+        return result(REASON.UNAVAILABLE, MESSAGES.appleUnavailable)
+      }
+      // Anything else (bad token, plugin failure, 500...): never raw text.
+      return result(REASON.UNKNOWN, MESSAGES.unknown)
     }
     return result(REASON.PROVIDER, MESSAGES.provider(provider))
   }

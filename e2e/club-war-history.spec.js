@@ -280,7 +280,7 @@ const WAR_LIST = Object.values(WARS_BY_ID).map((w) => ({
 async function openClub(page) {
   await page.locator('.game-menu-btn').click()
   await page.getByRole('button', { name: 'Club', exact: true }).click()
-  await page.getByRole('button', { name: 'Club Wars', exact: true }).click()
+  await page.getByRole('tab', { name: 'Club Wars', exact: true }).click()
   await page.getByText('War History').click()
 }
 

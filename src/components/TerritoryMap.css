@@ -750,3 +750,10 @@
     opacity: 0.35;
   }
 }
+
+/* Keyboard focus ring (invisible unless focused by keyboard). */
+.territory-map-locate:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--shop-accent-dark, #8f1fa3);
+}

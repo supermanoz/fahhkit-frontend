@@ -1,12 +1,17 @@
 import { registerPlugin } from '@capacitor/core'
-import { isNative } from './geo'
+import { isNative, platform } from './geo'
 import { requestNotificationPermission } from './notificationPermission'
 
-// Android-only persistent "Running"/"Paused" notification shown while a run
-// is being tracked - styled like the in-game run panel (see
-// RunNotificationPlugin.java). No-op everywhere else (web build, iOS -
-// iOS's equivalent live-tracking notification isn't built yet).
+// The "run in progress" surface shown while a run is being tracked, styled like
+// the in-game run panel:
+//  - Android: persistent notification (RunNotificationPlugin.java).
+//  - iOS: Live Activity on the lock screen + Dynamic Island, iOS 16.2+
+//    (RunLiveActivityPlugin.swift; silently does nothing on older iOS).
+// Both native plugins take the SAME start/update/pause/stop calls below.
+// No-op on the web build.
 const RunNotification = registerPlugin('RunNotification')
+const RunLiveActivity = registerPlugin('RunLiveActivity')
+const target = () => (platform === 'ios' ? RunLiveActivity : RunNotification)
 
 let permissionRequested = false
 
@@ -16,6 +21,9 @@ let permissionRequested = false
 // Denied or not-yet-decided just means no notification shows; run tracking
 // itself is never gated on this.
 async function ensurePermission() {
+  // Live Activities need no notification permission (the user toggles them in
+  // Settings), so iOS never gets a prompt from here.
+  if (platform === 'ios') return
   if (permissionRequested) return
   permissionRequested = true
   try {
@@ -39,9 +47,9 @@ export async function startRunNotification({
 } = {}) {
   if (!isNative) return
   await ensurePermission()
-  RunNotification.start({ elapsedMs, distanceMeters, paceLabel, title }).catch(
-    () => {}
-  )
+  target()
+    .start({ elapsedMs, distanceMeters, paceLabel, title })
+    .catch(() => {})
 }
 
 // distanceMeters/paceLabel are both optional - pass whichever changed.
@@ -56,12 +64,16 @@ export function updateRunNotification({
   if (!isNative) return
   // `title` swaps the header text (e.g. "Vehicle detected"); '' restores the
   // run-mode label. Omitted = unchanged.
-  RunNotification.update({ distanceMeters, paceLabel, title }).catch(() => {})
+  target()
+    .update({ distanceMeters, paceLabel, title })
+    .catch(() => {})
 }
 
 export function pauseRunNotification({ title = null } = {}) {
   if (!isNative) return
-  RunNotification.pause({ title }).catch(() => {})
+  target()
+    .pause({ title })
+    .catch(() => {})
 }
 
 // Resuming after pause() isn't a distinct native call - it's
@@ -71,5 +83,7 @@ export const resumeRunNotification = startRunNotification
 
 export function stopRunNotification() {
   if (!isNative) return
-  RunNotification.stop().catch(() => {})
+  target()
+    .stop()
+    .catch(() => {})
 }

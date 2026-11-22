@@ -4,8 +4,6 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.SystemClock;
 import android.widget.RemoteViews;
 
@@ -51,14 +49,12 @@ public class RunNotificationPlugin extends Plugin {
     // @capacitor-community/background-geolocation version bump.
     private static final int NOTIFICATION_ID = 28351;
     private static final String CHANNEL_ID = "active_run";
-    private static final long TICK_INTERVAL_MS = 1000;
-
-    private final Handler tickHandler = new Handler(Looper.getMainLooper());
-    private Runnable tickRunnable;
 
     private boolean active = false;
     private boolean paused = false;
     private long baseElapsedRealtime = 0L;
+    // Elapsed time frozen at pause() so the Chronometer stops showing a moving clock.
+    private long pausedElapsedMs = 0L;
     private String distanceText = "0.00";
     private String paceText = "--";
     // Header text from JS (utils/runModeLabel.js); null = legacy Running/Paused.
@@ -86,8 +82,8 @@ public class RunNotificationPlugin extends Plugin {
         paceText = pace != null ? pace : "--";
         titleText = call.getString("title");
         runTitleText = titleText;
+        pausedElapsedMs = 0L;
         ensureChannel();
-        startTicking();
         post();
         call.resolve();
     }
@@ -123,9 +119,10 @@ public class RunNotificationPlugin extends Plugin {
     public void pause(PluginCall call) {
         if (active) {
             paused = true;
+            // Freeze the Chronometer at the elapsed time of this moment.
+            pausedElapsedMs = Math.max(0, SystemClock.elapsedRealtime() - baseElapsedRealtime);
             String pausedTitle = call.getString("title");
             if (pausedTitle != null) titleText = pausedTitle;
-            stopTicking();
             post();
         }
         call.resolve();
@@ -135,35 +132,8 @@ public class RunNotificationPlugin extends Plugin {
     public void stop(PluginCall call) {
         active = false;
         paused = false;
-        stopTicking();
         NotificationManagerCompat.from(getContext()).cancel(NOTIFICATION_ID);
         call.resolve();
-    }
-
-    @Override
-    protected void handleOnDestroy() {
-        stopTicking();
-        super.handleOnDestroy();
-    }
-
-    private void startTicking() {
-        stopTicking();
-        tickRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!active || paused) return;
-                post();
-                tickHandler.postDelayed(this, TICK_INTERVAL_MS);
-            }
-        };
-        tickHandler.postDelayed(tickRunnable, TICK_INTERVAL_MS);
-    }
-
-    private void stopTicking() {
-        if (tickRunnable != null) {
-            tickHandler.removeCallbacks(tickRunnable);
-            tickRunnable = null;
-        }
     }
 
     private void ensureChannel() {
@@ -180,27 +150,29 @@ public class RunNotificationPlugin extends Plugin {
         NotificationManagerCompat.from(getContext()).createNotificationChannel(channel);
     }
 
-    private String formatElapsed() {
-        long elapsedMs = Math.max(0, SystemClock.elapsedRealtime() - baseElapsedRealtime);
-        long totalSeconds = elapsedMs / 1000;
-        long h = totalSeconds / 3600;
-        long m = (totalSeconds % 3600) / 60;
-        long s = totalSeconds % 60;
-        return h > 0
-                ? String.format(Locale.US, "%d:%02d:%02d", h, m, s)
-                : String.format(Locale.US, "%d:%02d", m, s);
-    }
-
     private RemoteViews buildViews(int layoutRes) {
         Context context = getContext();
         RemoteViews views = new RemoteViews(context.getPackageName(), layoutRes);
         views.setInt(
                 R.id.run_notif_header,
                 "setBackgroundResource",
-                paused ? R.drawable.run_notification_header_paused : R.drawable.run_notification_header_running
+                paused ? R.drawable.run_notification_pill_paused : R.drawable.run_notification_pill
         );
+        // Pill text: the run-mode label (or the temporary "Vehicle detected" /
+        // paused wording JS passes as `title`).
         views.setTextViewText(R.id.run_notif_header, titleText != null ? titleText : (paused ? "Paused" : "Running"));
-        views.setTextViewText(R.id.run_notif_value_time, formatElapsed());
+        // Live timer: a Chronometer ticks by itself (no per-second re-post). While
+        // paused it is re-based to the frozen elapsed time and stopped.
+        if (paused) {
+            views.setChronometer(
+                    R.id.run_notif_value_time,
+                    SystemClock.elapsedRealtime() - pausedElapsedMs,
+                    null,
+                    false
+            );
+        } else {
+            views.setChronometer(R.id.run_notif_value_time, baseElapsedRealtime, null, true);
+        }
         views.setTextViewText(R.id.run_notif_value_pace, paceText);
         views.setTextViewText(R.id.run_notif_value_distance, distanceText);
         return views;

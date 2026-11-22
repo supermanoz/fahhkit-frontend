@@ -50,7 +50,8 @@ test('Settings contact: email row, mailto link, copy toast', async ({
   await card.scrollIntoViewIfNeeded()
   const mail = card.locator(`a[href="mailto:${EMAIL}"]`)
   await expect(mail).toHaveText(EMAIL)
-  await expect(mail).toHaveCSS('color', 'rgb(113, 9, 19)')
+  // Shop-purple link (red is reserved for Log out).
+  await expect(mail).toHaveCSS('color', 'rgb(143, 31, 163)')
   // Plain dark text on the light card: no heavy stroke at this size.
   await expect(mail).toHaveCSS('-webkit-text-stroke-width', '0px')
   await expect(mail).toHaveCSS('text-shadow', 'none')

@@ -77,12 +77,13 @@ test.describe('Run image download feedback', () => {
     await mockExport(page, { fail: false })
     const btn = page.getByTestId('download-transparent')
     await expect(btn).toHaveAttribute('data-state', 'idle')
+    await page.waitForTimeout(800) // the modal's scale-in has settled
     const idleBox = await btn.boundingBox()
     await page.screenshot({ path: `${DIR}/1-idle.png` })
     await btn.click()
     await expect(btn).toHaveAttribute('data-state', 'loading')
     await expect(btn).toBeDisabled()
-    await expect(btn).toContainText('Downloading...')
+    await expect(btn).toContainText('Saving...')
     expect((await btn.boundingBox()).height).toBe(idleBox.height)
     await page.screenshot({ path: `${DIR}/2-loading.png` })
     await expect(btn).toHaveAttribute('data-state', 'success', {
@@ -102,8 +103,13 @@ test.describe('Run image download feedback', () => {
     const btn = page.getByTestId('download-transparent')
     await btn.click()
     await expect(btn).toHaveAttribute('data-state', 'error', { timeout: 5000 })
-    await expect(btn).toContainText("Couldn't save. Try again")
+    // The button becomes Retry; the plain reason sits under it and a short
+    // toast confirms.
+    await expect(btn).toContainText('Retry')
     await expect(btn).toBeEnabled()
+    await expect(page.getByRole('alert')).toContainText(
+      "Couldn't save. Check Photos permission and try again."
+    )
     await expect(page.getByTestId('export-toast')).toBeVisible()
     await page.screenshot({ path: `${DIR}/4-error.png` })
   })

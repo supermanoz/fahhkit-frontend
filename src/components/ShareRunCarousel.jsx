@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { IconChevronLeft, IconChevronRight } from './GameIcons'
 import { isNative } from '../utils/geo'
 import {
-  SAVE_STATUS,
   openAppSettings,
+  outcomeFromSave,
   saveImageToPhotos,
   shareImageFile,
 } from '../utils/saveImage'
@@ -135,18 +135,9 @@ export default function ShareRunCarousel({ run }) {
     // open as long as the player likes.
     const blob = await withTimeout(renderBlob(slide), 15000)
     if (action === 'share') {
-      const result = await shareImageFile(blob, filename)
-      if (result.status === SAVE_STATUS.CANCELLED) return { silent: true }
-      return { message: EXPORT_MESSAGES.shared }
+      return outcomeFromSave(await shareImageFile(blob, filename))
     }
-    const result = await saveImageToPhotos(blob, filename)
-    if (result.status === SAVE_STATUS.PERMISSION_DENIED) {
-      return { permissionDenied: true }
-    }
-    if (result.status === SAVE_STATUS.SHARED) {
-      return { message: EXPORT_MESSAGES.shared }
-    }
-    return { message: EXPORT_MESSAGES.saved }
+    return outcomeFromSave(await saveImageToPhotos(blob, filename))
   }
 
   return (
@@ -181,7 +172,7 @@ export default function ShareRunCarousel({ run }) {
                 <ExportButton
                   className="btn btn-primary btn-block"
                   idleLabel={`Download ${slide.ext.toUpperCase()}`}
-                  loadingLabel="Downloading..."
+                  loadingLabel="Saving..."
                   run={() => exportSlide(slide, 'save')}
                   onNotify={notify}
                   timeoutMs={isNative ? null : 15000}

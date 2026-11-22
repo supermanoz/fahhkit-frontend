@@ -1,0 +1,33 @@
+/* The post-run result popup (see RunResultCard.jsx): the shared GamePanel +
+   TitleRibbon + StatChip, sized for phones 320-412px wide. */
+.run-result-card {
+  /* .game-popup-layer (its parent) is pointer-events: none so the map stays
+     usable around toasts - the card itself must take taps again. */
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: min(92vw, 420px);
+  max-width: 100%;
+  margin-inline: auto;
+}
+.run-result-card .gm-panel-inner.run-result-inner {
+  /* The panel's own 4px frame + this padding is all that eats the width, so
+     the three tiles keep room at 360px. */
+  padding-inline: 12px;
+  text-align: center;
+}
+.run-result-stats {
+  min-width: 0;
+}
+.run-result-note {
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+.run-result-note.is-soft {
+  color: var(--ink-navy-soft);
+}
+.run-result-note.is-error {
+  color: #a82218;
+}
+.run-result-ok {
+  min-height: 44px;
+}

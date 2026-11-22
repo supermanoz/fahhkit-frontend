@@ -8,6 +8,7 @@ import {
 import { useToast } from '../game/ui/Toast'
 import { useNotificationPermission } from '../hooks/useNotificationPermission'
 import { isNative } from '../utils/geo'
+import { SwitchRow } from './SettingsParts'
 import { IconBell, IconChevronDown, IconFlag, IconMegaphone } from './GameIcons'
 import './NotificationsSection.css'
 
@@ -48,46 +49,6 @@ const PERMISSION_LABEL = {
   granted: 'Allowed',
   denied: 'Not allowed',
   prompt: 'Not asked yet',
-}
-
-function SwitchRow({
-  testId,
-  Icon,
-  label,
-  sub,
-  checked,
-  disabled = false,
-  onToggle,
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      className={`game-settings-row notif-row${disabled ? ' is-blocked' : ''}`}
-      data-testid={testId}
-      onClick={onToggle}
-    >
-      <span className="game-settings-row-label">
-        <span className="game-settings-row-icon">
-          <span className="game-settings-row-icon-badge" aria-hidden="true">
-            <Icon />
-          </span>
-        </span>
-        <span className="game-settings-row-text">
-          {label}
-          <span className="game-settings-row-sub">{sub}</span>
-        </span>
-      </span>
-      <span
-        className={`game-switch ${checked ? 'is-on' : ''}`}
-        aria-hidden="true"
-      >
-        <span className="game-switch-knob" />
-      </span>
-    </button>
-  )
 }
 
 export default function NotificationsSection({ push }) {
@@ -277,8 +238,9 @@ export default function NotificationsSection({ push }) {
                     <SwitchRow
                       key={key}
                       testId={`notif-${key}`}
+                      className={`notif-row${blocked ? ' is-blocked' : ''}`}
                       Icon={Icon}
-                      label={label}
+                      title={label}
                       sub={blocked ? hint : enabled ? on : off}
                       checked={enabled}
                       disabled={blocked}

@@ -1666,37 +1666,6 @@
   color: var(--game-cream);
 }
 
-/* The post-run result popup (Run submitted! / Checking your territory… /
-   territory outcome) - centered in the middle of the screen instead of
-   anchored to the bottom sheet, and sized up so it reads as the main thing
-   on screen right after a run instead of a small toast. */
-.game-claim-toast-center {
-  width: min(92vw, 420px);
-  padding: 30px 32px;
-}
-
-.game-claim-toast-center h3 {
-  font-size: 26px;
-}
-
-.game-claim-toast-center .game-claim-toast-stats {
-  margin: 4px 0 16px;
-}
-
-.game-claim-toast-center .game-stat-value {
-  font-size: 24px;
-}
-
-.game-claim-toast-center p {
-  font-size: 15px;
-}
-
-.game-claim-toast-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-
 .game-highlight-toast {
   position: relative;
   box-sizing: border-box;
@@ -2478,30 +2447,6 @@
 .game-radial-lock-badge svg {
   width: 11px;
   height: 11px;
-}
-
-/* Every big menu button is labelled above it, Pokémon GO style. Absolutely
-   positioned so the label doesn't shift the button off its x/y slot. */
-.game-radial-label {
-  /* Literal, not --game-cream (dark now) - this floats directly over the
-     live map, not a panel, so it needs to stay light; the ink outline
-     below is what keeps it readable against a busy map either way. */
-  color: #fff6e6;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  text-shadow:
-    1px 0 0 var(--game-ink),
-    -1px 0 0 var(--game-ink),
-    0 1px 0 var(--game-ink),
-    0 -1px 0 var(--game-ink),
-    0 2px 0 var(--game-ink);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
 }
 
 /* Mail and Settings - small bare icons either side of the FAB (like the
@@ -3649,7 +3594,14 @@
     margin-right: 0;
   }
 
-  .game-menu-picker-current {
+  /* The X perches on the bar's top-right corner (44px wide, 6px from the
+     edge = 50px in from the screen edge); the bar ends 20px in, so the
+     dropdown knob needs 44px of right padding to sit fully left of the X
+     (14px clear) instead of under it. The static PvP bar has no knob. */
+  .game-menu-picker-current:not(.is-static) {
+    padding-right: 44px;
+  }
+  .game-menu-picker-current.is-static {
     padding-right: 18px;
   }
 
@@ -4892,81 +4844,6 @@
   text-align: center;
 }
 
-/* Settings contact: Instagram row + email row (mailto link and a copy
-   button) in one off-white card, dark text; links open in a new tab / the
-   system browser / the mail app. */
-.game-settings-contact {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 16px 0 0;
-  padding: 12px 14px;
-  background: var(--white);
-  border: 2px solid var(--panel-border);
-  border-radius: 14px;
-  color: var(--text-body-dark);
-}
-.game-settings-contact-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.game-settings-contact-text {
-  margin: 0;
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.35;
-  min-width: 0;
-}
-.game-settings-contact-copy {
-  all: unset;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  margin: -6px -8px -6px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: var(--icon-dark, #1a1a1a);
-  font-size: 20px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.game-settings-contact-copy:active {
-  background: rgba(0, 0, 0, 0.08);
-}
-.game-settings-contact-copy:focus-visible {
-  outline: 3px solid var(--game-gold);
-}
-.game-settings-contact-copy svg {
-  width: 1em;
-  height: 1em;
-}
-.game-settings-contact-text a {
-  color: var(--text-link);
-  font-weight: 800;
-  text-decoration: underline;
-  overflow-wrap: anywhere;
-}
-/* The contact email link uses the legal pages' dark red; it may only wrap at
-   the @ (a <wbr> before it), never mid-word. Plain dark text on the light
-   card: no stroke/shadow at this small size. */
-.game-settings-contact-text a[href^='mailto:'] {
-  color: #710913;
-  overflow-wrap: normal;
-  word-break: normal;
-  font-size: 13px;
-}
-.game-settings-contact-text,
-.game-settings-contact-text a {
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
-}
-
 /* --- Small body text on light popup cards: plain dark, no stroke/shadow ---
    The same shared dark body colours the confirm dialogs use (see
    .game-confirm-card p), applied to the other popups that sat white-on-
@@ -5046,4 +4923,17 @@
   opacity: 0.45;
   cursor: default;
   pointer-events: none;
+}
+
+/* Visible keyboard / switch-access focus on every icon button. */
+.game-radial-btn:focus-visible,
+.game-menu-btn:focus-visible,
+.game-locate-btn:focus-visible,
+.game-settings-row:focus-visible,
+.map-attribution-toggle:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 6px var(--shop-accent-dark, #8f1fa3),
+    0 5px 0 var(--game-ink);
 }

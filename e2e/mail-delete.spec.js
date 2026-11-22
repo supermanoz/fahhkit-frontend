@@ -62,6 +62,11 @@ async function openMailPanel(page) {
     .waitFor({ state: 'visible', timeout: 15000 })
 }
 
+// A row's title (not getByText: each row also shows a one-line preview of its
+// body, which in this fixture repeats the title).
+const rowTitle = (page, title) =>
+  page.locator('.mail-item-title', { hasText: title })
+
 async function openRow(page, title) {
   await page.getByRole('button', { name: new RegExp(title) }).click()
 }
@@ -91,18 +96,18 @@ test('delete read mail removes it and updates the badge', async ({
   })
 
   await openMailPanel(page)
-  await expect(page.locator('.mail-tab-badge')).toHaveText('1')
+  await expect(page.locator('.mail-tabs .g-tab-badge')).toHaveText('1')
   await openRow(page, 'First read mail')
   await page.getByRole('button', { name: 'Delete mail' }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
 
-  await expect(page.getByText('First read mail')).toHaveCount(0)
+  await expect(rowTitle(page, 'First read mail')).toHaveCount(0)
   await expect(page.getByText('Mail deleted')).toBeVisible()
   expect(deleteCalled).toBe(true)
   // The unread item is untouched - still there, badge still accurate (not
   // dropped to 0 just because a mail got deleted).
-  await expect(page.getByText('Unread notice')).toBeVisible()
-  await expect(page.locator('.mail-tab-badge')).toHaveText('1')
+  await expect(rowTitle(page, 'Unread notice')).toBeVisible()
+  await expect(page.locator('.mail-tabs .g-tab-badge')).toHaveText('1')
   await expectNoHorizontalScroll(page)
 })
 
@@ -179,18 +184,18 @@ test('bulk delete read only removes read mail', async ({
   })
 
   await openMailPanel(page)
-  await expect(page.getByText('First read mail')).toBeVisible()
-  await expect(page.getByText('Second read mail')).toBeVisible()
+  await expect(rowTitle(page, 'First read mail')).toBeVisible()
+  await expect(rowTitle(page, 'Second read mail')).toBeVisible()
 
   await page.getByRole('button', { name: /Delete read/ }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
 
   expect(bulkDeleteCalled).toBe(true)
   await expect(page.getByText('Deleted 2 read mails')).toBeVisible()
-  await expect(page.getByText('First read mail')).toHaveCount(0)
-  await expect(page.getByText('Second read mail')).toHaveCount(0)
+  await expect(rowTitle(page, 'First read mail')).toHaveCount(0)
+  await expect(rowTitle(page, 'Second read mail')).toHaveCount(0)
   // Unread mail is never part of the bulk op - still there.
-  await expect(page.getByText('Unread notice')).toBeVisible()
+  await expect(rowTitle(page, 'Unread notice')).toBeVisible()
 })
 
 test('confirm Cancel does nothing', async ({ mockedPage: page }) => {

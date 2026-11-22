@@ -111,6 +111,7 @@ function PartnerBannerSlide({ partner: p, isSeasonPartner }) {
       {tag}
       <span className="sponsor-banner-view-btn" aria-hidden="true">
         View
+        <span className="sponsor-banner-view-chev">&gt;</span>
       </span>
     </a>
   ) : (
