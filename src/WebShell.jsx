@@ -1,3 +1,4 @@
+import { lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import GamePage from './pages/GamePage'
 import GameLegalPage from './pages/GameLegalPage'
@@ -22,7 +23,6 @@ import HistoryPage from './pages/HistoryPage'
 import TrackRunPage from './pages/TrackRunPage'
 import RunDetailPage from './pages/RunDetailPage'
 import ContactPage from './pages/ContactPage'
-import ShopPage from './pages/ShopPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import EventRegistrantsPage from './pages/EventRegistrantsPage'
 import EventReportPage from './pages/EventReportPage'
@@ -32,6 +32,10 @@ import FraudFlagsPage from './pages/FraudFlagsPage'
 import SponsorReportPage from './pages/SponsorReportPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
 import RequireAuth from './components/RequireAuth'
+
+// Public storefront - only visited from "Continue to Shop"/the website, so
+// it stays out of the main bundle.
+const ShopPage = lazy(() => import('./pages/ShopPage'))
 
 // Every website route (marketing home, events, shop, admin, ...). Lazy-loaded
 // from App.jsx and only on the website build: the native app build

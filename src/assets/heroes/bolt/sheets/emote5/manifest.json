@@ -5,10 +5,18 @@
   "sheets": [
     {
       "file": "sheet0.webp",
-      "cols": 12,
-      "rows": 3,
+      "cols": 19,
+      "rows": 2,
       "frames": 27
     }
   ],
-  "poster": "poster.webp"
+  "poster": "poster.webp",
+  "trim": {
+    "x": 5,
+    "y": 11,
+    "w": 327,
+    "h": 456
+  },
+  "sheetFrameWidth": 213,
+  "sheetFrameHeight": 298
 }

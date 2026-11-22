@@ -41,6 +41,13 @@ export default function AnimatedSprite({
   frameCount,
   frameWidth,
   frameHeight,
+  // Trimmed sheets (scripts/trim_downscale_sprites.py): frameWidth/Height stay
+  // the full box; `trim` is where the packed cell sits inside it and
+  // sheetFrameWidth/Height the cell's own pixel size. All absent = old
+  // untrimmed sheets, cell === full frame.
+  trim,
+  sheetFrameWidth,
+  sheetFrameHeight,
   sheets,
   // Loader for the frame-0 poster (heroManifest.js) - the static layer uses
   // it instead of the full sheet when present.
@@ -56,11 +63,23 @@ export default function AnimatedSprite({
   // releasing the decoded sheets (the clock is shifted on resume, so the
   // gap isn't skipped over). Defaults leave every other call site as is.
   paused = false,
+  // Passed to acquireSheet: 0 = free the decoded sheet the moment this
+  // sprite unmounts (undefined keeps the short default grace).
+  releaseGraceMs,
   onReady,
   onError,
   showStatic = true,
 }) {
   const width = Math.round((height * frameWidth) / frameHeight)
+  const cellW = sheetFrameWidth || frameWidth
+  const cellH = sheetFrameHeight || frameHeight
+  const box = trim || { x: 0, y: 0, w: frameWidth, h: frameHeight }
+  const boxStyle = {
+    left: `${(box.x / frameWidth) * 100}%`,
+    top: `${(box.y / frameHeight) * 100}%`,
+    width: `${(box.w / frameWidth) * 100}%`,
+    height: `${(box.h / frameHeight) * 100}%`,
+  }
   const canvasRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [staticUrl, setStaticUrl] = useState(null)
@@ -164,7 +183,7 @@ export default function AnimatedSprite({
       try {
         const urlList = await Promise.all(sheets.map((s) => s.loadUrl()))
         if (cancelled) return
-        for (const u of urlList) handles.push(acquireSheet(u))
+        for (const u of urlList) handles.push(acquireSheet(u, releaseGraceMs))
         bitmaps = await Promise.all(handles.map((h) => h.ready))
       } catch {
         // A sheet failed to load/decode: stay not-ready (the static
@@ -202,10 +221,10 @@ export default function AnimatedSprite({
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(
           bitmaps[sheetI],
-          col * frameWidth,
-          row * frameHeight,
-          frameWidth,
-          frameHeight,
+          col * cellW,
+          row * cellH,
+          cellW,
+          cellH,
           0,
           0,
           canvas.width,
@@ -282,7 +301,7 @@ export default function AnimatedSprite({
       canvasEl?.removeEventListener('contextrestored', onContextRestored)
       releaseAll()
     }
-  }, [active, sheets, frameCount, frameWidth, frameHeight, reloadKey])
+  }, [active, sheets, frameCount, cellW, cellH, reloadKey, releaseGraceMs])
 
   useEffect(() => {
     if (paused) controlRef.current?.pause()
@@ -311,10 +330,10 @@ export default function AnimatedSprite({
       )}
       <canvas
         ref={canvasRef}
-        width={frameWidth}
-        height={frameHeight}
+        width={cellW}
+        height={cellH}
         className={`animated-sprite-canvas${showStatic ? '' : ' is-instant'}`}
-        style={{ width, height, opacity: ready ? 1 : 0 }}
+        style={{ ...boxStyle, opacity: ready ? 1 : 0 }}
       />
     </span>
   )

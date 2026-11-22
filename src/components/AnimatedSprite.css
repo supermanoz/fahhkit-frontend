@@ -1,7 +1,29 @@
 .animated-sprite {
   position: relative;
   display: block;
-  filter: drop-shadow(0 6px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Static soft ground shadow under the feet. Replaces the old
+   filter: drop-shadow() on the whole sprite, which the browser had to
+   re-rasterise on every canvas frame (costly on phones). This is a single
+   painted ellipse that never changes, so it costs nothing per frame. It sits
+   behind the canvas (::before paints first). */
+.animated-sprite::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -1.5%;
+  width: 62%;
+  height: 7%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.32) 45%,
+    rgba(0, 0, 0, 0) 72%
+  );
+  pointer-events: none;
 }
 
 /* The frame-0 preview and the canvas player occupy the exact same box,

@@ -14,11 +14,23 @@ import './HeroFigure.css'
 // ClubWarHeroPicker.jsx's own "only the centred card animates" comment,
 // which renders a plain static <img> for every other slide instead of a
 // second HeroFigure).
-export default function HeroFigure({ hero, pose = 'idle', height = 170 }) {
+export default function HeroFigure({
+  hero,
+  pose = 'idle',
+  height = 170,
+  releaseGraceMs,
+}) {
   const sprite = getHeroSprite(hero?.name)
   if (sprite) {
     const poseData = sprite.poses[pose] || sprite.poses.idle
-    return <AnimatedSprite {...poseData} height={height} active />
+    return (
+      <AnimatedSprite
+        {...poseData}
+        height={height}
+        releaseGraceMs={releaseGraceMs}
+        active
+      />
+    )
   }
 
   const portrait =

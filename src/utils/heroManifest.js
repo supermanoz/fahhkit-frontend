@@ -130,6 +130,14 @@ function resolveSheets(heroName, heroDir) {
       frameCount: manifest.frameCount,
       frameWidth: manifest.frameWidth,
       frameHeight: manifest.frameHeight,
+      // frameWidth/frameHeight stay the ORIGINAL full-box size (layout math
+      // reads them). Sheets are trimmed + downscaled: `trim` is the union
+      // opaque box inside that full box and sheetFrameWidth/Height the size
+      // of one packed cell (scripts/trim_downscale_sprites.py). Absent on
+      // untrimmed sheets, where the player falls back to the full frame.
+      trim: manifest.trim,
+      sheetFrameWidth: manifest.sheetFrameWidth,
+      sheetFrameHeight: manifest.sheetFrameHeight,
       sheets,
       // undefined when a sequence has no poster yet: AnimatedSprite falls
       // back to cropping sheet 0 (the old, memory-hungry behaviour).

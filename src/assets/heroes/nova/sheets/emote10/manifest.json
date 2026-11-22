@@ -5,22 +5,24 @@
   "sheets": [
     {
       "file": "sheet0.webp",
-      "cols": 14,
-      "rows": 8,
-      "frames": 112
+      "cols": 24,
+      "rows": 13,
+      "frames": 312
     },
     {
       "file": "sheet1.webp",
-      "cols": 14,
-      "rows": 8,
-      "frames": 112
-    },
-    {
-      "file": "sheet2.webp",
-      "cols": 14,
-      "rows": 7,
-      "frames": 93
+      "cols": 5,
+      "rows": 1,
+      "frames": 5
     }
   ],
-  "poster": "poster.webp"
+  "poster": "poster.webp",
+  "trim": {
+    "x": 11,
+    "y": 11,
+    "w": 252,
+    "h": 466
+  },
+  "sheetFrameWidth": 165,
+  "sheetFrameHeight": 305
 }

@@ -40,7 +40,8 @@ import sharp from 'sharp'
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const OUT_DIR = path.join(ROOT, 'src/assets/ui/ranks')
-const SOURCE = path.join(OUT_DIR, 'badge_sheet_source.png')
+// Kept out of src/ (3.7MB, never imported) so it isn't bundled.
+const SOURCE = path.join(ROOT, 'assets-src/badge_sheet_source.png')
 
 // Grid layout - see the sheet: 2 rows (Players, Clubs) x 3 columns
 // (Top 1/2/3). Only used to NAME the 6 largest components found in the

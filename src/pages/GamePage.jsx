@@ -419,6 +419,24 @@ function describeRunRejection(outcome) {
 // Shop sub-sections (tab row under the wallet). Map style used to live
 // here too - it's a Settings row now (see MapStylePicker), not tied to
 // the Shop's owned/equip model at all (it's free and local-only).
+const HEROES_CACHE_KEY = 'shop.heroes.v1'
+function readCachedHeroes() {
+  try {
+    const raw = window.localStorage.getItem(HEROES_CACHE_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+function writeCachedHeroes(list) {
+  try {
+    window.localStorage.setItem(HEROES_CACHE_KEY, JSON.stringify(list))
+  } catch {
+    // Quota/private mode - the cache is only an optimisation.
+  }
+}
+
 const SHOP_SECTIONS = [
   { id: 'heroes', label: 'Heroes', Icon: IconHelmet },
   { id: 'territory', label: 'Territory', Icon: IconFlag },
@@ -788,7 +806,10 @@ function GamePageInner() {
   const [buyRedirectBundle, setBuyRedirectBundle] = useState(null)
   const [buyRedirecting, setBuyRedirecting] = useState(false)
   const [buyRedirectError, setBuyRedirectError] = useState(null)
-  const [heroes, setHeroes] = useState([])
+  // Hero roster is public catalog data: seed from the last fetch so the Shop
+  // paints instantly on a cold start while loadHeroes revalidates in the
+  // background (stale-while-revalidate).
+  const [heroes, setHeroes] = useState(readCachedHeroes)
   const [heroesLoading, setHeroesLoading] = useState(false)
   // True once /v1/store/owned has answered at least once (see loadStore).
   const [ownedLoaded, setOwnedLoaded] = useState(false)
@@ -2486,8 +2507,10 @@ function GamePageInner() {
         roster.map((h) => getHero(h.id).catch(() => h))
       )
       setHeroes(details)
+      writeCachedHeroes(details)
     } catch {
-      setHeroes([])
+      // Keep showing the cached roster (if any) when a refresh fails.
+      setHeroes((prev) => prev)
     } finally {
       setHeroesLoading(false)
     }
@@ -3480,6 +3503,23 @@ function GamePageInner() {
   // (TEMP - see constants/avatars.js-era notes for the pattern this
   // followed); the backend may still return SKIN items, they're just never
   // requested/rendered here any more.
+  // Stable handlers (all setters), so the memoized Shop components
+  // (HeroGallery/ColorShelf) can skip the re-renders GamePage gets from the
+  // GPS watch - inline arrows here defeated their React.memo every tick.
+  const handleSelectGalleryHero = useCallback((hero) => {
+    setStoreActionError(null)
+    setSelectedHeroId(hero.id)
+  }, [])
+  const handleSelectTerritoryColor = useCallback((item) => {
+    setPurchaseError(null)
+    setStoreActionError(null)
+    setColorPreview({ id: item.id, kind: 'territory' })
+  }, [])
+  const handleSelectTrailColor = useCallback((item) => {
+    setPurchaseError(null)
+    setStoreActionError(null)
+    setColorPreview({ id: item.id, kind: 'trail' })
+  }, [])
   const shadeItems = useMemo(
     () => storeCatalog.filter((i) => i.category === 'TERRITORY_SHADE'),
     [storeCatalog]
@@ -4441,6 +4481,7 @@ function GamePageInner() {
                         }}
                         aria-label={item.label}
                         title={item.label}
+                        data-label={item.label}
                         data-tour={`radial-${item.tab}`}
                       >
                         <item.Icon />
@@ -4504,6 +4545,7 @@ function GamePageInner() {
           aria-label={
             mapMode === 'follow' ? 'Switch to free look' : 'Follow your run'
           }
+          data-label={mapMode === 'follow' ? 'Following' : 'Follow'}
           onClick={toggleFollow}
         >
           <IconCrosshairs />
@@ -6106,10 +6148,7 @@ function GamePageInner() {
                     activeHeroId={activeHeroId}
                     level={profile?.level}
                     loading={heroesLoading}
-                    onSelect={(hero) => {
-                      setStoreActionError(null)
-                      setSelectedHeroId(hero.id)
-                    }}
+                    onSelect={handleSelectGalleryHero}
                     onEquip={handleEquip}
                   />
                 )}
@@ -6122,11 +6161,7 @@ function GamePageInner() {
                     ownedItems={ownedItems}
                     balance={profile?.fahhcoinBalance ?? 0}
                     level={profile?.level}
-                    onSelect={(item) => {
-                      setPurchaseError(null)
-                      setStoreActionError(null)
-                      setColorPreview({ id: item.id, kind: 'territory' })
-                    }}
+                    onSelect={handleSelectTerritoryColor}
                     emptyText="No territory colours in stock yet."
                   />
                 )}
@@ -6139,11 +6174,7 @@ function GamePageInner() {
                     ownedItems={ownedItems}
                     balance={profile?.fahhcoinBalance ?? 0}
                     level={profile?.level}
-                    onSelect={(item) => {
-                      setPurchaseError(null)
-                      setStoreActionError(null)
-                      setColorPreview({ id: item.id, kind: 'trail' })
-                    }}
+                    onSelect={handleSelectTrailColor}
                     emptyText="Fresh trail colours are on their way - check back soon!"
                   />
                 )}

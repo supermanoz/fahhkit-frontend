@@ -148,7 +148,11 @@ function makeRoom(incoming) {
 // Returns { ready, release } synchronously: `ready` resolves to the decoded
 // bitmap, `release` is idempotent and safe to call before `ready` settles (an
 // unmount racing the decode).
-export function acquireSheet(url) {
+// graceMs: how long the decoded bitmap lingers after the last holder lets go
+// (default RELEASE_GRACE_MS, so a quick re-mount reuses it). 0 drops the
+// reference immediately - the Shop gallery uses that so a hero you swiped
+// away from (or a tab you left) doesn't keep ~tens of MB resident.
+export function acquireSheet(url, graceMs = RELEASE_GRACE_MS) {
   let entry = cache.get(url)
   const fresh = !entry
   if (fresh) {
@@ -187,7 +191,11 @@ export function acquireSheet(url) {
     if (held.refCount > 0) return
     held.refCount = 0
     held.releasedAt = Date.now()
-    held.closeTimer = setTimeout(() => closeEntry(url, held), RELEASE_GRACE_MS)
+    if (graceMs <= 0) {
+      closeEntry(url, held)
+      return
+    }
+    held.closeTimer = setTimeout(() => closeEntry(url, held), graceMs)
   }
   return { ready: held.promise, release }
 }

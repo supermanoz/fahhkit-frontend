@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   IconCheck,
@@ -34,7 +34,7 @@ const flipVariants = {
   exit: (dir) => ({ rotateY: dir >= 0 ? -90 : 90, opacity: 0 }),
 }
 
-export default function HeroGallery({
+function HeroGallery({
   heroes,
   ownedItems,
   activeHeroId,
@@ -185,7 +185,12 @@ export default function HeroGallery({
                     // back to 240 (the old fixed size) only for the one
                     // frame before HeroStage's ResizeObserver reports a
                     // real height.
-                    <HeroFigure hero={hero} pose="idle" height={h || 240} />
+                    <HeroFigure
+                      hero={hero}
+                      pose="idle"
+                      height={h || 240}
+                      releaseGraceMs={0}
+                    />
                   )}
                 </HeroStage>
               </span>
@@ -285,3 +290,5 @@ export default function HeroGallery({
     </div>
   )
 }
+
+export default memo(HeroGallery)

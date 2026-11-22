@@ -79,7 +79,18 @@ function CardFooter({ state, price }) {
   }
 }
 
-function ColorCard({ item, kind, state, onSelect }) {
+const ColorCard = memo(function ColorCard({
+  item,
+  kind,
+  ownedItems,
+  balance,
+  level,
+  onSelect,
+}) {
+  const state = useMemo(
+    () => colorCardState({ item, ownedItems, balance, level }),
+    [item, ownedItems, balance, level]
+  )
   const name = itemDisplayName(item, kind)
   const rarity = rarityOf(item)
   const price = Number(item.priceFahhcoin) || 0
@@ -108,7 +119,7 @@ function ColorCard({ item, kind, state, onSelect }) {
       </span>
     </button>
   )
-}
+})
 
 function ColorShelf({
   kind = 'territory',
@@ -137,7 +148,9 @@ function ColorShelf({
               key={item.id}
               item={item}
               kind={kind}
-              state={colorCardState({ item, ownedItems, balance, level })}
+              ownedItems={ownedItems}
+              balance={balance}
+              level={level}
               onSelect={onSelect}
             />
           ))}

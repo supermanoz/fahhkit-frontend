@@ -4961,3 +4961,58 @@
     0 0 0 6px var(--shop-accent-dark, #8f1fa3),
     0 5px 0 var(--game-ink);
 }
+
+/* --- Text labels under the icon-only nav buttons -------------------------
+   The radial menu items and the run-mode follow button are bare icons; each
+   carries its name in data-label and this draws it as a small pill
+   under the icon (no DOM change, the icon and its tap target are untouched).
+   A solid navy pill with plain white text (no stroke/shadow) keeps 12px bold
+   text readable over any map colour and over the dimmed menu scrim. One
+   line, ellipsis if it ever doesn't fit. */
+.game-page :is(.game-radial-btn, .game-locate-btn)[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  top: var(--nav-label-top, calc(100% + 9px));
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  max-width: 96px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(27, 35, 71, 0.92);
+  color: #fff;
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+  pointer-events: none;
+}
+/* 4px-bordered round buttons: clear the border plus the hard drop shadow. */
+.game-page .game-radial-btn[data-label] {
+  --nav-label-top: calc(100% + 12px);
+}
+/* Mail / Settings are borderless bare icons. */
+.game-page .game-radial-btn.radial-mini[data-label] {
+  --nav-label-top: calc(100% + 3px);
+}
+/* The follow button's label hangs below it, so lift the button by the label's
+   height instead of letting it run into the action sheet underneath. (The
+   menu FAB and the Recenter button have no label: original position.) */
+.game-page .game-locate-btn {
+  bottom: calc(var(--sheet-h, 90px) + 34px + env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 380px) {
+  .game-page :is(.game-radial-btn, .game-locate-btn)[data-label]::after {
+    max-width: 84px;
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 16px;
+  }
+}
