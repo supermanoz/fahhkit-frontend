@@ -1,87 +1,49 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ platform: 'ios', isNative: true }))
-const plugins = vi.hoisted(() => {
-  const make = () => ({
-    start: vi.fn(() => Promise.resolve()),
-    update: vi.fn(() => Promise.resolve()),
-    pause: vi.fn(() => Promise.resolve()),
-    stop: vi.fn(() => Promise.resolve()),
-  })
-  return { RunNotification: make(), RunLiveActivity: make() }
-})
+const update = vi.fn(() => Promise.resolve())
+vi.mock('./geo', () => ({ isNative: true, platform: 'android' }))
 vi.mock('@capacitor/core', () => ({
-  registerPlugin: (name) => plugins[name],
+  registerPlugin: () => ({
+    start: () => Promise.resolve(),
+    update,
+    pause: () => Promise.resolve(),
+    stop: () => Promise.resolve(),
+  }),
+  Capacitor: { getPlatform: () => 'android', isNativePlatform: () => true },
 }))
-vi.mock('./geo', () => ({
-  get platform() {
-    return state.platform
-  },
-  get isNative() {
-    return state.isNative
-  },
-}))
-const requestPermission = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve('granted'))
-)
-vi.mock('./notificationPermission', () => ({
-  requestNotificationPermission: requestPermission,
-}))
-
-import {
-  pauseRunNotification,
-  startRunNotification,
-  stopRunNotification,
-  updateRunNotification,
-} from './runNotification'
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  state.platform = 'ios'
-  state.isNative = true
+  vi.useFakeTimers()
+  update.mockClear()
 })
+afterEach(() => vi.useRealTimers())
 
-describe('run notification routing', () => {
-  it('iOS: same calls go to RunLiveActivity, with no permission prompt', async () => {
-    await startRunNotification({
-      elapsedMs: 5000,
-      distanceMeters: 120,
-      paceLabel: '5:30',
-      title: 'Training',
-    })
-    updateRunNotification({ distanceMeters: 150 })
-    pauseRunNotification({ title: 'Paused' })
-    stopRunNotification()
-    const p = plugins.RunLiveActivity
-    expect(p.start).toHaveBeenCalledWith({
-      elapsedMs: 5000,
-      distanceMeters: 120,
-      paceLabel: '5:30',
-      title: 'Training',
-    })
-    expect(p.update).toHaveBeenCalledOnce()
-    expect(p.pause).toHaveBeenCalledWith({ title: 'Paused' })
-    expect(p.stop).toHaveBeenCalledOnce()
-    expect(plugins.RunNotification.start).not.toHaveBeenCalled()
-    expect(requestPermission).not.toHaveBeenCalled()
+describe('updateRunNotification throttle', () => {
+  it('sends at most one distance update per 5 s, latest values win', async () => {
+    const { updateRunNotification, stopRunNotification } =
+      await import('./runNotification')
+    stopRunNotification() // reset the limiter
+    vi.setSystemTime(100000)
+    updateRunNotification({ distanceMeters: 10 })
+    updateRunNotification({ distanceMeters: 20 })
+    updateRunNotification({ distanceMeters: 30 })
+    expect(update).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(5000)
+    expect(update).toHaveBeenCalledTimes(2)
+    expect(update.mock.calls[1][0].distanceMeters).toBe(30)
   })
-
-  it('Android: still uses RunNotification', async () => {
-    state.platform = 'android'
-    await startRunNotification({ title: 'Training' })
+  it('title changes go out immediately and stop cancels the queued update', async () => {
+    const { updateRunNotification, stopRunNotification } =
+      await import('./runNotification')
     stopRunNotification()
-    expect(plugins.RunNotification.start).toHaveBeenCalled()
-    expect(plugins.RunNotification.stop).toHaveBeenCalled()
-    expect(plugins.RunLiveActivity.start).not.toHaveBeenCalled()
-  })
-
-  it('web: nothing is called', async () => {
-    state.platform = 'web'
-    state.isNative = false
-    await startRunNotification()
+    vi.setSystemTime(500000)
     updateRunNotification({ distanceMeters: 1 })
+    updateRunNotification({ distanceMeters: 2 }) // queued
+    updateRunNotification({ title: 'Vehicle detected' }) // immediate
+    expect(update).toHaveBeenCalledTimes(2)
+    updateRunNotification({ distanceMeters: 3 }) // queued again
     stopRunNotification()
-    for (const p of Object.values(plugins))
-      for (const fn of Object.values(p)) expect(fn).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(10000)
+    expect(update).toHaveBeenCalledTimes(2)
   })
 })

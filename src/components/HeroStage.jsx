@@ -56,6 +56,7 @@ export default function HeroStage({
   return (
     <div ref={stageRef} className={`hero-stage ${className}`}>
       <img
+        decoding="async"
         className="hero-stage-bg"
         src={src}
         alt=""

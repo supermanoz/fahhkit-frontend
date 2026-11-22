@@ -33,7 +33,12 @@ export default function SponsorCarousel() {
         <div className="sponsors-track">
           {track.map((src, i) => (
             <div className="sponsor-card" key={i}>
-              <img src={src} alt="Partner logo" />
+              <img
+                loading="lazy"
+                decoding="async"
+                src={src}
+                alt="Partner logo"
+              />
             </div>
           ))}
         </div>

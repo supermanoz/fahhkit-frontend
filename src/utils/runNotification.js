@@ -46,6 +46,7 @@ export async function startRunNotification({
   title = null,
 } = {}) {
   if (!isNative) return
+  cancelPendingUpdate()
   await ensurePermission()
   target()
     .start({ elapsedMs, distanceMeters, paceLabel, title })
@@ -56,6 +57,30 @@ export async function startRunNotification({
 // paceLabel should already be formatted the way the in-app panel shows it
 // (e.g. "5:30", or null/omitted for "--") so the notification never drifts
 // from TrackRunPanel's own numbers.
+// Distance/pace updates are rate-limited: a fix arrives every ~2.5 s and each
+// update crosses the native bridge and spends iOS's Live Activity update
+// budget (and Android's notification updates wake the UI). The latest values
+// are always delivered (trailing edge); a title change goes out immediately.
+const NOTIFICATION_UPDATE_MIN_MS = 5000
+let lastUpdateAt = 0
+let pendingUpdate = null
+let pendingTimer = null
+
+// A queued trailing update must never fire after the run notification was
+// started again, paused or stopped.
+function cancelPendingUpdate() {
+  clearTimeout(pendingTimer)
+  pendingTimer = null
+  pendingUpdate = null
+}
+
+function sendUpdate(payload) {
+  lastUpdateAt = Date.now()
+  target()
+    .update(payload)
+    .catch(() => {})
+}
+
 export function updateRunNotification({
   distanceMeters,
   paceLabel,
@@ -64,13 +89,27 @@ export function updateRunNotification({
   if (!isNative) return
   // `title` swaps the header text (e.g. "Vehicle detected"); '' restores the
   // run-mode label. Omitted = unchanged.
-  target()
-    .update({ distanceMeters, paceLabel, title })
-    .catch(() => {})
+  const payload = { distanceMeters, paceLabel, title }
+  const elapsed = Date.now() - lastUpdateAt
+  if (title !== undefined || elapsed >= NOTIFICATION_UPDATE_MIN_MS) {
+    cancelPendingUpdate()
+    sendUpdate(payload)
+    return
+  }
+  pendingUpdate = { ...(pendingUpdate || {}), ...payload }
+  if (pendingTimer == null) {
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null
+      const next = pendingUpdate
+      pendingUpdate = null
+      if (next) sendUpdate(next)
+    }, NOTIFICATION_UPDATE_MIN_MS - elapsed)
+  }
 }
 
 export function pauseRunNotification({ title = null } = {}) {
   if (!isNative) return
+  cancelPendingUpdate()
   target()
     .pause({ title })
     .catch(() => {})
@@ -83,6 +122,8 @@ export const resumeRunNotification = startRunNotification
 
 export function stopRunNotification() {
   if (!isNative) return
+  cancelPendingUpdate()
+  lastUpdateAt = 0
   target()
     .stop()
     .catch(() => {})

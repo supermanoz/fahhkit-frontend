@@ -1,4 +1,4 @@
-import { Browser } from '@capacitor/browser'
+import { openExternal } from './externalLink'
 import { isNative, platform } from './geo'
 
 // The public website's own origin - where /shop (ShopPage.jsx) and
@@ -65,10 +65,7 @@ export const iosShopRedirectBlocked =
 // doesn't refuse on its own, so a caller that already decided to show the
 // disabled state can still choose not to call it.
 export function openShopPack(fahhcoinAmount) {
-  const url = getSiteUrl(`/shop?pack=${encodeURIComponent(fahhcoinAmount)}`)
-  if (isNative) {
-    return Browser.open({ url })
-  }
-  window.open(url, '_blank', 'noopener')
-  return Promise.resolve()
+  return openExternal(
+    getSiteUrl(`/shop?pack=${encodeURIComponent(fahhcoinAmount)}`)
+  )
 }

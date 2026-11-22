@@ -227,6 +227,8 @@ function PartnerRow({ partner, expanded, onToggle, onSaved }) {
       >
         {partner.imageUrl && (
           <img
+            loading="lazy"
+            decoding="async"
             className="sponsor-admin-row-thumb"
             src={resolveFileUrl(partner.imageUrl)}
             alt=""

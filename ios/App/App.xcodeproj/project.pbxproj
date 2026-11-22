@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7D0E0031A1B2C3D4E5F60031 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7D0E0030A1B2C3D4E5F60030 /* PrivacyInfo.xcprivacy */; };
 		7D0E0021A1B2C3D4E5F60021 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E0020A1B2C3D4E5F60020 /* SceneDelegate.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -51,6 +52,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7D0E0030A1B2C3D4E5F60030 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7D0E0020A1B2C3D4E5F60020 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
@@ -149,6 +151,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				7D0E0014A1B2C3D4E5F60014 /* MainViewController.swift */,
+				7D0E0030A1B2C3D4E5F60030 /* PrivacyInfo.xcprivacy */,
 				7D0E0020A1B2C3D4E5F60020 /* SceneDelegate.swift */,
 				7D0E0012A1B2C3D4E5F60012 /* RunLiveActivityPlugin.swift */,
 				7D0E0010A1B2C3D4E5F60010 /* RunActivityAttributes.swift */,
@@ -266,6 +269,7 @@
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				7D0E0004A1B2C3D4E5F60004 /* GoogleService-Info.plist in Resources */,
+				7D0E0031A1B2C3D4E5F60031 /* PrivacyInfo.xcprivacy in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 			);
@@ -484,7 +488,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 2VFNY7C8JQ;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 2VFNY7C8JQ;
 				INFOPLIST_FILE = App/Info.plist;
@@ -514,7 +518,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 2VFNY7C8JQ;
 				INFOPLIST_FILE = App/Info.plist;
@@ -600,7 +604,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 2VFNY7C8JQ;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 2VFNY7C8JQ;
 				INFOPLIST_FILE = App/Info.plist;
@@ -635,7 +639,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 2VFNY7C8JQ;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 2VFNY7C8JQ;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -683,7 +687,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 2VFNY7C8JQ;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 2VFNY7C8JQ;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -728,7 +732,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 2VFNY7C8JQ;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;

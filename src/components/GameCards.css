@@ -129,7 +129,16 @@
   box-shadow:
     inset 0 -4px 0 var(--game-wood-dark),
     0 3px 0 var(--game-ink);
-  color: var(--text-title);
+  color: var(--text-title-dark);
+}
+/* The face is white now, so the game-wide white fill + dark outline made the
+   label invisible (white on white). Plain dark text, no stroke or shadow,
+   on the button and anything inside it (the stroke is set per element). */
+.game-btn-wood,
+.game-btn-wood * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
 }
 
 .game-btn-lg {

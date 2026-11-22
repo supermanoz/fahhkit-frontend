@@ -2,19 +2,41 @@ import { Browser } from '@capacitor/browser'
 import { isNative } from './geo'
 import { isSafeExternalUrl } from './safeUrl'
 
-// Capacitor's WebView doesn't reliably handle target="_blank" (it tries to
-// open a new WebView window that doesn't exist, which Android usually just
-// drops) - opening explicitly through the system browser/Custom Tabs plugin
-// is the documented native-safe way to send a partner link out of the app.
-// A no-op passthrough on the web, where target="_blank" already just works,
-// so callers can wire this unconditionally without a platform check.
-export function openExternal(url, event) {
-  if (!isNative || !url) return
+// The ONE way to send the user to a page/app outside the game WebView.
+//
+//  - web:    window.open(url, '_blank', 'noopener') (a new tab; the running
+//            game/map in this tab is never torn down).
+//  - native: @capacitor/browser (SFSafariViewController / Custom Tabs).
+//            Capacitor's WebView doesn't handle target="_blank" or
+//            window.open reliably (iOS drops them), so never rely on those.
+//  - { app: true }: for links that should open their own app when installed
+//            (Instagram...). A top-level https navigation is handed to the OS
+//            by Capacitor (iOS: UIApplication.open -> the universal link opens
+//            the app, otherwise Safari; Android: an ACTION_VIEW intent), so no
+//            custom scheme / LSApplicationQueriesSchemes entry is needed.
+//
+// Safe to call from an anchor's onClick (pass the event: the anchor's own
+// navigation is suppressed) or from a button (no event). Returns a promise
+// that never rejects. Only http(s) URLs are ever opened - javascript:, data:,
+// file:, intent: and credentialed URLs from server content are dropped. For
+// mailto:/tel: use openMailto / openTel below.
+export function openExternal(url, event, { app = false } = {}) {
+  if (!url) return Promise.resolve()
   event?.preventDefault()
-  // Never hand javascript:/data:/file:/intent: (or credentialed) URLs from
-  // server content to the system browser.
-  if (!isSafeExternalUrl(url)) return
-  Browser.open({ url })
+  if (!isSafeExternalUrl(url)) return Promise.resolve()
+  if (!isNative) {
+    window.open(url, '_blank', 'noopener')
+    return Promise.resolve()
+  }
+  if (app) {
+    window.location.href = url
+    return Promise.resolve()
+  }
+  return Browser.open({ url }).catch(() => {
+    // The in-app browser could not be shown: hand the link to the OS instead
+    // of leaving the tap dead.
+    window.location.href = url
+  })
 }
 
 // mailto: links. On the web the plain <a href="mailto:..."> already opens the
@@ -25,6 +47,14 @@ export function openMailto(address, event) {
   if (!isNative || !address) return
   event?.preventDefault()
   window.location.href = `mailto:${address}`
+}
+
+// tel: links, same mechanism as openMailto (plain anchors already work on the
+// web).
+export function openTel(number, event) {
+  if (!isNative || !number) return
+  event?.preventDefault()
+  window.location.href = `tel:${String(number).replace(/[^\d+]/g, '')}`
 }
 
 // Copies text for the "no mail app" fallback. Returns true on success.

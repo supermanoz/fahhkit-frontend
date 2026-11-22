@@ -91,6 +91,8 @@ export default function ProfileAvatar({
             <IconClose />
           </button>
           <img
+            loading="lazy"
+            decoding="async"
             className="profile-lightbox-img"
             src={src}
             alt={name || 'Profile picture'}

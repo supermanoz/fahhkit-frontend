@@ -92,7 +92,7 @@ export function YouFigure({ heroName, avatarSrc, name, size = 72 }) {
   )
 }
 
-// The "VS" motif: a hex badge with a faint crossed-swords behind it.
+// The "VS" motif: a hex badge with the crossed-swords icon centred above "VS".
 export function VsBadge({ small = false }) {
   return (
     <span className={`pvp-vs${small ? ' is-small' : ''}`} aria-hidden="true">

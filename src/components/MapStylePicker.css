@@ -23,12 +23,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 4px 6px 56px;
+  box-sizing: border-box;
+  /* Right padding keeps the "Free" / check label off the card's edge. */
+  padding: 6px 16px 6px 56px;
   border: none;
   background: none;
   cursor: pointer;
   text-align: left;
-  color: var(--text-title);
+  /* Dark text: in the game scope --text-title is WHITE, which vanished on the
+     white settings card. */
+  color: var(--text-title-dark);
 }
 
 .map-style-picker-option.is-selected {
@@ -48,15 +52,23 @@
   min-width: 0;
   font-size: 15px;
   font-weight: 700;
-  color: var(--text-title);
+  line-height: 1.25;
+  color: var(--text-title-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .map-style-picker-state {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  min-width: 28px;
   font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
   font-weight: 700;
   color: var(--text-muted-dark);
 }

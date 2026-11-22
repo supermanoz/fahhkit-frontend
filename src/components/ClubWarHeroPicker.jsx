@@ -208,6 +208,7 @@ export default function ClubWarHeroPicker({
                       />
                     ) : item.assetUrl ? (
                       <img
+                        decoding="async"
                         src={resolveFileUrl(item.assetUrl)}
                         alt=""
                         loading="lazy"

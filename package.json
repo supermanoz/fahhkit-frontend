@@ -26,7 +26,10 @@
     "ios:dev": "npx cap run ios -l --host=$HOST_IP",
     "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
     "android:release": "npm run cap:sync && cd android && ./gradlew bundleRelease",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "assets:posters": "node scripts/build-sprite-posters.mjs",
+    "assets:optimize": "node scripts/optimize-images.mjs",
+    "assets:verify": "node scripts/verify-assets.mjs && node scripts/build-sprite-posters.mjs --check"
   },
   "lint-staged": {
     "*.{js,jsx}": [
@@ -51,6 +54,7 @@
     "@capacitor/haptics": "^6.0.2",
     "@capacitor/ios": "^6.2.2",
     "@capacitor/local-notifications": "6.1.3",
+    "@capacitor/preferences": "6.0.3",
     "@capacitor/push-notifications": "^6.0.5",
     "@capacitor/share": "6.0.4",
     "@capacitor/splash-screen": "^6.0.4",

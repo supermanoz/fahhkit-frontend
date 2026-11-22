@@ -63,6 +63,8 @@ const BACKGROUND_GAP_THRESHOLD_MS = 10000
 // accepted point per MIN_POINT_INTERVAL_MS collapses those redundant fixes;
 // a real run never needs sub-2.5s point density anyway.
 const MIN_POINT_INTERVAL_MS = 2500
+// devicemotion handler cap (~30 Hz), see handleDeviceMotion.
+const MOTION_MIN_INTERVAL_MS = 33
 
 // --- Vehicle detection (anti-cheat) ---
 // The actual speed/cadence/pattern state machine lives in
@@ -261,16 +263,19 @@ export function useRunTracker() {
   // Rough step/cadence detector off the accelerometer, forwarded into the
   // vehicle-detection state machine - see handleMotionSample in
   // utils/vehicleDetection.js for the actual peak-detection math.
+  const lastMotionSampleAtRef = useRef(0)
   const handleDeviceMotion = useCallback((event) => {
+    // The sensor can fire at 60+ Hz; step detection needs far less. Capped at
+    // ~30 Hz (a footstrike peak lasts ~100+ ms), halving the handler work.
+    const nowMs = Date.now()
+    if (nowMs - lastMotionSampleAtRef.current < MOTION_MIN_INTERVAL_MS) return
+    lastMotionSampleAtRef.current = nowMs
     const acc = event.accelerationIncludingGravity || event.acceleration
     if (!acc || acc.x == null) return
     const magnitude = Math.sqrt(
       (acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2
     )
-    const isStep = detectorRef.current?.handleMotionSample(
-      magnitude,
-      Date.now()
-    )
+    const isStep = detectorRef.current?.handleMotionSample(magnitude, nowMs)
     if (isStep) totalStepsRef.current += 1
   }, [])
 

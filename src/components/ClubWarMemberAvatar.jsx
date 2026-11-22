@@ -6,5 +6,14 @@ import heroIcon from '../assets/ui/hero_icon.png'
 // One flat icon for every member, not a per-hero portrait - no hero lookup,
 // no broken-image fallback chain needed.
 export default function ClubWarMemberAvatar() {
-  return <img src={heroIcon} alt="" loading="lazy" width={40} height={40} />
+  return (
+    <img
+      decoding="async"
+      src={heroIcon}
+      alt=""
+      loading="lazy"
+      width={40}
+      height={40}
+    />
+  )
 }

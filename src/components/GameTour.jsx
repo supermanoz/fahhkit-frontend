@@ -17,6 +17,7 @@ import {
   SPOT_PAD,
 } from '../utils/tourLayout'
 import './GameTour.css'
+import { visibleInterval } from '../utils/visibleInterval'
 
 const MODE_ICON = {
   training: IconRunning,
@@ -89,11 +90,11 @@ export default function GameTour({
       }
     }
     tick()
-    const id = setInterval(tick, POLL_MS)
+    const stopPoll = visibleInterval(tick, POLL_MS, 'tour-rect-poll')
     window.addEventListener('resize', tick)
     window.addEventListener('orientationchange', tick)
     return () => {
-      clearInterval(id)
+      stopPoll()
       window.removeEventListener('resize', tick)
       window.removeEventListener('orientationchange', tick)
     }

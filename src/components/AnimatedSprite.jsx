@@ -42,6 +42,9 @@ export default function AnimatedSprite({
   frameWidth,
   frameHeight,
   sheets,
+  // Loader for the frame-0 poster (heroManifest.js) - the static layer uses
+  // it instead of the full sheet when present.
+  posterLoadUrl,
   height,
   active = false,
   className = '',
@@ -75,21 +78,26 @@ export default function AnimatedSprite({
   onErrorRef.current = onError
 
   const firstSheet = sheets?.[0]
+  // With a poster the static layer is ONE small cell image; without one it
+  // is a crop of the whole sheet (the browser then has to decode the entire
+  // ~4000x4000 image - ~60 MB - just to show frame 0).
+  const usePoster = Boolean(posterLoadUrl)
 
-  // Frame 0 - loaded eagerly regardless of `active` (a cheap plain image
-  // fetch, not a decode), so an inactive grid tile still shows real art
-  // immediately instead of a blank box.
+  // Frame 0 - loaded eagerly regardless of `active` (a plain image fetch),
+  // so an inactive grid tile still shows real art immediately instead of a
+  // blank box.
   useEffect(() => {
     let cancelled = false
-    if (firstSheet) {
-      firstSheet.loadUrl().then((url) => {
+    const loader = posterLoadUrl || firstSheet?.loadUrl
+    if (loader) {
+      loader().then((url) => {
         if (!cancelled) setStaticUrl(url)
       })
     }
     return () => {
       cancelled = true
     }
-  }, [firstSheet])
+  }, [firstSheet, posterLoadUrl])
 
   useEffect(() => {
     setReady(false)
@@ -294,7 +302,9 @@ export default function AnimatedSprite({
             width,
             height,
             backgroundImage: `url(${staticUrl})`,
-            backgroundSize: `${width * firstSheet.cols}px ${height * firstSheet.rows}px`,
+            backgroundSize: usePoster
+              ? `${width}px ${height}px`
+              : `${width * firstSheet.cols}px ${height * firstSheet.rows}px`,
             opacity: ready ? 0 : 1,
           }}
         />

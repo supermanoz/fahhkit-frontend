@@ -73,6 +73,7 @@ function PrizeInfoButton({ onOpen }) {
 function PartnerBannerSlide({ partner: p, isSeasonPartner }) {
   const image = (
     <img
+      decoding="async"
       className="sponsor-banner-image"
       src={resolveFileUrl(p.imageUrl)}
       alt={p.name}

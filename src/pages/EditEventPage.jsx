@@ -325,6 +325,8 @@ export default function EditEventPage() {
                       <label htmlFor={`eventImage${slot}`}>Image {slot}</label>
                       {imageUrls[slot] && !images[slot] && (
                         <img
+                          loading="lazy"
+                          decoding="async"
                           src={resolveFileUrl(imageUrls[slot])}
                           alt={`Current event image ${slot}`}
                           className="edit-event-image-preview"

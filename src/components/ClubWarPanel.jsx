@@ -36,6 +36,7 @@ import './GameCards.css'
 import './ClubPanel.css'
 import { playerNameOf } from '../utils/playerName'
 import { formatNumber } from '../utils/format'
+import { visibleInterval } from '../utils/visibleInterval'
 
 // While queued or at war, re-check this often - matching and the phase
 // changes happen server-side on a schedule, with no push event for them.
@@ -193,15 +194,18 @@ export default function ClubWarPanel({
     phaseDeadline != null && now > phaseDeadline - NEAR_FLIP_WINDOW_MS
   useEffect(() => {
     if (!inMotion) return undefined
-    const poll = setInterval(refresh, nearFlip ? FAST_POLL_MS : POLL_MS)
-    return () => clearInterval(poll)
+    return visibleInterval(
+      refresh,
+      nearFlip ? FAST_POLL_MS : POLL_MS,
+      'clubwar-poll'
+    )
   }, [inMotion, nearFlip, refresh])
   useEffect(() => {
-    const tick = setInterval(
+    return visibleInterval(
       () => setNow(Date.now()),
-      nearFlip ? FAST_POLL_MS : 30000
+      nearFlip ? FAST_POLL_MS : 30000,
+      'clubwar-clock'
     )
-    return () => clearInterval(tick)
   }, [nearFlip])
 
   async function runAction(key, action, fallback) {

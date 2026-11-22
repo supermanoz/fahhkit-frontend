@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { postJson } from '../api/client'
 import { useCurrentUser } from './useCurrentUser'
+import { visibleInterval } from '../utils/visibleInterval'
 
 const EVENT_WINDOW_MS = 60 * 60 * 1000 // an event is "live" for 1 hour after its start time
 const REFETCH_INTERVAL_MS = 5 * 60 * 1000 // pick up newly-registered events without a reload
@@ -31,10 +32,14 @@ export function useLiveRegisteredEvent() {
         .catch(() => {})
     }
     load()
-    const id = setInterval(load, REFETCH_INTERVAL_MS)
+    const stop = visibleInterval(
+      load,
+      REFETCH_INTERVAL_MS,
+      'live-event-refetch'
+    )
     return () => {
       cancelled = true
-      clearInterval(id)
+      stop()
     }
   }, [isAuthed, isAthlete, user?.id])
 
@@ -50,8 +55,7 @@ export function useLiveRegisteredEvent() {
       setLiveEvent(match || null)
     }
     check()
-    const id = setInterval(check, CHECK_INTERVAL_MS)
-    return () => clearInterval(id)
+    return visibleInterval(check, CHECK_INTERVAL_MS, 'live-event-check')
   }, [history])
 
   return liveEvent

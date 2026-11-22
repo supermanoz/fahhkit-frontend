@@ -112,6 +112,8 @@ export default function AthleteProfilePage() {
               <span className="athlete-profile-avatar">
                 {profile.profilePictureUrl ? (
                   <img
+                    loading="lazy"
+                    decoding="async"
                     src={resolveFileUrl(profile.profilePictureUrl)}
                     alt={profile.fullName}
                   />

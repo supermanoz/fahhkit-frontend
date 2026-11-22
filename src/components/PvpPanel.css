@@ -326,12 +326,18 @@
   white-space: nowrap;
 }
 .pvp-vs {
-  position: relative;
+  /* Icon above "VS", both centred in the hexagon: a plain flex column, no
+     absolute offsets, so it can't drift at any width / safe-area inset. */
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1px;
+  flex: none;
+  box-sizing: border-box;
   width: 62px;
   height: 70px;
+  padding: 0;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   background: linear-gradient(180deg, #5aa9ff, #2457d6);
   filter: drop-shadow(0 0 8px rgba(47, 123, 255, 0.45));
@@ -341,21 +347,32 @@
   height: 52px;
 }
 .pvp-vs-swords {
-  position: absolute;
-  inset: 8px;
-  width: auto;
-  height: auto;
-  color: rgba(255, 255, 255, 0.3);
+  position: static;
+  flex: none;
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: #fff;
+  opacity: 1;
+}
+.pvp-vs.is-small .pvp-vs-swords {
+  width: 16px;
+  height: 16px;
 }
 .pvp-vs-text {
-  position: relative;
-  font-size: 20px;
+  display: block;
+  flex: none;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
   color: #fff;
   -webkit-text-stroke: 2px #0a1a5c;
   paint-order: stroke fill;
 }
 .pvp-vs.is-small .pvp-vs-text {
-  font-size: 15px;
+  font-size: 13px;
+  -webkit-text-stroke-width: 1.5px;
 }
 .pvp-silhouette {
   position: relative;
@@ -1643,6 +1660,13 @@
   .pvp-vs {
     width: 52px;
     height: 58px;
+  }
+  .pvp-vs-swords {
+    width: 18px;
+    height: 18px;
+  }
+  .pvp-vs-text {
+    font-size: 15px;
   }
   .pvp-tier-badge {
     min-width: 54px;

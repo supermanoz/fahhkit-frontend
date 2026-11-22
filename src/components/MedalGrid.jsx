@@ -124,6 +124,8 @@ export default function MedalGrid({
                 <span className="medal-tile-preview">
                   {item.assetUrl ? (
                     <img
+                      loading="lazy"
+                      decoding="async"
                       src={resolveFileUrl(item.assetUrl)}
                       alt=""
                       onError={(e) => {

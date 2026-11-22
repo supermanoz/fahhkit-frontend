@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react'
-import { getJson, getToken, getUser, setUser } from '../api/client'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import {
+  getJson,
+  getToken,
+  getUser,
+  setUser,
+  subscribeAuth,
+} from '../api/client'
 
 // Every page renders <Navbar>, which calls this hook independently of
 // whatever the page itself calls it for (e.g. LandingPage) — without dedup,
@@ -26,13 +32,17 @@ function fetchCurrentUser() {
 // cached copy in localStorage indefinitely — the cache can go stale when a
 // user's role changes server-side after they logged in.
 export function useCurrentUser() {
-  const isAuthed = Boolean(getToken())
+  // Subscribed, so a sign-out (or a session the server confirmed dead) flips
+  // this at once - the native app has no page reload to rely on.
+  const token = useSyncExternalStore(subscribeAuth, getToken, () => null)
+  const isAuthed = Boolean(token)
   const [user, setLocalUser] = useState(getUser())
   const [loading, setLoading] = useState(isAuthed)
 
   useEffect(() => {
     if (!isAuthed) {
       setLoading(false)
+      setLocalUser(null)
       return
     }
     let cancelled = false
@@ -40,6 +50,7 @@ export function useCurrentUser() {
       .then((data) => {
         if (!cancelled) setLocalUser(data)
       })
+      // Network/5xx: keep the cached user, the session is untouched.
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false)

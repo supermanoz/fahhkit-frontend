@@ -93,7 +93,7 @@ export function openNotificationSettings() {
   // iOS: the app-settings: scheme opens this app's page in Settings (no native
   // plugin needed). Android: AppSettingsPlugin.java.
   if (platform === 'ios') {
-    window.open('app-settings:', '_system')
+    window.location.href = 'app-settings:'
     return Promise.resolve()
   }
   return AppSettings.openNotificationSettings().catch(() => {})

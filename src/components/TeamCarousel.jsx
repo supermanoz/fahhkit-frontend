@@ -49,7 +49,12 @@ export default function TeamCarousel({ team }) {
                 .map((member) => (
                   <div className="team-card" key={member.name}>
                     <div className="team-card-photo">
-                      <img src={member.photo} alt={member.name} />
+                      <img
+                        loading="lazy"
+                        decoding="async"
+                        src={member.photo}
+                        alt={member.name}
+                      />
                     </div>
                     <div className="team-card-body">
                       <h3>{member.name}</h3>

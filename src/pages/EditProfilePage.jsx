@@ -230,6 +230,8 @@ export default function EditProfilePage() {
             <span className="edit-profile-avatar">
               {profilePictureUrl ? (
                 <img
+                  loading="lazy"
+                  decoding="async"
                   src={resolveFileUrl(profilePictureUrl)}
                   alt={form.fullName}
                 />

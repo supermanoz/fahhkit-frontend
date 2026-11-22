@@ -227,7 +227,7 @@ export default function GameSettings({
             href={INSTAGRAM_URL}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => openExternal(INSTAGRAM_URL, e)}
+            onClick={(e) => openExternal(INSTAGRAM_URL, e, { app: true })}
           >
             <RowLabel
               Icon={IconInstagram}

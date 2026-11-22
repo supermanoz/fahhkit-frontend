@@ -15,6 +15,7 @@ import {
   setPvpDiscoverable,
 } from '../api/pvp'
 import { playerName } from '../utils/playerName'
+import { visibleInterval } from '../utils/visibleInterval'
 
 const DISCOVERABLE_KEY = 'fahhkit_pvp_discoverable'
 // Backend treats a location older than 15 min as stale (pvp.discovery.
@@ -162,20 +163,21 @@ export function usePvp({ userId, playerLocation, pvpOpen }) {
   })
   useEffect(() => {
     if (!userId || !pvpOpen) return
-    const interval = setInterval(
+    const stop = visibleInterval(
       refreshChallenges,
       waitingOnThem
         ? CHALLENGE_FAST_POLL_MS
         : discoverable
           ? CHALLENGE_OPEN_POLL_MS
-          : CHALLENGE_POLL_MS
+          : CHALLENGE_POLL_MS,
+      'pvp-challenges'
     )
     const onVisible = () => {
       if (!document.hidden) refreshChallenges()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => {
-      clearInterval(interval)
+      stop()
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [userId, pvpOpen, refreshChallenges, waitingOnThem, discoverable])
@@ -186,8 +188,7 @@ export function usePvp({ userId, playerLocation, pvpOpen }) {
   useEffect(() => {
     if (!userId || !discoverable || !pvpOpen) return
     ping()
-    const interval = setInterval(ping, LOCATION_PING_MS)
-    return () => clearInterval(interval)
+    return visibleInterval(ping, LOCATION_PING_MS, 'pvp-location-ping')
   }, [userId, discoverable, pvpOpen, ping])
 
   const waiting = queueEntry?.status === 'WAITING'

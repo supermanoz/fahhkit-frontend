@@ -13,6 +13,7 @@ import { IconCrosshairs } from './GameIcons'
 import MapAttribution from './MapAttribution'
 import { mapConfig } from '../config/mapProvider'
 import { nextSpriteFacing } from '../utils/spriteFacing'
+import { openExternal } from '../utils/externalLink'
 import {
   MapContainer,
   Polygon,
@@ -49,6 +50,8 @@ import AnimatedSprite from './AnimatedSprite'
 import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './TerritoryMap.css'
+import { isAppActive } from '../utils/appActivity'
+import { visibleInterval } from '../utils/visibleInterval'
 
 // A free, keyless vector basemap (OpenFreeMap) instead of a raster tile
 // provider — lets us drop most text/icon labels ourselves, keeping only
@@ -1128,11 +1131,10 @@ function HudEmoteLayer({ slot, heroKey, asset, paused }) {
 // is missing/hidden for several checks in a row, or the idle sheet failed to
 // load, put the hero back on the next check and warn (throttled) so it is
 // visible in the console if it ever still happens. Cheap: a few property
-// reads about ten times a second, none while the tab is hidden.
+// reads five times a second, none while the app is hidden.
 function useHeroPaintGuard(markerRef) {
   const map = useMap()
   useEffect(() => {
-    let raf = 0
     let frame = 0
     let lastWarn = -Infinity
     let badStreak = 0
@@ -1143,10 +1145,13 @@ function useHeroPaintGuard(markerRef) {
       lastWarn = now
       console.warn(`[TerritoryMap] hero not painted (${what}) - restoring it`)
     }
+    // One check per tick (200 ms); `frame` counts ticks. This used to be a
+    // requestAnimationFrame loop waking the main thread 60x a second to do
+    // its work on every 6th frame - same checks, a fraction of the wake-ups,
+    // and none at all while the app is hidden.
     const check = () => {
-      raf = requestAnimationFrame(check)
       frame += 1
-      if (document.hidden || frame % 6 !== 0) return
+      if (!isAppActive()) return
       const marker = markerRef.current
       if (!marker) return
       const el = marker.getElement?.()
@@ -1186,7 +1191,7 @@ function useHeroPaintGuard(markerRef) {
         return
       }
       // Every ~2s: did the idle/run sheet itself load?
-      if (frame % 120 === 0) {
+      if (frame % 10 === 0) {
         const url = cs.backgroundImage.match(/url\("?(.*?)"?\)/)?.[1]
         if (url) {
           let probe = probes.get(url)
@@ -1206,8 +1211,8 @@ function useHeroPaintGuard(markerRef) {
         }
       }
     }
-    raf = requestAnimationFrame(check)
-    return () => cancelAnimationFrame(raf)
+    const stop = visibleInterval(check, 200, 'hero-paint-guard')
+    return stop
   }, [map, markerRef])
 }
 
@@ -2042,7 +2047,12 @@ export default function TerritoryMap({
               {i > 0 && ' '}
               {credit.prefix}
               {credit.href ? (
-                <a href={credit.href} target="_blank" rel="noreferrer">
+                <a
+                  href={credit.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => openExternal(credit.href, e)}
+                >
                   {credit.label}
                 </a>
               ) : (

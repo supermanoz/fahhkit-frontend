@@ -466,3 +466,13 @@ button {
     );
   }
 }
+
+/* Phone-heat guard: utils/appActivity.js sets <html data-app-hidden> while the
+   tab/app is hidden or backgrounded. Nothing visible is running then, so
+   freeze every CSS animation and transition (weather overlays, sprite steps,
+   pulses, shimmers...) instead of letting them tick in the background. */
+html[data-app-hidden] *,
+html[data-app-hidden] *::before,
+html[data-app-hidden] *::after {
+  animation-play-state: paused !important;
+}

@@ -116,6 +116,8 @@ export default function MailDetail({
       {isNews && item.imageUrl && !imageFailed && (
         <span className="mail-detail-banner">
           <img
+            loading="lazy"
+            decoding="async"
             src={resolveFileUrl(item.imageUrl)}
             alt=""
             onError={() => setImageFailed(true)}

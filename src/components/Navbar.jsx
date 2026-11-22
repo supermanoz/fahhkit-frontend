@@ -279,6 +279,7 @@ export default function Navbar() {
                 >
                   {user?.profilePictureUrl ? (
                     <img
+                      decoding="async"
                       src={resolveFileUrl(user.profilePictureUrl)}
                       alt=""
                       className="navbar-user-photo"

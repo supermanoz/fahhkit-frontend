@@ -202,17 +202,18 @@ import {
 import { openExternal } from '../utils/externalLink'
 import { App as CapacitorApp } from '@capacitor/app'
 import { isNative } from '../utils/geo'
+import { GOOD_FIX_ACCURACY_M, shouldCommitFix } from '../utils/idleGps'
+import { useAppActive } from '../hooks/useAppActive'
+import { perf } from '../dev/perfLog'
+import { visibleInterval } from '../utils/visibleInterval'
 import HeroDetailModal from '../components/HeroDetailModal'
 import IdleNudge from '../components/IdleNudge'
 import GameIntroGlobe from '../components/GameIntroGlobe'
 import GameLoadingBackdrop from '../components/GameLoadingBackdrop'
 import MailBadgeIcon from '../components/MailBadgeIcon'
 import LeaderboardPodium, {
-  LeaderboardEmpty,
-  LeaderboardError,
   LeaderboardSkeleton,
 } from '../components/LeaderboardPodium'
-import Tabs from '../game/ui/Tabs'
 import SponsorBannerCarousel from '../components/SponsorBannerCarousel'
 import RouteTurnIndicator from '../components/RouteTurnIndicator'
 import { getRouteGuidance } from '../utils/routeNav'
@@ -550,6 +551,7 @@ function GamePageInner() {
   const auth = useAuthFlow()
   useDailyNudge({ isAuthed, loading: userLoading })
   const tracker = useRunTracker()
+  perf.render('GamePage')
   // A full reload (not just clearing the token + re-rendering) is
   // deliberate here - this page holds dozens of pieces of React state tied
   // to the signed-in player (hero, territory, run tracker, club, etc.) that
@@ -1129,13 +1131,34 @@ function GamePageInner() {
   // fix that would jump the hero further than its own error is ignored, and
   // near-identical fixes within 1s are dropped (fewer GamePage re-renders).
   const liveLocationRef = useRef(null)
+  // Adaptive GPS (see utils/idleGps.js): this watch is OFF while a run is
+  // being tracked (the run tracker owns GPS then and the hero position comes
+  // from its path - two simultaneous high-accuracy streams doubled the GPS
+  // cost) and while the app is backgrounded; it restarts on return. Fixes
+  // that are just jitter inside the accuracy circle aren't committed, so a
+  // phone lying still doesn't re-render this whole page every second.
+  const appActive = useAppActive()
+  const gpsOff = tracker.status === 'tracking' || !appActive
+  const menuOpenRef = useRef(false)
+  menuOpenRef.current = menuOpen
+  const gpsStartedForTickRef = useRef(null)
   useEffect(() => {
     if (!isAuthed || !('geolocation' in navigator)) {
       setLocating(false)
-      return
+      return undefined
     }
-    const GOOD_FIX_ACCURACY_M = 50
-    let settled = false
+    if (gpsOff) {
+      // Never leave the loading screen waiting on a watch that is
+      // deliberately off (a run resumed on launch, app opened hidden).
+      setLocating(false)
+      return undefined
+    }
+    // The first-fix "settle" (loading bar + recentre) only applies to a fresh
+    // start (login, or location newly allowed) - not to resuming after a
+    // run / the background, which must not yank the map around.
+    const fresh = gpsStartedForTickRef.current !== gpsRestartTick
+    gpsStartedForTickRef.current = gpsRestartTick
+    let settled = !fresh
     let lastCommitAt = 0
     const settle = () => {
       if (settled) return
@@ -1143,9 +1166,10 @@ function GamePageInner() {
       clearTimeout(timeout)
       setLocating(false)
     }
-    const timeout = setTimeout(settle, 5000)
+    const timeout = fresh ? setTimeout(settle, 5000) : null
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        perf.geo('idle-watch')
         const fix = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -1166,7 +1190,18 @@ function GamePageInner() {
             prev.accuracy != null && prev.accuracy <= GOOD_FIX_ACCURACY_M
           const moved = haversineDistance(prev, fix)
           if (prevGood && !good && moved > (prev.accuracy || 0)) return
-          if (now - lastCommitAt < 1000 && moved < 2) return
+          if (
+            settled &&
+            !shouldCommitFix({
+              prev,
+              fix,
+              movedM: moved,
+              elapsedMs: now - lastCommitAt,
+              menuOpen: menuOpenRef.current,
+            })
+          ) {
+            return
+          }
         }
         lastCommitAt = now
         liveLocationRef.current = fix
@@ -1187,7 +1222,7 @@ function GamePageInner() {
       clearTimeout(timeout)
       navigator.geolocation.clearWatch(watchId)
     }
-  }, [isAuthed, gpsRestartTick])
+  }, [isAuthed, gpsRestartTick, gpsOff])
 
   // Location permission asked AFTER login: the watch above started before the
   // player answered the prompt, so when the answer is "allow" restart it and
@@ -1677,15 +1712,19 @@ function GamePageInner() {
     loadSky()
     // Don't hold the game hostage to a slow weather API.
     const giveUp = setTimeout(() => setSkyLoaded(true), 5000)
-    const refresh = setInterval(loadSky, 15 * 60 * 1000)
+    const stopRefresh = visibleInterval(loadSky, 15 * 60 * 1000, 'sky-refresh')
     // Re-evaluates dawn/day/dusk/night between fetches.
-    const tick = setInterval(() => setSkyClock(Date.now()), 60 * 1000)
+    const stopTick = visibleInterval(
+      () => setSkyClock(Date.now()),
+      60 * 1000,
+      'sky-clock'
+    )
     return () => {
       cancelled = true
       controller?.abort()
       clearTimeout(giveUp)
-      clearInterval(refresh)
-      clearInterval(tick)
+      stopRefresh()
+      stopTick()
     }
   }, [locating])
 
@@ -5362,91 +5401,135 @@ function GamePageInner() {
               <div className="game-menu-panel game-cards">
                 <SponsorBannerCarousel />
                 <section className="game-card game-card-dark">
-                  {/* Two selectors, one selection style (shop purple fill +
-                      white text; the rest cream + dark text): Players |
-                      Clubs on top, Global | District/Country under it.
-                      Same state + handlers as before. */}
-                  <Tabs
-                    className="lb-mode-tabs"
-                    accent="shop"
-                    ariaLabel="Leaderboard"
-                    value={leaderboardMode}
-                    onChange={switchLeaderboardMode}
-                    tabs={[
-                      {
-                        id: 'individual',
-                        label: 'Players',
-                        ariaLabel: 'Top Players',
-                        icon: <IconUser aria-hidden="true" />,
-                      },
-                      {
-                        id: 'club',
-                        label: 'Clubs',
-                        ariaLabel: 'Top Clubs',
-                        icon: <IconUsers aria-hidden="true" />,
-                      },
-                    ]}
-                  />
+                  <div
+                    className="game-menu-subtabs game-shop-tabs game-leaderboard-mode"
+                    role="tablist"
+                    aria-label="Leaderboard"
+                  >
+                    {/* IconUser/IconUsers reused exactly as-is from the Me/
+                        Club nav tabs and radial menu buttons (RADIAL_ITEMS
+                        above) rather than inventing a separate icon
+                        language just for this tab row. IconTrophy (this
+                        tab's old icon) stays dropped for Players
+                        specifically - it already means "score/rank"
+                        elsewhere on this same screen (the podium medals,
+                        the stat chips), so reusing it here too for "this
+                        is the Players section" reads as the wrong concept.
+                        Label text is back next to the icon (short "Players"/
+                        "Clubs" swapped in under 360px via CSS, see
+                        .game-leaderboard-mode .game-menu-subtab-label in
+                        GamePage.css) - game-shop-tabs' icon-only squircle
+                        sizing is overridden just for this row there too, so
+                        Shop's section tabs stay icon-only.
+                        game-leaderboard-mode only still exists to keep this
+                        row's active state slate instead of the shop's
+                        green, see GamePage.css. */}
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={leaderboardMode === 'individual'}
+                      aria-label="Top Players"
+                      title="Top Players"
+                      className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
+                      onClick={() => switchLeaderboardMode('individual')}
+                    >
+                      <IconUser />
+                      <span className="game-menu-subtab-label">
+                        <span className="label-full">Top Players</span>
+                        <span className="label-short">Players</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={leaderboardMode === 'club'}
+                      aria-label="Top Clubs"
+                      title="Top Clubs"
+                      className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
+                      onClick={() => switchLeaderboardMode('club')}
+                    >
+                      <IconUsers />
+                      <span className="game-menu-subtab-label">
+                        <span className="label-full">Top Clubs</span>
+                        <span className="label-short">Clubs</span>
+                      </span>
+                    </button>
+                  </div>
+
                   {leaderboardMode === 'individual' ? (
-                    <Tabs
-                      className="lb-scope-tabs"
-                      accent="shop"
-                      size="sm"
-                      ariaLabel="Scope"
-                      value={individualScope}
-                      onChange={switchIndividualScope}
-                      tabs={[
-                        {
-                          id: 'global',
-                          label: 'Global',
-                          icon: (
-                            <img
-                              src={globeScopeIcon}
-                              alt=""
-                              aria-hidden="true"
-                            />
-                          ),
-                        },
-                        {
-                          id: 'city',
-                          label:
-                            (individualScope === 'city' &&
-                              leaderboard[0]?.cityName) ||
-                            'District',
-                          icon: <IconFlagScope aria-hidden="true" />,
-                        },
-                      ]}
-                    />
+                    <div
+                      className="game-menu-subtabs game-menu-subtabs-scope"
+                      role="tablist"
+                      aria-label="Scope"
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={individualScope === 'global'}
+                        className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
+                        onClick={() => switchIndividualScope('global')}
+                      >
+                        <img
+                          src={globeScopeIcon}
+                          alt=""
+                          className="game-menu-subtab-scope-icon"
+                        />
+                        <span className="game-menu-subtab-scope-label">
+                          Global
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={individualScope === 'city'}
+                        className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
+                        onClick={() => switchIndividualScope('city')}
+                      >
+                        <IconFlagScope className="game-menu-subtab-scope-icon" />
+                        <span className="game-menu-subtab-scope-label">
+                          {(individualScope === 'city' &&
+                            leaderboard[0]?.cityName) ||
+                            'District'}
+                        </span>
+                      </button>
+                    </div>
                   ) : (
-                    <Tabs
-                      className="lb-scope-tabs"
-                      accent="shop"
-                      size="sm"
-                      ariaLabel="Scope"
-                      value={clubScope}
-                      onChange={switchClubScope}
-                      tabs={[
-                        {
-                          id: 'global',
-                          label: 'Global',
-                          icon: (
-                            <img
-                              src={globeScopeIcon}
-                              alt=""
-                              aria-hidden="true"
-                            />
-                          ),
-                        },
-                        {
-                          id: 'national',
-                          label:
-                            (clubScope === 'national' &&
-                              clubLeaderboard[0]?.countryName) ||
-                            'Country',
-                          icon: <IconFlagScope aria-hidden="true" />,
-                        },
-                      ]}
-                    />
+                    <div
+                      className="game-menu-subtabs game-menu-subtabs-scope"
+                      role="tablist"
+                      aria-label="Scope"
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={clubScope === 'global'}
+                        className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
+                        onClick={() => switchClubScope('global')}
+                      >
+                        <img
+                          src={globeScopeIcon}
+                          alt=""
+                          className="game-menu-subtab-scope-icon"
+                        />
+                        <span className="game-menu-subtab-scope-label">
+                          Global
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={clubScope === 'national'}
+                        className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
+                        onClick={() => switchClubScope('national')}
+                      >
+                        <IconFlagScope className="game-menu-subtab-scope-icon" />
+                        <span className="game-menu-subtab-scope-label">
+                          {(clubScope === 'national' &&
+                            clubLeaderboard[0]?.countryName) ||
+                            'Country'}
+                        </span>
+                      </button>
+                    </div>
                   )}
 
                   {leaderboardMode === 'individual' &&
@@ -5465,21 +5548,15 @@ function GamePageInner() {
 
                   {leaderboardMode === 'individual' ? (
                     leaderboardError ? (
-                      <LeaderboardError
-                        message={leaderboardError}
-                        onRetry={() => loadLeaderboard()}
-                      />
+                      <p className="game-menu-empty">{leaderboardError}</p>
                     ) : leaderboardLoading && leaderboard.length === 0 ? (
                       <LeaderboardSkeleton />
                     ) : leaderboard.length === 0 ? (
-                      <LeaderboardEmpty
-                        message="No runners here yet. Claim territory to get on the board."
-                        hint={
-                          individualScope === 'city'
-                            ? 'District rankings only refresh about once an hour, so a very recent run may not show up yet.'
-                            : undefined
-                        }
-                      />
+                      <p className="game-menu-empty">
+                        {individualScope === 'city'
+                          ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
+                          : 'No territory claimed yet — be the first.'}
+                      </p>
                     ) : (
                       <LeaderboardPodium
                         nameLabel="Runner"
@@ -5487,8 +5564,6 @@ function GamePageInner() {
                           key: entry.userId,
                           rank: entry.rank,
                           name: playerNameOf(entry),
-                          // Club tag, only when the row already carries one.
-                          sub: entry.clubName || null,
                           // Same "icon + stat" treatment as the Club board's
                           // trophy count below - territory is this board's
                           // equivalent score.
@@ -5517,20 +5592,15 @@ function GamePageInner() {
                       />
                     )
                   ) : leaderboardError ? (
-                    <LeaderboardError
-                      message={leaderboardError}
-                      onRetry={() => loadClubLeaderboard()}
-                    />
+                    <p className="game-menu-empty">{leaderboardError}</p>
                   ) : leaderboardLoading && clubLeaderboard.length === 0 ? (
                     <LeaderboardSkeleton />
                   ) : clubLeaderboard.length === 0 ? (
-                    <LeaderboardEmpty
-                      message={
-                        clubScope === 'national'
-                          ? 'No club has claimed territory in your country yet.'
-                          : 'No clubs here yet. Claim territory with your club to get on the board.'
-                      }
-                    />
+                    <p className="game-menu-empty">
+                      {clubScope === 'national'
+                        ? 'No club has claimed territory in your country yet.'
+                        : 'No club has claimed territory yet.'}
+                    </p>
                   ) : (
                     <LeaderboardPodium
                       nameLabel="Club"
@@ -5539,14 +5609,7 @@ function GamePageInner() {
                         key: entry.clubId,
                         rank: entry.rank,
                         name: entry.clubName,
-                        badge: (size) => (
-                          <ClubBadge name={entry.clubName} size={size} />
-                        ),
-                        // Member count, only when the row already has it.
-                        sub:
-                          typeof entry.memberCount === 'number'
-                            ? `${entry.memberCount} ${entry.memberCount === 1 ? 'member' : 'members'}`
-                            : null,
+                        badge: <ClubBadge name={entry.clubName} size={40} />,
                         area: (
                           <span className="lb-trophy-stat">
                             <ClubTrophyIcon size={26} />
@@ -5669,6 +5732,8 @@ function GamePageInner() {
                     </HeroStage>
                   ) : (
                     <img
+                      loading="lazy"
+                      decoding="async"
                       className="game-menu-hero-img"
                       src={avatarSrc}
                       alt=""
@@ -5976,7 +6041,8 @@ function GamePageInner() {
                 onSelectMapStyle={handleChooseMapStyle}
                 pvp={pvp}
                 onEditProfile={() => {
-                  // Website-only page: native opens it in the system browser.
+                  // Website page: the system browser natively (not a game
+                  // route there), the in-app route on the web.
                   if (isNative) openExternal(getSiteUrl('/profile/edit'))
                   else navigate('/profile/edit')
                 }}
@@ -6468,7 +6534,7 @@ function GamePageInner() {
                       </span>
                       <button
                         type="button"
-                        className="btn btn-outline"
+                        className="game-btn game-btn-green game-btn-sm game-coin-buy-btn"
                         onClick={() => openBuyRedirectConfirm(bundle)}
                       >
                         Buy
@@ -6834,12 +6900,22 @@ function GamePageInner() {
               <p>Set this avatar?</p>
               <div className="game-avatar-confirm-compare">
                 <div className="game-avatar-confirm-option">
-                  <img src={currentAvatar?.src || defaultAvatarImage} alt="" />
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src={currentAvatar?.src || defaultAvatarImage}
+                    alt=""
+                  />
                   <span>{currentAvatar?.name || 'Current'}</span>
                 </div>
                 <span className="game-avatar-confirm-arrow">→</span>
                 <div className="game-avatar-confirm-option">
-                  <img src={avatarChoice.src} alt={avatarChoice.name} />
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src={avatarChoice.src}
+                    alt={avatarChoice.name}
+                  />
                   <span>{avatarChoice.name}</span>
                 </div>
               </div>

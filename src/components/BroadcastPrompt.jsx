@@ -174,6 +174,7 @@ export default function BroadcastPrompt({ notices, onDismiss }) {
           >
             {broadcast.imageUrl && (
               <img
+                decoding="async"
                 className="bcast-image"
                 src={resolveFileUrl(broadcast.imageUrl)}
                 alt=""

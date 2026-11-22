@@ -176,6 +176,8 @@ export default function EventsPage() {
               {event.eventImageUrl1 && (
                 <div className="event-card-image-wrap">
                   <img
+                    loading="lazy"
+                    decoding="async"
                     src={resolveFileUrl(event.eventImageUrl1)}
                     alt={event.name}
                     className="event-card-image"

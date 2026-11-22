@@ -78,6 +78,7 @@ export default function RankBadge({ type, rank, className = '' }) {
       className={`rank-badge rank-badge-${type} rank-badge-${rank} ${rank === 1 ? 'rank-badge-shine' : ''} ${paused ? 'is-paused' : ''} ${className}`}
     >
       <img
+        decoding="async"
         className="rank-badge-img"
         src={badge.src}
         srcSet={`${badge.src} 1x, ${badge.src2x} 2x`}

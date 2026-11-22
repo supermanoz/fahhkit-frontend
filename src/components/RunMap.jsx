@@ -8,6 +8,7 @@ import {
   useMap,
 } from 'react-leaflet'
 import L from 'leaflet'
+import { openExternal } from '../utils/externalLink'
 import 'leaflet/dist/leaflet.css'
 import MapAttribution from './MapAttribution'
 import './RunMap.css'
@@ -80,6 +81,9 @@ export default function RunMap({ points }) {
           href="https://www.openstreetmap.org/copyright"
           target="_blank"
           rel="noreferrer"
+          onClick={(e) =>
+            openExternal('https://www.openstreetmap.org/copyright', e)
+          }
         >
           OpenStreetMap
         </a>{' '}

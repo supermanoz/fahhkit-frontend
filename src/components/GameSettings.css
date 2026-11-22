@@ -137,7 +137,14 @@
 }
 .set-card .map-style-picker-option {
   padding-left: 76px;
+  padding-right: 16px;
   min-height: 52px;
+}
+@media (max-width: 380px) {
+  .set-card .map-style-picker-option {
+    padding-left: 60px;
+    gap: 10px;
+  }
 }
 .game-root .set-card .map-style-picker-name,
 .game-root .set-card .map-style-picker-state,

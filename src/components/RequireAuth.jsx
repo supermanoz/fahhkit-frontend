@@ -1,7 +1,12 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useSyncExternalStore } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { clearSession, getToken, subscribeAuth } from '../api/client'
+import {
+  clearSession,
+  getToken,
+  logAuthRedirect,
+  subscribeAuth,
+} from '../api/client'
 import { isTokenUsable, tokenExpiryMs } from '../utils/jwtExpiry'
 import { buildLoginPath } from '../utils/safeNext'
 
@@ -20,6 +25,15 @@ export default function RequireAuth({ children }) {
   const token = useSyncExternalStore(subscribeAuth, getToken, () => null)
   const location = useLocation()
   const usable = isTokenUsable(token)
+
+  useEffect(() => {
+    if (!usable) {
+      logAuthRedirect(
+        token ? 'stored token expired' : 'no session token',
+        location.pathname
+      )
+    }
+  }, [usable, token, location.pathname])
 
   // Token present but expired: drop it so the rest of the site (navbar...)
   // stops treating the visitor as signed in.

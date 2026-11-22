@@ -2017,6 +2017,16 @@
   overflow-y: auto;
 }
 
+/* The pack rows' Buy button: the game's own green slab (it was the website's
+   white .btn-outline, whose white text + game stroke was unreadable on its
+   white fill). Sized to be an easy tap target. */
+.game-coin-shop-card .game-coin-buy-btn {
+  min-width: 72px;
+  min-height: 40px;
+  padding: 6px 16px;
+  font-size: 16px;
+}
+
 /* Buy-redirect confirmation (GamePage.jsx's buyRedirectBundle) - a Buy tap
    in the list above opens this instead of starting a purchase directly.
    340px (base .game-confirm-card is 320px) - just enough extra for
@@ -4673,17 +4683,30 @@
   text-align: left;
 }
 
+/* Light card: plain dark body text, no game-wide white stroke. */
+.nickname-card-title,
+.nickname-card-sub,
+.nickname-card-hint,
+.nickname-card-at {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+
 .nickname-card-title {
   margin: 0;
   font-size: 17px;
-  color: var(--text-title);
+  font-weight: 800;
+  color: var(--text-title-dark);
 }
 
 .nickname-card-sub,
 .nickname-card-hint {
   margin: 0;
   font-size: 14px;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--text-body-dark);
 }
 
 .nickname-card-hint.is-error {
@@ -4698,6 +4721,7 @@
 
 .nickname-card-at {
   font-size: 20px;
+  font-weight: 800;
   color: var(--gold-text);
 }
 

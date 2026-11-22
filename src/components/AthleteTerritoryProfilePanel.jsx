@@ -206,6 +206,8 @@ export default function AthleteTerritoryProfilePanel({
               </HeroStage>
             ) : (
               <img
+                loading="lazy"
+                decoding="async"
                 className="game-menu-hero-img"
                 src={resolveFileUrl(heroAssetUrl)}
                 alt=""

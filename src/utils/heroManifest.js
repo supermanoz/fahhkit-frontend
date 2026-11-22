@@ -57,7 +57,15 @@ const sheetManifests = import.meta.glob(
 // instead of every hero's every emote's every sheet being resolved at
 // startup.
 const sheetUrlLoaders = import.meta.glob(
-  '../assets/heroes/*/sheets/*/*.{webp,png}',
+  '../assets/heroes/*/sheets/*/sheet*.{webp,png}',
+  { eager: false, import: 'default', query: '?url' }
+)
+// Each sequence's poster.webp (frame 0 at native cell size, a few KB - see
+// scripts/build-sprite-posters.mjs): AnimatedSprite's static "frozen tile"
+// layer uses it so an inactive sprite never decodes a whole ~4000x4000 sheet
+// just to show one cell. Lazy for the same reason the sheets are.
+const posterUrlLoaders = import.meta.glob(
+  '../assets/heroes/*/sheets/*/poster.webp',
   { eager: false, import: 'default', query: '?url' }
 )
 
@@ -123,6 +131,11 @@ function resolveSheets(heroName, heroDir) {
       frameWidth: manifest.frameWidth,
       frameHeight: manifest.frameHeight,
       sheets,
+      // undefined when a sequence has no poster yet: AnimatedSprite falls
+      // back to cropping sheet 0 (the old, memory-hungry behaviour).
+      posterLoadUrl: manifest.poster
+        ? posterUrlLoaders[`${dir}/${manifest.poster}`]
+        : undefined,
     }
   }
   return out

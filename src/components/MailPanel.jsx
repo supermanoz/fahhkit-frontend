@@ -507,6 +507,7 @@ function NewsCard({ item, onOpen }) {
         <span className="news-card-media">
           {item.imageUrl && !imageFailed ? (
             <img
+              decoding="async"
               src={resolveFileUrl(item.imageUrl)}
               alt=""
               loading="lazy"

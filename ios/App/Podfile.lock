@@ -31,6 +31,8 @@ PODS:
     - Capacitor
   - CapacitorNativeSettings (6.0.6):
     - Capacitor
+  - CapacitorPreferences (6.0.3):
+    - Capacitor
   - CapacitorPushNotifications (6.0.5):
     - Capacitor
   - CapacitorShare (6.0.4):
@@ -121,6 +123,7 @@ DEPENDENCIES:
   - "CapacitorHaptics (from `../../node_modules/@capacitor/haptics`)"
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
   - CapacitorNativeSettings (from `../../node_modules/capacitor-native-settings`)
+  - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
@@ -171,6 +174,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/local-notifications"
   CapacitorNativeSettings:
     :path: "../../node_modules/capacitor-native-settings"
+  CapacitorPreferences:
+    :path: "../../node_modules/@capacitor/preferences"
   CapacitorPushNotifications:
     :path: "../../node_modules/@capacitor/push-notifications"
   CapacitorShare:
@@ -197,6 +202,7 @@ SPEC CHECKSUMS:
   CapacitorHaptics: b53409aaca1203f79c6d0eb3ed5de40556339518
   CapacitorLocalNotifications: b205182fab8947a0c412d56d72b709738a9d28e7
   CapacitorNativeSettings: 024d3e0638b694756a566803c3ba6a1d97bc03ca
+  CapacitorPreferences: 9f9935bce493977183511362131a93f7b260191a
   CapacitorPushNotifications: 83974a7be0f6829c26148f6ed65745b96a7d16bd
   CapacitorShare: 44c43f74b95500ba7399c2ac21f0d55efc1a931e
   CapacitorSplashScreen: f65292695df7d7b24a22954a6cfbaecadd1718a4
@@ -215,6 +221,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
 
-PODFILE CHECKSUM: f568eb8f5475512916a24efdbd3ee3d4774c626b
+PODFILE CHECKSUM: ef86c4e549a65c1c4ddb995c0d8904519e1aafa3
 
 COCOAPODS: 1.17.0

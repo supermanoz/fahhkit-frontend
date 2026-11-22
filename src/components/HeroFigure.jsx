@@ -26,6 +26,8 @@ export default function HeroFigure({ hero, pose = 'idle', height = 170 }) {
   if (portrait) {
     return (
       <img
+        loading="lazy"
+        decoding="async"
         className="hero-figure-portrait"
         src={portrait}
         alt=""

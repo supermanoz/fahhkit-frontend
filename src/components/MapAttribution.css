@@ -32,6 +32,9 @@
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
 }
 
 /* Opens upward from the button, not downward - every anchor point this

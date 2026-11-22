@@ -42,6 +42,7 @@ export default function SeasonBanner() {
             sizes="(min-width: 1100px) 1100px, 100vw"
           />
           <img
+            decoding="async"
             className="season-banner-image"
             src={seasonBannerJpg}
             srcSet={`${seasonBannerJpg} 1600w, ${seasonBannerJpg2x} 1983w`}
