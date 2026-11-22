@@ -50,3 +50,26 @@ describe('shouldCommitFix', () => {
     expect(jitterThresholdMeters(undefined)).toBe(3)
   })
 })
+
+import { idleWatchShouldRun } from './idleGps'
+
+describe('idleWatchShouldRun (hero GPS outside a run)', () => {
+  it('runs only with no active run and the app in the foreground', () => {
+    expect(idleWatchShouldRun({ runTracking: false, appActive: true })).toBe(
+      true
+    )
+  })
+  it('no run + hidden/backgrounded: GPS off', () => {
+    expect(idleWatchShouldRun({ runTracking: false, appActive: false })).toBe(
+      false
+    )
+  })
+  it('active run: the hero watch is off in every state (the run tracker owns GPS)', () => {
+    expect(idleWatchShouldRun({ runTracking: true, appActive: true })).toBe(
+      false
+    )
+    expect(idleWatchShouldRun({ runTracking: true, appActive: false })).toBe(
+      false
+    )
+  })
+})

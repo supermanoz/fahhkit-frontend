@@ -202,7 +202,11 @@ import {
 import { openExternal } from '../utils/externalLink'
 import { App as CapacitorApp } from '@capacitor/app'
 import { isNative } from '../utils/geo'
-import { GOOD_FIX_ACCURACY_M, shouldCommitFix } from '../utils/idleGps'
+import {
+  GOOD_FIX_ACCURACY_M,
+  idleWatchShouldRun,
+  shouldCommitFix,
+} from '../utils/idleGps'
 import { useAppActive } from '../hooks/useAppActive'
 import { perf } from '../dev/perfLog'
 import { visibleInterval } from '../utils/visibleInterval'
@@ -1138,7 +1142,10 @@ function GamePageInner() {
   // that are just jitter inside the accuracy circle aren't committed, so a
   // phone lying still doesn't re-render this whole page every second.
   const appActive = useAppActive()
-  const gpsOff = tracker.status === 'tracking' || !appActive
+  const gpsOff = !idleWatchShouldRun({
+    runTracking: tracker.status === 'tracking',
+    appActive,
+  })
   const menuOpenRef = useRef(false)
   menuOpenRef.current = menuOpen
   const gpsStartedForTickRef = useRef(null)

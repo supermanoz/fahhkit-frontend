@@ -31,3 +31,11 @@ export function shouldCommitFix({ prev, fix, movedM, elapsedMs, menuOpen }) {
     : jitterThresholdMeters(fix.accuracy)
   return movedM >= threshold
 }
+
+// The ONE rule for the "where is the hero" watch: it runs only when no run is
+// being tracked AND the app is in the foreground. It is deliberately NOT a
+// rule for run tracking - an active run's GPS belongs to useRunTracker
+// (high accuracy, background-capable) and must never depend on app visibility.
+export function idleWatchShouldRun({ runTracking, appActive }) {
+  return !runTracking && appActive
+}
