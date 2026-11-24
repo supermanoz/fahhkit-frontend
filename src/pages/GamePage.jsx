@@ -44,6 +44,14 @@ import { AnimatePresence, motion } from 'framer-motion'
 import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import VehicleAlert from '../components/VehicleAlert'
+import {
+  OVER_SPEED_STATUS_LABEL,
+  OVER_SPEED_WARNING_COPY,
+  OVER_SPEED_WARNING_TITLE,
+  SERVER_REJECTED_TERRITORY_COPY,
+  SERVER_REJECTED_TITLE,
+} from '../constants/runMessages'
+import { describeGpsShortfall } from '../utils/runIssues'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
 import TerritoryPopup from '../components/TerritoryPopup'
 import PvpResultPopup from '../components/PvpResultPopup'
@@ -215,7 +223,11 @@ import { useLeaderboardPages } from '../hooks/useLeaderboardPages'
 import { rangeLabel } from '../utils/leaderboardPaging'
 import WelcomeBonusModal from '../components/WelcomeBonusModal'
 import { popupBlockedBy } from '../utils/popupQueue'
-import { SHOW_PVP_ENTRY, SHOW_PVP_IN_DROPDOWN } from '../config/features'
+import {
+  MAP_ROTATION_ENABLED,
+  SHOW_PVP_ENTRY,
+  SHOW_PVP_IN_DROPDOWN,
+} from '../config/features'
 import {
   pickerBadgeCount,
   pickerTabs,
@@ -256,6 +268,7 @@ import GameLoadingBackdrop from '../components/GameLoadingBackdrop'
 import MailBadgeIcon from '../components/MailBadgeIcon'
 import LeaderboardPodium, {
   LeaderboardSkeleton,
+  LeaderboardDock,
 } from '../components/LeaderboardPodium'
 import SponsorBannerCarousel from '../components/SponsorBannerCarousel'
 import RouteTurnIndicator from '../components/RouteTurnIndicator'
@@ -427,9 +440,8 @@ const RESULT_POLL_DELAY_MS = 2500
 // to just look like a silent timeout.
 const RUN_REJECTION_COPY = {
   CHEAT_DETECTED: {
-    title: 'Whoa there, speedster 🛵',
-    message:
-      "That pace looked more scooter than sneakers, so this one didn't count for territory.",
+    title: SERVER_REJECTED_TITLE,
+    message: SERVER_REJECTED_TERRITORY_COPY,
   },
   NOT_ENOUGH_POINTS: {
     title: 'GPS lost the plot 📡',
@@ -1125,7 +1137,7 @@ function GamePageInner() {
   // "Run Conquest" brand text beside them isn't clipped.
   const runStatusLabel =
     tracker.vehicleState === 'vehicle'
-      ? 'Vehicle detected'
+      ? OVER_SPEED_STATUS_LABEL
       : getRunModeLabel(
           getRunMode(tracker),
           tracker.paused ? 'paused' : undefined
@@ -2247,9 +2259,15 @@ function GamePageInner() {
   // ONE shared RUN / IDLE state for a tracked run: it drives the hero's run
   // animation AND the heading-up map (utils/runView.js), so they can't disagree.
   // Outside a run the old on-screen motion check above still animates the hero.
-  const runView = useRunView(tracker.status === 'tracking')
+  // Flag off: the machine never starts and the hero uses the old on-screen
+  // motion check (playerMoving) in a run too, exactly as before rotation.
+  const runView = useRunView(
+    MAP_ROTATION_ENABLED && tracker.status === 'tracking'
+  )
   const heroRunning =
-    tracker.status === 'tracking' ? runView.mode === 'run' : playerMoving
+    MAP_ROTATION_ENABLED && tracker.status === 'tracking'
+      ? runView.mode === 'run'
+      : playerMoving
   useEffect(() => {
     const fix = playerLocation
     if (
@@ -2796,6 +2814,51 @@ function GamePageInner() {
     ? lb.loadedRows.find((e) => e.clubName === profile.clubName)
     : null
   const leaderboardScopeLabel = lb.loadedRows[0]
+  const leaderboardMe =
+    leaderboardMode === 'individual'
+      ? user
+        ? {
+            rank: myPlayerRow?.rank ?? null,
+            name: playerNameOf(user),
+            avatarSrc: resolveFileUrl(user.profilePictureUrl),
+            area: (
+              <span className="lb-trophy-stat">
+                <IconFlag />
+                {myPlayerRow
+                  ? formatArea(myPlayerRow.areaSqMeters)
+                  : individualScope === 'global' &&
+                      profile?.totalAreaSqMeters != null
+                    ? formatArea(profile.totalAreaSqMeters)
+                    : '—'}
+              </span>
+            ),
+            onClick: () =>
+              setViewingProfile(
+                myPlayerRow || {
+                  userId: user.id,
+                  fullName: user.fullName,
+                  nickname: user.nickname,
+                }
+              ),
+          }
+        : null
+      : profile?.clubName
+        ? {
+            rank: myClubRow?.rank ?? null,
+            name: profile.clubName,
+            badge: <ClubBadge name={profile.clubName} size={40} />,
+            area: (
+              <span className="lb-trophy-stat">
+                <ClubTrophyIcon size={26} />
+                {myClubRow ? formatCoins(myClubRow.trophies ?? 0) : '—'}
+              </span>
+            ),
+            onClick: () => {
+              if (myClubRow) setOpenClubId(myClubRow.clubId)
+              switchTab('club')
+            },
+          }
+        : null
   // New page -> back to the top (the menu sheet is the scroller).
   useEffect(() => {
     menuSheetRef.current?.scrollTo?.({ top: 0 })
@@ -3358,7 +3421,21 @@ function GamePageInner() {
   function handleCancelTracking() {
     tracker.stop()
     tracker.clearPendingRun()
+    tracker.clearRunIssue() // a deliberate discard is not a GPS problem
   }
+
+  // A run that ended with nothing measured because of the phone's GPS (no
+  // fix, or mostly imprecise ones): explain it neutrally instead of ending
+  // in silence.
+  useEffect(() => {
+    if (!tracker.runIssue) return
+    setSaveError({
+      title: tracker.runIssue.title,
+      message: tracker.runIssue.message,
+    })
+    tracker.clearRunIssue()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the issue only
+  }, [tracker.runIssue])
 
   // The run stops (End, or GPS/motion kicks it back to idle) -> nothing
   // left for the turn HUD to guide, and the route's own info toast would
@@ -3723,6 +3800,16 @@ function GamePageInner() {
   }
 
   async function attemptSubmit(pendingRun) {
+    // Lost to the phone's GPS (not the player): say so, neutrally, with a
+    // way to try again - never the "warm-up" or any fraud wording.
+    const gpsIssue =
+      pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS
+        ? describeGpsShortfall(pendingRun)
+        : null
+    if (gpsIssue) {
+      setSaveError({ title: gpsIssue.title, message: gpsIssue.message })
+      return
+    }
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
         title: "That's a warm-up, not a run 😅",
@@ -5321,24 +5408,29 @@ function GamePageInner() {
                   <div className="game-controls-actions game-run-actions">
                     {tracker.isTraining &&
                       (tracker.paused ? (
-                        <button
-                          type="button"
-                          className="game-run-btn game-run-btn-resume"
+                        <GameButton
+                          variant="accent"
+                          size="compact"
+                          icon={<IconPlay />}
+                          className="game-run-slot game-run-btn-resume"
                           onClick={tracker.resume}
                         >
-                          <IconPlay /> Resume
-                        </button>
+                          Resume
+                        </GameButton>
                       ) : (
-                        <button
-                          type="button"
-                          className="game-run-btn game-run-btn-pause"
+                        <GameButton
+                          variant="accent"
+                          size="compact"
+                          icon={<IconPause />}
+                          className="game-run-slot game-run-btn-pause"
                           onClick={tracker.pause}
                         >
-                          <IconPause /> Pause
-                        </button>
+                          Pause
+                        </GameButton>
                       ))}
                     <GameButton
                       variant="primary"
+                      size="compact"
                       icon={<IconFlagCheckered />}
                       className="game-run-slot game-run-btn-end"
                       onClick={handleRequestEnd}
@@ -5347,6 +5439,7 @@ function GamePageInner() {
                     </GameButton>
                     <GameButton
                       variant="danger"
+                      size="compact"
                       icon={<IconClose />}
                       className="game-run-slot game-run-btn-discard"
                       onClick={() => setConfirmAction('cancel')}
@@ -5637,12 +5730,8 @@ function GamePageInner() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.9 }}
             >
-              <h3>Whoa there, speedster 🛵</h3>
-              <p>
-                {tracker.invalidMotion.reason === 'no-gait'
-                  ? "You're covering ground fast with no running stride detected. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."
-                  : "This pace is faster than running allows. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."}
-              </p>
+              <h3>{OVER_SPEED_WARNING_TITLE}</h3>
+              <p>{OVER_SPEED_WARNING_COPY}</p>
               <div className="game-highlight-toast-actions">
                 <GameButton onClick={() => tracker.stop()}>Stop Run</GameButton>
                 <GameButton
@@ -5870,7 +5959,7 @@ function GamePageInner() {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className={`game-menu-sheet${menuTab === 'race' ? ' is-pvp' : ''}${menuTab === 'settings' ? ' is-fixed-head' : ''}`}
+            className={`game-menu-sheet${menuTab === 'race' ? ' is-pvp' : ''}${menuTab === 'settings' ? ' is-fixed-head' : ''}${menuTab === 'leaderboard' ? ' is-lb' : ''}`}
             ref={menuSheetRef}
             // Opened through the cloud portal: appear in place (the clouds
             // cover it), no slide-up flash.
@@ -6045,15 +6134,16 @@ function GamePageInner() {
             )}
 
             {menuTab === 'leaderboard' && (
-              <div className="game-menu-panel game-cards">
-                <SponsorBannerCarousel />
-                <section className="game-card game-card-dark">
-                  <div
-                    className="game-menu-subtabs game-shop-tabs game-leaderboard-mode"
-                    role="tablist"
-                    aria-label="Leaderboard"
-                  >
-                    {/* IconUser/IconUsers reused exactly as-is from the Me/
+              <>
+                <div className="game-menu-panel game-cards lb-panel">
+                  <SponsorBannerCarousel />
+                  <section className="game-card game-card-dark">
+                    <div
+                      className="game-menu-subtabs game-shop-tabs game-leaderboard-mode"
+                      role="tablist"
+                      aria-label="Leaderboard"
+                    >
+                      {/* IconUser/IconUsers reused exactly as-is from the Me/
                         Club nav tabs and radial menu buttons (RADIAL_ITEMS
                         above) rather than inventing a separate icon
                         language just for this tab row. IconTrophy (this
@@ -6071,255 +6161,210 @@ function GamePageInner() {
                         game-leaderboard-mode only still exists to keep this
                         row's active state slate instead of the shop's
                         green, see GamePage.css. */}
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={leaderboardMode === 'individual'}
-                      aria-label="Top Players"
-                      title="Top Players"
-                      className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
-                      onClick={() => switchLeaderboardMode('individual')}
-                    >
-                      <IconUser />
-                      <span className="game-menu-subtab-label">
-                        <span className="label-full">Top Players</span>
-                        <span className="label-short">Players</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={leaderboardMode === 'club'}
-                      aria-label="Top Clubs"
-                      title="Top Clubs"
-                      className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
-                      onClick={() => switchLeaderboardMode('club')}
-                    >
-                      <IconUsers />
-                      <span className="game-menu-subtab-label">
-                        <span className="label-full">Top Clubs</span>
-                        <span className="label-short">Clubs</span>
-                      </span>
-                    </button>
-                  </div>
-
-                  {leaderboardMode === 'individual' ? (
-                    <div
-                      className="game-menu-subtabs game-menu-subtabs-scope"
-                      role="tablist"
-                      aria-label="Scope"
-                    >
                       <button
                         type="button"
                         role="tab"
-                        aria-selected={individualScope === 'global'}
-                        className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
-                        onClick={() => switchIndividualScope('global')}
+                        aria-selected={leaderboardMode === 'individual'}
+                        aria-label="Top Players"
+                        title="Top Players"
+                        className={`game-menu-subtab ${leaderboardMode === 'individual' ? 'active' : ''}`}
+                        onClick={() => switchLeaderboardMode('individual')}
                       >
-                        <img
-                          src={globeScopeIcon}
-                          alt=""
-                          className="game-menu-subtab-scope-icon"
-                        />
-                        <span className="game-menu-subtab-scope-label">
-                          Global
+                        <IconUser />
+                        <span className="game-menu-subtab-label">
+                          <span className="label-full">Top Players</span>
+                          <span className="label-short">Players</span>
                         </span>
                       </button>
                       <button
                         type="button"
                         role="tab"
-                        aria-selected={individualScope === 'city'}
-                        className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
-                        onClick={() => switchIndividualScope('city')}
+                        aria-selected={leaderboardMode === 'club'}
+                        aria-label="Top Clubs"
+                        title="Top Clubs"
+                        className={`game-menu-subtab ${leaderboardMode === 'club' ? 'active' : ''}`}
+                        onClick={() => switchLeaderboardMode('club')}
                       >
-                        <IconFlagScope className="game-menu-subtab-scope-icon" />
-                        <span className="game-menu-subtab-scope-label">
-                          {(individualScope === 'city' &&
-                            leaderboardScopeLabel?.cityName) ||
-                            'District'}
+                        <IconUsers />
+                        <span className="game-menu-subtab-label">
+                          <span className="label-full">Top Clubs</span>
+                          <span className="label-short">Clubs</span>
                         </span>
                       </button>
                     </div>
-                  ) : (
-                    <div
-                      className="game-menu-subtabs game-menu-subtabs-scope"
-                      role="tablist"
-                      aria-label="Scope"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={clubScope === 'global'}
-                        className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
-                        onClick={() => switchClubScope('global')}
-                      >
-                        <img
-                          src={globeScopeIcon}
-                          alt=""
-                          className="game-menu-subtab-scope-icon"
-                        />
-                        <span className="game-menu-subtab-scope-label">
-                          Global
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={clubScope === 'national'}
-                        className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
-                        onClick={() => switchClubScope('national')}
-                      >
-                        <IconFlagScope className="game-menu-subtab-scope-icon" />
-                        <span className="game-menu-subtab-scope-label">
-                          {(clubScope === 'national' &&
-                            leaderboardScopeLabel?.countryName) ||
-                            'Country'}
-                        </span>
-                      </button>
-                    </div>
-                  )}
 
-                  {leaderboardMode === 'individual' &&
-                    individualScope === 'city' && (
+                    {leaderboardMode === 'individual' ? (
+                      <div
+                        className="game-menu-subtabs game-menu-subtabs-scope"
+                        role="tablist"
+                        aria-label="Scope"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={individualScope === 'global'}
+                          className={`game-menu-subtab ${individualScope === 'global' ? 'active' : ''}`}
+                          onClick={() => switchIndividualScope('global')}
+                        >
+                          <img
+                            src={globeScopeIcon}
+                            alt=""
+                            className="game-menu-subtab-scope-icon"
+                          />
+                          <span className="game-menu-subtab-scope-label">
+                            Global
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={individualScope === 'city'}
+                          className={`game-menu-subtab ${individualScope === 'city' ? 'active' : ''}`}
+                          onClick={() => switchIndividualScope('city')}
+                        >
+                          <IconFlagScope className="game-menu-subtab-scope-icon" />
+                          <span className="game-menu-subtab-scope-label">
+                            {(individualScope === 'city' &&
+                              leaderboardScopeLabel?.cityName) ||
+                              'District'}
+                          </span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className="game-menu-subtabs game-menu-subtabs-scope"
+                        role="tablist"
+                        aria-label="Scope"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={clubScope === 'global'}
+                          className={`game-menu-subtab ${clubScope === 'global' ? 'active' : ''}`}
+                          onClick={() => switchClubScope('global')}
+                        >
+                          <img
+                            src={globeScopeIcon}
+                            alt=""
+                            className="game-menu-subtab-scope-icon"
+                          />
+                          <span className="game-menu-subtab-scope-label">
+                            Global
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={clubScope === 'national'}
+                          className={`game-menu-subtab ${clubScope === 'national' ? 'active' : ''}`}
+                          onClick={() => switchClubScope('national')}
+                        >
+                          <IconFlagScope className="game-menu-subtab-scope-icon" />
+                          <span className="game-menu-subtab-scope-label">
+                            {(clubScope === 'national' &&
+                              leaderboardScopeLabel?.countryName) ||
+                              'Country'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+
+                    {leaderboardMode === 'individual' &&
+                      individualScope === 'city' && (
+                        <p className="game-leaderboard-notice">
+                          Showing conquered area in{' '}
+                          {leaderboardScopeLabel?.cityName || 'your district'}{' '}
+                          only.
+                        </p>
+                      )}
+                    {leaderboardMode === 'club' && clubScope === 'national' && (
                       <p className="game-leaderboard-notice">
-                        Showing conquered area in{' '}
-                        {leaderboardScopeLabel?.cityName || 'your district'}{' '}
+                        Showing clubs in{' '}
+                        {leaderboardScopeLabel?.countryName || 'your country'}{' '}
                         only.
                       </p>
                     )}
-                  {leaderboardMode === 'club' && clubScope === 'national' && (
-                    <p className="game-leaderboard-notice">
-                      Showing clubs in{' '}
-                      {leaderboardScopeLabel?.countryName || 'your country'}{' '}
-                      only.
-                    </p>
-                  )}
 
-                  {lb.error && lb.rows.length === 0 ? (
-                    <div className="game-menu-empty">
-                      <p>{lb.error.message}</p>
-                      <GameButton
-                        size="sm"
-                        variant="neutral"
-                        onClick={lb.retry}
-                      >
-                        Retry
-                      </GameButton>
-                    </div>
-                  ) : lb.initialLoading ? (
-                    <LeaderboardSkeleton />
-                  ) : lb.rows.length === 0 ? (
-                    <p className="game-menu-empty">
-                      {leaderboardMode === 'individual'
-                        ? individualScope === 'city'
-                          ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
-                          : 'No territory claimed yet — be the first.'
-                        : clubScope === 'national'
-                          ? 'No club has claimed territory in your country yet.'
-                          : 'No club has claimed territory yet.'}
-                    </p>
-                  ) : leaderboardMode === 'individual' ? (
-                    <LeaderboardPodium
-                      nameLabel="Runner"
-                      page={lb.page}
-                      pager={leaderboardPager}
-                      me={
-                        user
-                          ? {
-                              rank: myPlayerRow?.rank ?? null,
-                              name: playerNameOf(user),
-                              avatarSrc: resolveFileUrl(user.profilePictureUrl),
-                              area: (
-                                <span className="lb-trophy-stat">
-                                  <IconFlag />
-                                  {myPlayerRow
-                                    ? formatArea(myPlayerRow.areaSqMeters)
-                                    : individualScope === 'global' &&
-                                        profile?.totalAreaSqMeters != null
-                                      ? formatArea(profile.totalAreaSqMeters)
-                                      : '—'}
-                                </span>
-                              ),
-                              onClick: () =>
-                                setViewingProfile(
-                                  myPlayerRow || {
-                                    userId: user.id,
-                                    fullName: user.fullName,
-                                    nickname: user.nickname,
-                                  }
-                                ),
-                            }
-                          : null
-                      }
-                      entries={lb.rows.map((entry) => ({
-                        key: entry.userId,
-                        rank: entry.rank,
-                        name: playerNameOf(entry),
-                        // Same "icon + stat" treatment as the Club board's
-                        // trophy count - territory is this board's score.
-                        area: (
-                          <span className="lb-trophy-stat">
-                            <IconFlag />
-                            {formatArea(entry.areaSqMeters)}
-                          </span>
-                        ),
-                        // The leaderboard API has no profile pictures yet
-                        // (always null today) -> coloured initials.
-                        avatarSrc: resolveFileUrl(entry.profilePictureUrl),
-                        isPlayer: isMyEntry(entry),
-                        onClick: () => setViewingProfile(entry),
-                      }))}
-                    />
-                  ) : (
-                    <LeaderboardPodium
-                      nameLabel="Club"
-                      statLabel="Trophies"
-                      page={lb.page}
-                      pager={leaderboardPager}
-                      me={
-                        profile?.clubName
-                          ? {
-                              rank: myClubRow?.rank ?? null,
-                              name: profile.clubName,
-                              badge: (
-                                <ClubBadge name={profile.clubName} size={40} />
-                              ),
-                              area: (
-                                <span className="lb-trophy-stat">
-                                  <ClubTrophyIcon size={26} />
-                                  {myClubRow
-                                    ? formatCoins(myClubRow.trophies ?? 0)
-                                    : '—'}
-                                </span>
-                              ),
-                              onClick: () => {
-                                if (myClubRow) setOpenClubId(myClubRow.clubId)
-                                switchTab('club')
-                              },
-                            }
-                          : null
-                      }
-                      entries={lb.rows.map((entry) => ({
-                        key: entry.clubId,
-                        rank: entry.rank,
-                        name: entry.clubName,
-                        badge: <ClubBadge name={entry.clubName} size={40} />,
-                        area: (
-                          <span className="lb-trophy-stat">
-                            <ClubTrophyIcon size={26} />
-                            {formatCoins(entry.trophies ?? 0)}
-                          </span>
-                        ),
-                        isPlayer: entry.clubName === profile?.clubName,
-                        onClick: () => {
-                          setOpenClubId(entry.clubId)
-                          switchTab('club')
-                        },
-                      }))}
-                    />
-                  )}
-                </section>
-              </div>
+                    {lb.error && lb.rows.length === 0 ? (
+                      <div className="game-menu-empty">
+                        <p>{lb.error.message}</p>
+                        <GameButton
+                          size="sm"
+                          variant="neutral"
+                          onClick={lb.retry}
+                        >
+                          Retry
+                        </GameButton>
+                      </div>
+                    ) : lb.initialLoading ? (
+                      <LeaderboardSkeleton />
+                    ) : lb.rows.length === 0 ? (
+                      <p className="game-menu-empty">
+                        {leaderboardMode === 'individual'
+                          ? individualScope === 'city'
+                            ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
+                            : 'No territory claimed yet — be the first.'
+                          : clubScope === 'national'
+                            ? 'No club has claimed territory in your country yet.'
+                            : 'No club has claimed territory yet.'}
+                      </p>
+                    ) : leaderboardMode === 'individual' ? (
+                      <LeaderboardPodium
+                        nameLabel="Runner"
+                        page={lb.page}
+                        pager={leaderboardPager}
+
+                        entries={lb.rows.map((entry) => ({
+                          key: entry.userId,
+                          rank: entry.rank,
+                          name: playerNameOf(entry),
+                          // Same "icon + stat" treatment as the Club board's
+                          // trophy count - territory is this board's score.
+                          area: (
+                            <span className="lb-trophy-stat">
+                              <IconFlag />
+                              {formatArea(entry.areaSqMeters)}
+                            </span>
+                          ),
+                          // The leaderboard API has no profile pictures yet
+                          // (always null today) -> coloured initials.
+                          avatarSrc: resolveFileUrl(entry.profilePictureUrl),
+                          isPlayer: isMyEntry(entry),
+                          onClick: () => setViewingProfile(entry),
+                        }))}
+                      />
+                    ) : (
+                      <LeaderboardPodium
+                        nameLabel="Club"
+                        statLabel="Trophies"
+                        page={lb.page}
+                        pager={leaderboardPager}
+
+                        entries={lb.rows.map((entry) => ({
+                          key: entry.clubId,
+                          rank: entry.rank,
+                          name: entry.clubName,
+                          badge: <ClubBadge name={entry.clubName} size={40} />,
+                          area: (
+                            <span className="lb-trophy-stat">
+                              <ClubTrophyIcon size={26} />
+                              {formatCoins(entry.trophies ?? 0)}
+                            </span>
+                          ),
+                          isPlayer: entry.clubName === profile?.clubName,
+                          onClick: () => {
+                            setOpenClubId(entry.clubId)
+                            switchTab('club')
+                          },
+                        }))}
+                      />
+                    )}
+                  </section>
+                </div>
+                {/* The player's own row: a SIBLING after the one scrolling
+                  element (.lb-panel), docked flush at the bottom. */}
+                <LeaderboardDock me={leaderboardMe} />
+              </>
             )}
 
             {menuTab === 'club' && (
@@ -6775,7 +6820,7 @@ function GamePageInner() {
                   <span className="game-shop-wallet-value">
                     {formatCoins(fahhcoin ?? 0)}
                   </span>
-                  <GameButton size="sm" onClick={openCoinShop}>
+                  <GameButton variant="gold" size="sm" onClick={openCoinShop}>
                     + Get more
                   </GameButton>
                 </div>
@@ -7220,6 +7265,7 @@ function GamePageInner() {
                         </span>
                       </span>
                       <GameButton
+                        variant="gold"
                         size="sm"
                         className="game-coin-buy-btn"
                         onClick={() => openBuyRedirectConfirm(bundle)}
@@ -7504,6 +7550,7 @@ function GamePageInner() {
                     </GameButton>
                     {short ? (
                       <GameButton
+                        variant="gold"
                         onClick={() => {
                           closeStoreChoice()
                           openCoinShop()

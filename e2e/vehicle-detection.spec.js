@@ -104,21 +104,19 @@ test.describe('Vehicle detection', () => {
     })
     await page.evaluate(() => (window.__gps.paused = true)) // freeze for the shot
     await expect(page.getByTestId('vehicle-warning')).toContainText(
-      'You seem to be in a vehicle. Slow down or this run will be discarded.'
+      "Your speed is above running pace. Slow down or this run won't count."
     )
     await expect(page.getByTestId('vehicle-warning')).toContainText(
       /Discarding in \d+s/
     )
-    await expect(page.locator('.game-run-card-status')).toHaveText(
-      'Vehicle detected'
-    )
+    await expect(page.locator('.game-run-card-status')).toHaveText('Too fast')
     await page.screenshot({ path: `${SHOT_DIR}/1-warning-banner.png` })
 
     // Keep driving: the warning runs out and the run is thrown away.
     await page.evaluate(() => (window.__gps.paused = false))
     const discarded = page.getByTestId('vehicle-discarded')
     await expect(discarded).toBeVisible({ timeout: 20_000 })
-    await expect(discarded).toContainText('Run discarded: vehicle detected')
+    await expect(discarded).toContainText('Run not counted: speed too high')
     await expect(page.locator('.game-run-card')).toHaveCount(0)
     await page.screenshot({ path: `${SHOT_DIR}/2-run-discarded.png` })
 

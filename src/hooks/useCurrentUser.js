@@ -28,6 +28,49 @@ function fetchCurrentUser() {
   return inFlightFetch
 }
 
+// Role decisions (Admin menu, admin routes) must never come from the copy of
+// the user kept in localStorage - anyone can edit that in dev tools. This
+// hook only ever reports what the SERVER said in this page load:
+//   status 'anon'    no session
+//         'loading'  waiting for GET /v1/user/find/logged-in
+//         'ready'    `user` is the server's answer (role = user.userType)
+//         'error'    the server could not be asked (offline, 5xx): `user`
+//                    stays null, so callers fail CLOSED (no admin UI).
+// The real enforcement is server-side (SecurityConfig); this only decides what
+// the UI shows.
+export function useVerifiedUser() {
+  const token = useSyncExternalStore(subscribeAuth, getToken, () => null)
+  const isAuthed = Boolean(token)
+  const [attempt, setAttempt] = useState(0)
+  const [state, setState] = useState({
+    status: isAuthed ? 'loading' : 'anon',
+    user: null,
+  })
+
+  useEffect(() => {
+    if (!isAuthed) {
+      setState({ status: 'anon', user: null })
+      return undefined
+    }
+    let cancelled = false
+    setState((s) =>
+      s.status === 'ready' ? s : { status: 'loading', user: null }
+    )
+    fetchCurrentUser()
+      .then((data) => {
+        if (!cancelled) setState({ status: 'ready', user: data })
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'error', user: null })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthed, token, attempt])
+
+  return { ...state, retry: () => setAttempt((n) => n + 1) }
+}
+
 // Always re-fetches the logged-in user on mount instead of trusting the
 // cached copy in localStorage indefinitely — the cache can go stale when a
 // user's role changes server-side after they logged in.

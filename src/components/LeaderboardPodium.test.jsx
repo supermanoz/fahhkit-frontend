@@ -7,7 +7,7 @@ import {
   within,
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import LeaderboardPodium from './LeaderboardPodium'
+import LeaderboardPodium, { LeaderboardDock } from './LeaderboardPodium'
 
 const entry = (rank, extra = {}) => ({
   key: `k${rank}`,
@@ -41,12 +41,7 @@ afterEach(cleanup)
 describe('LeaderboardPodium paging + pinned You row', () => {
   it('page 1 shows the podium (top 3) plus rows 4-20', () => {
     const { container } = render(
-      <LeaderboardPodium
-        entries={rows(1, 20)}
-        page={1}
-        pager={pager()}
-        me={me()}
-      />
+      <LeaderboardPodium entries={rows(1, 20)} page={1} pager={pager()} />
     )
     expect(container.querySelector('.lb-podium')).toBeTruthy()
     expect(
@@ -65,7 +60,6 @@ describe('LeaderboardPodium paging + pinned You row', () => {
         entries={rows(21, 20)}
         page={2}
         pager={pager({ page: 2, hasPrev: true, range: '21-40' })}
-        me={me()}
       />
     )
     expect(container.querySelector('.lb-podium')).toBeNull()
@@ -75,23 +69,14 @@ describe('LeaderboardPodium paging + pinned You row', () => {
 
   it('Prev / Next call the handlers; Prev is disabled on page 1', () => {
     const p = pager()
-    render(
-      <LeaderboardPodium entries={rows(1, 20)} page={1} pager={p} me={me()} />
-    )
+    render(<LeaderboardPodium entries={rows(1, 20)} page={1} pager={p} />)
     expect(screen.getByLabelText('Previous page').disabled).toBe(true)
     fireEvent.click(screen.getByLabelText('Next page'))
     expect(p.onNext).toHaveBeenCalledTimes(1)
   })
 
-  it('pins the You row with a rank outside the page, formatted 1,178', () => {
-    render(
-      <LeaderboardPodium
-        entries={rows(1, 20)}
-        page={1}
-        pager={pager()}
-        me={me()}
-      />
-    )
+  it('docks the You row with a rank outside the page, formatted 1,178', () => {
+    render(<LeaderboardDock me={me()} />)
     const pinned = screen.getByTestId('lb-pinned-you')
     expect(within(pinned).getByText('1,178')).toBeTruthy()
     expect(within(pinned).getByText('Flash')).toBeTruthy()
@@ -100,50 +85,28 @@ describe('LeaderboardPodium paging + pinned You row', () => {
   })
 
   it('unranked user shows a dash, no fake number', () => {
-    render(
-      <LeaderboardPodium
-        entries={rows(1, 20)}
-        page={1}
-        pager={pager()}
-        me={me({ rank: null })}
-      />
-    )
+    render(<LeaderboardDock me={me({ rank: null })} />)
     const pinned = screen.getByTestId('lb-pinned-you')
     expect(within(pinned).getByText('—')).toBeTruthy()
-    expect(pinned.textContent).not.toMatch(/\b\d{1,3}(,\d{3})?\b.*Flash/)
+    expect(within(pinned).queryByText(/\d{2,}/)).toBeNull()
   })
 
-  it('no pinned row when there is nothing to pin (no club)', () => {
-    render(
-      <LeaderboardPodium
-        entries={rows(1, 5)}
-        page={1}
-        pager={pager({ hasNext: false })}
-        me={null}
-      />
-    )
+  it('renders nothing when there is nothing to dock (no club)', () => {
+    render(<LeaderboardDock me={null} />)
     expect(screen.queryByTestId('lb-pinned-you')).toBeNull()
   })
 
-  it('still pins the row when you are on the visible page (one consistent behaviour)', () => {
-    const list = rows(1, 20)
-    list[9] = entry(10, { name: 'Flash', isPlayer: true })
-    render(
-      <LeaderboardPodium
-        entries={list}
-        page={1}
-        pager={pager()}
-        me={me({ rank: 10 })}
-      />
+  it('the dock is not part of the podium/list (it is a sibling the parent places)', () => {
+    const { container } = render(
+      <LeaderboardPodium entries={rows(1, 20)} page={1} pager={pager()} />
     )
-    expect(screen.getByTestId('lb-pinned-you')).toBeTruthy()
-    expect(screen.getAllByText('Flash').length).toBeGreaterThanOrEqual(2)
+    expect(container.querySelector('.lb-pinned-you')).toBeNull()
   })
 
   it('a failed page shows the message and Retry, and the current rows stay', () => {
     const p = pager({ error: { message: 'Could not load page 2.', page: 2 } })
     const { container } = render(
-      <LeaderboardPodium entries={rows(1, 20)} page={1} pager={p} me={me()} />
+      <LeaderboardPodium entries={rows(1, 20)} page={1} pager={p} />
     )
     expect(screen.getByRole('alert').textContent).toMatch(
       /Could not load page 2/
@@ -159,7 +122,6 @@ describe('LeaderboardPodium paging + pinned You row', () => {
         entries={rows(21, 20)}
         page={2}
         pager={pager({ page: 2, hasPrev: true, loading: true })}
-        me={me()}
       />
     )
     expect(container.querySelector('.lb-page.is-loading')).toBeTruthy()
@@ -172,7 +134,6 @@ describe('LeaderboardPodium paging + pinned You row', () => {
         entries={rows(1, 5)}
         page={1}
         pager={pager({ hasNext: false })}
-        me={me()}
       />
     )
     expect(screen.queryByTestId('lb-pager')).toBeNull()

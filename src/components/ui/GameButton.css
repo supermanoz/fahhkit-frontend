@@ -132,6 +132,34 @@
   position: absolute;
   inset: -6px -3px;
 }
+.gbtn-compact {
+  /* Tight rows (3 buttons across a phone): small padding + icon, a label that
+     scales with the screen and is NEVER ellipsised. Still a 44px touch target. */
+  --b-h: 44px;
+  gap: 4px;
+  padding: 4px 9px;
+  font-size: clamp(13px, 3.9vw, 15px);
+  font-weight: 800;
+  letter-spacing: normal;
+}
+.gbtn-compact .gbtn-icon {
+  width: 16px;
+  height: 16px;
+}
+.gbtn-compact .gbtn-label {
+  overflow: visible;
+  text-overflow: clip;
+  flex: 0 1 auto;
+}
+/* Very narrow screens: icons go first, labels stay. */
+@media (max-width: 350px) {
+  .gbtn-compact {
+    padding-inline: 6px;
+  }
+  .gbtn-compact .gbtn-icon {
+    display: none;
+  }
+}
 .gbtn-lg {
   --b-edge: 5px;
   --b-drop: 4px;

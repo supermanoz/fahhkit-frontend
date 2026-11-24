@@ -11,6 +11,10 @@ describe('CoinAmount', () => {
     expect(screen.getByTestId('a')).toHaveTextContent('12,500')
     expect(screen.getByTestId('a')).toHaveClass('coin-amount')
   })
+  it('plain mode drops the white fill/outline class look (light surfaces)', () => {
+    render(<CoinAmount value={50} plain data-testid="pl" />)
+    expect(screen.getByTestId('pl')).toHaveClass('coin-amount', 'is-plain')
+  })
   it('shows a placeholder text and defaults to 0', () => {
     render(
       <>

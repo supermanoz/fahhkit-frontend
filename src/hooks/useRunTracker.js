@@ -8,7 +8,17 @@ import {
   computeRunDurationSeconds,
   calculatePaceMinPerKm,
 } from '../utils/run'
-import { VEHICLE_RUN_INVALID_RATIO } from '../constants/antiCheat'
+import {
+  ACCESSIBILITY_SPEED_MULTIPLIER,
+  VEHICLE_RUN_INVALID_RATIO,
+} from '../constants/antiCheat'
+import { describeGpsShortfall } from '../utils/runIssues'
+import {
+  createDistanceFilter,
+  DISTANCE_FILTER_CONFIG,
+  histogramLabels,
+} from '../utils/distanceFilter'
+import { isGpsWobble, MAX_CONSECUTIVE_WOBBLE_DROPS } from '../utils/gpsQuality'
 import {
   createVehicleDetector,
   validDeviceSpeed,
@@ -18,7 +28,10 @@ import {
   buildPauseResumeJumpSegment,
 } from '../utils/vehicleDetection'
 import { newClientRunId } from '../utils/clientRunId'
-import { isAccessibilityModeEnabled } from '../utils/antiCheatSettings'
+import {
+  isAccessibilityModeEnabled,
+  isAntiCheatDebugEnabled,
+} from '../utils/antiCheatSettings'
 import { useWakeLock } from './useWakeLock'
 import { watchPosition, clearWatch } from '../utils/geo'
 import { publishFix } from '../utils/gpsFeed'
@@ -79,6 +92,16 @@ const MIN_POINT_INTERVAL_MS = 2500
 // trusts anything reported here.
 
 // status: idle | tracking | permission-denied | unsupported | error
+// A fresh counted-distance filter for a run. The speed ceiling is the one the
+// detector uses for the same mode (accessibility mode raises it).
+function newDistanceFilter() {
+  return createDistanceFilter({
+    maxSpeedMs: isAccessibilityModeEnabled()
+      ? DISTANCE_FILTER_CONFIG.maxSpeedMs * ACCESSIBILITY_SPEED_MULTIPLIER
+      : DISTANCE_FILTER_CONFIG.maxSpeedMs,
+  })
+}
+
 export function useRunTracker() {
   const [status, setStatus] = useState('idle')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -109,6 +132,10 @@ export function useRunTracker() {
   // True once a run was discarded for being in a vehicle - drives the
   // "Run discarded" message until the player dismisses it.
   const [vehicleDiscarded, setVehicleDiscarded] = useState(false)
+  // Why a run ended with nothing measured when it was the phone's GPS (see
+  // utils/runIssues.js): {kind, title, message} or null.
+  const [runIssue, setRunIssue] = useState(null)
+  const clearRunIssue = useCallback(() => setRunIssue(null), [])
   // Hides the current SUSPECT banner without changing detection state (a
   // "keep going" dismiss) - resets the moment the state changes again.
   const [suspectDismissed, setSuspectDismissed] = useState(false)
@@ -127,6 +154,10 @@ export function useRunTracker() {
   // the run (per-segment flags) alongside the aggregate fields below.
   const segmentsRef = useRef([])
   const vehicleExcludedMetersRef = useRef(0)
+  // Consecutive fixes skipped as GPS wobble (utils/gpsQuality.js).
+  const wobbleDropsRef = useRef(0)
+  // Turns noisy fixes into the credited distance (utils/distanceFilter.js).
+  const distanceFilterRef = useRef(null)
   const traceMetersRef = useRef(0) // every non-jump segment, for avg speed
   const traceSecondsRef = useRef(0)
   const maxSpeedMpsRef = useRef(0)
@@ -152,6 +183,8 @@ export function useRunTracker() {
   // clubWarId so a reload mid-run (or mid-pause) still knows to show it.
   const isTrainingRef = useRef(false)
   const fixCountRef = useRef(0)
+  // Fixes dropped for being worse than MAX_ACCEPTABLE_ACCURACY_METERS.
+  const lowAccuracyFixCountRef = useRef(0)
   const lastAccuracyRef = useRef(null)
   // Total ms spent paused so far this run, across every pause/resume cycle -
   // subtracted from wall-clock elapsed to get movingSeconds/the submitted
@@ -379,8 +412,11 @@ export function useRunTracker() {
           heading: Number.isFinite(heading) && heading >= 0 ? heading : null,
           t: position.timestamp,
         })
-        if (accuracy != null && accuracy > MAX_ACCEPTABLE_ACCURACY_METERS)
+        if (accuracy != null && accuracy > MAX_ACCEPTABLE_ACCURACY_METERS) {
+          lowAccuracyFixCountRef.current += 1
+          distanceFilterRef.current?.noteRejectedFix(accuracy)
           return
+        }
 
         const point = {
           lat: latitude,
@@ -406,9 +442,31 @@ export function useRunTracker() {
         ) {
           return
         }
+        // Imprecise fix whose "movement" is only position noise (the chip
+        // says we're still, or the hop is impossible for the chip's speed):
+        // leave it out of the trace - see utils/gpsQuality.js. Never more
+        // than a few in a row, so the trace always resyncs.
+        if (
+          previous &&
+          !resumeJumpPendingRef.current &&
+          wobbleDropsRef.current < MAX_CONSECUTIVE_WOBBLE_DROPS &&
+          isGpsWobble(previous, point)
+        ) {
+          wobbleDropsRef.current += 1
+          return
+        }
+        wobbleDropsRef.current = 0
 
         pointsRef.current = [...pointsRef.current, point]
         setPath(pointsRef.current)
+        // What the distance filter sees (the route keeps the raw `point`).
+        const filterFix = {
+          lat: point.lat,
+          lng: point.lng,
+          timestamp: point.timestamp,
+          accuracy: point.accuracy,
+          speed: point.speed,
+        }
 
         if (previous && resumeJumpPendingRef.current) {
           // The first fix after resume() - the real-world gap since the
@@ -423,6 +481,8 @@ export function useRunTracker() {
           // scoring nothing, the same as any run's very first fix.
           resumeJumpPendingRef.current = false
           segmentsRef.current.push(buildPauseResumeJumpSegment(previous, point))
+          // The distance filter starts over from here (still, at this spot).
+          distanceFilterRef.current?.rebase(filterFix)
           detectorRef.current?.addGpsPoint({
             lat: point.lat,
             lng: point.lng,
@@ -430,6 +490,9 @@ export function useRunTracker() {
             accuracy: point.accuracy,
             speedMps: point.speed,
           })
+        } else if (!previous) {
+          // First fix of the run: just sets the distance filter's anchor.
+          distanceFilterRef.current?.process(filterFix)
         } else if (previous && detectorRef.current) {
           const result = detectorRef.current.addGpsPoint({
             lat: point.lat,
@@ -439,6 +502,20 @@ export function useRunTracker() {
             speedMps: point.speed,
           })
           const segment = result.segment
+          // Credited length of this hop: the filter sees every non-jump fix
+          // (to keep its anchor in step) but only a non-excluded segment is
+          // added. Raw lengths stay in the telemetry below.
+          let creditedMeters = 0
+          if (segment) {
+            creditedMeters =
+              segment.kind === SegmentKind.JUMP || !distanceFilterRef.current
+                ? segment.distanceMeters
+                : distanceFilterRef.current.process(filterFix, {
+                    secondsSinceStep: detectorRef.current.secondsSinceStep(
+                      point.timestamp
+                    ),
+                  }).meters
+          }
           if (segment) {
             segmentsRef.current.push({
               fromTimestamp: previous.timestamp,
@@ -460,20 +537,30 @@ export function useRunTracker() {
             }
             if (segment.excluded) {
               if (segment.kind === SegmentKind.VEHICLE) {
-                vehicleExcludedMetersRef.current += segment.distanceMeters
+                vehicleExcludedMetersRef.current += creditedMeters
               }
               // Jump segments are discarded entirely - not real movement
               // either direction, same philosophy as the backend's own
               // filterTeleportingPoints.
             } else {
-              distanceRef.current += segment.distanceMeters
+              distanceRef.current += creditedMeters
               setDistance(distanceRef.current)
             }
           }
           if (result.reclaimMeters > 0) {
             // The detector needed a few seconds to recognise the vehicle:
             // take back the distance it let through in the meantime.
-            const reclaim = Math.min(result.reclaimMeters, distanceRef.current)
+            // The detector measured that stretch in raw hops; scale it to
+            // what the filter actually credited.
+            const fs = distanceFilterRef.current?.getStats()
+            const scale =
+              fs && fs.rawMeters > 0
+                ? Math.min(1, fs.countedMeters / fs.rawMeters)
+                : 1
+            const reclaim = Math.min(
+              result.reclaimMeters * scale,
+              distanceRef.current
+            )
             distanceRef.current -= reclaim
             vehicleExcludedMetersRef.current += reclaim
             setDistance(distanceRef.current)
@@ -575,6 +662,7 @@ export function useRunTracker() {
         startedAt: savedStartedAt,
         endedAt: savedEndedAt,
         fixCount: saved.fixCount ?? saved.points.length,
+        lowAccuracyFixCount: saved.lowAccuracyFixCount ?? 0,
         lastAccuracy: saved.lastAccuracy ?? null,
         segments: saved.segments ?? [],
         vehicleExcludedMeters: saved.vehicleExcludedMeters ?? 0,
@@ -597,6 +685,7 @@ export function useRunTracker() {
     clubWarIdRef.current = saved.clubWarId ?? null
     isTrainingRef.current = saved.isTraining ?? false
     pausedMsRef.current = saved.pausedMs || 0
+    distanceFilterRef.current = newDistanceFilter()
     detectorRef.current = createVehicleDetector({
       hasMotionSensing: true,
       accessibilityMode: isAccessibilityModeEnabled(),
@@ -682,6 +771,7 @@ export function useRunTracker() {
       pointsRef.current = []
       distanceRef.current = 0
       fixCountRef.current = 0
+      lowAccuracyFixCountRef.current = 0
       lastAccuracyRef.current = null
       segmentsRef.current = []
       vehicleExcludedMetersRef.current = 0
@@ -690,6 +780,7 @@ export function useRunTracker() {
       maxSpeedMpsRef.current = 0
       totalStepsRef.current = 0
       disputesRef.current = []
+      distanceFilterRef.current = newDistanceFilter()
       detectorRef.current = createVehicleDetector({
         hasMotionSensing: true,
         accessibilityMode: isAccessibilityModeEnabled(),
@@ -780,6 +871,7 @@ export function useRunTracker() {
       startedAt,
       endedAt,
       fixCount: fixCountRef.current,
+      lowAccuracyFixCount: lowAccuracyFixCountRef.current,
       lastAccuracy: lastAccuracyRef.current,
       // Anti-cheat telemetry sent with the run (see api/runs.js createRun) -
       // the backend re-validates independently and never trusts this alone.
@@ -795,12 +887,28 @@ export function useRunTracker() {
       stepCount: totalStepsRef.current,
       disputes: disputesRef.current,
     }
+    // Calibration log (debug flag only, off by default): raw vs credited
+    // length, fixes held as drift, accuracy histogram - for tuning
+    // DISTANCE_FILTER_CONFIG against real-phone runs.
+    if (isAntiCheatDebugEnabled() && distanceFilterRef.current) {
+      const st = distanceFilterRef.current.getStats()
+      console.info('[distance-calibration]', {
+        rawPathMeters: Math.round(st.rawMeters),
+        countedMeters: Math.round(st.countedMeters),
+        driftFixesDropped: st.driftDrops,
+        fixesRejectedForAccuracy: st.accuracyDropped,
+        accuracyHistogram: Object.fromEntries(
+          histogramLabels().map((label, i) => [label, st.histogram[i]])
+        ),
+      })
+    }
     applyVehicleState(VehicleState.RUNNING, null)
 
     if (result.points.length === 0) {
       // Nothing worth retrying — clear rather than leaving an empty pending record behind.
       clearActiveRun()
       setPendingRun(null)
+      setRunIssue(describeGpsShortfall(result))
     } else {
       saveActiveRun({
         startedAt: startedAt.toISOString(),
@@ -815,6 +923,7 @@ export function useRunTracker() {
         endedAt: endedAt.toISOString(),
         duration: result.duration,
         fixCount: result.fixCount,
+        lowAccuracyFixCount: result.lowAccuracyFixCount,
         lastAccuracy: result.lastAccuracy,
         segments: result.segments,
         vehicleExcludedMeters: result.vehicleExcludedMeters,
@@ -937,9 +1046,20 @@ export function useRunTracker() {
     vehicleWarningDeadline,
     vehicleDiscarded,
     dismissVehicleDiscarded,
+    runIssue,
+    clearRunIssue,
     suspectDismissed,
     dismissSuspect,
     disputeVehicle,
-    getDebugInfo: () => detectorRef.current?.getDebugInfo() ?? null,
+    // Debug panel only (utils/antiCheatSettings.js): the detector's live
+    // readout plus the distance filter's calibration numbers.
+    getDebugInfo: () => {
+      const info = detectorRef.current?.getDebugInfo() ?? null
+      if (!info) return null
+      return {
+        ...info,
+        distance: distanceFilterRef.current?.getStats() ?? null,
+      }
+    },
   }
 }

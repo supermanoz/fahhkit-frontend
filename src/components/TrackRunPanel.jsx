@@ -13,6 +13,12 @@ import {
 import VehicleDebugOverlay from './VehicleDebugOverlay'
 import VehicleAlert from './VehicleAlert'
 import {
+  PARTLY_FAST_TITLE,
+  WEAK_GPS_COPY,
+  WEAK_GPS_TITLE,
+} from '../constants/runMessages'
+import { describeGpsShortfall } from '../utils/runIssues'
+import {
   MIN_DISTANCE_FOR_PACE_METERS,
   MIN_VALID_RUN_DISTANCE_METERS,
   MIN_VALID_RUN_DURATION_SECONDS,
@@ -108,8 +114,8 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     // silently thrown away).
     if (run.isVehicleInvalid && !force) {
       setSaveError({
-        title: 'Mostly vehicle, not legs 🚗',
-        message: `About ${Math.round((run.vehicleSuspiciousRatio || 0) * 100)}% of this run looked vehicle-assisted, so it won't score as-is. Discard it, or save anyway if this was a false alarm (it'll still be reviewed).`,
+        title: PARTLY_FAST_TITLE,
+        message: `About ${Math.round((run.vehicleSuspiciousRatio || 0) * 100)}% of this run was above running pace, so it won't score as-is. Discard it, or save anyway if you were on foot (it'll still be reviewed).`,
         offerForceSave: true,
       })
       return
@@ -153,22 +159,11 @@ export default function TrackRunPanel({ eventId, onSaved }) {
     setConfirmingStop(false)
     const result = stop()
     if (result.points.length === 0) {
-      if (result.fixCount === 0) {
-        setSaveError({
-          title: 'Nice try 👀',
-          message:
-            'We never actually found you out there. Did the run happen, or nah? Check your location is turned on and give it another go.',
-        })
-      } else {
-        const accuracyText =
-          result.lastAccuracy != null
-            ? ` Signal was ~${Math.round(result.lastAccuracy)}m off — nowhere close.`
-            : ''
-        setSaveError({
-          title: "That's sus 😏",
-          message: `${accuracyText} Feels like laptop cardio, not the real thing. Grab your phone, get outside, and try again — GPS needs sky, not WiFi.`,
-        })
-      }
+      const issue = describeGpsShortfall(result)
+      setSaveError({
+        title: issue?.title ?? WEAK_GPS_TITLE,
+        message: issue?.message ?? WEAK_GPS_COPY,
+      })
       return
     }
     await attemptSave(result)

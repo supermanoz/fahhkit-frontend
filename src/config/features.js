@@ -18,3 +18,14 @@ export const SHOW_PVP_ENTRY = import.meta.env?.VITE_SHOW_PVP
 export const SHOW_PVP_IN_DROPDOWN = import.meta.env?.VITE_SHOW_PVP_IN_DROPDOWN
   ? import.meta.env.VITE_SHOW_PVP_IN_DROPDOWN === 'true'
   : false
+
+// Heading-up map rotation (the map turns to face the way you run): the whole
+// feature - rotation, compass / reset-north button, first-time hint, the
+// "Rotate map while running" setting, the hidden debug panel and the shared
+// RUN / IDLE view machine. OFF: the map stays north-up exactly as before,
+// nothing of it is mounted (no listeners, timers, oversized rotor or extra
+// tiles) and any stored setting value is ignored. All the code stays in the
+// app. Turn on: `true` here, or build with VITE_MAP_ROTATION=true.
+export const MAP_ROTATION_ENABLED = import.meta.env?.VITE_MAP_ROTATION
+  ? import.meta.env.VITE_MAP_ROTATION === 'true'
+  : false

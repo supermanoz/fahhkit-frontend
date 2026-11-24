@@ -62,6 +62,28 @@ export const STEP_ACCEL_DEVIATION_MPS2 = 3
 // exists so the detector is still correct when fed raw/synthetic traces).
 export const ACCURACY_LIMIT_METERS = 30
 
+// Fixes at or better than this are taken at face value. Worse than this, the
+// distance between two consecutive fixes is partly just GPS wobble (a phone
+// lying still with 15 m accuracy "moves" ~10 m between fixes), so for the
+// speed EVIDENCE half of each fix's accuracy beyond this is discounted from
+// the hop. Counted distance is not touched. Real speed (the chip's own
+// Doppler speed, which jitter cannot inflate) still convicts a vehicle.
+export const GOOD_ACCURACY_METERS = 6
+
+// With imprecise fixes the chip's own speed (Doppler, good to ~0.5 m/s and
+// immune to position jitter) caps the speed evidence at this much above it.
+export const DOPPLER_TOLERANCE_MS = 1
+
+// "Fast, but no footsteps" must hold this long before it counts as evidence
+// (a phone strapped to an arm, swapped between hands or briefly still reads
+// no steps for a few seconds without being a vehicle).
+export const NO_GAIT_SUSTAIN_SECONDS = 10
+// Body motion without clear step peaks (armband, pocket, backpack) still
+// shakes the accelerometer far more than a car or bike on a road does. At or
+// above this RMS wobble (m/s^2 around the gravity baseline) a gait exists
+// even if the peak detector missed the steps.
+export const GAIT_ENERGY_RMS_MPS2 = 2.2
+
 // Ignore the first few seconds of a run - GPS hasn't settled yet.
 export const SKIP_INITIAL_SECONDS = 5
 

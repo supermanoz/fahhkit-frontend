@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>leaderboard dock harness</title>
+  </head>
+  <body style="margin: 0">
+    <!-- Mirrors GamePage's leaderboard sheet: .game-menu-sheet.is-lb >
+         .lb-panel (the one scroller) + .lb-dock (sibling footer).
+         ?s=players | clubs -->
+    <div id="root" class="game-page game-root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import '/src/index.css'
+      import '/src/game/styles/tokens.css'
+      import '/src/pages/GamePage.css'
+      import '/src/game/ui/components.css'
+      import '/src/components/GameCards.css'
+      import '/src/game/ui/gameSkin.css'
+      import LeaderboardPodium, {
+        LeaderboardDock,
+      } from '/src/components/LeaderboardPodium.jsx'
+      import ClubBadge from '/src/components/ClubBadge.jsx'
+      import { IconFlag } from '/src/components/GameIcons.jsx'
+      const h = React.createElement
+      const clubs = new URLSearchParams(location.search).get('s') === 'clubs'
+      const stat = (r) =>
+        h(
+          'span',
+          { className: 'lb-trophy-stat' },
+          h(IconFlag),
+          `${Math.round(2400000 / r)} m²`
+        )
+      const entries = Array.from({ length: 20 }, (_, i) => ({
+        key: 'k' + (i + 1),
+        rank: i + 1,
+        name: (clubs ? 'Club ' : 'Runner ') + (i + 1),
+        area: stat(i + 1),
+        badge: clubs ? h(ClubBadge, { name: 'C' + i, size: 40 }) : undefined,
+        onClick() {},
+      }))
+      const pager = {
+        page: 1,
+        hasPrev: false,
+        hasNext: true,
+        loading: false,
+        error: null,
+        range: '1-20',
+        onPrev() {},
+        onNext() {},
+        onRetry() {},
+      }
+      const me = {
+        rank: 1178,
+        name: clubs ? 'Night Runners' : 'Flash',
+        area: stat(1178),
+        onClick() {},
+      }
+      createRoot(document.getElementById('root')).render(
+        h(
+          'div',
+          { className: 'game-menu-sheet is-lb' },
+          h(
+            'div',
+            { className: 'game-menu-panel game-cards lb-panel' },
+            h('div', { style: { height: 90 } }, 'banner'),
+            h(
+              'section',
+              { className: 'game-card game-card-dark' },
+              h(LeaderboardPodium, {
+                entries,
+                page: 1,
+                pager,
+                nameLabel: clubs ? 'Club' : 'Runner',
+              })
+            )
+          ),
+          h(LeaderboardDock, { me })
+        )
+      )
+      document.title = 'ready'
+    </script>
+  </body>
+</html>

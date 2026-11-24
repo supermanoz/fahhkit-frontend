@@ -9,6 +9,8 @@ const VARIANT = {
   success: 'primary',
   premium: 'primary',
   danger: 'danger',
+  gold: 'gold',
+  accent: 'accent',
   secondary: 'neutral',
   ghost: 'neutral',
 }

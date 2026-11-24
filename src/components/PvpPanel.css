@@ -723,6 +723,9 @@
 .pvp-delta.is-plus {
   color: var(--p-gold-text);
 }
+.pvp-delta.is-minus {
+  color: #c62828;
+}
 
 /* ---------- distance tiers ---------- */
 .pvp-choice-list {
@@ -1287,7 +1290,8 @@
   color: var(--p-gold-text);
 }
 .pvp-payout .is-minus {
-  color: var(--p-muted);
+  /* loss: red, readable on the light card (~5.5:1) */
+  color: #c62828;
 }
 .pvp-payout .pvp-coin {
   width: 24px;

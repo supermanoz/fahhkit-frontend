@@ -8,6 +8,7 @@ import { TOUR_ACTIONS } from '../constants/tourCopy'
 import { GAME_CONTACT_EMAIL } from '../constants/gameLegal'
 import { isNative } from '../utils/geo'
 import { toggleMapDebug } from '../utils/mapDebug'
+import { MAP_ROTATION_ENABLED } from '../config/features'
 import { copyText, openExternal, openMailto } from '../utils/externalLink'
 import { playSfx } from '../utils/gameSound'
 import {
@@ -222,18 +223,20 @@ export default function GameSettings({
           selectedId={mapStyleId}
           onSelect={onSelectMapStyle}
         />
-        <SwitchRow
-          Icon={IconCompassNeedle}
-          title="Rotate map while running"
-          sub={
-            rotateMap
-              ? 'The map turns to face the way you run'
-              : 'The map always keeps north up'
-          }
-          checked={rotateMap}
-          onToggle={() => setRotateWhileRunning(!rotateMap)}
-          testId="rotate-map-switch"
-        />
+        {MAP_ROTATION_ENABLED && (
+          <SwitchRow
+            Icon={IconCompassNeedle}
+            title="Rotate map while running"
+            sub={
+              rotateMap
+                ? 'The map turns to face the way you run'
+                : 'The map always keeps north up'
+            }
+            checked={rotateMap}
+            onToggle={() => setRotateWhileRunning(!rotateMap)}
+            testId="rotate-map-switch"
+          />
+        )}
       </SettingsCard>
 
       <SettingsCard id="privacy" title="Privacy">
@@ -349,10 +352,12 @@ export default function GameSettings({
           <span
             className="set-static-value"
             data-testid="app-version"
-            {...secretSwitchProps(() => {
-              const on = toggleMapDebug()
-              toast.push(on ? 'Map debug panel ON' : 'Map debug panel off')
-            })}
+            {...(MAP_ROTATION_ENABLED
+              ? secretSwitchProps(() => {
+                  const on = toggleMapDebug()
+                  toast.push(on ? 'Map debug panel ON' : 'Map debug panel off')
+                })
+              : {})}
           >
             {version || 'Web'}
           </span>

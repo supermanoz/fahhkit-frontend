@@ -2,13 +2,17 @@
 import { visibleInterval } from '../utils/visibleInterval'
 import { useEffect, useState } from 'react'
 import { VehicleState } from '../utils/vehicleDetection'
+import {
+  OVER_SPEED_DISCARDED_COPY,
+  OVER_SPEED_DISCARDED_TITLE,
+  OVER_SPEED_WARNING_COPY,
+  OVER_SPEED_WARNING_TITLE,
+} from '../constants/runMessages'
 import './VehicleAlert.css'
 
-export const VEHICLE_WARNING_COPY =
-  'You seem to be in a vehicle. Slow down or this run will be discarded.'
-export const VEHICLE_DISCARDED_TITLE = 'Run discarded: vehicle detected'
-export const VEHICLE_DISCARDED_COPY =
-  "Looks like you were riding, not running, so that run didn't count - no XP, no territory. Lace up and go again."
+export const VEHICLE_WARNING_COPY = OVER_SPEED_WARNING_COPY
+export const VEHICLE_DISCARDED_TITLE = OVER_SPEED_DISCARDED_TITLE
+export const VEHICLE_DISCARDED_COPY = OVER_SPEED_DISCARDED_COPY
 
 function useSecondsLeft(deadline) {
   const [now, setNow] = useState(() => Date.now())
@@ -43,7 +47,7 @@ export default function VehicleAlert({
             !
           </span>
           <div className="vehicle-alert-text">
-            <strong>Vehicle detected</strong>
+            <strong>{OVER_SPEED_WARNING_TITLE}</strong>
             <span>{VEHICLE_WARNING_COPY}</span>
             {secondsLeft != null && (
               <span className="vehicle-alert-countdown">

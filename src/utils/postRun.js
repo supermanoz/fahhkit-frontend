@@ -11,6 +11,11 @@
 // flag in the payload), so the server still processes it as territory. The
 // app just never presents it as one.
 
+import {
+  SERVER_REJECTED_COPY,
+  SERVER_REJECTED_TITLE,
+} from '../constants/runMessages'
+
 export const POST_RUN_MODE = Object.freeze({
   CONQUER: 'conquer',
   TRAINING: 'training',
@@ -71,9 +76,8 @@ export function showsRejection(mode, outcome) {
 
 // Cheat copy for modes that have no territory to lose.
 export const CHEAT_COPY_NEUTRAL = Object.freeze({
-  title: 'Whoa there, speedster 🛵',
-  message:
-    "That pace looked more scooter than sneakers, so this run didn't count.",
+  title: SERVER_REJECTED_TITLE,
+  message: SERVER_REJECTED_COPY,
 })
 
 // Should the reward sequence (stats -> XP -> score/perk -> run image) be on

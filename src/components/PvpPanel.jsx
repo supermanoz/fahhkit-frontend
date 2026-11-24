@@ -428,7 +428,7 @@ export default function PvpPanel({
               Try again
             </GameButton>
             <GameButton
-              variant="secondary"
+              variant="accent"
               size="lg"
               className="g-full-width"
               onClick={goNearby}
@@ -531,7 +531,7 @@ export default function PvpPanel({
                 </span>
                 {onGetCoins && (
                   <GameButton
-                    variant="success"
+                    variant="gold"
                     size="sm"
                     className="pvp-get-coins"
                     onClick={onGetCoins}
@@ -784,7 +784,7 @@ export default function PvpPanel({
             </ul>
           )}
           <GameButton
-            variant="secondary"
+            variant="accent"
             size="lg"
             className="g-full-width"
             onClick={pvp.scanNearby}
@@ -1203,7 +1203,7 @@ export default function PvpPanel({
                 Challenge a runner and settle it on the road.
               </p>
               <GameButton
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 className="pvp-empty-btn"
                 onClick={beginNewMatch}
@@ -1389,7 +1389,7 @@ function ResultHero({ outcome }) {
         <p className="pvp-payout">
           <span className={outcome.coins > 0 ? 'is-plus' : 'is-minus'}>
             {outcome.coins > 0 ? '+' : '−'}
-            <CoinAmount className="pvp-num" value={counted} />
+            <CoinAmount className="pvp-num" value={counted} plain />
           </span>{' '}
           <Coin />
         </p>

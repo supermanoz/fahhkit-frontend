@@ -19,11 +19,15 @@ import {
   BRISK_SPEED_MS,
   CADENCE_WINDOW_SECONDS,
   FAST_PACE_SPEED_MS,
+  DOPPLER_TOLERANCE_MS,
   FAST_PACE_WINDOW_SECONDS,
+  GAIT_ENERGY_RMS_MPS2,
   GAP_SECONDS,
+  GOOD_ACCURACY_METERS,
   MAX_PLAUSIBLE_SPEED_MS,
   MIN_CADENCE_HZ,
   MIN_WINDOW_COVERAGE_SECONDS,
+  NO_GAIT_SUSTAIN_SECONDS,
   NO_MOTION_TIMEOUT_SECONDS,
   RESUME_SECONDS,
   RESUME_WINDOW_SECONDS,
@@ -123,6 +127,11 @@ export function createVehicleDetector({
   let motionBaseline = 9.81
   let lastStepAtMs = 0
   let lastMotionAtMs = null
+  let firstMotionAtMs = null
+  // Mean-square wobble of the accelerometer around its baseline (see
+  // GAIT_ENERGY_RMS_MPS2): body motion without clean step peaks.
+  let motionEnergy = 0
+  let noGaitSinceMs = null
 
   let suspectSinceMs = null
   let vehicleSinceMs = null
@@ -156,7 +165,7 @@ export function createVehicleDetector({
     let time = 0
     for (const sample of samples) {
       if (sample.t < cutoff) continue
-      distance += sample.distanceMeters
+      distance += sample.evidenceMeters
       time += sample.dtSeconds
     }
     return { time, avg: time > 0 ? distance / time : 0 }
@@ -175,10 +184,10 @@ export function createVehicleDetector({
   // runner must not be convicted for that).
   function gaitJudgeable(nowMs) {
     if (!motionAvailable || accessibilityMode) return false
-    const reference = lastMotionAtMs ?? startedAtMs
-    return (
-      reference != null && nowMs - reference <= NO_MOTION_TIMEOUT_SECONDS * 1000
-    )
+    // A sensor that never reported (denied, unsupported, prompt unanswered)
+    // is "unknown", not "no footsteps": the speed rules alone decide.
+    if (lastMotionAtMs == null) return false
+    return nowMs - lastMotionAtMs <= NO_MOTION_TIMEOUT_SECONDS * 1000
   }
 
   function setMotionAvailable(available) {
@@ -190,8 +199,10 @@ export function createVehicleDetector({
   // sample counted as a new step.
   function handleMotionSample(magnitude, nowMs) {
     lastMotionAtMs = nowMs
+    firstMotionAtMs ??= nowMs
     motionBaseline += (magnitude - motionBaseline) * 0.05
     const deviation = Math.abs(magnitude - motionBaseline)
+    motionEnergy += (deviation * deviation - motionEnergy) * 0.005
     if (
       deviation > STEP_ACCEL_DEVIATION_MPS2 &&
       nowMs - lastStepAtMs > STEP_MIN_INTERVAL_MS
@@ -206,6 +217,7 @@ export function createVehicleDetector({
   // Direct step injection for tests/simulated traces.
   function recordStep(nowMs) {
     lastMotionAtMs = nowMs
+    firstMotionAtMs ??= nowMs
     lastStepAtMs = nowMs
     stepTimestamps.push(nowMs)
   }
@@ -245,7 +257,7 @@ export function createVehicleDetector({
     const sinceStartMs = timestamp - startedAtMs
     const previous = lastPoint
     if (!previous) {
-      lastPoint = { lat, lng, timestamp }
+      lastPoint = { lat, lng, timestamp, accuracy }
       return snapshot(null, {}, timestamp)
     }
 
@@ -258,7 +270,7 @@ export function createVehicleDetector({
     if (dtSeconds > GAP_SECONDS) {
       // Tunnel/signal drop - the implied speed across the gap is no evidence
       // either way, and whatever hysteresis was building stays frozen.
-      lastPoint = { lat, lng, timestamp }
+      lastPoint = { lat, lng, timestamp, accuracy }
       suspectJump = null
       return snapshot(
         {
@@ -279,7 +291,7 @@ export function createVehicleDetector({
       if (!suspectJump) {
         // First impossible hop: hold it back. If the next fix is back on
         // the path it was a spike; if the next fix keeps going, it was real.
-        suspectJump = { lat, lng, timestamp }
+        suspectJump = { lat, lng, timestamp, accuracy }
         return snapshot(
           {
             kind: SegmentKind.JUMP,
@@ -298,7 +310,12 @@ export function createVehicleDetector({
       inFastRegime = true
       const held = suspectJump
       suspectJump = null
-      lastPoint = { lat: held.lat, lng: held.lng, timestamp: held.timestamp }
+      lastPoint = {
+        lat: held.lat,
+        lng: held.lng,
+        timestamp: held.timestamp,
+        accuracy: held.accuracy,
+      }
       const heldDt = (timestamp - held.timestamp) / 1000
       if (heldDt <= 0) return snapshot(null, {}, timestamp)
       distanceMeters = haversineDistance(lastPoint, { lat, lng })
@@ -310,7 +327,8 @@ export function createVehicleDetector({
     const segDt = confirmedFast
       ? (timestamp - lastPoint.timestamp) / 1000
       : dtSeconds
-    lastPoint = { lat, lng, timestamp }
+    const prevAccuracy = lastPoint.accuracy
+    lastPoint = { lat, lng, timestamp, accuracy }
 
     // The device's own speed is a cross-check, only when valid (iOS gives
     // -1, some browsers null). When it disagrees wildly with the distance
@@ -326,10 +344,30 @@ export function createVehicleDetector({
         : impliedSpeedMps
     // Never let one hop weigh more than a very fast vehicle would cover.
     const cappedDistance = Math.min(distanceMeters, 60 * segDt)
+    // Speed EVIDENCE for the windows. Fixes at GOOD_ACCURACY_METERS or better
+    // count exactly as measured. With imprecise fixes part of the hop is GPS
+    // wobble, so half of each fix's accuracy beyond that is discounted, and
+    // a valid chip (Doppler) speed - which jitter cannot inflate - caps the
+    // estimate at DOPPLER_TOLERANCE_MS above itself. A real vehicle still
+    // shows up in the chip's own speed.
+    const allowance =
+      0.5 *
+      (Math.max(0, (prevAccuracy ?? 0) - GOOD_ACCURACY_METERS) +
+        Math.max(0, (accuracy ?? 0) - GOOD_ACCURACY_METERS))
+    let evidenceMeters = cappedDistance
+    if (allowance > 0 && segDt > 0) {
+      const adjustedImplied = Math.max(0, distanceMeters - allowance) / segDt
+      const evidenceSpeed =
+        deviceSpeed != null
+          ? Math.min(adjustedImplied, deviceSpeed + DOPPLER_TOLERANCE_MS)
+          : adjustedImplied
+      evidenceMeters = Math.min(evidenceSpeed * segDt, cappedDistance)
+    }
     const sample = {
       t: timestamp,
       speedMps: sampleSpeedMps,
       distanceMeters: cappedDistance,
+      evidenceMeters,
       dtSeconds: segDt,
       counted: false,
     }
@@ -357,12 +395,18 @@ export function createVehicleDetector({
     const cadenceHz = cadenceHzAt(timestamp)
     const judgeGait = gaitJudgeable(timestamp)
 
-    // Fast, with no footstrike at all, is decisive on its own.
-    const noGait =
+    // Fast, with no footstrike and no body wobble at all, for a sustained
+    // stretch, is decisive on its own.
+    const gaitEnergyRms = Math.sqrt(motionEnergy)
+    const noGaitNow =
       judgeGait &&
       windowCovered &&
       win.avg > BRISK_SPEED_MS &&
-      cadenceHz < MIN_CADENCE_HZ
+      cadenceHz < MIN_CADENCE_HZ &&
+      gaitEnergyRms < GAIT_ENERGY_RMS_MPS2
+    noGaitSinceMs = noGaitNow ? (noGaitSinceMs ?? timestamp) : null
+    const noGait =
+      noGaitNow && timestamp - noGaitSinceMs >= NO_GAIT_SUSTAIN_SECONDS * 1000
     const speedVehicle = windowCovered && win.avg > ceiling(VEHICLE_SPEED_MS)
     const paceVehicle = longCovered && longWin.avg > ceiling(FAST_PACE_SPEED_MS)
     const vehicleEvidence = speedVehicle || paceVehicle || noGait
@@ -499,6 +543,9 @@ export function createVehicleDetector({
     motionBaseline = 9.81
     lastStepAtMs = 0
     lastMotionAtMs = null
+    firstMotionAtMs = null
+    motionEnergy = 0
+    noGaitSinceMs = null
     suspectSinceMs = null
     vehicleSinceMs = null
     cleanSinceMs = null
@@ -515,8 +562,21 @@ export function createVehicleDetector({
     }
   }
 
+  // Seconds since the last footstep, for the distance filter's "no steps and
+  // slow = standing still" check. null when that cannot be judged (no sensor,
+  // denied, silent, accessibility mode): the check is then skipped, never a
+  // failure.
+  function secondsSinceStep(nowMs) {
+    if (!gaitJudgeable(nowMs) || firstMotionAtMs == null) return null
+    // Body motion without clean step peaks (armband, pocket): the missing
+    // steps say nothing about standing still.
+    if (Math.sqrt(motionEnergy) >= GAIT_ENERGY_RMS_MPS2) return null
+    return (nowMs - Math.max(lastStepAtMs, firstMotionAtMs)) / 1000
+  }
+
   return {
     addGpsPoint,
+    secondsSinceStep,
     handleMotionSample,
     recordStep,
     setMotionAvailable,

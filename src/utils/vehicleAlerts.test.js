@@ -43,15 +43,15 @@ beforeEach(() => {
 })
 
 describe('vehicle alerts', () => {
-  it('backgrounded: posts a high-importance "Vehicle detected" notification', async () => {
+  it('backgrounded: posts a high-importance "Moving faster than running pace" notification', async () => {
     await alertVehicleWarning(1000)
     expect(ln.createChannel).toHaveBeenCalledWith(
       expect.objectContaining({ id: VEHICLE_CHANNEL_ID, importance: 5 })
     )
     const { notifications } = ln.schedule.mock.calls[0][0]
     expect(notifications[0]).toMatchObject({
-      title: 'Vehicle detected',
-      body: 'Your run will be discarded if you keep moving this fast. Slow down to continue.',
+      title: 'Moving faster than running pace',
+      body: "Your speed is above running pace. Slow down or this run won't count.",
       channelId: VEHICLE_CHANNEL_ID,
     })
     expect(cues.buzz).not.toHaveBeenCalled()
@@ -76,7 +76,7 @@ describe('vehicle alerts', () => {
   it('discard posts its own notification', async () => {
     await alertVehicleDiscarded()
     const { notifications } = ln.schedule.mock.calls[0][0]
-    expect(notifications[0].title).toBe('Run discarded: vehicle detected')
+    expect(notifications[0].title).toBe('Run not counted: speed too high')
   })
 
   it('does nothing on the web build and never throws without permission', async () => {

@@ -179,10 +179,6 @@ export default function LeaderboardPodium({
   statLabel = 'Territory',
   page = 1,
   pager = null,
-  // The player's own standing, always pinned at the bottom of the card:
-  // { rank (number | null = unranked), name, avatarSrc?, badge?, area,
-  //   onClick? }. null = nothing to pin (e.g. no club yet).
-  me = null,
 }) {
   // The podium (top 3) belongs to page 1 only; later pages are plain rows.
   const showPodium = page === 1
@@ -191,54 +187,58 @@ export default function LeaderboardPodium({
 
   return (
     <div className="lb">
-      <div className="lb-scroll" key={page}>
-        {showPodium && (
-          <div className="lb-podium">
-            <PodiumSpot entry={second} place={2} />
-            <PodiumSpot entry={first} place={1} />
-            <PodiumSpot entry={third} place={3} />
-          </div>
-        )}
-
-        {rest.length > 0 && (
-          <div className={pager?.loading ? 'lb-page is-loading' : 'lb-page'}>
-            <div className="lb-list-head">
-              <span className="lb-col-rank">Rank</span>
-              <span className="lb-col-name">{nameLabel}</span>
-              <span className="lb-col-area">{statLabel}</span>
-            </div>
-            <ul className="lb-list" aria-busy={pager?.loading || undefined}>
-              {rest.map((entry) => (
-                <li key={entry.key}>
-                  <button
-                    type="button"
-                    className={`lb-row ${entry.isPlayer ? 'is-player' : ''}`}
-                    onClick={entry.onClick}
-                    disabled={!entry.onClick}
-                  >
-                    <RowContent entry={entry} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {pager && <Pager pager={pager} />}
-
-      {me && (
-        <div className="lb-pinned-you" data-testid="lb-pinned-you">
-          <button
-            type="button"
-            className="lb-row is-player"
-            onClick={me.onClick}
-            disabled={!me.onClick}
-          >
-            <RowContent entry={{ ...me, isPlayer: true }} />
-          </button>
+      {showPodium && (
+        <div className="lb-podium">
+          <PodiumSpot entry={second} place={2} />
+          <PodiumSpot entry={first} place={1} />
+          <PodiumSpot entry={third} place={3} />
         </div>
       )}
+
+      {rest.length > 0 && (
+        <div className={pager?.loading ? 'lb-page is-loading' : 'lb-page'}>
+          <div className="lb-list-head">
+            <span className="lb-col-rank">Rank</span>
+            <span className="lb-col-name">{nameLabel}</span>
+            <span className="lb-col-area">{statLabel}</span>
+          </div>
+          <ul className="lb-list" aria-busy={pager?.loading || undefined}>
+            {rest.map((entry) => (
+              <li key={entry.key}>
+                <button
+                  type="button"
+                  className={`lb-row ${entry.isPlayer ? 'is-player' : ''}`}
+                  onClick={entry.onClick}
+                  disabled={!entry.onClick}
+                >
+                  <RowContent entry={entry} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {pager && <Pager pager={pager} />}
+    </div>
+  )
+}
+
+// The player's own standing, docked at the bottom of the leaderboard sheet.
+// Rendered by the parent as a SIBLING after the scrolling panel (never inside
+// it): { rank (number | null = unranked), name, avatarSrc?, badge?, area,
+// onClick? }. null = nothing to dock (e.g. no club yet).
+export function LeaderboardDock({ me }) {
+  if (!me) return null
+  return (
+    <div className="lb lb-dock lb-pinned-you" data-testid="lb-pinned-you">
+      <button
+        type="button"
+        className="lb-row is-player"
+        onClick={me.onClick}
+        disabled={!me.onClick}
+      >
+        <RowContent entry={{ ...me, isPlayer: true }} />
+      </button>
     </div>
   )
 }

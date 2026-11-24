@@ -8,7 +8,7 @@ import {
   resolveFileUrl,
 } from '../api/client'
 import { googleSignOut } from '../utils/googleSession'
-import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useCurrentUser, useVerifiedUser } from '../hooks/useCurrentUser'
 import { useCoinsSession } from '../state/coins'
 import { formatCoins } from '../utils/format'
 import ThemeToggle from './ThemeToggle'
@@ -26,6 +26,9 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
   const { user, isAuthed } = useCurrentUser()
+  // Staff menu items follow the SERVER's answer only (never the cached copy
+  // in localStorage): hidden until confirmed, and while offline.
+  const { user: verifiedUser } = useVerifiedUser()
   const navigate = useNavigate()
   const location = useLocation()
   const userMenuRef = useRef(null)
@@ -139,7 +142,7 @@ export default function Navbar() {
   // Fraud Flags off the main row into their own "Admin" group so the main
   // row doesn't wrap. The trigger itself only shows for someone who can
   // reach at least one of the three.
-  const hasAdminAccess = isAdmin(user) || canManageEvents(user)
+  const hasAdminAccess = isAdmin(verifiedUser) || canManageEvents(verifiedUser)
 
   return (
     <header className={`navbar ${scrolled ? 'scrolled' : ''}`}>
@@ -181,7 +184,7 @@ export default function Navbar() {
           className={`navbar-links ${open ? 'open' : ''}`}
         >
           <div className="navbar-links-main">
-            {isAdmin(user) && (
+            {isAdmin(verifiedUser) && (
               <NavLink
                 to="/admin/dashboard"
                 className={navLinkClass}
@@ -196,7 +199,7 @@ export default function Navbar() {
             <NavLink to="/shop" className={navLinkClass} onClick={close}>
               Shop
             </NavLink>
-            {canManageEvents(user) && (
+            {canManageEvents(verifiedUser) && (
               <NavLink to="/athletes" className={navLinkClass} onClick={close}>
                 Athletes
               </NavLink>
@@ -219,22 +222,22 @@ export default function Navbar() {
                 </button>
                 {adminMenuOpen && (
                   <div className="navbar-admin-dropdown">
-                    {isAdmin(user) && (
+                    {isAdmin(verifiedUser) && (
                       <Link to="/admin/moderators" onClick={close}>
                         Moderators
                       </Link>
                     )}
-                    {isAdmin(user) && (
+                    {isAdmin(verifiedUser) && (
                       <Link to="/admin/game-mechanics" onClick={close}>
                         Game Mechanics
                       </Link>
                     )}
-                    {canManageEvents(user) && (
+                    {canManageEvents(verifiedUser) && (
                       <Link to="/admin/fraud-flags" onClick={close}>
                         Fraud Flags
                       </Link>
                     )}
-                    {canManageEvents(user) && (
+                    {canManageEvents(verifiedUser) && (
                       <Link to="/admin/sponsor-report" onClick={close}>
                         Sponsor Report
                       </Link>

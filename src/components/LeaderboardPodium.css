@@ -328,26 +328,34 @@
    area here. The drop shadow (box-shadow would get lost under the
    following list content otherwise) is what reads it as "floating above"
    rather than just another row. */
-.lb-pinned-you {
-  /* DOCKED footer: the last item of the card. The menu sheet is the one and
-     only scroller (banner, tabs, podium, rows, pager all scroll with it); the
-     footer sticks to the bottom edge of the viewport while the card is on
-     screen and ends flush at the card's bottom. Solid card-coloured
-     background + a thin divider (no shadow/glow), same width as the rows. */
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
+/* Leaderboard sheet = bounded flex column (the sheet is 100dvh):
+     child A  .lb-panel      the ONLY scroller (banner, tabs, podium, rows,
+                              pager), flex 1 / min-height 0 / overflow-y auto
+     child B  .lb-dock       the player's row, a SIBLING after A (flex none),
+                              in normal flow: no sticky/absolute/fixed, no
+                              negative margins, no transform, no shadow.
+   Rows end above the dock; nothing scrolls behind it. */
+.game-menu-sheet.is-lb {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.game-menu-sheet.is-lb > .lb-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 12px;
+}
+.lb-dock {
   flex: 0 0 auto;
-  margin-top: 2px;
-  padding: 10px 0 2px;
+  position: static;
+  /* line up with the rows: card border (3px) + card padding (14px) */
+  padding: 10px 17px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--game-panel);
   border-top: 1px solid rgba(43, 42, 36, 0.18);
-}
-
-/* No nested scroller and no clipping: the Top 1 medal and name are never cut
-   off, and there is nothing here that can trap touch scrolling. */
-.lb-scroll {
-  display: contents;
 }
 
 .lb-pinned-you .lb-row {

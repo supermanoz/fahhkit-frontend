@@ -3,6 +3,12 @@ import { buzzAlert } from './haptics'
 import { isNative } from './geo'
 import { isSfxMuted, playSfx } from './gameSound'
 import { VEHICLE_NOTIFY_COOLDOWN_SECONDS } from '../constants/antiCheat'
+import {
+  OVER_SPEED_DISCARD_NOTIFICATION_BODY,
+  OVER_SPEED_DISCARDED_TITLE,
+  OVER_SPEED_NOTIFICATION_BODY,
+  OVER_SPEED_WARNING_TITLE,
+} from '../constants/runMessages'
 
 // "You're in a vehicle" alerts for a live run. In the foreground: a haptic
 // buzz + the pop sound (the in-app banner is rendered by the UI). With the
@@ -13,15 +19,13 @@ export const VEHICLE_CHANNEL_ID = 'run_alerts'
 const WARNING_NOTIFICATION_ID = 9101
 const DISCARD_NOTIFICATION_ID = 9102
 
-export const VEHICLE_WARNING_TITLE = 'Vehicle detected'
-export const VEHICLE_WARNING_BODY =
-  'Your run will be discarded if you keep moving this fast. Slow down to continue.'
-export const VEHICLE_DISCARD_TITLE = 'Run discarded: vehicle detected'
-export const VEHICLE_DISCARD_BODY =
-  "It looked like you were in a vehicle, so that run didn't count. Lace up and go again."
+export const VEHICLE_WARNING_TITLE = OVER_SPEED_WARNING_TITLE
+export const VEHICLE_WARNING_BODY = OVER_SPEED_NOTIFICATION_BODY
+export const VEHICLE_DISCARD_TITLE = OVER_SPEED_DISCARDED_TITLE
+export const VEHICLE_DISCARD_BODY = OVER_SPEED_DISCARD_NOTIFICATION_BODY
 
 // Header the Android run notification shows while the warning is up.
-export const VEHICLE_NOTIFICATION_HEADER = 'Vehicle detected'
+export const VEHICLE_NOTIFICATION_HEADER = OVER_SPEED_WARNING_TITLE
 
 let lastWarningAtMs = null
 

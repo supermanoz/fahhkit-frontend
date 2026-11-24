@@ -10,6 +10,10 @@ import { VETERAN } from './mocks/personas.js'
 //
 // 390px screenshots of the map at 0 / ~90 / ~180 degrees: MAP_ROTATION_SHOTS=dir
 const SHOTS = process.env.MAP_ROTATION_SHOTS || ''
+// The feature is OFF by default (MAP_ROTATION_ENABLED in src/config/features.js).
+// The rotation tests below only run when the dev server was started with
+// VITE_MAP_ROTATION=true; the "flag off" block at the bottom runs otherwise.
+const ROT_ON = process.env.VITE_MAP_ROTATION === 'true'
 
 async function startRun(
   page,
@@ -179,6 +183,7 @@ async function shoot(page, name) {
 }
 
 test.describe('heading-up map rotation', () => {
+  test.skip(!ROT_ON, 'map rotation flag is off (VITE_MAP_ROTATION=true to run)')
   test('straight line east: the map turns so east points up', async ({
     mockedPage: page,
   }, testInfo) => {
@@ -641,6 +646,7 @@ for (const rotate of [false, true]) {
   test(`tile requests during a run (rotation ${rotate ? 'on' : 'off'})`, async ({
     mockedPage: page,
   }) => {
+    test.skip(!ROT_ON, 'map rotation flag is off')
     test.skip(!process.env.MAP_TILE_COUNT, 'measurement only')
     test.setTimeout(150_000)
     await startRun(page, { rotate })
@@ -659,3 +665,55 @@ for (const rotate of [false, true]) {
     )
   })
 }
+
+// Flag OFF (the default): the run map is north-up exactly as before rotation
+// existed - nothing of the feature is mounted or running.
+test.describe('map rotation flag off', () => {
+  test.skip(ROT_ON, 'flag is on')
+
+  test('run map stays north-up: no compass, rotor, hint, setting row or CSS vars', async ({
+    mockedPage: page,
+  }) => {
+    test.setTimeout(120_000)
+    // rotate=true is stored on purpose: the flag must make it be ignored.
+    await startRun(page, { rotate: true })
+    await run(page, 90, 14)
+    await page.waitForTimeout(1500)
+    expect(await mapRotation(page)).toBeCloseTo(0, 0)
+    const state = await page.evaluate(() => {
+      const tilt = document.querySelector('.territory-map-tilt')
+      const root = document.querySelector('.territory-map')
+      return {
+        isRotor: tilt.classList.contains('is-rotor'),
+        rotorSize: tilt.style.getPropertyValue('--rotor-size'),
+        mapRot: tilt.style.getPropertyValue('--map-rot'),
+        mapShift: tilt.style.getPropertyValue('--map-shift'),
+        counter: root.style.getPropertyValue('--map-counter'),
+        compass: document.querySelectorAll('.territory-map-compass').length,
+        hint: document.querySelectorAll('.territory-map-rotation-hint').length,
+        debug: document.querySelectorAll('[data-testid="map-debug-panel"]')
+          .length,
+      }
+    })
+    expect(state).toEqual({
+      isRotor: false,
+      rotorSize: '',
+      mapRot: '',
+      mapShift: '',
+      counter: '',
+      compass: 0,
+      hint: 0,
+      debug: 0,
+    })
+    await expect(page.locator('.game-locate-btn')).toBeVisible()
+    await expect(page.getByTestId('map-compass')).toHaveCount(0)
+    fs.mkdirSync('screenshots/map-rotation', { recursive: true })
+    await expect(page.locator('.game-loading-overlay')).toHaveCount(0, {
+      timeout: 30_000,
+    })
+    await page.waitForTimeout(900)
+    await page.screenshot({
+      path: 'screenshots/map-rotation/run-map-north-up-390.png',
+    })
+  })
+})

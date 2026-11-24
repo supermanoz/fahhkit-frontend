@@ -948,14 +948,14 @@ export default function ClubPanel({
                   />
                   <GameButton
                     type="submit"
-                    variant="neutral"
+                    variant="accent"
                     disabled={inviteSearching || !inviteQuery.trim()}
                   >
                     Search
                   </GameButton>
                 </form>
                 <GameButton
-                  variant="neutral"
+                  variant="accent"
                   size="sm"
                   className="club-nearby-btn"
                   onClick={findPlayersNearby}
@@ -1428,7 +1428,7 @@ export default function ClubPanel({
                   {balance}.
                 </p>
                 {onGetCoins && (
-                  <GameButton variant="neutral" size="sm" onClick={onGetCoins}>
+                  <GameButton variant="gold" size="sm" onClick={onGetCoins}>
                     Get Fahhcoin
                   </GameButton>
                 )}
@@ -1462,7 +1462,7 @@ export default function ClubPanel({
             }}
           />
           <GameButton
-            variant="neutral"
+            variant="accent"
             onClick={() => loadClubs(searchText.trim())}
             disabled={loadingClubs}
           >

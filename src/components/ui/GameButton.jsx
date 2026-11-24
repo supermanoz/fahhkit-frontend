@@ -8,7 +8,7 @@ import './GameButton.css'
 // chunky bottom edge, white outlined display-font label). Colour = `variant`:
 //   primary (green) | accent (slate, the Leaderboard's) | gold | danger (red)
 //   neutral (cream, dark label) | tab (segmented toggle)
-// `size` sm | md | lg, `fullWidth`, `icon` (left), `iconOnly` (round, needs
+// `size` sm | md | lg | compact (tight multi-button rows, no ellipsis), `fullWidth`, `icon` (left), `iconOnly` (round, needs
 // aria-label), `loading` (spinner, label kept so the width never changes),
 // `selected` (tab filled), `as`/`href` (renders a link). Visual only - it adds
 // no behaviour of its own except the optional tap `sound` (off by default).

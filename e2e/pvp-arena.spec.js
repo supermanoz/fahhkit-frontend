@@ -671,6 +671,15 @@ test.describe('searching, found, race screens', () => {
         await expect(page.locator('.pvp-payout')).toContainText('+100', {
           timeout: 5000,
         })
+        // The amount must be readable: not the white-with-outline HUD fill.
+        const amount = await page
+          .locator('.pvp-payout .coin-amount')
+          .evaluate((el) => {
+            const cs = getComputedStyle(el)
+            return { color: cs.color, stroke: cs.webkitTextStrokeWidth }
+          })
+        expect(amount.color).not.toBe('rgb(255, 255, 255)')
+        expect(amount.stroke).toBe('0px')
         await expect(go(page, 'Rematch')).toBeVisible()
         await expect(go(page, 'Done')).toBeVisible()
       },

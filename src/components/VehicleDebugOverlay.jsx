@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useEffect, useState } from 'react'
+import { histogramLabels } from '../utils/distanceFilter'
 import './VehicleDebugOverlay.css'
 
 const POLL_MS = 500
@@ -45,6 +46,35 @@ export default function VehicleDebugOverlay({ getDebugInfo, vehicleState }) {
         <div>
           <dt>Reason</dt>
           <dd>{info?.reason || '--'}</dd>
+        </div>
+        {/* Distance-filter calibration: raw path length vs what is credited. */}
+        <div>
+          <dt>Raw path</dt>
+          <dd>
+            {info?.distance ? `${Math.round(info.distance.rawMeters)} m` : '--'}
+          </dd>
+        </div>
+        <div>
+          <dt>Counted</dt>
+          <dd>
+            {info?.distance
+              ? `${Math.round(info.distance.countedMeters)} m (${info.distance.state})`
+              : '--'}
+          </dd>
+        </div>
+        <div>
+          <dt>Drift dropped</dt>
+          <dd>{info?.distance ? info.distance.driftDrops : '--'}</dd>
+        </div>
+        <div>
+          <dt>Accuracy (m)</dt>
+          <dd>
+            {info?.distance
+              ? histogramLabels()
+                  .map((label, i) => `${label}:${info.distance.histogram[i]}`)
+                  .join(' ')
+              : '--'}
+          </dd>
         </div>
       </dl>
     </div>

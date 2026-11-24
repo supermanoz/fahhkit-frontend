@@ -107,7 +107,7 @@ export default function ColorItemSheet({
           {formatPrice(state.needMore)} more.
         </p>
         <GameButton
-          variant="success"
+          variant="gold"
           size="lg"
           className="g-full-width"
           onClick={onGetCoins}

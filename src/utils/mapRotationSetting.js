@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { MAP_ROTATION_ENABLED } from '../config/features'
 
 // Settings > Map > "Rotate map while running". Stored on this device only.
 // Default ON: the map turns to face the way you run during an active run.
@@ -16,6 +17,8 @@ function read(key, fallback) {
 }
 
 export function getRotateWhileRunning() {
+  // Feature flag off: whatever is stored is ignored.
+  if (!MAP_ROTATION_ENABLED) return false
   return read(KEY, true)
 }
 
@@ -30,7 +33,12 @@ export function setRotateWhileRunning(on) {
 }
 
 let memory = null
-const snapshot = () => (memory !== null ? memory : getRotateWhileRunning())
+const snapshot = () =>
+  !MAP_ROTATION_ENABLED
+    ? false
+    : memory !== null
+      ? memory
+      : getRotateWhileRunning()
 
 function subscribe(cb) {
   listeners.add(cb)
@@ -38,7 +46,7 @@ function subscribe(cb) {
 }
 
 export function useRotateWhileRunning() {
-  return useSyncExternalStore(subscribe, snapshot, () => true)
+  return useSyncExternalStore(subscribe, snapshot, () => MAP_ROTATION_ENABLED)
 }
 
 // The one-time "Map turns as you run" tip.

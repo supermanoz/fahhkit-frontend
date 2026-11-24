@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
 import { MapCompass, MapRotationController, RotationHint } from './MapRotation'
 import { useRotateWhileRunning } from '../utils/mapRotationSetting'
+import { MAP_ROTATION_ENABLED } from '../config/features'
 import { useMapDebug } from '../utils/mapDebug'
 import MapDebugPanel from './MapDebugPanel'
 import MapAttribution from './MapAttribution'
@@ -1762,7 +1763,7 @@ export default function TerritoryMap({
   // Heading-up rotation during a run (see MapRotation.jsx). `rotInfo` only
   // changes a few times per run (bucketed), never per GPS fix.
   const rotateSetting = useRotateWhileRunning()
-  const rotationEnabled = rotateSetting && isTracking
+  const rotationEnabled = MAP_ROTATION_ENABLED && rotateSetting && isTracking
   const compassControlRef = useRef(null)
   const mapDebugRef = useRef(null)
   const mapDebug = useMapDebug()
@@ -2114,18 +2115,20 @@ export default function TerritoryMap({
             programmaticMoveRef={programmaticMoveRef}
             onUserPan={onUserPan}
           />
-          <MapRotationController
-            rotorRef={tiltRef}
-            rootRef={rootRef}
-            glMapRef={baseGlMapRef}
-            enabled={rotationEnabled}
-            runView={runView}
-            following={isFollowing}
-            debugRef={mapDebugRef}
-            controlRef={compassControlRef}
-            onInfo={handleRotationInfo}
-            onRequestFollow={onRequestFollow}
-          />
+          {MAP_ROTATION_ENABLED && (
+            <MapRotationController
+              rotorRef={tiltRef}
+              rootRef={rootRef}
+              glMapRef={baseGlMapRef}
+              enabled={rotationEnabled}
+              runView={runView}
+              following={isFollowing}
+              debugRef={mapDebugRef}
+              controlRef={compassControlRef}
+              onInfo={handleRotationInfo}
+              onRequestFollow={onRequestFollow}
+            />
+          )}
           <CaptureMapInstance onReady={setMapInstance} />
           <WeatherLayer ambience={ambience} />
           {activeTapEffects.map((effect) => (
@@ -2158,13 +2161,17 @@ export default function TerritoryMap({
           onLocated={() => exitGlobe()}
         />
       )}
-      <MapCompass
-        visible={rotationEnabled && (mapTurned || rotInfo.userNorth)}
-        userNorth={rotInfo.userNorth}
-        onClick={toggleNorthUp}
-      />
-      {mapDebug && isTracking && <MapDebugPanel debugRef={mapDebugRef} />}
-      {showRotationHint && rotationEnabled && (
+      {MAP_ROTATION_ENABLED && (
+        <MapCompass
+          visible={rotationEnabled && (mapTurned || rotInfo.userNorth)}
+          userNorth={rotInfo.userNorth}
+          onClick={toggleNorthUp}
+        />
+      )}
+      {MAP_ROTATION_ENABLED && mapDebug && isTracking && (
+        <MapDebugPanel debugRef={mapDebugRef} />
+      )}
+      {MAP_ROTATION_ENABLED && showRotationHint && rotationEnabled && (
         <RotationHint onDone={hideRotationHint} />
       )}
       {/* Leaflet's own attribution control lives inside .territory-map-tilt

@@ -15,6 +15,8 @@ import ContactPage from './pages/ContactPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
 import RequireAuth from './components/RequireAuth'
+import RequireRole from './components/RequireRole'
+import AccessDeniedNotice from './components/AccessDeniedNotice'
 
 // Public storefront - only visited from "Continue to Shop"/the website, so
 // it stays out of the main bundle.
@@ -49,11 +51,25 @@ const SponsorReportPage = lazy(() => import('./pages/SponsorReportPage'))
 // Public: landing, login/register/forgot/update-password, terms, contact,
 // the events list + detail, and /game (which has its own in-game sign in).
 const guard = (page) => <RequireAuth>{page}</RequireAuth>
+// Staff pages: signed in AND the server confirms the role (never localStorage).
+// The page - and its lazy chunk - is not even rendered for anyone else; they
+// are sent home with a notice. Enforcement is still server-side (SecurityConfig).
+const adminOnly = (page) => (
+  <RequireAuth>
+    <RequireRole allow="admin">{page}</RequireRole>
+  </RequireAuth>
+)
+const staffOnly = (page) => (
+  <RequireAuth>
+    <RequireRole allow="staff">{page}</RequireRole>
+  </RequireAuth>
+)
 
 export default function WebShell() {
   return (
     <>
       <LiveEventRunPrompt />
+      <AccessDeniedNotice />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -67,32 +83,38 @@ export default function WebShell() {
         />
         <Route path="/profile/edit" element={guard(<EditProfilePage />)} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/create" element={guard(<CreateEventPage />)} />
+        <Route path="/events/create" element={staffOnly(<CreateEventPage />)} />
         <Route path="/events/:id" element={<EventDetailPage />} />
-        <Route path="/events/:id/edit" element={guard(<EditEventPage />)} />
+        <Route path="/events/:id/edit" element={staffOnly(<EditEventPage />)} />
         <Route
           path="/events/:id/registrations"
-          element={guard(<EventRegistrantsPage />)}
+          element={staffOnly(<EventRegistrantsPage />)}
         />
-        <Route path="/events/:id/report" element={guard(<EventReportPage />)} />
+        <Route
+          path="/events/:id/report"
+          element={staffOnly(<EventReportPage />)}
+        />
         <Route
           path="/admin/create-moderator"
-          element={guard(<CreateModeratorPage />)}
+          element={adminOnly(<CreateModeratorPage />)}
         />
-        <Route path="/admin/dashboard" element={guard(<DashboardPage />)} />
-        <Route path="/admin/moderators" element={guard(<ModeratorsPage />)} />
+        <Route path="/admin/dashboard" element={adminOnly(<DashboardPage />)} />
+        <Route
+          path="/admin/moderators"
+          element={adminOnly(<ModeratorsPage />)}
+        />
         <Route
           path="/admin/moderators/:id/edit"
-          element={guard(<EditModeratorPage />)}
+          element={adminOnly(<EditModeratorPage />)}
         />
-        <Route path="/athletes" element={guard(<AthleteSearchPage />)} />
+        <Route path="/athletes" element={staffOnly(<AthleteSearchPage />)} />
         <Route
           path="/athletes/:userId"
-          element={guard(<AthleteProfilePage />)}
+          element={staffOnly(<AthleteProfilePage />)}
         />
         <Route
           path="/athletes/:userId/edit"
-          element={guard(<EditAthletePage />)}
+          element={staffOnly(<EditAthletePage />)}
         />
         <Route path="/history" element={guard(<HistoryPage />)} />
         <Route path="/runs" element={<Navigate to="/history" replace />} />
@@ -105,12 +127,15 @@ export default function WebShell() {
         <Route path="/game/privacy" element={<GameLegalPage doc="privacy" />} />
         <Route
           path="/admin/game-mechanics"
-          element={guard(<GameMechanicsPage />)}
+          element={adminOnly(<GameMechanicsPage />)}
         />
-        <Route path="/admin/fraud-flags" element={guard(<FraudFlagsPage />)} />
+        <Route
+          path="/admin/fraud-flags"
+          element={staffOnly(<FraudFlagsPage />)}
+        />
         <Route
           path="/admin/sponsor-report"
-          element={guard(<SponsorReportPage />)}
+          element={staffOnly(<SponsorReportPage />)}
         />
         <Route path="/payment-status" element={guard(<PaymentStatusPage />)} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -110,7 +110,9 @@ export default function EmoteShowcase({
               <GameButton onClick={onEquip}>Equip</GameButton>
             )
           ) : short ? (
-            <GameButton onClick={onGetCoins}>Get Fahhcoin</GameButton>
+            <GameButton variant="gold" onClick={onGetCoins}>
+              Get Fahhcoin
+            </GameButton>
           ) : (
             <GameButton onClick={onBuy} disabled={purchasing}>
               {purchasing ? (

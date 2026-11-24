@@ -14,3 +14,14 @@
   paint-order: stroke fill;
   text-shadow: none;
 }
+
+/* Plain tone for LIGHT surfaces (cards, popups): the white-with-outline HUD
+   look disappears on a light background, so take the surrounding colour
+   (gold / red / grey) with no outline. Use via <CoinAmount plain />. */
+.coin-amount.is-plain {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  -webkit-text-stroke: 0;
+  paint-order: normal;
+}

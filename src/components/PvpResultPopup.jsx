@@ -5,6 +5,7 @@ import GameButton from './ui/GameButton'
 import { IconClock, IconTrophy } from './GameIcons'
 import { RivalHero } from './pvp/PvpParts'
 import { playSfx } from '../utils/gameSound'
+import { SERVER_REJECTED_COPY } from '../constants/runMessages'
 import { formatCoins } from '../utils/format'
 import { coinChange, formatRaceTime } from '../utils/pvpResult'
 import './PvpResultPopup.css'
@@ -61,8 +62,7 @@ function Skeleton({ w = 120, h = 34 }) {
 const INVALID_COPY = {
   DISTANCE_NOT_MET:
     'The full race distance wasn’t covered, so this run didn’t count.',
-  CHEAT_DETECTED:
-    'That pace looked more scooter than sneakers, so this run didn’t count.',
+  CHEAT_DETECTED: SERVER_REJECTED_COPY,
 }
 
 function bannerFor(view) {
