@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import {
-  FaArrowRight,
-  FaMapMarkedAlt,
-  FaRoute,
-  FaShieldAlt,
-  FaUsers,
-} from 'react-icons/fa'
 import Navbar from '../components/Navbar'
 import Carousel from '../components/Carousel'
 import SectionTitle from '../components/SectionTitle'
@@ -19,7 +12,6 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 import bannerImage from '../assets/images/Fahhkit-Banner.jfif'
 import sundayRundayImage from '../assets/images/Sunday-Runday.jfif'
 import foundingMembersImage from '../assets/images/founding-members.jfif'
-import territoryRunImage from '../assets/images/territory-run-teaser.svg'
 import manojBasnetPhoto from '../assets/images/team/manojbasnet.webp'
 import aryanDahalPhoto from '../assets/images/team/aryandahal.webp'
 import aryanShahPhoto from '../assets/images/team/aryanshah.webp'
@@ -55,39 +47,6 @@ function getSlides(isAuthed) {
         <Link to="/events" className="btn btn-white btn-lg">
           View Events
         </Link>
-      ),
-    },
-    {
-      image: territoryRunImage,
-      content: (
-        <div className="territory-slide">
-          <span className="territory-slide-eyebrow">
-            <FaMapMarkedAlt aria-hidden="true" />
-            Coming Soon...
-          </span>
-          <h2 className="territory-slide-title">Run Conquer</h2>
-          <p className="territory-slide-subtitle">
-            Run a loop, claim the ground, defend it from the crew.
-          </p>
-          <ul className="territory-slide-features">
-            <li>
-              <FaRoute aria-hidden="true" />
-              Run to claim
-            </li>
-            <li>
-              <FaShieldAlt aria-hidden="true" />
-              Defend it
-            </li>
-            <li>
-              <FaUsers aria-hidden="true" />
-              vs. the crew
-            </li>
-          </ul>
-          <Link to="/game" className="btn btn-white btn-lg territory-slide-cta">
-            View Live Demo
-            <FaArrowRight aria-hidden="true" />
-          </Link>
-        </div>
       ),
     },
   ]
