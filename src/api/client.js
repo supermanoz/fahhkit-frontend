@@ -1,3 +1,4 @@
+import { dedupe } from '../utils/requestCache'
 import {
   MAX_UPLOAD_BYTES,
   compressFormDataImages,
@@ -572,8 +573,11 @@ export function postJson(path, payload, extraHeaders = {}) {
   })
 }
 
+// Concurrent identical GETs (same path, same session) share one request.
 export function getJson(path) {
-  return request(path, { method: 'GET', unreachable: UNREACHABLE })
+  return dedupe(`GET ${getToken() || ''} ${path}`, () =>
+    request(path, { method: 'GET', unreachable: UNREACHABLE })
+  )
 }
 
 export function putJson(path, payload) {

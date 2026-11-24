@@ -1,4 +1,5 @@
 import { getJson, postJson } from './client'
+import { cached, invalidate } from '../utils/requestCache'
 
 // Cosmetics store (see StoreController in the FahhKit backend). Categories
 // are HERO, AVATAR_BORDER, TERRITORY_SHADE, TRAIL_COLOR, PROFILE_BACKGROUND,
@@ -7,19 +8,27 @@ import { getJson, postJson } from './client'
 // profile picture instead of standing in for one.
 
 export function getStoreCatalog(pageNumber = 1, noOfRecords = 200) {
-  return postJson('/v1/store/catalog/find', { pageNumber, noOfRecords })
+  // Short TTL cache: the catalog barely changes, every mutation below drops it.
+  return cached(
+    `store:catalog:${pageNumber}:${noOfRecords}`,
+    () => postJson('/v1/store/catalog/find', { pageNumber, noOfRecords }),
+    { ttlMs: 60_000 }
+  )
 }
 
 export function purchaseStoreItem(storeItemId) {
-  return postJson('/v1/store/purchase', { storeItemId })
+  invalidate('store:')
+  return postJson('/v1/store/purchase', { storeItemId }).finally(() =>
+    invalidate('store:')
+  )
 }
 
 export function equipStoreItem(id) {
-  return postJson(`/v1/store/${id}/equip`)
+  return postJson(`/v1/store/${id}/equip`).finally(() => invalidate('store:'))
 }
 
 export function unequipStoreItem(id) {
-  return postJson(`/v1/store/${id}/unequip`)
+  return postJson(`/v1/store/${id}/unequip`).finally(() => invalidate('store:'))
 }
 
 export function getOwnedStoreItems() {
