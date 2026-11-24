@@ -9,6 +9,7 @@ import { TitleRibbon } from '../game/ui/GameModal'
 import { IconClose } from './GameIcons'
 import './RunRewardsModal.css'
 import { formatNumber } from '../utils/format'
+import GameButton from './ui/GameButton'
 
 // One reward sequence for every mode that can grant XP or score - replaces
 // the old pair of popups (RunRewardAnimation's XP-only modal, and
@@ -313,13 +314,9 @@ export default function RunRewardsModal({
               <IconClose />
             </button>
             <ShareRunCarousel run={shareRun} />
-            <button
-              type="button"
-              className="game-btn game-btn-green run-rewards-action"
-              onClick={onDismiss}
-            >
+            <GameButton className="run-rewards-action" onClick={onDismiss}>
               Done
-            </button>
+            </GameButton>
           </motion.div>
         )}
         <div
@@ -435,13 +432,12 @@ export default function RunRewardsModal({
             )}
 
             {reached('total') && (
-              <button
-                type="button"
-                className="game-btn game-btn-green run-rewards-action"
+              <GameButton
+                className="run-rewards-action"
                 onClick={hasImage ? () => setStep('image') : onDismiss}
               >
                 {hasImage ? 'Next' : 'Continue'}
-              </button>
+              </GameButton>
             )}
             {animating && (
               <button

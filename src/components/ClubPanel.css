@@ -255,9 +255,8 @@
 }
 
 .club-treasury-value {
-  font-size: 20px;
-  font-weight: 900;
-  color: var(--text-title);
+  display: block;
+  font-size: 22px;
 }
 
 .club-donate {
@@ -471,7 +470,7 @@
   width: 100%;
 }
 
-.club-war-result-actions .game-btn {
+.club-war-result-actions .gbtn {
   flex: 1;
 }
 
@@ -581,8 +580,11 @@
   text-align: center;
 }
 
+/* Not owned: the shared locked look (heroLocked.css) - shaded art and a
+   matching dimmed card; the name and the "Level N / Unlock" label stay at full
+   strength so they remain readable. */
 .club-war-hero-card.is-locked {
-  opacity: 0.55;
+  background: color-mix(in srgb, var(--white) 80%, var(--hero-locked-tier));
 }
 
 .club-war-hero-card-stage {
@@ -600,9 +602,10 @@
   object-fit: contain;
 }
 
-.club-war-hero-card.is-locked .club-war-hero-card-stage img,
-.club-war-hero-card.is-locked .hero-figure-portrait {
-  filter: grayscale(0.7);
+.club-war-hero-card.is-locked
+  .club-war-hero-card-stage
+  > :not(.club-war-hero-card-lock) {
+  filter: var(--hero-locked-filter);
 }
 
 .club-war-hero-card-lock {

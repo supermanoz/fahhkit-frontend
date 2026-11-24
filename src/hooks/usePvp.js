@@ -14,7 +14,7 @@ import {
   sendDirectChallenge,
   setPvpDiscoverable,
 } from '../api/pvp'
-import { playerName } from '../utils/playerName'
+import { getDisplayName } from '../utils/playerName'
 import { visibleInterval } from '../utils/visibleInterval'
 
 const DISCOVERABLE_KEY = 'fahhkit_pvp_discoverable'
@@ -41,15 +41,34 @@ function errorMessage(err, fallback) {
 }
 
 // My side of a challenge, whichever seat I'm in.
+// One side of a challenge as a user-like object. The server may send a
+// nickname and the hero that side runs as (<role>Nickname, <role>HeroName,
+// <role>HeroId, <role>HeroColor); today it only sends the full name, so the
+// extras are simply absent until the backend adds them.
+export function partyOf(challenge, role) {
+  const c = challenge || {}
+  const heroName = c[`${role}HeroName`] || null
+  const heroId = c[`${role}HeroId`] || null
+  return {
+    id: c[`${role}Id`] ?? null,
+    nickname: c[`${role}Nickname`] ?? null,
+    fullName: c[`${role}Name`] ?? null,
+    hero:
+      heroName || heroId
+        ? { name: heroName, id: heroId, color: c[`${role}HeroColor`] || null }
+        : null,
+  }
+}
+
 export function mySide(challenge, userId) {
   const isChallenger = challenge.challengerId === userId
+  const opponent = partyOf(challenge, isChallenger ? 'opponent' : 'challenger')
   return {
     isChallenger,
-    // First name only - PvP responses carry full names, no nicknames.
-    opponentName: playerName(
-      null,
-      isChallenger ? challenge.opponentName : challenge.challengerName
-    ),
+    // nickname || name (first word) - see utils/playerName.js
+    opponentId: opponent.id,
+    opponentName: getDisplayName(opponent),
+    opponentHero: opponent.hero,
     confirmed: isChallenger
       ? challenge.challengerConfirmed
       : challenge.opponentConfirmed,

@@ -3,6 +3,7 @@ import {
   MODE_INFO,
   STEPS,
   distanceAwayLabel,
+  raceEndedView,
   estimateLabel,
   isLive,
   needCoinsLine,
@@ -146,5 +147,48 @@ describe('copy has no jargon', () => {
       resolutionText('WIN_BY_FORFEIT'),
     ].join(' ')
     expect(all).not.toMatch(/queue|api|status|resolution|forfeit_|WIN_BY/i)
+  })
+})
+
+describe('raceEndedView', () => {
+  const base = { challengerId: 'me', opponentId: 'aryan' }
+  it('challenger sees the rival declined', () => {
+    const v = raceEndedView(
+      { ...base, status: 'DECLINED' },
+      { userId: 'me', rivalName: 'Aryan' }
+    )
+    expect(v.message).toBe('Aryan declined your challenge.')
+  })
+  it('the challenged player sees that they declined', () => {
+    const v = raceEndedView(
+      { ...base, status: 'DECLINED' },
+      { userId: 'aryan', rivalName: 'Me' }
+    )
+    expect(v.message).toBe("You declined Me's challenge.")
+  })
+  it('declinedByMe overrides the role guess', () => {
+    const v = raceEndedView(
+      { ...base, status: 'DECLINED' },
+      { userId: 'me', rivalName: 'Aryan', declinedByMe: true }
+    )
+    expect(v.message).toMatch(/^You declined/)
+  })
+  it('cancelled past its expiry reads as expired', () => {
+    const v = raceEndedView(
+      { ...base, status: 'CANCELLED', expiresAt: '2020-01-01T00:00:00' },
+      { userId: 'me', rivalName: 'Aryan' }
+    )
+    expect(v.kind).toBe('expired')
+  })
+  it('cancelled before expiry reads as cancelled', () => {
+    const v = raceEndedView(
+      { ...base, status: 'CANCELLED', expiresAt: '2999-01-01T00:00:00' },
+      { userId: 'me', rivalName: 'Aryan' }
+    )
+    expect(v.kind).toBe('cancelled')
+  })
+  it('played / live races have no ended view', () => {
+    for (const status of ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED'])
+      expect(raceEndedView({ ...base, status }, { userId: 'me' })).toBeNull()
   })
 })

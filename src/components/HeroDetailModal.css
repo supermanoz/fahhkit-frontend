@@ -136,10 +136,15 @@
   opacity: 0.8;
 }
 
-/* Level-locked hero: greyed slightly (still readable - it can be previewed),
-   no colour glow. Matches the Shop card (HeroGallery.css). */
-.hero-emote-slide-figure.is-level-locked {
-  filter: grayscale(0.85) brightness(0.82);
+/* Locked hero (any reason): the same shade as the Shop card (heroLocked.css) on
+   the stage background AND the static sprite, eased off on unlock. */
+.hero-modal-stage .hero-stage-bg,
+.hero-modal-stage .hero-emote-slide-figure {
+  transition: filter 0.6s ease;
+}
+.hero-modal-stage.is-hero-locked .hero-stage-bg,
+.hero-modal-stage.is-hero-locked .hero-emote-slide-figure {
+  filter: var(--hero-locked-filter);
 }
 
 .hero-emote-lock-badge {
@@ -715,17 +720,9 @@
   -webkit-text-stroke-width: 0;
   paint-order: normal;
 }
-.hero-perk-pop *:not(.gb):not(.gb *):not(.hero-perk-value):not(svg):not(svg *) {
+.hero-perk-pop
+  *:not(.gbtn):not(.gbtn *):not(.hero-perk-value):not(svg):not(svg *) {
   font-family: var(--font-body);
-}
-.hero-perk-pop .gb,
-.hero-perk-pop .gb * {
-  -webkit-text-stroke: 2px #0a0e28;
-  paint-order: stroke fill;
-}
-.hero-perk-pop .gb-lg {
-  height: 56px;
-  font-size: 19px;
 }
 .hero-perk-value {
   margin: 0;

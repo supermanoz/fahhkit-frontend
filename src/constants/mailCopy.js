@@ -19,13 +19,7 @@ export const MAIL_GROUPS = Object.freeze({
   Earlier: 'Earlier',
 })
 
-// What each real mail `type` is called (chip in the detail view).
-export const MAIL_TYPE_LABEL = Object.freeze({
-  NOTICE: 'Notice',
-  CLUB_INVITE: 'Club invite',
-  STORE_ITEM_GRANT: 'Gift',
-})
-export const MAIL_TYPE_FALLBACK = 'Message'
+// (type labels/icons/tones live in utils/mailTypes.js)
 export const MAIL_DEFAULT_SENDER = 'Run Conquest'
 
 // Resolved states shown on a row / in the detail view.

@@ -1,6 +1,7 @@
 import { test, expect, seedSession } from './fixtures/base.js'
 import { ok } from './fixtures/mockApi.js'
 import { VETERAN } from './mocks/personas.js'
+import { scriptGps } from './helpers/gps.js'
 
 // The PvP arena (PvpPanel.jsx): hub, distance, rival, nearby + stake,
 // searching / found, race screens and results, the pre-run countdown, safe
@@ -36,6 +37,7 @@ async function setup(
   { challenges = [], nearby = [], balance = 2500, queue = null } = {}
 ) {
   await seedSession(page, VETERAN)
+  await scriptGps(page)
   // Visibility is on for these tests (the gate itself is in pvp-portal.spec.js).
   await page.addInitScript(() =>
     localStorage.setItem('fahhkit_pvp_discoverable', 'true')
@@ -179,6 +181,40 @@ test.describe('hub', () => {
     )
     await expectNoOverflow(page)
     await page.screenshot({ path: `${OUT}/hub-empty-360x640.png` })
+  })
+
+  test('empty-state art: swords fully inside the dotted ring, shadow centred', async ({
+    mockedPage: page,
+    context,
+  }) => {
+    test.setTimeout(60_000)
+    await setup(page, { challenges: [] })
+    await openArena(page, context, SMALL)
+    const ring = page.locator('.pvp-empty-ring')
+    await ring.scrollIntoViewIfNeeded()
+    const r = await ring.boundingBox()
+    const icon = await page.locator('.pvp-empty-ring svg').boundingBox()
+    const sh = await page.locator('.pvp-empty-shadow').boundingBox()
+    const cx = (b) => b.x + b.width / 2
+    // Icon ~56-64px, centred horizontally in the ring, shadow centred under it.
+    expect(icon.width).toBeGreaterThanOrEqual(56)
+    expect(icon.width).toBeLessThanOrEqual(64)
+    expect(Math.abs(cx(icon) - cx(r))).toBeLessThan(1)
+    expect(Math.abs(cx(sh) - cx(r))).toBeLessThan(1)
+    // The crossing point (10/24 down the glyph) sits at the ring's centre.
+    const cross = icon.y + (icon.height * 10) / 24
+    expect(Math.abs(cross - (r.y + r.height / 2))).toBeLessThan(2)
+    // Fully inside the ring: nothing clipped.
+    expect(icon.x).toBeGreaterThan(r.x)
+    expect(icon.x + icon.width).toBeLessThan(r.x + r.width)
+    await expect(page.locator('.pvp-empty-ring svg')).toHaveCSS(
+      'color',
+      'rgb(31, 86, 196)'
+    )
+    if (process.env.EMPTY_SHOT)
+      await page
+        .locator('.pvp-empty')
+        .screenshot({ path: process.env.EMPTY_SHOT })
   })
 
   test('active races + recent results as cards with status chips (390x844)', async ({
@@ -584,9 +620,9 @@ test.describe('searching, found, race screens', () => {
         }),
       check: async (page) => {
         await expect(go(page, 'Accept and lock stake')).toHaveClass(
-          /gb-success/
+          /gbtn-primary/
         )
-        await expect(go(page, 'Decline')).toHaveClass(/gb-danger/)
+        await expect(go(page, 'Decline')).toHaveClass(/gbtn-danger/)
         await expect(page.getByText('wants to race you')).toBeVisible()
       },
       shot: 'race-accept',
@@ -595,7 +631,7 @@ test.describe('searching, found, race screens', () => {
       name: 'waiting for the rival: cancel is neutral, not red',
       c: () => race({ id: 'r2', status: 'PENDING' }),
       check: async (page) => {
-        await expect(go(page, 'Cancel challenge')).toHaveClass(/gb-secondary/)
+        await expect(go(page, 'Cancel challenge')).toHaveClass(/gbtn-neutral/)
         await expect(
           page.getByText('Waiting for Aarav to accept')
         ).toBeVisible()
@@ -611,9 +647,9 @@ test.describe('searching, found, race screens', () => {
           opponentConfirmed: true,
         }),
       check: async (page) => {
-        await expect(go(page, 'Start the race')).toHaveClass(/gb-success/)
+        await expect(go(page, 'Start the race')).toHaveClass(/gbtn-primary/)
         const forfeit = go(page, 'Forfeit')
-        await expect(forfeit).toHaveClass(/gb-danger/)
+        await expect(forfeit).toHaveClass(/gbtn-danger/)
         await forfeit.click()
         await expect(page.getByText(/Give up/)).toBeVisible()
       },

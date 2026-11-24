@@ -54,13 +54,17 @@ async function verifyHero(hero) {
         continue
       }
       const meta = await sharp(sheetPath).metadata()
-      const expectedW = sheet.cols * frameWidth
-      const expectedH = sheet.rows * frameHeight
+      // Trimmed/downscaled sheets (scripts/trim_downscale_sprites.py) pack
+      // cells of sheetFrameWidth x sheetFrameHeight, not the display frame size.
+      const cellW = manifest.sheetFrameWidth ?? frameWidth
+      const cellH = manifest.sheetFrameHeight ?? frameHeight
+      const expectedW = sheet.cols * cellW
+      const expectedH = sheet.rows * cellH
       if (meta.width !== expectedW || meta.height !== expectedH) {
         problems.push(
           `${hero}/${key}/${sheet.file}: real size ${meta.width}x${meta.height}, ` +
             `expected ${expectedW}x${expectedH} from manifest (cols=${sheet.cols} ` +
-            `rows=${sheet.rows} frameWidth=${frameWidth} frameHeight=${frameHeight}) - ` +
+            `rows=${sheet.rows} cellW=${cellW} cellH=${cellH}) - ` +
             `output may have been scaled`
         )
       }

@@ -34,11 +34,11 @@
 /* The game forces the display font + a white outline on every element
    (.game-page * / the shared text recipe), so the body font and plain text
    are re-applied here. Titles / numbers (.pvp-display) and the chunky buttons
-   (.gb) keep their own look. */
+   (.gbtn) keep their own look. */
 .pvp-arena
-  *:not(.gb):not(.gb *):not(.pvp-display):not(.g-stat-chip-value):not(svg):not(
-    svg *
-  ) {
+  *:not(.gbtn):not(.gbtn *):not(.pvp-display):not(.g-stat-chip-value):not(
+    svg
+  ):not(svg *) {
   font-family: var(--font-body);
 }
 .pvp-arena .g-stat-chip-value:not(.is-muted) {
@@ -50,11 +50,6 @@
   text-shadow: none;
   paint-order: normal;
 }
-.pvp-arena .gb,
-.pvp-arena .gb * {
-  -webkit-text-stroke: 2px #0a0e28;
-  paint-order: stroke fill;
-}
 .pvp-arena .pvp-display {
   font-family: var(--font-display);
   font-weight: 400;
@@ -62,30 +57,6 @@
 }
 .pvp-arena .pvp-num {
   font-variant-numeric: tabular-nums;
-}
-/* Secondary = the white game button with dark text. */
-.pvp-arena .gb-secondary,
-.pvp-arena .gb-secondary * {
-  color: #2b2a24;
-  -webkit-text-stroke-width: 0;
-}
-.pvp-arena .gb-secondary {
-  background: #fff;
-}
-.pvp-arena .gb:disabled {
-  filter: grayscale(1);
-  opacity: 0.8;
-}
-.pvp-arena .gb {
-  min-height: 48px;
-}
-.pvp-arena .gb-lg {
-  height: 56px;
-  font-size: 19px;
-  white-space: nowrap;
-}
-.pvp-arena .gb-sm {
-  min-height: 44px;
 }
 
 /* ---------- inline gold coin ---------- */
@@ -131,13 +102,15 @@
   min-height: 34px;
   padding: 0 10px 0 6px;
   border-radius: 999px;
-  border: 2px solid #e0b53a;
-  background: #fff6d6;
-  font-family: var(--font-display);
+  /* Dark gold/brown so the HUD's white outlined digits read on it. */
+  border: 2px solid #2b2a24;
+  background: linear-gradient(180deg, #a8710f 0%, #7a4f06 100%);
+  max-width: 100%;
+  min-width: 0;
+}
+.pvp-balance-chip .coin-amount {
   font-size: 17px;
-  color: #6b4500;
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
+  -webkit-text-stroke-width: 2.5px;
 }
 .pvp-balance-chip .pvp-coin {
   width: 18px;
@@ -394,6 +367,32 @@
   -webkit-text-stroke: 2px #0a0e28;
   paint-order: stroke fill;
 }
+.pvp-rival-hero.is-loading .pvp-hero-stage {
+  background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.2),
+      rgba(255, 255, 255, 0.04)
+    )
+    0 0 / 200% 100%;
+  border-radius: 16px;
+  animation: pvp-rival-shimmer 1.1s linear infinite;
+}
+.pvp-rival-hero-img {
+  display: block;
+  margin: 0 auto;
+  object-fit: contain;
+}
+@keyframes pvp-rival-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pvp-rival-hero.is-loading .pvp-hero-stage {
+    animation: none;
+  }
+}
 .pvp-hero-fig {
   position: relative;
   display: block;
@@ -509,8 +508,38 @@
   text-align: center;
 }
 .pvp-empty-art {
-  width: 140px;
-  height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.pvp-empty-ring {
+  box-sizing: border-box;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 2px dashed rgba(47, 123, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+  line-height: 0;
+  color: var(--p-blue-dark);
+  overflow: visible;
+}
+/* The blades cross a little above the 24px icon box's centre; nudge the glyph
+   down so the crossing point sits at the circle's centre. */
+.pvp-empty-ring .game-icon {
+  display: block;
+  overflow: visible;
+  transform: translateY(0.08em);
+}
+.pvp-empty-shadow {
+  width: 76px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: rgba(47, 123, 255, 0.18);
 }
 .pvp-empty-title {
   margin: 0;
@@ -1293,22 +1322,8 @@
   text-shadow: none;
   paint-order: normal;
 }
-.pvp-gate *:not(.gb):not(.gb *):not(.pvp-gate-title):not(svg):not(svg *) {
+.pvp-gate *:not(.gbtn):not(.gbtn *):not(.pvp-gate-title):not(svg):not(svg *) {
   font-family: var(--font-body);
-}
-.pvp-gate .gb,
-.pvp-gate .gb * {
-  -webkit-text-stroke: 2px #0a0e28;
-  paint-order: stroke fill;
-}
-.pvp-gate .gb-secondary,
-.pvp-gate .gb-secondary * {
-  color: #2b2a24;
-  -webkit-text-stroke-width: 0;
-}
-.pvp-gate .gb-lg {
-  height: 56px;
-  font-size: 19px;
 }
 .pvp-gate-icon {
   display: flex;
@@ -1419,15 +1434,10 @@
   paint-order: normal;
 }
 .pvp-incoming
-  *:not(.gb):not(.gb *):not(.pvp-vs-text):not(.pvp-incoming-title):not(
+  *:not(.gbtn):not(.gbtn *):not(.pvp-vs-text):not(.pvp-incoming-title):not(
     .pvp-incoming-value
   ):not(svg):not(svg *) {
   font-family: var(--font-body);
-}
-.pvp-incoming .gb,
-.pvp-incoming .gb * {
-  -webkit-text-stroke: 2px #0a0e28;
-  paint-order: stroke fill;
 }
 .pvp-incoming-kicker {
   margin: 0;
@@ -1517,15 +1527,6 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
-}
-.pvp-incoming .gb-lg {
-  height: 56px;
-  font-size: 19px;
-}
-.pvp-incoming .gb-secondary,
-.pvp-incoming .gb-secondary * {
-  color: #2b2a24;
-  -webkit-text-stroke-width: 0;
 }
 .pvp-incoming-error {
   margin: 0;
@@ -1672,4 +1673,30 @@
     min-width: 54px;
     font-size: 19px;
   }
+}
+
+/* Race ended without being run: declined / cancelled / expired. */
+.pvp-ended {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+.pvp-ended-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #e6e9f5;
+  color: #3b4a86;
+}
+.pvp-ended-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.pvp-ended .pvp-screen-title {
+  margin: 0;
 }

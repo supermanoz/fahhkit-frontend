@@ -564,13 +564,6 @@
   filter: drop-shadow(0 0 6px rgba(224, 165, 55, 0.55));
 }
 
-/* Tapping a claimed parcel views that owner's whole territory (see
-   handleParcelClick in GamePage.jsx) - the pointer cursor is the only hint
-   that the filled shape (not just its badge marker) is itself tappable. */
-.territory-poly-clickable {
-  cursor: pointer;
-}
-
 /* Pulsing white glow for whichever parcel the player tapped in the
    leaderboard, so "viewing their territory" reads as more than just a
    camera pan. */
@@ -622,7 +615,7 @@
    every device/content state instead of a guessed fixed pixel value. */
 .territory-map-locate {
   position: absolute;
-  right: max(14px, env(safe-area-inset-right, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
   bottom: calc(var(--sheet-h, 90px) + 20px);
   z-index: 500;
   width: 46px;
@@ -651,14 +644,6 @@
   line-height: 1.4;
   text-align: right;
   box-shadow: 0 3px 0 var(--game-ink);
-}
-
-@media (max-width: 560px) {
-  .territory-map-locate {
-    width: 42px;
-    height: 42px;
-    font-size: 16px;
-  }
 }
 
 /* Zoomed-out "whole earth" view (see TerritoryGlobe in TerritoryMap.jsx).
@@ -756,4 +741,156 @@
   outline: 3px solid #fff;
   outline-offset: 3px;
   box-shadow: 0 0 0 6px var(--shop-accent-dark, #8f1fa3);
+}
+
+/* ---- Heading-up map rotation (see MapRotation.jsx) ----
+   While a run rotates the map, .territory-map-tilt becomes a square "rotor"
+   big enough to cover the screen at any angle (--rotor-size, set from JS),
+   centred on the player and nudged down (--map-shift) so more of the path
+   ahead shows. --map-rot / --map-shift are written imperatively; the
+   transition does the gliding. */
+.territory-map-tilt.is-rotor {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: var(--rotor-size);
+  height: var(--rotor-size);
+  margin: calc(var(--rotor-size) / -2) 0 0 calc(var(--rotor-size) / -2);
+  transform: translateY(var(--map-shift, 0px)) rotate(var(--map-rot, 0deg));
+  transition: transform var(--map-rot-dur, 0ms) var(--map-rot-ease, linear);
+  will-change: transform;
+}
+
+/* Everything pinned to the ground that must stay upright counter-rotates
+   about its own anchor (the transform-origin set where the icon is built). */
+.territory-map-upright {
+  rotate: var(--map-counter, none);
+  transition: rotate var(--map-rot-dur, 0ms) var(--map-rot-ease, linear);
+}
+.territory-map-upright-fill {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* Ground direction cone (north-up / non-rotating map only; see
+   useHeadingCone). Soft wedge fanning out past the ring under the feet. */
+.territory-map-heading-cone {
+  position: absolute;
+  inset: -45%;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  rotate: var(--cone-deg, 0deg);
+  transition:
+    opacity 0.3s ease,
+    rotate 0.5s linear;
+  background: conic-gradient(
+    from -32deg at 50% 50%,
+    rgba(255, 214, 102, 0.7) 0deg 64deg,
+    transparent 64deg 360deg
+  );
+  -webkit-mask-image: radial-gradient(
+    circle,
+    transparent 24%,
+    #000 34%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(
+    circle,
+    transparent 24%,
+    #000 34%,
+    transparent 70%
+  );
+}
+.territory-map-player-icon.is-cone-on .territory-map-heading-cone {
+  opacity: 0.85;
+}
+
+/* Hidden heading diagnostics (utils/mapDebug.js) - top-left, never takes taps. */
+.territory-map-debug {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  left: 8px;
+  z-index: 1200;
+  max-width: 230px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #d7ffd7;
+  font:
+    11px/1.35 ui-monospace,
+    Menlo,
+    monospace;
+  pointer-events: none;
+}
+.territory-map-debug-why {
+  color: #ffd98a;
+  margin-bottom: 3px;
+}
+.territory-map-debug-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Compass: sits above the locate / Follow button with a clear 16px gap
+   (both 46px round, same right margin). Idle: locate top = sheet + 20 + 46,
+   so compass bottom = sheet + 82. Run mode (Follow button + its label) is
+   overridden in GamePage.css. Both ride --sheet-h, so they move up with the
+   run panel when it expands. */
+.territory-map-compass {
+  --stack-bottom: calc(var(--sheet-h, 90px) + 82px);
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: var(--stack-bottom);
+  z-index: 690;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--game-stone, #9a9d93);
+  color: #fff;
+  border: 3px solid var(--game-ink, #3d2b1a);
+  box-shadow:
+    inset 0 -5px 0 var(--game-stone-dark, #6e7166),
+    0 3px 0 var(--game-ink, #3d2b1a);
+  cursor: pointer;
+  font-size: 22px;
+}
+.territory-map-compass:active {
+  transform: translateY(2px);
+}
+.territory-map-compass-needle {
+  rotate: var(--map-compass, 0deg);
+  transition: rotate var(--map-rot-dur, 0ms) var(--map-rot-ease, linear);
+}
+
+/* One-time tip. */
+.territory-map-rotation-hint {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--stack-bottom-hint, calc(var(--sheet-h, 90px) + 140px)));
+  z-index: 690;
+  max-width: min(240px, calc(100% - 96px));
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--game-panel);
+  border: 2px solid var(--game-ink);
+  color: var(--game-cream);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: right;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .territory-map-tilt.is-rotor,
+  .territory-map-upright,
+  .territory-map-compass-needle {
+    transition-duration: 0ms !important;
+  }
 }

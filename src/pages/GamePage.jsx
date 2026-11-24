@@ -45,6 +45,18 @@ import TerritoryMap from '../components/TerritoryMap'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import VehicleAlert from '../components/VehicleAlert'
 import AthleteTerritoryProfilePanel from '../components/AthleteTerritoryProfilePanel'
+import TerritoryPopup from '../components/TerritoryPopup'
+import PvpResultPopup from '../components/PvpResultPopup'
+import { usePvpPostRun } from '../hooks/usePvpPostRun'
+import { useRivalHeroes } from '../hooks/useRivalHeroes'
+import { useRunView } from '../hooks/useRunView'
+import { isMapDebugEnabled } from '../utils/mapDebug'
+import {
+  clearSession as clearPvpSession,
+  loadSession as loadPvpSession,
+  markSeen as markPvpSeen,
+  saveSession as savePvpSession,
+} from '../utils/pvpResult'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useRunTracker } from '../hooks/useRunTracker'
 import { useAuthFlow } from '../hooks/useAuthFlow'
@@ -58,9 +70,9 @@ import { useAndroidBackButton } from '../hooks/useAndroidBackButton'
 const GameAuthGate = lazy(() => import('../components/game-auth/GameAuthGate'))
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useMailbox } from '../hooks/useMailbox'
-import { mySide, usePvp } from '../hooks/usePvp'
+import { mySide, partyOf, usePvp } from '../hooks/usePvp'
 import { useClubWarWatch } from '../hooks/useClubWarWatch'
-import { ApiError, resolveFileUrl } from '../api/client'
+import { ApiError, isNetworkError, resolveFileUrl } from '../api/client'
 import { createRun, getRun, getRuns } from '../api/runs'
 import {
   findClubLeaderboard,
@@ -86,7 +98,6 @@ import {
 } from '../utils/emotes'
 import EmoteGlyph from '../components/EmoteGlyph'
 import { ToastProvider, useToast } from '../game/ui/Toast'
-import Avatar from '../game/ui/Avatar'
 import ProfileAvatar from '../components/ProfileAvatar'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
@@ -109,7 +120,7 @@ import {
 import { snapSegment } from '../utils/routeSnapping'
 import {
   DEFAULT_CENTER,
-  LOOP_CLOSURE_THRESHOLD_METERS,
+  isLoopOpen,
   LOOP_MIN_AREA_SQ_METERS,
   LOOP_MIN_POINTS,
   VIEW_RADIUS_METERS,
@@ -135,7 +146,6 @@ import {
   formatPace,
   formatRunDate,
   haversineDistance,
-  toLocalDateTimeString,
 } from '../utils/run'
 import { playSfx } from '../utils/gameSound'
 import { resumeAudio, routeElement } from '../utils/audioGraph'
@@ -186,12 +196,41 @@ import { useGameTour } from '../hooks/useGameTour'
 import { tourWaitReason } from '../utils/tour'
 import GameLegalModal from '../components/game-legal/GameLegalModal'
 import { useAnnouncementNotices } from '../hooks/useAnnouncementNotices'
+import { useDailyReward } from '../hooks/useDailyReward'
+import {
+  applyDelta,
+  bindUser as bindFahhcoinUser,
+  coinsToken,
+  getCoins,
+  refresh as refreshFahhcoin,
+  setCoins,
+  setCoinsIfCurrent,
+  setCoinsIfNewer,
+  startResumeRefresh,
+  useCoins,
+} from '../state/coins'
+import { mailData } from '../utils/mailDetails'
+import { useWelcomeBonus } from '../hooks/useWelcomeBonus'
+import { useLeaderboardPages } from '../hooks/useLeaderboardPages'
+import { rangeLabel } from '../utils/leaderboardPaging'
+import WelcomeBonusModal from '../components/WelcomeBonusModal'
+import { popupBlockedBy } from '../utils/popupQueue'
+import { SHOW_PVP_ENTRY, SHOW_PVP_IN_DROPDOWN } from '../config/features'
+import {
+  pickerBadgeCount,
+  pickerTabs,
+  visiblePlayOptions,
+} from '../utils/playOptions'
+import { SHOW_ICON_LABELS } from '../config/iconLabels'
+import DailyRewardModal from '../components/DailyRewardModal'
+import { DailyHudChest } from '../components/DailyChest'
 import RunRewardsModal from '../components/RunRewardsModal'
 import ClubBadge from '../components/ClubBadge'
 import ClubTrophyIcon from '../components/ClubTrophyIcon'
 import NicknameCard from '../components/NicknameCard'
-import { playerName, playerNameOf } from '../utils/playerName'
+import { getDisplayName, playerNameOf } from '../utils/playerName'
 import { formatCoins, formatNumber } from '../utils/format'
+import CoinAmount from '../components/CoinAmount'
 import { formatPrice, getHeroUnlockItem } from '../utils/price'
 import Price from '../components/Price'
 import {
@@ -243,6 +282,30 @@ import './GamePage.css'
 import '../components/GameCards.css'
 import '../game/ui/gameSkin.css'
 import { GameModal, GameActions } from '../game/ui/GameModal'
+import GameButton from '../components/ui/GameButton'
+import { blurActiveField } from '../utils/blurActiveField'
+import ConnectionBanner from '../components/ConnectionBanner'
+import { useIsOnline } from '../utils/connectivity'
+import { useRunSync } from '../hooks/useRunSync'
+import {
+  enqueueRun,
+  pendingCount,
+  removeOutboxRun,
+  retryOutboxRun,
+} from '../utils/runOutbox'
+import {
+  buildRunMeta,
+  buildRunPayload,
+  buildRunSummary,
+} from '../utils/runPayload'
+import OfflineRunSavedModal from '../components/OfflineRunSavedModal'
+import PendingRunsList from '../components/PendingRunsList'
+import { OFFLINE_BLOCKED_TABS } from '../utils/offlineFeatures'
+import {
+  formatLastUpdated,
+  loadCachedProfile,
+  saveCachedProfile,
+} from '../utils/profileCache'
 
 function formatMeters(meters) {
   if (!meters) return '0 m'
@@ -268,6 +331,8 @@ const ROLLOUT_LOCKED_TABS = new Set([
   'leaderboard',
 ])
 
+// `showLabel: false` hides just that item's text label (the aria-label/title
+// stay); SHOW_ICON_LABELS (config/iconLabels.js) still switches all of them off.
 const RADIAL_ITEMS = [
   { tab: 'me', label: 'Me', Icon: IconUser, tone: 'green', x: -112, y: -300 },
   {
@@ -300,6 +365,7 @@ const RADIAL_ITEMS = [
     label: 'Mail',
     Icon: IconEnvelope,
     tone: 'mini',
+    showLabel: false,
     x: -100,
     y: 0,
   },
@@ -308,15 +374,16 @@ const RADIAL_ITEMS = [
     label: 'Settings',
     Icon: IconSettings,
     tone: 'mini',
+    showLabel: false,
     x: 100,
     y: 0,
   },
 ]
 
 // What the red Play button opens into: the original start-a-run ("Conquer"
-// territory), a PvP race, or Training - a choice between modes, shown in
+// territory), Training, or a PvP race (in that order) - a choice between modes, shown in
 // place of the main layout.
-const PLAY_OPTIONS = [
+const ALL_PLAY_OPTIONS = [
   {
     tab: 'conquer',
     label: 'Conquer',
@@ -326,22 +393,24 @@ const PLAY_OPTIONS = [
     y: -170,
   },
   {
-    tab: 'race',
-    label: 'PvP',
-    Icon: IconSwords,
-    tone: 'red',
-    x: 0,
-    y: -170,
-  },
-  {
     tab: 'training',
     label: 'Training',
     Icon: IconRunning,
     tone: 'gold',
+    x: 0,
+    y: -170,
+  },
+  {
+    tab: 'race',
+    label: 'PvP',
+    Icon: IconSwords,
+    tone: 'violet',
     x: 120,
     y: -170,
   },
 ]
+// PvP is hidden unless SHOW_PVP_ENTRY (config/features.js); the rest re-centre.
+const PLAY_OPTIONS = visiblePlayOptions(ALL_PLAY_OPTIONS, SHOW_PVP_ENTRY)
 
 // Territory processing runs asynchronously on the server after POST /v1/run
 // returns (see TerritoryRunCompletionListener) — there's no endpoint to ask
@@ -525,20 +594,10 @@ function ExitConfirmOverlay({ backButton }) {
           >
             <p>Exit Run Conquest?</p>
             <div className="game-confirm-actions">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={backButton.cancelExit}
-              >
+              <GameButton variant="neutral" onClick={backButton.cancelExit}>
                 Stay
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={backButton.confirmExit}
-              >
-                Exit
-              </button>
+              </GameButton>
+              <GameButton onClick={backButton.confirmExit}>Exit</GameButton>
             </div>
           </motion.div>
         </motion.div>
@@ -568,9 +627,16 @@ function TabMedal({ tab, medalClassName = '' }) {
 
 function GamePageInner() {
   const toast = useToast()
+  // Online-only features are shaded while offline and answer a tap with this
+  // toast instead of opening (see utils/offlineFeatures.js).
+  const offline = !useIsOnline()
+  const needsInternet = () =>
+    toast.push('Needs internet', { type: 'info', duration: 2500 })
   const navigate = useNavigate()
   const { user, isAuthed, loading: userLoading, replaceUser } = useCurrentUser()
   const auth = useAuthFlow()
+  const userIdRef = useRef(null)
+  userIdRef.current = user?.id ?? null
   useDailyNudge({ isAuthed, loading: userLoading })
   const tracker = useRunTracker()
   perf.render('GamePage')
@@ -580,7 +646,15 @@ function GamePageInner() {
   // have no single "reset to signed-out" path; reloading guarantees none of
   // it leaks into whatever the next GameAuthGate session does, at the cost
   // of a logout being the one action in the game that isn't instant.
-  async function handleLogout() {
+  // Runs recorded on this phone that haven't uploaded yet stay on the phone for
+  // this account (signing out never deletes them) - but say so first.
+  const [logoutWarn, setLogoutWarn] = useState(false)
+  async function handleLogout(confirmed = false) {
+    if (confirmed !== true && pendingCount(runSync.runs) > 0) {
+      setLogoutWarn(true)
+      return
+    }
+    setLogoutWarn(false)
     // Stop pushes for this player on this phone first (needs the token still
     // valid; bounded to ~1.5s and never throws).
     await auth.signOut()
@@ -661,6 +735,17 @@ function GamePageInner() {
   const handleMapReady = useCallback(() => setMapReady(true), [])
 
   const [profile, setProfile] = useState(null)
+  // The ONE Fahhcoin balance (state/coins.js): every pill / popup /
+  // shop / PvP / club read below goes through it, never profile.fahhcoinBalance.
+  const fahhcoin = useCoins()
+  useEffect(() => {
+    const uid = isAuthed ? user?.id : null
+    bindFahhcoinUser(uid)
+    if (uid) refreshFahhcoin({ force: true })
+  }, [isAuthed, user?.id])
+  useEffect(() => startResumeRefresh(), [])
+  // Set while `profile` is the on-device copy (offline) rather than fresh.
+  const [profileCachedAt, setProfileCachedAt] = useState(null)
   const [myParcels, setMyParcels] = useState([])
   // The backend still lists one row per claimed loop, so two adjacent runs
   // show up as two separate parcels there - merged the same way
@@ -768,21 +853,12 @@ function GamePageInner() {
     }
     return sum + segSum
   }, 0)
-  const [leaderboard, setLeaderboard] = useState([])
   const [leaderboardMode, setLeaderboardMode] = useState('individual')
   // Solo: ranked worldwide, or just within the city the backend resolves
   // from your last-known GPS fix. Club: worldwide, or just within your
-  // country (every city in it pooled together) - see loadLeaderboard/
-  // loadClubLeaderboard below.
+  // country (every city in it pooled together) - see useLeaderboardPages.
   const [individualScope, setIndividualScope] = useState('global')
   const [clubScope, setClubScope] = useState('global')
-  const [clubLeaderboard, setClubLeaderboard] = useState([])
-  const [leaderboardError, setLeaderboardError] = useState(null)
-  // True while a leaderboard request is in flight - without this, the
-  // panel briefly showed its "No territory claimed yet"/"No club..." empty
-  // state on every first load (leaderboard.length is 0 before the request
-  // even lands), reading as "there's nothing here" instead of "loading."
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   // Set when a club leaderboard row is tapped - the Club tab jumps straight
   // to that club's info instead of wherever it was left.
   const [openClubId, setOpenClubId] = useState(null)
@@ -818,6 +894,19 @@ function GamePageInner() {
   const [selectedHeroId, setSelectedHeroId] = useState(null)
 
   const [menuOpen, setMenuOpen] = useState(false)
+  // No text field may hold focus while running: it is what lets iOS's "Shake
+  // to Undo" pop "Undo Typing" over the run (also disabled natively). Blur when
+  // the run starts, when the app comes back to the foreground, and whenever the
+  // menu/popups are closed mid-run.
+  useEffect(() => {
+    if (tracker.status !== 'tracking') return undefined
+    if (!menuOpen) blurActiveField()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') blurActiveField()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [tracker.status, menuOpen])
   const [menuTab, setMenuTab] = useState('me')
   // Run Conquest terms/privacy overlay opened from Settings ('terms'|'privacy').
   const [legalDoc, setLegalDoc] = useState(null)
@@ -930,6 +1019,43 @@ function GamePageInner() {
     () => loadMapStyleId() || MAP_STYLES[0].id
   )
   const [saving, setSaving] = useState(false)
+  // "Run saved" popup for a run queued while offline.
+  const [offlineSavedRun, setOfflineSavedRun] = useState(null)
+  // The PvP post-run popup (components/PvpResultPopup): one session per
+  // finished race run, from "Calculating..." to the final WIN/LOSE.
+  const [pvpSession, setPvpSession] = useState(null)
+  const pvpSessionRef = useRef(null)
+  pvpSessionRef.current = pvpSession
+  // HUD coin value while the popup counts the balance up (null = real value).
+  const [pvpHudCoins, setPvpHudCoins] = useState(null)
+  const pvpSubmitInFlightRef = useRef(false)
+  const pvpAutoSubmitRef = useRef(null)
+  // Uploads queued runs whenever it can (online again, app foreground, app
+  // start, right after login) and exposes them for the Pending runs list.
+  const runSync = useRunSync({
+    userId: user?.id ?? null,
+    send: (payload) => createRun(payload),
+    onSynced: handleSyncedRun,
+  })
+  // A run that ENDS (or is found stopped after an app kill) while offline goes
+  // straight to the outbox. Runs below the minimum keep the normal card, which
+  // explains why they won't count.
+  const autoQueuedRef = useRef(new Set())
+  useEffect(() => {
+    const run = tracker.pendingRun
+    if (!run || !offline || !user?.id) return
+    if (
+      run.distance < MIN_VALID_RUN_DISTANCE_METERS ||
+      run.duration < MIN_VALID_RUN_DURATION_SECONDS
+    ) {
+      return
+    }
+    const id = buildRunPayload(run).clientRunId
+    if (autoQueuedRef.current.has(id)) return
+    autoQueuedRef.current.add(id)
+    queueRunForUpload(run)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- queue once per run
+  }, [tracker.pendingRun, offline, user?.id])
   const [saveError, setSaveError] = useState(null)
   const [runResult, setRunResult] = useState(null)
   const [gpsErrorDismissed, setGpsErrorDismissed] = useState(false)
@@ -1070,6 +1196,35 @@ function GamePageInner() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [confirmAction])
+  // Conquer only (Training / PvP / Club War never capture territory - see
+  // postRun.checksTerritory). Ending one of those never shows the loop warning.
+  const liveRunIsConquer = checksTerritory(
+    postRunModeOf({
+      isTraining: tracker.isTraining,
+      challengeId: tracker.challengeId,
+      clubWarId: tracker.clubWarId,
+    })
+  )
+  const liveLoopOpen = isLoopOpen(tracker.path)
+  const endClickedRef = useRef(false)
+  // End: a Conquer run whose loop isn't closed gets the "Loop not closed yet"
+  // popup INSTEAD of "End this run?" (one popup, never two).
+  function handleRequestEnd() {
+    endClickedRef.current = false
+    setConfirmAction(
+      tracker.status === 'tracking' && liveRunIsConquer && liveLoopOpen
+        ? 'loop'
+        : 'end'
+    )
+  }
+  // While that popup is open: the loop closing swaps it for the normal
+  // confirm (nothing left to warn about); the run ending by itself (vehicle
+  // discard, auto-finish...) just dismisses it.
+  useEffect(() => {
+    if (confirmAction !== 'loop') return
+    if (tracker.status !== 'tracking') setConfirmAction(null)
+    else if (!liveLoopOpen) setConfirmAction('end')
+  }, [confirmAction, tracker.status, liveLoopOpen])
   // Shows the "loop not closed" popup once right after a run ends open -
   // dismissible so it doesn't nag while the athlete decides whether to
   // submit anyway or go back out and close it. Reset to false every time
@@ -1249,6 +1404,11 @@ function GamePageInner() {
     return () => {
       clearTimeout(timeout)
       navigator.geolocation.clearWatch(watchId)
+      // Torn down before the first fix settled (React StrictMode runs every
+      // effect twice in dev): the next run must count as fresh again, or it
+      // starts "settled" with no 5s timeout and `locating` never clears -
+      // the loading screen would sit on "Finding your location…" forever.
+      if (!settled) gpsStartedForTickRef.current = null
     }
   }, [isAuthed, gpsRestartTick, gpsOff])
 
@@ -1359,11 +1519,91 @@ function GamePageInner() {
   // true (see usePvp); the incoming-challenge pop-up itself still works
   // everywhere via the socket push, which needs no polling.
   const pvpOpen = menuOpen && menuTab === 'race'
+  // Coin screens re-read the balance when they open (throttled by the store).
+  const coinScreenOpen = menuOpen && ['shop', 'race', 'club'].includes(menuTab)
+  useEffect(() => {
+    if (coinScreenOpen) refreshFahhcoin()
+  }, [coinScreenOpen, menuTab])
   const pvp = usePvp({
     userId: isAuthed ? user?.id : null,
     playerLocation,
     pvpOpen,
   })
+
+  // --- PvP post-run: follow the finished race run to its result ----------
+  // (usePvpPostRun: own result -> rival via socket/poll -> wallet). The
+  // socket push reaches it through pvp.challenges (usePvp.handlePush).
+  const pvpRivalSide = pvpSession?.challengeId
+    ? (() => {
+        const c = pvp.challenges.find((x) => x.id === pvpSession.challengeId)
+        return c ? mySide(c, user?.id) : null
+      })()
+    : null
+  const pvpRivalHeroes = useRivalHeroes([pvpRivalSide?.opponentId])
+  const pvpRivalHero =
+    pvpRivalSide?.opponentHero ||
+    pvpRivalHeroes[pvpRivalSide?.opponentId] ||
+    null
+  const pvpFollow = usePvpPostRun({
+    session: pvpSession?.runId ? pvpSession : null,
+    userId: user?.id ?? null,
+    pushed: pvpSession
+      ? pvp.challenges.find((c) => c.id === pvpSession.challengeId) || null
+      : null,
+    refreshProfile,
+  })
+  // The wallet balance from BEFORE the race resolved (the payout is shown as
+  // the server's before/after difference): if the profile hadn't loaded yet
+  // when the run was submitted, take the first balance that arrives - as long
+  // as the race isn't resolved (the refresh after it must not become "before").
+  useEffect(() => {
+    const bal = fahhcoin
+    if (
+      pvpSession &&
+      pvpSession.balanceBefore == null &&
+      bal != null &&
+      !pvpFollow.view.resolved
+    ) {
+      setPvpSession((s) => (s ? { ...s, balanceBefore: bal } : s))
+    }
+  }, [fahhcoin, pvpSession, pvpFollow.view.resolved])
+  // App was closed before the result was seen: pick the race up again.
+  useEffect(() => {
+    if (!user?.id || pvpSessionRef.current) return
+    const saved = loadPvpSession(user.id)
+    if (saved) setPvpSession({ ...saved, status: 'submitted' })
+  }, [user?.id])
+  // Closed while waiting for the rival: when the result lands, bring it back.
+  useEffect(() => {
+    if (pvpSession?.dismissed && pvpFollow.view.resolved) {
+      setPvpSession((s) => (s ? { ...s, dismissed: false } : s))
+    }
+  }, [pvpSession?.dismissed, pvpFollow.view.resolved])
+  // A race ended by hand (End -> Yes, End) submits itself, like the
+  // auto-finish at the target distance already did.
+  useEffect(() => {
+    const run = tracker.pendingRun
+    if (!run?.challengeId || saving || offline) return
+    const key = run.clientRunId || run.startedAt
+    if (pvpAutoSubmitRef.current === key) return
+    pvpAutoSubmitRef.current = key
+    attemptSubmit(run)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per run
+  }, [tracker.pendingRun])
+  function closePvpPopup() {
+    const s = pvpSession
+    if (!s) return
+    if (pvpFollow.view.resolved) {
+      markPvpSeen(s.challengeId)
+      clearPvpSession()
+      setPvpSession(null)
+    } else if (s.status === 'submitted' && s.runId) {
+      // Keep following in the background; the popup returns with the result.
+      setPvpSession({ ...s, dismissed: true })
+    } else {
+      setPvpSession(null)
+    }
+  }
 
   // Run-processing outcomes pushed over the socket, keyed by run id - the
   // push can land before OR after createRun() resolves, so it's parked here
@@ -1401,6 +1641,10 @@ function GamePageInner() {
   useGameSocket(isAuthed ? user?.id : null, {
     onRunProcessed: (outcome) => {
       runOutcomesRef.current[outcome.runId] = outcome
+      // A finished run can leave mail behind (results, territory, rewards):
+      // pick it up without waiting for a game re-open. Skipped while the Mail
+      // tab is open (refresh() resets its paging); live pushes cover that case.
+      if (!(menuOpen && menuTab === 'mail')) mailbox.refresh()
       if (outcome.runId !== watchedRunIdRef.current) return
       // Captured for every outcome, not just a rejection - a successful
       // (or Club War/Boss Fight) run's score numbers live on this same
@@ -1408,7 +1652,10 @@ function GamePageInner() {
       setRunScoreBreakdown(outcome)
       showRunOutcome(outcome)
     },
-    onMail: mailbox.receiveMail,
+    onMail: (mail) => {
+      mailbox.receiveMail(mail)
+      syncCoinsFromMail(mail)
+    },
     onBroadcastMail: (broadcast) => {
       mailbox.receiveBroadcast(broadcast)
       announcementNotices.receive(broadcast)
@@ -1496,6 +1743,15 @@ function GamePageInner() {
   portalStartRef.current = portal.start
 
   function enterPvp(source) {
+    if (!SHOW_PVP_ENTRY) {
+      // Safe fallback for anything that still tries to open PvP (an old push,
+      // a stale link): say so instead of opening a screen that isn't there.
+      toast.push("PvP isn't available right now.", {
+        type: 'info',
+        duration: 4000,
+      })
+      return false
+    }
     return pvpEntryRef.current.enterPvp(source)
   }
 
@@ -1592,6 +1848,7 @@ function GamePageInner() {
   // the callout pill still shows then.
   useEffect(() => {
     const a = pvp.alert
+    if (!SHOW_PVP_ENTRY) return // hidden: no auto-jump to a missing screen
     if (!a?.challenge?.id) return
     if (a.kind !== 'started' && a.kind !== 'matched') return
     if (tracker.status === 'tracking') return
@@ -1653,15 +1910,16 @@ function GamePageInner() {
   // this session (it's still in the Race tab).
   const [laterChallengeIds, setLaterChallengeIds] = useState(() => new Set())
   const [challengeBusy, setChallengeBusy] = useState(null)
-  const incomingChallenge = user?.id
-    ? pvp.challenges.find(
-        (c) =>
-          c.status === 'PENDING' &&
-          c.challengerId !== user.id &&
-          !mySide(c, user.id).confirmed &&
-          !laterChallengeIds.has(c.id)
-      )
-    : null
+  const incomingChallenge =
+    SHOW_PVP_ENTRY && user?.id
+      ? pvp.challenges.find(
+          (c) =>
+            c.status === 'PENDING' &&
+            c.challengerId !== user.id &&
+            !mySide(c, user.id).confirmed &&
+            !laterChallengeIds.has(c.id)
+        )
+      : null
 
   // Ping the player the first time each challenge shows up: a buzz + chime,
   // and a system notification when the app is in the background (if they
@@ -1680,7 +1938,7 @@ function GamePageInner() {
     ) {
       try {
         const n = new Notification('Race challenge! ⚔️', {
-          body: `${playerName(null, c.challengerName) || 'A runner'} wants to race you for ${c.stakeAmount} Fahhcoin.`,
+          body: `${getDisplayName(partyOf(c, 'challenger')) || 'A runner'} wants to race you for ${c.stakeAmount} Fahhcoin.`,
           tag: `pvp-challenge-${c.id}`,
         })
         n.onclick = () => {
@@ -1866,7 +2124,13 @@ function GamePageInner() {
     setInsideParcelId(nextId)
     if (standingIn && standingIn.ownerId !== user?.id) {
       setTerritoryEntryBanner({
-        ownerName: playerName(null, standingIn.ownerName) || 'a rival',
+        name: getDisplayName(
+          {
+            nickname: standingIn.ownerNickname,
+            fullName: standingIn.ownerName,
+          },
+          'a rival'
+        ),
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1966,14 +2230,26 @@ function GamePageInner() {
   // Fixes with poor accuracy are ignored entirely. Once running, it holds
   // for a few seconds so a missed/slow fix mid-run doesn't flicker him
   // back to idle.
-  const RUN_ANIM_MIN_SPEED_MPS = 1.8 // ~9:15 min/km - a slow jog
+  // Walking counts too: the only moving sheet is the run cycle (there is no
+  // separate walk sheet), and a standing-still idle while the map turns with a
+  // walker looked broken.
+  // Hidden debug switch on (utils/mapDebug.js): even a slow walk plays the run
+  // animation, so rotation can be tested on foot.
+  const testWalk = isMapDebugEnabled()
+  const RUN_ANIM_MIN_SPEED_MPS = testWalk ? 0.25 : 1.0 // a brisk walk and up
   const RUN_ANIM_MAX_ACCURACY_M = 25
   const RUN_ANIM_WINDOW_MS = 12000
-  const RUN_ANIM_MIN_DISPLACEMENT_M = 8
+  const RUN_ANIM_MIN_DISPLACEMENT_M = testWalk ? 3 : 8
   const RUN_ANIM_HOLD_MS = 3000
   const recentFixesRef = useRef([])
   const lastRunningAtRef = useRef(0)
   const [playerMoving, setPlayerMoving] = useState(false)
+  // ONE shared RUN / IDLE state for a tracked run: it drives the hero's run
+  // animation AND the heading-up map (utils/runView.js), so they can't disagree.
+  // Outside a run the old on-screen motion check above still animates the hero.
+  const runView = useRunView(tracker.status === 'tracking')
+  const heroRunning =
+    tracker.status === 'tracking' ? runView.mode === 'run' : playerMoving
   useEffect(() => {
     const fix = playerLocation
     if (
@@ -2039,6 +2315,27 @@ function GamePageInner() {
     hasXp: Boolean(xpReward),
     hasScore: runScoreBreakdown?.totalScore != null,
   })
+  // Popup queue: only one of these shows at a time, in this order -
+  // rollout-blocking -> welcome bonus -> first-time walkthrough -> daily reward
+  // (utils/popupQueue.js). None of them ever interrupts a run, the post-run
+  // screens, the intro or a notice.
+  const popupBase =
+    tracker.status === 'tracking' ||
+    Boolean(tracker.pendingRun) ||
+    startCountdown != null ||
+    Boolean(runResult) ||
+    runRewardsOpen ||
+    announcementNotices.queue.length > 0 ||
+    introPlaying ||
+    !gameReady
+  // First-login welcome bonus: the server already granted the coins; this only
+  // announces them once per account (hooks/useWelcomeBonus.js).
+  const welcomeBonus = useWelcomeBonus({
+    userId: isAuthed ? user?.id : null,
+    blocked:
+      popupBase ||
+      popupBlockedBy('welcome', { rollout: rolloutStatus.showModal }),
+  })
   const [idleNudgeOpen, setIdleNudgeOpen] = useState(false)
   const idleDelayRef = useRef(IDLE_NUDGE_MS)
   // Only nag when it makes sense: game on screen, nothing running or
@@ -2056,6 +2353,7 @@ function GamePageInner() {
     !runResult &&
     !runRewardsOpen &&
     !saveError &&
+    !(pvpSession && !pvpSession.dismissed) &&
     !playerMoving
   useEffect(() => {
     if (!canNudge) {
@@ -2094,11 +2392,33 @@ function GamePageInner() {
     openMenu('race', PVP_SOURCES.IDLE_NUDGE)
   }
 
+  // A live event mail that moved coins: PVP_RESULT carries the new balance
+  // (applied unless something newer already wrote it); REWARD only has the
+  // amount, which the claim response may already have applied, so it just
+  // triggers a throttled re-read instead of being added a second time.
+  function syncCoinsFromMail(mail) {
+    if (mail?.type === 'PVP_RESULT') {
+      const n = Number(mailData(mail).newBalance)
+      if (
+        mailData(mail).newBalance != null &&
+        Number.isFinite(n) &&
+        setCoinsIfNewer(n, Date.parse(mail.createdDate), 'mail-pvp')
+      )
+        return
+      refreshFahhcoin({ force: true })
+    } else if (mail?.type === 'REWARD') {
+      refreshFahhcoin({ force: true })
+    }
+  }
+
   async function refreshProfile() {
     // Independent, not Promise.all: a failing parcels call (e.g. a brand-new
     // account with none) must not keep the level/XP HUD from loading.
     // Failures leave whatever's already loaded in place - a background
     // refresh isn't worth surfacing as an error.
+    // A balance the server answered while this request was in flight (a
+    // claim, a pushed payout) must not be overwritten by this older read.
+    const balanceSeq = coinsToken()
     const [profileResult, parcelsResult] = await Promise.allSettled([
       getTerritoryProfile(),
       findMyParcels(1, 100),
@@ -2106,8 +2426,31 @@ function GamePageInner() {
     if (parcelsResult.status === 'fulfilled') {
       setMyParcels(parcelsResult.value?.content || [])
     }
-    if (profileResult.status !== 'fulfilled') return null
+    if (profileResult.status !== 'fulfilled') {
+      // Offline (or the server is down): keep showing the last known profile.
+      if (userIdRef.current) {
+        const cached = loadCachedProfile(userIdRef.current)
+        if (cached) {
+          setProfile((p) => p || cached.profile)
+          setProfileCachedAt(cached.at)
+          // Offline: show the last known balance rather than nothing (never
+          // over a value the server already gave us this session).
+          if (getCoins() == null) {
+            setCoins(cached.profile?.fahhcoinBalance, 'offline-cache')
+          }
+        }
+      }
+      return null
+    }
     setProfile(profileResult.value)
+    setCoinsIfCurrent(
+      balanceSeq,
+      profileResult.value?.fahhcoinBalance,
+      'profile'
+    )
+    setProfileCachedAt(null)
+    if (userIdRef.current)
+      saveCachedProfile(userIdRef.current, profileResult.value)
     return profileResult.value
   }
 
@@ -2405,71 +2748,62 @@ function GamePageInner() {
     }
   }, [tracker.status, tracker.distance])
 
-  async function loadLeaderboard(scope = individualScope) {
-    setLeaderboardError(null)
-    setLeaderboardLoading(true)
-    try {
-      if (scope === 'city') {
-        const list = await getTopIndividualsLocal(20)
-        setLeaderboard(list || [])
-      } else {
-        const page = await findIndividualLeaderboard(1, 20)
-        setLeaderboard(page?.content || [])
-      }
-    } catch (err) {
-      setLeaderboardError(
-        err instanceof ApiError
-          ? err.message
-          : scope === 'city'
-            ? "Could not load your city's leaderboard."
-            : 'Could not load the leaderboard.'
-      )
-    } finally {
-      setLeaderboardLoading(false)
+  // Leaderboard: 20 rows per page (hooks/useLeaderboardPages.js). Global is
+  // paged by the server; District / Country only have a `limit`, so they are
+  // fetched once and sliced here. Re-opens / tab / scope switches start at
+  // page 1.
+  const leaderboardSource = useMemo(() => {
+    if (leaderboardMode === 'individual') {
+      return individualScope === 'city'
+        ? {
+            key: 'individual:city',
+            kind: 'client',
+            fetchAll: (limit) => getTopIndividualsLocal(limit),
+          }
+        : {
+            key: 'individual:global',
+            kind: 'server',
+            fetchPage: findIndividualLeaderboard,
+          }
     }
+    return clubScope === 'national'
+      ? {
+          key: 'club:national',
+          kind: 'client',
+          fetchAll: (limit) => getTopClubsNational(limit),
+        }
+      : { key: 'club:global', kind: 'server', fetchPage: findClubLeaderboard }
+  }, [leaderboardMode, individualScope, clubScope])
+  const lb = useLeaderboardPages(leaderboardSource, {
+    active: menuOpen && menuTab === 'leaderboard',
+  })
+  const leaderboardPager = {
+    page: lb.page,
+    hasPrev: lb.hasPrev,
+    hasNext: lb.hasNext,
+    loading: lb.loading,
+    error: lb.error,
+    range: rangeLabel(lb.rows, lb.page),
+    onPrev: lb.prev,
+    onNext: lb.next,
+    onRetry: lb.retry,
   }
-
-  async function loadClubLeaderboard(scope = clubScope) {
-    setLeaderboardError(null)
-    setLeaderboardLoading(true)
-    try {
-      if (scope === 'national') {
-        const list = await getTopClubsNational(20)
-        setClubLeaderboard(list || [])
-      } else {
-        const page = await findClubLeaderboard(1, 20)
-        setClubLeaderboard(page?.content || [])
-      }
-    } catch (err) {
-      setLeaderboardError(
-        err instanceof ApiError
-          ? err.message
-          : scope === 'national'
-            ? "Could not load your country's club leaderboard."
-            : 'Could not load the club leaderboard.'
-      )
-    } finally {
-      setLeaderboardLoading(false)
-    }
-  }
-
-  function switchLeaderboardMode(mode) {
-    setLeaderboardMode(mode)
-    if (mode === 'club' && clubLeaderboard.length === 0) loadClubLeaderboard()
-    if (mode === 'individual' && leaderboard.length === 0) loadLeaderboard()
-  }
-
-  function switchIndividualScope(scope) {
-    if (scope === individualScope) return
-    setIndividualScope(scope)
-    loadLeaderboard(scope)
-  }
-
-  function switchClubScope(scope) {
-    if (scope === clubScope) return
-    setClubScope(scope)
-    loadClubLeaderboard(scope)
-  }
+  // The player's own pinned row. Rank comes from the rows loaded so far (the
+  // API has no "my rank"); not in any loaded page -> unknown (a dash, never a
+  // made-up number).
+  const myPlayerRow = lb.loadedRows.find((e) => e.userId === user?.id)
+  const myClubRow = profile?.clubName
+    ? lb.loadedRows.find((e) => e.clubName === profile.clubName)
+    : null
+  const leaderboardScopeLabel = lb.loadedRows[0]
+  // New page -> back to the top (the menu sheet is the scroller).
+  useEffect(() => {
+    menuSheetRef.current?.scrollTo?.({ top: 0 })
+  }, [lb.page, leaderboardSource.key])
+  // Mode / scope switches just change the source; the hook resets to page 1.
+  const switchLeaderboardMode = setLeaderboardMode
+  const switchIndividualScope = setIndividualScope
+  const switchClubScope = setClubScope
 
   async function loadStore() {
     setStoreError(null)
@@ -2552,6 +2886,8 @@ function GamePageInner() {
       if (storeCatalog.length > 0) loadStore()
     }
     if (item.type === 'CLUB_INVITE') refreshProfile()
+    // Anything that may have paid coins: re-read the common balance.
+    if (item.type === 'REWARD') refreshFahhcoin({ force: true })
   }
 
   // Club war entry run - createRun sends clubWarId, and the server checks
@@ -2956,7 +3292,6 @@ function GamePageInner() {
     // Heroes now live inside the Shop tab.
     const tab = nextTab === 'heroes' ? 'shop' : nextTab
     setMenuTab(tab)
-    if (tab === 'leaderboard' && leaderboard.length === 0) loadLeaderboard()
     // loadStore also loads the heroes, plus owned items for their badges.
     if (tab === 'shop' && storeCatalog.length === 0) loadStore()
     // Club Wars' hero lock-in needs owned heroes + the catalog for names.
@@ -3069,18 +3404,27 @@ function GamePageInner() {
     return () => clearTimeout(autoClose)
   }, [highlightedEntry, territoryRunWarning])
 
+  // Dev/e2e only (stripped from production builds): lets the screenshot spec
+  // put the popup into its loading / error states, which no live code path
+  // reaches today (the card is built from parcels already on the map).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined
+    window.__setTerritoryPopupStatus = (status) =>
+      setHighlightedEntry((e) => (e ? { ...e, status } : e))
+    return () => delete window.__setTerritoryPopupStatus
+  }, [])
+
   // Tapping a claimed parcel directly on the map is a stronger signal than
   // tapping a leaderboard row (the player already has it in view), so this
   // skips the "view on map?" confirm dialog and goes straight to the same
   // highlight/focus toast the leaderboard flow produces.
   function handleParcelClick(parcel) {
-    // A territory polygon's own click bubbles up to the map's click too
-    // (it isn't stopped - see DrawClickCatcher), so while drawing a route
-    // this still also plants a point under the tap, same as anywhere
-    // else on the map - routes aren't claims, so there's nothing stopping
-    // one from crossing someone else's territory. Only the "whose ground
-    // is this" popup is suppressed, since it has nothing to do with
-    // drawing and would just get in the way.
+    // Territory taps are resolved by point in TerritoryMap's
+    // TerritoryHitLayer (innermost territory under the tap wins; tap the same
+    // spot again to go outward). While drawing a route that layer stays out
+    // of the way and the tap just plants a point (DrawClickCatcher) - routes
+    // aren't claims, so one may cross someone else's territory. This guard
+    // is a second safety net for the "whose ground is this" popup.
     if (routeDraftMode) return
     const isMine = Boolean(user?.id) && parcel.ownerId === user.id
     // Avatar: the owner's real uploaded profile picture, never a cosmetic
@@ -3100,13 +3444,14 @@ function GamePageInner() {
     setHighlightedEntry({
       userId: parcel.ownerId,
       fullName: parcel.ownerName,
+      nickname: parcel.ownerNickname,
       areaSqMeters: parcel.area,
       avatarSrc:
         resolveFileUrl(
           isMine
             ? user?.profilePictureUrl
             : parcel.ownerProfilePictureUrl ||
-                leaderboard.find((e) => e.userId === parcel.ownerId)
+                lb.loadedRows.find((e) => e.userId === parcel.ownerId)
                   ?.profilePictureUrl
         ) || null,
       // The territory's own display color (gold for mine, hashed/shade for
@@ -3120,6 +3465,11 @@ function GamePageInner() {
     })
   }
 
+  function closeTerritoryPopup() {
+    setHighlightedEntry(null)
+    setTerritoryRunWarning(null)
+  }
+
   // A loop longer than this is a long run to commit to by accident - the
   // spec's own "over 10 km" example.
   const TERRITORY_RUN_WARN_MAX_METERS = 10000
@@ -3127,12 +3477,6 @@ function GamePageInner() {
   // sliver/edge case parcel) - warn rather than silently guide something
   // this trivial.
   const TERRITORY_RUN_WARN_MIN_METERS = 40
-  // Past this far from the generated loop's own start point, flag it in
-  // the confirm toast (not a separate "navigate there first" mode - the
-  // guide's own off-route steering, see routeNav.js, already points the
-  // runner at the nearest point on the loop the moment the run begins,
-  // starting point included).
-  const TERRITORY_RUN_FAR_START_METERS = 150
 
   // Builds the boundary-loop guide route for `entry` (a highlightedEntry -
   // see handleParcelClick) and starts running it through the exact same
@@ -3193,6 +3537,7 @@ function GamePageInner() {
     setHighlightedEntry({
       userId: user?.id,
       fullName: user?.fullName,
+      nickname: user?.nickname,
       areaSqMeters: territory.area,
       // The player's own real uploaded profile picture, not a cosmetic -
       // see handleParcelClick's own comment on this.
@@ -3220,6 +3565,163 @@ function GamePageInner() {
     tracker.clearPendingRun()
   }
 
+  // Everything the player sees after a run was accepted by the server: the
+  // result card (territory check / "Run saved!" / war points), then XP rewards.
+  // Shared by a normal Submit and by an offline run that just finished
+  // uploading (fromQueue: that one must not touch the draft/saving state of
+  // whatever else is on screen).
+  function presentSubmittedRun(run, created, submittedAt, { fromQueue }) {
+    // The History list's every page shifts by one with a new run saved -
+    // next time the Me tab is open, it re-fetches from page 1 instead of
+    // showing the now-stale cache.
+    scheduleDailyNudge()
+    resetMyRunsPagination()
+    if (run.challengeId) pvp.refreshChallenges()
+    const isRace = Boolean(run.challengeId)
+    if (isRace) {
+      // PvP has its own popup (PvpResultPopup): no territory/"Run submitted"
+      // card, no generic reward modal. It follows the race to its result.
+      const known = pvp.challenges.find((c) => c.id === run.challengeId)
+      const prev = pvpSessionRef.current
+      const next = {
+        userId: user?.id ?? null,
+        challengeId: run.challengeId,
+        runId: created.id,
+        opponentName:
+          prev?.opponentName ||
+          (known ? mySide(known, user?.id).opponentName : null),
+        balanceBefore: prev?.balanceBefore ?? fahhcoin ?? null,
+        run: {
+          distance: run.distance,
+          duration: run.duration,
+          avgPace: created.avgPace,
+        },
+        status: 'submitted',
+        dismissed: Boolean(prev?.dismissed),
+      }
+      setPvpSession(next)
+      savePvpSession(next)
+      if (!fromQueue) {
+        discardDraft()
+        setSaving(false)
+      }
+      return
+    }
+    const isWar = Boolean(run.clubWarId)
+    // Watched from here, not just inside pollForTerritoryResult below -
+    // a Club War/Boss Fight run also gets a score push (just never a
+    // territory-event poll), so this needs to be set for every mode, not
+    // only the territory-capture one.
+    watchedRunIdRef.current = created.id
+    watchedModeRef.current = postRunModeOf(run)
+    settledRunIdRef.current = null
+    setCompletedRun({
+      id: created.id,
+      isRace,
+      isWar,
+      isTraining: Boolean(run.isTraining),
+      points: run.points,
+      distance: run.distance,
+      duration: run.duration,
+      avgPace: created.avgPace,
+      startedAt: run.startedAt,
+    })
+    if (!fromQueue) {
+      discardDraft()
+      setSaving(false)
+    }
+    // Territory is only ever evaluated for a plain Conquer run. A PvP
+    // race, Club War entry or Training run skips the territory poll
+    // entirely instead of showing "Checking your territory…" for a check
+    // that was never going to happen (Training: "Run saved!").
+    if (!checksTerritory(postRunModeOf(run))) {
+      setRunResult({ phase: 'submitted' })
+      // Club War/Boss Fight runs DO get a score push (pace + base effort
+      // only, no territory - see TerritoryProcessingServiceImpl); a PvP
+      // race never does (scored entirely separately), so this just finds
+      // nothing and runScoreBreakdown stays null for that mode, same as
+      // ever - RunRewardsModal already renders nothing score-related in
+      // that case.
+      const early = runOutcomesRef.current[created.id]
+      if (early) setRunScoreBreakdown(early)
+      // A race/war run's XP is awarded by the same async processing a
+      // conquer run's territory check waits on, but there's no
+      // poll/socket signal for these modes to know when it's landed - a
+      // short delay gives it a reasonable chance without building a full
+      // poll loop for it. If it's not there yet, the reward just quietly
+      // doesn't show (same as today) rather than showing a wrong number.
+      setTimeout(refreshProfileAfterRun, 3000)
+    } else {
+      pollForTerritoryResult(submittedAt, created.id)
+    }
+  }
+
+  // Offline (or the upload could not reach the server): the run goes to the
+  // outbox - the durable, per-account queue - and the player gets the "Run
+  // saved" popup. Nothing is lost and nothing is submitted twice.
+  async function queueRunForUpload(run) {
+    if (!user?.id) return
+    const payload = buildRunPayload(run)
+    const record = await enqueueRun({
+      clientRunId: payload.clientRunId,
+      userId: user.id,
+      payload,
+      summary: buildRunSummary(run),
+      meta: buildRunMeta({ heroId: activeHeroId ?? null }),
+    })
+    tracker.clearPendingRun()
+    setSaving(false)
+    setSaveError(null)
+    if (run.challengeId) {
+      // PvP needs a connection for its result: say so in the PvP popup (the
+      // run itself is safe in the outbox and uploads by itself).
+      setPvpSession((s) => ({
+        ...(s || {
+          userId: user.id,
+          challengeId: run.challengeId,
+          runId: null,
+          opponentName: null,
+          balanceBefore: fahhcoin ?? null,
+          run: { distance: run.distance, duration: run.duration },
+        }),
+        status: 'offline',
+      }))
+      return
+    }
+    setOfflineSavedRun(record)
+  }
+
+  // An outbox run was accepted by the server (it uploaded in the background).
+  function handleSyncedRun(record, created) {
+    toast.push('Your offline run was submitted', {
+      type: 'success',
+      duration: 4500,
+    })
+    resetMyRunsPagination()
+    if (tracker.status === 'tracking') {
+      // Mid-run: just refresh the numbers, no popups over the run.
+      refreshProfile()
+      return
+    }
+    runXpBeforeRef.current = profile
+      ? { level: profile.level, xp: profile.xp }
+      : null
+    presentSubmittedRun(
+      {
+        points: record.payload.points,
+        distance: record.payload.distance,
+        duration: record.payload.duration,
+        startedAt: record.summary.startedAt,
+        challengeId: record.payload.challengeId,
+        clubWarId: record.payload.clubWarId,
+        isTraining: record.summary.isTraining,
+      },
+      created,
+      new Date(),
+      { fromQueue: true }
+    )
+  }
+
   async function attemptSubmit(pendingRun) {
     if (pendingRun.distance < MIN_VALID_RUN_DISTANCE_METERS) {
       setSaveError({
@@ -3235,6 +3737,24 @@ function GamePageInner() {
       })
       return
     }
+    const isPvpRun = Boolean(pendingRun.challengeId)
+    if (isPvpRun) {
+      // One submit at a time (auto-finish and the draft effect can both
+      // fire); the popup shows "Calculating..." straight away.
+      if (pvpSubmitInFlightRef.current) return
+      pvpSubmitInFlightRef.current = true
+      const known = pvp.challenges.find((c) => c.id === pendingRun.challengeId)
+      setPvpSession({
+        userId: user?.id ?? null,
+        challengeId: pendingRun.challengeId,
+        runId: null,
+        opponentName: known ? mySide(known, user?.id).opponentName : null,
+        balanceBefore: fahhcoin ?? null,
+        run: { distance: pendingRun.distance, duration: pendingRun.duration },
+        status: 'submitting',
+        dismissed: false,
+      })
+    }
     setSaving(true)
     setSaveError(null)
     setRunScoreBreakdown(null)
@@ -3243,75 +3763,39 @@ function GamePageInner() {
       ? { level: profile.level, xp: profile.xp }
       : null
     try {
-      const created = await createRun({
-        eventId: null,
-        points: pendingRun.points,
-        distance: pendingRun.distance,
-        duration: pendingRun.duration,
-        startedAt: toLocalDateTimeString(pendingRun.startedAt),
-        endedAt: toLocalDateTimeString(pendingRun.endedAt),
-        challengeId: pendingRun.challengeId || undefined,
-        clubWarId: pendingRun.clubWarId || undefined,
-        // Stable per recorded run (startedAt is persisted with the pending
-        // run), so "Retry Save" after a lost response - or after the app
-        // was closed - returns the run the server already created instead
-        // of counting it twice. The backend scopes this id per user.
-        clientRunId: `run-${new Date(pendingRun.startedAt).getTime()}`,
+      // clientRunId is stable per recorded run (created at run start and
+      // persisted with it), so a retry after a lost response - or after the
+      // app was closed - returns the run the server already created instead of
+      // counting it twice. The backend scopes this id per user.
+      const created = await createRun(buildRunPayload(pendingRun))
+      presentSubmittedRun(pendingRun, created, submittedAt, {
+        fromQueue: false,
       })
-      // The History list's every page shifts by one with a new run saved -
-      // next time the Me tab is open, it re-fetches from page 1 instead of
-      // showing the now-stale cache.
-      scheduleDailyNudge()
-      resetMyRunsPagination()
-      if (pendingRun.challengeId) pvp.refreshChallenges()
-      const isRace = Boolean(pendingRun.challengeId)
-      const isWar = Boolean(pendingRun.clubWarId)
-      // Watched from here, not just inside pollForTerritoryResult below -
-      // a Club War/Boss Fight run also gets a score push (just never a
-      // territory-event poll), so this needs to be set for every mode, not
-      // only the territory-capture one.
-      watchedRunIdRef.current = created.id
-      watchedModeRef.current = postRunModeOf(pendingRun)
-      settledRunIdRef.current = null
-      setCompletedRun({
-        id: created.id,
-        isRace,
-        isWar,
-        isTraining: Boolean(pendingRun.isTraining),
-        points: pendingRun.points,
-        distance: pendingRun.distance,
-        duration: pendingRun.duration,
-        avgPace: created.avgPace,
-        startedAt: pendingRun.startedAt,
-      })
-      discardDraft()
-      setSaving(false)
-      // Territory is only ever evaluated for a plain Conquer run. A PvP
-      // race, Club War entry or Training run skips the territory poll
-      // entirely instead of showing "Checking your territory…" for a check
-      // that was never going to happen (Training: "Run saved!").
-      if (!checksTerritory(postRunModeOf(pendingRun))) {
-        setRunResult({ phase: 'submitted' })
-        // Club War/Boss Fight runs DO get a score push (pace + base effort
-        // only, no territory - see TerritoryProcessingServiceImpl); a PvP
-        // race never does (scored entirely separately), so this just finds
-        // nothing and runScoreBreakdown stays null for that mode, same as
-        // ever - RunRewardsModal already renders nothing score-related in
-        // that case.
-        const early = runOutcomesRef.current[created.id]
-        if (early) setRunScoreBreakdown(early)
-        // A race/war run's XP is awarded by the same async processing a
-        // conquer run's territory check waits on, but there's no
-        // poll/socket signal for these modes to know when it's landed - a
-        // short delay gives it a reasonable chance without building a full
-        // poll loop for it. If it's not there yet, the reward just quietly
-        // doesn't show (same as today) rather than showing a wrong number.
-        setTimeout(refreshProfileAfterRun, 3000)
-      } else {
-        pollForTerritoryResult(submittedAt, created.id)
-      }
     } catch (err) {
       runXpBeforeRef.current = null
+      // No connection: not a failure - the run goes to the outbox and uploads
+      // by itself when the connection is back.
+      if (isNetworkError(err) && user?.id) {
+        await queueRunForUpload(pendingRun)
+        return
+      }
+      if (isPvpRun) {
+        // The popup shows the error + "Try again"; the run stays saved.
+        setPvpSession((s) =>
+          s
+            ? {
+                ...s,
+                status: 'error',
+                error:
+                  err instanceof ApiError
+                    ? err.message
+                    : 'Could not reach the server.',
+              }
+            : s
+        )
+        setSaving(false)
+        return
+      }
       // Deliberately not clearing the pending run - it stays saved (see
       // useRunTracker) so "Retry Save" works even after closing the app.
       setSaveError({
@@ -3322,6 +3806,8 @@ function GamePageInner() {
             : 'Could not save this run. Please try again.',
       })
       setSaving(false)
+    } finally {
+      pvpSubmitInFlightRef.current = false
     }
   }
 
@@ -3370,6 +3856,8 @@ function GamePageInner() {
     setPurchasing(true)
     try {
       await purchaseStoreItem(item.id)
+      applyDelta(-(item.priceFahhcoin || 0), 'shop-purchase')
+      refreshFahhcoin({ force: true })
       await loadStore()
       refreshProfile()
       setStoreChoice(null)
@@ -3614,14 +4102,9 @@ function GamePageInner() {
   // than only discovering it after the server silently doesn't count the run
   // as territory.
   const draftLoopOpen =
-    pendingRun &&
-    pendingRun.points.length >= 2 &&
-    haversineDistance(
-      pendingRun.points[0],
-      pendingRun.points[pendingRun.points.length - 1]
-    ) > LOOP_CLOSURE_THRESHOLD_METERS
+    pendingRun && pendingRun.points.length >= 2 && isLoopOpen(pendingRun.points)
 
-  const menuTabs = [
+  const allMenuTabs = [
     { id: 'leaderboard', label: 'Leaderboard', Icon: IconTrophy, tone: 'gold' },
     { id: 'club', label: 'Club', Icon: IconUsers, tone: 'green' },
     {
@@ -3651,12 +4134,22 @@ function GamePageInner() {
     { id: 'shop', label: 'Shop', Icon: IconStore, tone: 'wood' },
     { id: 'settings', label: 'Settings', Icon: IconSettings, tone: 'stone' },
   ]
+  // The PvP tab only exists while SHOW_PVP_ENTRY is on.
+  const menuTabs = allMenuTabs.filter((t) => SHOW_PVP_ENTRY || t.id !== 'race')
   const activeMenuTab = menuTabs.find((t) => t.id === menuTab) || menuTabs[0]
   const switcherTabs = menuTabs
   // Collapsed picker shows one dot summing what's waiting on other tabs.
-  const otherTabsBadgeCount =
-    (menuTab === 'race' ? 0 : pvp.actionCount) +
-    (menuTab === 'mail' ? 0 : mailbox.unreadCount)
+  const otherTabsBadgeCount = pickerBadgeCount({
+    menuTab,
+    pvpCount: SHOW_PVP_ENTRY ? pvp.actionCount : 0,
+    mailCount: mailbox.unreadCount,
+    showPvpInDropdown: SHOW_PVP_IN_DROPDOWN,
+  })
+  // The drop-down list (phones). PvP is not a row in it while
+  // SHOW_PVP_IN_DROPDOWN is off - it lives in the round Play menu. (The
+  // desktop tab row above keeps `switcherTabs`, and the PvP screen's own
+  // static header still uses menuTabs/activeMenuTab.)
+  const dropdownTabs = pickerTabs(menuTabs, SHOW_PVP_IN_DROPDOWN)
 
   // Live PvP race this tracked run counts for, if any.
   const raceChallenge = tracker.challengeId
@@ -3670,12 +4163,7 @@ function GamePageInner() {
       formatMeters(raceChallenge.distanceMeters)
     : ''
   const raceOpponentName = raceChallenge
-    ? playerName(
-        null,
-        raceChallenge.challengerId === user?.id
-          ? raceChallenge.opponentName
-          : raceChallenge.challengerName
-      )
+    ? mySide(raceChallenge, user?.id).opponentName
     : ''
 
   // Detail tiles under the run card's main row when it's expanded - only
@@ -3891,6 +4379,7 @@ function GamePageInner() {
     introPlaying,
     running: tracker.status === 'tracking' || startCountdown != null,
     rolloutPopup: rolloutStatus.showModal,
+    welcome: welcomeBonus.holdsQueue,
     broadcast: announcementNotices.queue.length > 0,
     challenge: Boolean(incomingChallenge),
     nudge: idleNudgeOpen,
@@ -3905,6 +4394,7 @@ function GamePageInner() {
       pendingRun ||
       completedRun ||
       confirmAction ||
+      (pvpSession && !pvpSession.dismissed) ||
       pvpGate ||
       weatherHype ||
       storeChoice ||
@@ -3926,6 +4416,41 @@ function GamePageInner() {
     running: tracker.status === 'tracking',
   })
   tourBusyRef.current = tour.active || tour.pending
+  // Daily reward (7-day streak, server-authoritative - see
+  // hooks/useDailyReward.js). Last in the popup queue: waits for the rollout
+  // popup, the welcome bonus and the walkthrough; claim refreshes balance/XP.
+  const dailyReward = useDailyReward({
+    userId: isAuthed ? user?.id : null,
+    blocked:
+      popupBase ||
+      popupBlockedBy('daily', {
+        rollout: rolloutStatus.showModal,
+        welcome: welcomeBonus.holdsQueue,
+        tour: tour.active || tour.pending,
+      }),
+    onClaimed: (result) => {
+      // The server's own answer is the balance; a response without one (older
+      // backend) triggers a re-read instead of guessing.
+      if (!setCoins(result.balance, 'daily-claim'))
+        refreshFahhcoin({ force: true })
+      const g = result.granted
+      setProfile((p) =>
+        p ? { ...p, xp: result.xp ?? p.xp, level: result.level ?? p.level } : p
+      )
+      // XP / items change more than the number: only then re-read the profile.
+      if ((g?.xp || 0) > 0 || g?.item) refreshProfile()
+    },
+  })
+  // The welcome bonus was credited at signup: its popup shows the real number.
+  const welcomeOpen = welcomeBonus.visible
+  useEffect(() => {
+    if (welcomeOpen) refreshFahhcoin()
+  }, [welcomeOpen])
+  // The claim popup shows the balance too: re-read it as it opens.
+  const dailyRewardOpen = dailyReward.state.open
+  useEffect(() => {
+    if (dailyRewardOpen) refreshFahhcoin()
+  }, [dailyRewardOpen])
   tourBackRef.current = {
     active: tour.active && !tour.paused,
     close: tour.index > 0 ? tour.back : tour.skip,
@@ -4014,10 +4539,13 @@ function GamePageInner() {
           animatedMarkerHero={animatedMarkerHero}
           heroEmoteAsset={hudEmoteAsset}
           heroEmotePaused={menuOpen || !gameReady || introPlaying}
-          playerMoving={playerMoving}
+          playerMoving={heroRunning}
+          runView={runView.mode}
+          movingSlowly={runView.slow}
           isFollowing={isFollowing}
           isTracking={tracker.status === 'tracking'}
           onUserPan={handleUserPan}
+          onRequestFollow={() => setMapMode('follow')}
           isLoopRun={!tracker.challengeId && !tracker.clubWarId}
           drawActive={routeDraftMode}
           onDrawPoint={handleDrawMapClick}
@@ -4186,12 +4714,19 @@ function GamePageInner() {
           aria-label="Fahhcoin balance - buy more Fahhcoin"
           onClick={openCoinShop}
         >
-          <span className="game-hud-value">
-            {formatCoins(profile?.fahhcoinBalance ?? 0)}
-          </span>
+          <CoinAmount
+            className="game-hud-value"
+            value={pvpHudCoins ?? fahhcoin ?? 0}
+          />
           <span className="game-hud-icon game-hud-icon-coin" />
         </button>
       </div>
+      {dailyReward.available && (
+        <DailyHudChest
+          dr={dailyReward}
+          onOpen={offline ? needsInternet : dailyReward.open}
+        />
+      )}
 
       {/* Its own class (not .game-weather-hype, which the PvP/war alert
           banners further below still use as-is) so this redesign - circular
@@ -4313,7 +4848,7 @@ function GamePageInner() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {pvp.alert && PVP_ALERT_COPY[pvp.alert.kind] && (
+        {SHOW_PVP_ENTRY && pvp.alert && PVP_ALERT_COPY[pvp.alert.kind] && (
           <motion.button
             type="button"
             key={`pvp-${pvp.alert.kind}-${pvp.alert.challenge?.id || ''}`}
@@ -4361,7 +4896,54 @@ function GamePageInner() {
       {legalDoc && (
         <GameLegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
       )}
+      <ConnectionBanner enabled={gameReady && !introPlaying} />
+      <OfflineRunSavedModal
+        run={offlineSavedRun}
+        onClose={() => setOfflineSavedRun(null)}
+      />
+      <GameModal
+        open={logoutWarn}
+        onClose={() => setLogoutWarn(false)}
+        tone="warning"
+        title="Runs not uploaded yet"
+        overlayClassName="game-end-run-overlay"
+      >
+        <p className="game-end-run-summary">
+          {pendingCount(runSync.runs)} run(s) are still waiting to upload. They
+          stay safely on this phone and upload the next time you sign in to this
+          account with internet.
+        </p>
+        <GameActions>
+          <GameButton onClick={() => setLogoutWarn(false)}>
+            Stay signed in
+          </GameButton>
+          <GameButton variant="danger" onClick={() => handleLogout(true)}>
+            Sign out anyway
+          </GameButton>
+        </GameActions>
+      </GameModal>
       <AnimatePresence>
+        <WelcomeBonusModal
+          key="welcome-bonus"
+          open={welcomeBonus.visible}
+          amount={welcomeBonus.amount}
+          name={playerNameOf(user)}
+          ack={welcomeBonus.state.ack}
+          error={welcomeBonus.state.error}
+          onContinue={welcomeBonus.acknowledge}
+          onDismiss={welcomeBonus.dismiss}
+        />
+        <DailyRewardModal
+          key="daily-reward"
+          open={dailyReward.state.open}
+          onClose={dailyReward.close}
+          state={dailyReward.state}
+          balance={fahhcoin ?? 0}
+          onClaim={dailyReward.claim}
+          onRetry={dailyReward.retry}
+          onSkipAnim={dailyReward.skipAnim}
+          onAnimDone={dailyReward.animDone}
+        />
         {announcementNotices.queue.length > 0 && (
           <BroadcastPrompt
             notices={announcementNotices.queue}
@@ -4390,6 +4972,7 @@ function GamePageInner() {
             key="idle-nudge"
             onRun={runFromIdleNudge}
             onBattle={battleFromIdleNudge}
+            showBattle={SHOW_PVP_ENTRY}
             onDismiss={dismissIdleNudge}
           />
         )}
@@ -4398,7 +4981,7 @@ function GamePageInner() {
       <AnimatePresence>
         {territoryEntryBanner && (
           <motion.div
-            key={territoryEntryBanner.ownerName}
+            key={territoryEntryBanner.name}
             className="game-popup-layer is-top"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -4416,7 +4999,7 @@ function GamePageInner() {
             >
               <span className="game-territory-entry-banner-flag">🚩</span>
               <span className="game-territory-entry-banner-text">
-                Entering <strong>{territoryEntryBanner.ownerName}</strong>
+                Entering <strong>{territoryEntryBanner.name}</strong>
                 &apos;s territory!
               </span>
             </motion.div>
@@ -4444,6 +5027,8 @@ function GamePageInner() {
                         ? pvp.actionCount
                         : 0
                   const locked = gameLocked && ROLLOUT_LOCKED_TABS.has(item.tab)
+                  const offlineLocked =
+                    offline && OFFLINE_BLOCKED_TABS.has(item.tab)
                   return (
                     <motion.div
                       key={item.tab}
@@ -4460,9 +5045,14 @@ function GamePageInner() {
                     >
                       <button
                         type="button"
-                        className={`game-radial-btn radial-${item.tone}${locked ? ' is-locked' : ''}`}
+                        className={`game-radial-btn radial-${item.tone}${locked ? ' is-locked' : ''}${offlineLocked ? ' is-offline-locked' : ''}`}
                         disabled={locked}
+                        aria-disabled={offlineLocked || undefined}
                         onClick={() => {
+                          if (offlineLocked) {
+                            needsInternet()
+                            return
+                          }
                           if (item.tab === 'play') {
                             setRadialMode('play')
                             return
@@ -4481,10 +5071,33 @@ function GamePageInner() {
                         }}
                         aria-label={item.label}
                         title={item.label}
-                        data-label={item.label}
+                        data-label={
+                          SHOW_ICON_LABELS && item.showLabel !== false
+                            ? item.label
+                            : undefined
+                        }
                         data-tour={`radial-${item.tab}`}
                       >
                         <item.Icon />
+                        {offlineLocked && (
+                          <span
+                            className="game-offline-lock-badge"
+                            aria-hidden="true"
+                          >
+                            <svg viewBox="0 0 24 24" width="14" height="14">
+                              <path
+                                d="M6.5 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.4 8.4 4.6 4.6 0 0 1 17.5 19H6.5Z"
+                                fill="currentColor"
+                              />
+                              <path
+                                d="M3 3l18 18"
+                                stroke="#0a0e28"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </span>
+                        )}
                         {badge > 0 && (
                           <span className="game-menu-tab-badge game-radial-badge">
                             {badge > 9 ? '9+' : badge}
@@ -4504,6 +5117,13 @@ function GamePageInner() {
             aria-label={radialOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={radialOpen}
           >
+            {dailyReward.dot && !radialOpen && (
+              <span
+                className="game-menu-btn-dot"
+                data-testid="daily-reward-dot"
+                aria-hidden="true"
+              />
+            )}
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={radialOpen ? 'close' : 'open'}
@@ -4545,7 +5165,13 @@ function GamePageInner() {
           aria-label={
             mapMode === 'follow' ? 'Switch to free look' : 'Follow your run'
           }
-          data-label={mapMode === 'follow' ? 'Following' : 'Follow'}
+          data-label={
+            SHOW_ICON_LABELS
+              ? mapMode === 'follow'
+                ? 'Following'
+                : 'Follow'
+              : undefined
+          }
           onClick={toggleFollow}
         >
           <IconCrosshairs />
@@ -4685,11 +5311,10 @@ function GamePageInner() {
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.22, ease: 'easeInOut' }}
                 >
-                  {/* Discard is deliberately quieter than End (smaller,
-                      muted, no fat drop-shadow) so a thumb reaching for End
-                      doesn't land on it by accident - the actual
-                      "are you sure" step is the modal below, triggered by
-                      either one. Pause/Resume only ever renders for a
+                  {/* End (green) and Discard (red) are the shared GameButton
+                      (primary / danger) like every other screen; the "are you
+                      sure" step is the modal below, triggered by either one
+                      (Discard always asks). Pause/Resume only ever renders for a
                       Training run (tracker.isTraining) - every other mode
                       (Conquer, PvP, Club War) keeps exactly the two buttons
                       it always had. */}
@@ -4712,20 +5337,22 @@ function GamePageInner() {
                           <IconPause /> Pause
                         </button>
                       ))}
-                    <button
-                      type="button"
-                      className="game-run-btn game-run-btn-end"
-                      onClick={() => setConfirmAction('end')}
+                    <GameButton
+                      variant="primary"
+                      icon={<IconFlagCheckered />}
+                      className="game-run-slot game-run-btn-end"
+                      onClick={handleRequestEnd}
                     >
-                      <IconFlagCheckered /> End
-                    </button>
-                    <button
-                      type="button"
-                      className="game-run-btn game-run-btn-discard"
+                      End
+                    </GameButton>
+                    <GameButton
+                      variant="danger"
+                      icon={<IconClose />}
+                      className="game-run-slot game-run-btn-discard"
                       onClick={() => setConfirmAction('cancel')}
                     >
-                      <IconClose /> Discard
-                    </button>
+                      Discard
+                    </GameButton>
                   </div>
                 </motion.div>
               )}
@@ -4753,43 +5380,42 @@ function GamePageInner() {
                   Discard this run? It won&apos;t be saved.
                 </p>
                 <div className="game-controls-actions">
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood"
+                  <GameButton
+                    variant="neutral"
                     onClick={() => setConfirmAction(null)}
                   >
                     Keep It
-                  </button>
-                  <button
-                    type="button"
-                    className="game-btn game-btn-red"
+                  </GameButton>
+                  <GameButton
+                    variant="danger"
                     onClick={() => {
                       setConfirmAction(null)
                       discardDraft()
                     }}
                   >
                     Yes, Discard
-                  </button>
+                  </GameButton>
                 </div>
               </div>
             ) : (
               <div className="game-controls-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-green game-btn-lg"
+                <GameButton
+                  size="lg"
+                  fullWidth
                   onClick={() => attemptSubmit(pendingRun)}
                   disabled={saving}
                 >
                   {saving ? 'Submitting…' : 'Submit Run'}
-                </button>
-                <button
-                  type="button"
-                  className="game-btn game-btn-red game-btn-lg"
+                </GameButton>
+                <GameButton
+                  variant="danger"
+                  size="lg"
+                  fullWidth
                   onClick={() => setConfirmAction('discard')}
                   disabled={saving}
                 >
                   Discard
-                </button>
+                </GameButton>
               </div>
             )}
             {draftLoopOpen ? (
@@ -4830,47 +5456,41 @@ function GamePageInner() {
                   Discard this route? Nothing will be saved.
                 </p>
                 <div className="game-controls-actions">
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood"
+                  <GameButton
+                    variant="neutral"
                     onClick={() => setRouteConfirmCancel(false)}
                   >
                     Keep Drawing
-                  </button>
-                  <button
-                    type="button"
-                    className="game-btn game-btn-red"
+                  </GameButton>
+                  <GameButton
+                    variant="danger"
                     onClick={handleConfirmCancelDrawing}
                   >
                     Yes, Discard
-                  </button>
+                  </GameButton>
                 </div>
               </div>
             ) : (
               <div className="game-controls-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
+                <GameButton
+                  variant="neutral"
                   onClick={handleUndoRoutePoint}
                   disabled={routeDraftWaypoints.length === 0 || routeSnapBusy}
                 >
                   Undo
-                </button>
-                <button
-                  type="button"
-                  className="game-btn game-btn-green"
+                </GameButton>
+                <GameButton
                   onClick={handleFinishDrawing}
                   disabled={routeSnapBusy}
                 >
                   Finish
-                </button>
-                <button
-                  type="button"
-                  className="game-btn game-btn-red"
+                </GameButton>
+                <GameButton
+                  variant="danger"
                   onClick={handleRequestCancelDrawing}
                 >
                   Cancel
-                </button>
+                </GameButton>
               </div>
             )}
             <p className="game-controls-hint">
@@ -4889,6 +5509,44 @@ function GamePageInner() {
           pattern elsewhere - see TrackRunPanel/PvpPanel). This one gets the
           heavier treatment since ending/discarding an in-progress run is a
           bigger, easier-to-fat-finger decision than those. */}
+      {/* Conquer + End while the loop is open (see handleRequestEnd).
+          Backdrop / Esc = Keep Running; the run is never touched by it. */}
+      <GameModal
+        open={confirmAction === 'loop'}
+        onClose={() => setConfirmAction(null)}
+        tone="warning"
+        title="Loop not closed yet"
+        overlayClassName="game-end-run-overlay"
+      >
+        <p className="game-end-run-summary" data-testid="loop-warning-stats">
+          {/* tracker.distance, not displayedDistance: that one only refreshes
+              every 5 s (HUD throttle), this popup should be exact on open. */}
+          {formatMeters(tracker.distance)} ·{' '}
+          {formatDuration(tracker.elapsedSeconds)}
+        </p>
+        <p className="game-end-run-summary">
+          Close your loop to capture territory. If you end now, no territory
+          will be claimed.
+        </p>
+        <GameActions>
+          <GameButton onClick={() => setConfirmAction(null)}>
+            Keep Running
+          </GameButton>
+          <GameButton
+            variant="danger"
+            onClick={() => {
+              if (endClickedRef.current) return // double tap
+              endClickedRef.current = true
+              setConfirmAction(null)
+              setLoopWarningDismissed(false)
+              tracker.stop()
+            }}
+          >
+            End Anyway
+          </GameButton>
+        </GameActions>
+      </GameModal>
+
       <GameModal
         open={confirmAction === 'end' || confirmAction === 'cancel'}
         onClose={() => setConfirmAction(null)}
@@ -4910,18 +5568,11 @@ function GamePageInner() {
             </p>
           )}
         <GameActions>
-          <button
-            type="button"
-            className="game-btn game-btn-wood"
-            onClick={() => setConfirmAction(null)}
-          >
+          <GameButton variant="neutral" onClick={() => setConfirmAction(null)}>
             Keep Running
-          </button>
-          <button
-            type="button"
-            className={`game-btn ${
-              confirmAction === 'end' ? 'game-btn-green' : 'game-btn-red'
-            }`}
+          </GameButton>
+          <GameButton
+            variant={confirmAction === 'end' ? 'primary' : 'danger'}
             onClick={() => {
               setConfirmAction(null)
               if (confirmAction === 'end') {
@@ -4931,7 +5582,7 @@ function GamePageInner() {
             }}
           >
             {confirmAction === 'end' ? 'Yes, End' : 'Yes, Discard'}
-          </button>
+          </GameButton>
         </GameActions>
       </GameModal>
 
@@ -4953,22 +5604,19 @@ function GamePageInner() {
               <p>{saveError.message}</p>
               <div className="game-highlight-toast-actions">
                 {pendingRun && (
-                  <button
-                    type="button"
-                    className="game-btn game-btn-green"
+                  <GameButton
                     onClick={() => attemptSubmit(pendingRun)}
                     disabled={saving}
                   >
                     Retry Save
-                  </button>
+                  </GameButton>
                 )}
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
+                <GameButton
+                  variant="neutral"
                   onClick={() => setSaveError(null)}
                 >
                   Dismiss
-                </button>
+                </GameButton>
               </div>
             </motion.div>
           </motion.div>
@@ -4996,20 +5644,13 @@ function GamePageInner() {
                   : "This pace is faster than running allows. Keep this up and the whole run will come back invalid — stop here and restart once you're back on foot."}
               </p>
               <div className="game-highlight-toast-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-green"
-                  onClick={() => tracker.stop()}
-                >
-                  Stop Run
-                </button>
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
+                <GameButton onClick={() => tracker.stop()}>Stop Run</GameButton>
+                <GameButton
+                  variant="neutral"
                   onClick={tracker.dismissInvalidMotion}
                 >
                   Keep Going
-                </button>
+                </GameButton>
               </div>
             </motion.div>
           </motion.div>
@@ -5108,6 +5749,43 @@ function GamePageInner() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {pvpSession && !pvpSession.dismissed && (
+          <PvpResultPopup
+            key={pvpSession.challengeId}
+            status={pvpSession.status}
+            error={pvpSession.error}
+            view={pvpFollow.view}
+            rivalHero={pvpRivalHero}
+            heroCatalog={heroes}
+            delayed={pvpFollow.delayed}
+            settled={pvpFollow.settled}
+            distanceText={
+              pvpSession.run?.distance != null
+                ? formatMeters(pvpSession.run.distance)
+                : null
+            }
+            paceText={
+              pvpSession.run?.avgPace != null
+                ? formatPace(pvpSession.run.avgPace)
+                : null
+            }
+            balanceBefore={pvpSession.balanceBefore}
+            balanceAfter={pvpFollow.balanceAfter}
+            onBalanceTick={setPvpHudCoins}
+            onDone={closePvpPopup}
+            onDetails={() => {
+              closePvpPopup()
+              openMenu('race', PVP_SOURCES.ALERT_PILL)
+            }}
+            onRetry={() => {
+              const run = tracker.pendingRun
+              if (run) attemptSubmit(run)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {highlightedEntry &&
           (() => {
             const isMine = isMyEntry(highlightedEntry)
@@ -5122,154 +5800,68 @@ function GamePageInner() {
                     playerLocation
                   )
                 : null
-            const canRun =
-              (highlightedEntry.points?.length || 0) >= 3 &&
-              tracker.status === 'idle' &&
-              !pendingRun
+            const canRun = (highlightedEntry.points?.length || 0) >= 3
+            const busy = tracker.status !== 'idle' || Boolean(pendingRun)
+            const runBlockedReason = busy
+              ? 'Finish your current run first.'
+              : offline
+                ? 'Needs internet - connect to Wi-Fi or mobile data.'
+                : gameLocked
+                  ? 'Territory runs aren’t open in your area yet.'
+                  : null
             return (
               <motion.div
                 className="game-popup-layer"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                onClick={(e) => {
+                  // Backdrop tap closes (the layer ignores pointer events, so
+                  // this only fires through the popup's own scrim, see CSS).
+                  if (e.target === e.currentTarget) closeTerritoryPopup()
+                }}
               >
-                <motion.div
-                  className="game-highlight-toast glass-card game-territory-popup"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                >
-                  {/* --- Header: avatar + owner name + close --- */}
-                  <div className="game-highlight-toast-header">
-                    <Avatar
-                      src={highlightedEntry.avatarSrc}
-                      name={playerNameOf(highlightedEntry)}
-                      ring={highlightedEntry.color || 'var(--game-gold)'}
-                      size={60}
-                      className="game-highlight-toast-avatar"
-                      holdUntilLoaded
-                    />
-                    <div className="game-highlight-toast-owner">
-                      <p className="game-highlight-toast-owner-label">
-                        Territory owner
-                      </p>
-                      <h3>{isMine ? 'You' : playerNameOf(highlightedEntry)}</h3>
-                    </div>
-                    <button
-                      type="button"
-                      className="game-close-btn game-highlight-toast-close"
-                      aria-label="Close"
-                      onClick={() => {
-                        setHighlightedEntry(null)
-                        setTerritoryRunWarning(null)
-                      }}
-                    >
-                      <IconClose />
-                    </button>
-                  </div>
-
-                  {/* --- Stats row: the two numbers that actually matter --- */}
-                  <div className="game-territory-stats">
-                    <div className="game-territory-stat">
-                      <span className="game-territory-stat-value">
-                        {formatAreaStat(highlightedEntry.areaSqMeters)}
-                      </span>
-                      <span className="game-territory-stat-label">Held</span>
-                    </div>
-                    <div className="game-territory-stat">
-                      <span className="game-territory-stat-value">
-                        <IconTrophy />
-                        {formatNumber(highlightedEntry.runScore || 0)}
-                      </span>
-                      <span className="game-territory-stat-label">
-                        Run score
-                      </span>
-                    </div>
-                  </div>
-
-                  {!highlightHasVisibleParcels && (
-                    <p className="game-controls-hint">
-                      Nothing of theirs is in view right now — try exploring the
-                      map.
-                    </p>
-                  )}
-                  {territoryRunWarning && (
-                    <>
-                      <p className="game-controls-hint game-controls-hint-warn">
-                        {territoryRunWarning}
-                      </p>
-                      <div className="game-highlight-toast-actions">
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => setTerritoryRunWarning(null)}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() =>
-                            handleRunTerritory(highlightedEntry, {
-                              force: true,
-                            })
-                          }
-                        >
-                          Continue anyway
-                        </button>
-                      </div>
-                    </>
-                  )}
-                  {!territoryRunWarning && canRun && (
-                    <>
-                      {/* --- Secondary info line: distance to the route's
-                          start point, with the "guide will steer you there"
-                          detail kept as a smaller caption underneath rather
-                          than a hover-only tooltip (this is a touch-first
-                          game, nothing here is hoverable on mobile). --- */}
-                      {previewRoute?.startDistanceMeters >
-                        TERRITORY_RUN_FAR_START_METERS && (
-                        <p className="game-territory-distance">
-                          <IconCrosshairs />
-                          <span>
-                            Start point is{' '}
-                            {formatMeters(previewRoute.startDistanceMeters)}{' '}
-                            away
-                            <span className="game-territory-distance-caption">
-                              The guide will steer you there first.
-                            </span>
-                          </span>
-                        </p>
-                      )}
-                      <div className="game-highlight-toast-actions">
-                        <button
-                          type="button"
-                          className="game-route-run-btn"
-                          onClick={() => handleRunTerritory(highlightedEntry)}
-                        >
-                          🏃{' '}
-                          {isMine
-                            ? 'Defend This Territory'
-                            : 'Run This Territory'}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                  {!territoryRunWarning && (
-                    <div className="game-highlight-toast-actions is-secondary">
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => {
-                          setViewingProfile(highlightedEntry)
-                          setHighlightedEntry(null)
-                        }}
-                      >
-                        View Profile
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
+                <TerritoryPopup
+                  status={highlightedEntry.status || 'ready'}
+                  isMine={isMine}
+                  name={playerNameOf(highlightedEntry)}
+                  avatarSrc={highlightedEntry.avatarSrc}
+                  color={highlightedEntry.color}
+                  level={isMine ? profileLevel : null}
+                  clubTag={isMine ? profile?.clubName || null : null}
+                  areaText={formatAreaStat(highlightedEntry.areaSqMeters)}
+                  scoreText={formatNumber(highlightedEntry.runScore || 0)}
+                  // playerLocation can be the map's fallback centre; only a real fix
+                  // makes the distance meaningful.
+                  hasLocation={Boolean(liveLocation)}
+                  startDistanceMeters={
+                    previewRoute?.startDistanceMeters ?? null
+                  }
+                  startDistanceText={
+                    previewRoute
+                      ? formatMeters(previewRoute.startDistanceMeters)
+                      : null
+                  }
+                  canRun={canRun}
+                  runBlockedReason={runBlockedReason}
+                  hasVisibleParcels={highlightHasVisibleParcels}
+                  warning={territoryRunWarning}
+                  onClose={closeTerritoryPopup}
+                  onRun={() => handleRunTerritory(highlightedEntry)}
+                  onForceRun={() =>
+                    handleRunTerritory(highlightedEntry, { force: true })
+                  }
+                  onCancelWarning={() => setTerritoryRunWarning(null)}
+                  onProfile={() => {
+                    setViewingProfile(highlightedEntry)
+                    setHighlightedEntry(null)
+                  }}
+                  onRetry={() =>
+                    setHighlightedEntry((e) =>
+                      e ? { ...e, status: undefined } : e
+                    )
+                  }
+                />
               </motion.div>
             )
           })()}
@@ -5309,12 +5901,10 @@ function GamePageInner() {
                     <h1 className="game-menu-picker-label">PvP</h1>
                     <span
                       className="pvp-balance-chip"
-                      aria-label={`${profile?.fahhcoinBalance ?? 0} Fahhcoin`}
+                      aria-label={`${fahhcoin ?? 0} Fahhcoin`}
                     >
                       <span className="pvp-coin" aria-hidden="true" />
-                      <span className="pvp-num">
-                        {profile?.fahhcoinBalance ?? 0}
-                      </span>
+                      <CoinAmount className="pvp-num" value={fahhcoin ?? 0} />
                     </span>
                   </div>
                 </div>
@@ -5341,9 +5931,17 @@ function GamePageInner() {
                     <button
                       key={tab.id}
                       type="button"
-                      className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}${gameLocked && ROLLOUT_LOCKED_TABS.has(tab.id) ? ' is-locked' : ''}`}
+                      className={`game-menu-tab ${menuTab === tab.id ? 'active' : ''}${gameLocked && ROLLOUT_LOCKED_TABS.has(tab.id) ? ' is-locked' : ''}${offline && OFFLINE_BLOCKED_TABS.has(tab.id) ? ' is-offline-locked' : ''}`}
                       disabled={gameLocked && ROLLOUT_LOCKED_TABS.has(tab.id)}
-                      onClick={() => switchTab(tab.id)}
+                      aria-disabled={
+                        (offline && OFFLINE_BLOCKED_TABS.has(tab.id)) ||
+                        undefined
+                      }
+                      onClick={() =>
+                        offline && OFFLINE_BLOCKED_TABS.has(tab.id)
+                          ? needsInternet()
+                          : switchTab(tab.id)
+                      }
                     >
                       <TabMedal
                         tab={tab}
@@ -5400,7 +5998,7 @@ function GamePageInner() {
                           damping: 26,
                         }}
                       >
-                        {switcherTabs.map((tab, i) => (
+                        {dropdownTabs.map((tab, i) => (
                           <motion.li
                             key={tab.id}
                             initial={{ opacity: 0, x: -18 }}
@@ -5537,7 +6135,7 @@ function GamePageInner() {
                         <IconFlagScope className="game-menu-subtab-scope-icon" />
                         <span className="game-menu-subtab-scope-label">
                           {(individualScope === 'city' &&
-                            leaderboard[0]?.cityName) ||
+                            leaderboardScopeLabel?.cityName) ||
                             'District'}
                         </span>
                       </button>
@@ -5574,7 +6172,7 @@ function GamePageInner() {
                         <IconFlagScope className="game-menu-subtab-scope-icon" />
                         <span className="game-menu-subtab-scope-label">
                           {(clubScope === 'national' &&
-                            clubLeaderboard[0]?.countryName) ||
+                            leaderboardScopeLabel?.countryName) ||
                             'Country'}
                         </span>
                       </button>
@@ -5585,76 +6183,123 @@ function GamePageInner() {
                     individualScope === 'city' && (
                       <p className="game-leaderboard-notice">
                         Showing conquered area in{' '}
-                        {leaderboard[0]?.cityName || 'your district'} only.
+                        {leaderboardScopeLabel?.cityName || 'your district'}{' '}
+                        only.
                       </p>
                     )}
                   {leaderboardMode === 'club' && clubScope === 'national' && (
                     <p className="game-leaderboard-notice">
                       Showing clubs in{' '}
-                      {clubLeaderboard[0]?.countryName || 'your country'} only.
+                      {leaderboardScopeLabel?.countryName || 'your country'}{' '}
+                      only.
                     </p>
                   )}
 
-                  {leaderboardMode === 'individual' ? (
-                    leaderboardError ? (
-                      <p className="game-menu-empty">{leaderboardError}</p>
-                    ) : leaderboardLoading && leaderboard.length === 0 ? (
-                      <LeaderboardSkeleton />
-                    ) : leaderboard.length === 0 ? (
-                      <p className="game-menu-empty">
-                        {individualScope === 'city'
-                          ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
-                          : 'No territory claimed yet — be the first.'}
-                      </p>
-                    ) : (
-                      <LeaderboardPodium
-                        nameLabel="Runner"
-                        entries={leaderboard.map((entry) => ({
-                          key: entry.userId,
-                          rank: entry.rank,
-                          name: playerNameOf(entry),
-                          // Same "icon + stat" treatment as the Club board's
-                          // trophy count below - territory is this board's
-                          // equivalent score.
-                          area: (
-                            <span className="lb-trophy-stat">
-                              <IconFlag />
-                              {formatArea(entry.areaSqMeters)}
-                            </span>
-                          ),
-                          // Same default (colored initials) as everyone
-                          // else - the leaderboard API has no profile
-                          // pictures for anyone yet (see
-                          // resolveFileUrl(entry.profilePictureUrl) below,
-                          // always null today), and the player's own row
-                          // used to special-case in their real equipped-
-                          // hero avatarSrc here, which made it visually
-                          // stand out as a different, bigger "card" rather
-                          // than reading as the same row as everyone
-                          // else's - a small "You" tag (see
-                          // LeaderboardPodium.jsx's isPlayer handling)
-                          // marks it instead.
-                          avatarSrc: resolveFileUrl(entry.profilePictureUrl),
-                          isPlayer: isMyEntry(entry),
-                          onClick: () => setViewingProfile(entry),
-                        }))}
-                      />
-                    )
-                  ) : leaderboardError ? (
-                    <p className="game-menu-empty">{leaderboardError}</p>
-                  ) : leaderboardLoading && clubLeaderboard.length === 0 ? (
+                  {lb.error && lb.rows.length === 0 ? (
+                    <div className="game-menu-empty">
+                      <p>{lb.error.message}</p>
+                      <GameButton
+                        size="sm"
+                        variant="neutral"
+                        onClick={lb.retry}
+                      >
+                        Retry
+                      </GameButton>
+                    </div>
+                  ) : lb.initialLoading ? (
                     <LeaderboardSkeleton />
-                  ) : clubLeaderboard.length === 0 ? (
+                  ) : lb.rows.length === 0 ? (
                     <p className="game-menu-empty">
-                      {clubScope === 'national'
-                        ? 'No club has claimed territory in your country yet.'
-                        : 'No club has claimed territory yet.'}
+                      {leaderboardMode === 'individual'
+                        ? individualScope === 'city'
+                          ? 'Nothing here yet — district rankings only refresh about once an hour, so a run from the last little while (or from a different district than you expect) may not show up here yet.'
+                          : 'No territory claimed yet — be the first.'
+                        : clubScope === 'national'
+                          ? 'No club has claimed territory in your country yet.'
+                          : 'No club has claimed territory yet.'}
                     </p>
+                  ) : leaderboardMode === 'individual' ? (
+                    <LeaderboardPodium
+                      nameLabel="Runner"
+                      page={lb.page}
+                      pager={leaderboardPager}
+                      me={
+                        user
+                          ? {
+                              rank: myPlayerRow?.rank ?? null,
+                              name: playerNameOf(user),
+                              avatarSrc: resolveFileUrl(user.profilePictureUrl),
+                              area: (
+                                <span className="lb-trophy-stat">
+                                  <IconFlag />
+                                  {myPlayerRow
+                                    ? formatArea(myPlayerRow.areaSqMeters)
+                                    : individualScope === 'global' &&
+                                        profile?.totalAreaSqMeters != null
+                                      ? formatArea(profile.totalAreaSqMeters)
+                                      : '—'}
+                                </span>
+                              ),
+                              onClick: () =>
+                                setViewingProfile(
+                                  myPlayerRow || {
+                                    userId: user.id,
+                                    fullName: user.fullName,
+                                    nickname: user.nickname,
+                                  }
+                                ),
+                            }
+                          : null
+                      }
+                      entries={lb.rows.map((entry) => ({
+                        key: entry.userId,
+                        rank: entry.rank,
+                        name: playerNameOf(entry),
+                        // Same "icon + stat" treatment as the Club board's
+                        // trophy count - territory is this board's score.
+                        area: (
+                          <span className="lb-trophy-stat">
+                            <IconFlag />
+                            {formatArea(entry.areaSqMeters)}
+                          </span>
+                        ),
+                        // The leaderboard API has no profile pictures yet
+                        // (always null today) -> coloured initials.
+                        avatarSrc: resolveFileUrl(entry.profilePictureUrl),
+                        isPlayer: isMyEntry(entry),
+                        onClick: () => setViewingProfile(entry),
+                      }))}
+                    />
                   ) : (
                     <LeaderboardPodium
                       nameLabel="Club"
                       statLabel="Trophies"
-                      entries={clubLeaderboard.map((entry) => ({
+                      page={lb.page}
+                      pager={leaderboardPager}
+                      me={
+                        profile?.clubName
+                          ? {
+                              rank: myClubRow?.rank ?? null,
+                              name: profile.clubName,
+                              badge: (
+                                <ClubBadge name={profile.clubName} size={40} />
+                              ),
+                              area: (
+                                <span className="lb-trophy-stat">
+                                  <ClubTrophyIcon size={26} />
+                                  {myClubRow
+                                    ? formatCoins(myClubRow.trophies ?? 0)
+                                    : '—'}
+                                </span>
+                              ),
+                              onClick: () => {
+                                if (myClubRow) setOpenClubId(myClubRow.clubId)
+                                switchTab('club')
+                              },
+                            }
+                          : null
+                      }
+                      entries={lb.rows.map((entry) => ({
                         key: entry.clubId,
                         rank: entry.rank,
                         name: entry.clubName,
@@ -5682,7 +6327,7 @@ function GamePageInner() {
                 <ClubPanel
                   hasClub={Boolean(profile?.clubName)}
                   userId={user?.id}
-                  balance={profile?.fahhcoinBalance ?? 0}
+                  balance={fahhcoin ?? 0}
                   onClubChanged={refreshProfile}
                   onViewProfile={setViewingProfile}
                   ownedItems={ownedItems}
@@ -5704,7 +6349,7 @@ function GamePageInner() {
                 <PvpPanel
                   pvp={pvp}
                   userId={user?.id}
-                  balance={profile?.fahhcoinBalance ?? 0}
+                  balance={fahhcoin ?? 0}
                   onStartRace={handleStartRace}
                   onForfeited={() => refreshProfile()}
                   racing={tracker.status === 'tracking' || Boolean(pendingRun)}
@@ -5715,6 +6360,7 @@ function GamePageInner() {
                     resolveFileUrl(user?.profilePictureUrl) || avatarSrc
                   }
                   playerName={playerNameOf(user)}
+                  heroCatalog={heroes}
                   onClose={exitPvp}
                   onGetCoins={openCoinShop}
                   onOpenSettings={() => switchTab('settings')}
@@ -5749,6 +6395,15 @@ function GamePageInner() {
                     : undefined
                 }
               >
+                {profileCachedAt && (
+                  <p
+                    className="game-controls-hint"
+                    data-testid="profile-last-updated"
+                  >
+                    Offline - showing your last known stats (updated{' '}
+                    {formatLastUpdated(profileCachedAt)})
+                  </p>
+                )}
                 <div className="game-menu-hero">
                   {showHeroTurntable ? (
                     // Plays the equipped emote in place of the idle
@@ -5869,22 +6524,22 @@ function GamePageInner() {
                         </ul>
                         {myTerritoriesTotalPages > 1 && (
                           <div className="game-route-pager">
-                            <button
-                              type="button"
-                              className="game-btn game-btn-wood game-btn-sm"
+                            <GameButton
+                              variant="neutral"
+                              size="sm"
                               aria-label="Show previous territories"
                               disabled={myTerritoriesPage <= 1}
                               onClick={() => setMyTerritoriesPage((p) => p - 1)}
                             >
                               ◀
-                            </button>
+                            </GameButton>
                             <span className="game-route-pager-label">
                               Page {myTerritoriesPage} of{' '}
                               {myTerritoriesTotalPages}
                             </span>
-                            <button
-                              type="button"
-                              className="game-btn game-btn-wood game-btn-sm"
+                            <GameButton
+                              variant="neutral"
+                              size="sm"
                               aria-label="Show more territories"
                               disabled={
                                 myTerritoriesPage >= myTerritoriesTotalPages
@@ -5892,7 +6547,7 @@ function GamePageInner() {
                               onClick={() => setMyTerritoriesPage((p) => p + 1)}
                             >
                               ▶
-                            </button>
+                            </GameButton>
                           </div>
                         )}
                       </>
@@ -5901,13 +6556,13 @@ function GamePageInner() {
 
                   <section className="game-me-section">
                     <p className="game-menu-section-title">My Routes</p>
-                    <button
-                      type="button"
-                      className="game-btn game-btn-green game-btn-sm game-me-draw-route-btn"
+                    <GameButton
+                      size="sm"
+                      className="game-me-draw-route-btn"
                       onClick={handleStartDrawRoute}
                     >
                       + Draw New Route
-                    </button>
+                    </GameButton>
                     {myRoutesError && (
                       <p className="game-controls-hint game-controls-hint-error">
                         {myRoutesError}
@@ -5965,30 +6620,39 @@ function GamePageInner() {
                         </ul>
                         {myRoutesTotalPages > 1 && (
                           <div className="game-route-pager">
-                            <button
-                              type="button"
-                              className="game-btn game-btn-wood game-btn-sm"
+                            <GameButton
+                              variant="neutral"
+                              size="sm"
                               disabled={myRoutesPage <= 1}
                               onClick={() => loadMyRoutes(myRoutesPage - 1)}
                             >
                               Prev
-                            </button>
+                            </GameButton>
                             <span className="game-route-pager-label">
                               Page {myRoutesPage} of {myRoutesTotalPages}
                             </span>
-                            <button
-                              type="button"
-                              className="game-btn game-btn-wood game-btn-sm"
+                            <GameButton
+                              variant="neutral"
+                              size="sm"
                               disabled={myRoutesPage >= myRoutesTotalPages}
                               onClick={() => loadMyRoutes(myRoutesPage + 1)}
                             >
                               Next
-                            </button>
+                            </GameButton>
                           </div>
                         )}
                       </>
                     )}
                   </section>
+
+                  <PendingRunsList
+                    runs={runSync.runs}
+                    onRetry={async (id) => {
+                      await retryOutboxRun(id)
+                      runSync.flush()
+                    }}
+                    onDelete={(id) => removeOutboxRun(id)}
+                  />
 
                   <section className="game-me-section" ref={myRunsListRef}>
                     <p className="game-menu-section-title">History</p>
@@ -5997,13 +6661,13 @@ function GamePageInner() {
                         <p className="game-controls-hint game-controls-hint-error">
                           {myRunsError}
                         </p>
-                        <button
-                          type="button"
-                          className="game-btn game-btn-wood game-btn-sm"
+                        <GameButton
+                          variant="neutral"
+                          size="sm"
                           onClick={() => loadMyRunsPage(myRunsPage)}
                         >
                           Retry
-                        </button>
+                        </GameButton>
                       </div>
                     ) : myRunsLoading && myRuns.length === 0 ? (
                       <ul className="game-me-history-list" aria-hidden="true">
@@ -6109,15 +6773,11 @@ function GamePageInner() {
                 <div className="game-shop-wallet">
                   <span className="game-hud-icon game-hud-icon-coin" />
                   <span className="game-shop-wallet-value">
-                    {formatCoins(profile?.fahhcoinBalance ?? 0)}
+                    {formatCoins(fahhcoin ?? 0)}
                   </span>
-                  <button
-                    type="button"
-                    className="game-btn game-btn-green game-btn-sm"
-                    onClick={openCoinShop}
-                  >
+                  <GameButton size="sm" onClick={openCoinShop}>
                     + Get more
-                  </button>
+                  </GameButton>
                 </div>
                 {(storeError ||
                   (storeActionError && !isNotOwnedError(storeActionError))) && (
@@ -6159,7 +6819,7 @@ function GamePageInner() {
                     title="Territory"
                     items={shadeItems}
                     ownedItems={ownedItems}
-                    balance={profile?.fahhcoinBalance ?? 0}
+                    balance={fahhcoin ?? 0}
                     level={profile?.level}
                     onSelect={handleSelectTerritoryColor}
                     emptyText="No territory colours in stock yet."
@@ -6172,7 +6832,7 @@ function GamePageInner() {
                     title="Trail"
                     items={trailItems}
                     ownedItems={ownedItems}
-                    balance={profile?.fahhcoinBalance ?? 0}
+                    balance={fahhcoin ?? 0}
                     level={profile?.level}
                     onSelect={handleSelectTrailColor}
                     emptyText="Fresh trail colours are on their way - check back soon!"
@@ -6270,6 +6930,10 @@ function GamePageInner() {
             >
               <p>Name your route</p>
               <input
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 type="text"
                 className="game-club-input"
                 placeholder="e.g. Riverside Loop"
@@ -6288,17 +6952,15 @@ function GamePageInner() {
                 </p>
               )}
               <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
+                <GameButton
+                  variant="neutral"
                   onClick={() => setRouteNamePromptOpen(false)}
                   disabled={savingRoute}
                 >
                   Back
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
+                </GameButton>
+                <GameButton
+                  variant="neutral"
                   disabled={savingRoute || !profile?.clubName}
                   title={
                     profile?.clubName
@@ -6313,10 +6975,8 @@ function GamePageInner() {
                   }
                 >
                   {savingRoute ? 'Saving…' : 'Share with Club'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
+                </GameButton>
+                <GameButton
                   disabled={savingRoute}
                   onClick={() =>
                     handleSaveRoute({
@@ -6326,7 +6986,7 @@ function GamePageInner() {
                   }
                 >
                   {savingRoute ? 'Saving…' : 'Just Me'}
-                </button>
+                </GameButton>
               </div>
             </motion.div>
           </motion.div>
@@ -6467,13 +7127,9 @@ function GamePageInner() {
                 loop first.
               </p>
               <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setLoopWarningDismissed(true)}
-                >
+                <GameButton onClick={() => setLoopWarningDismissed(true)}>
                   Got it
-                </button>
+                </GameButton>
               </div>
             </motion.div>
           </motion.div>
@@ -6498,20 +7154,13 @@ function GamePageInner() {
             >
               <p>{gpsStatusMessage}</p>
               <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
+                <GameButton
+                  variant="neutral"
                   onClick={() => setGpsErrorDismissed(true)}
                 >
                   Dismiss
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleStartRun}
-                >
-                  Try Again
-                </button>
+                </GameButton>
+                <GameButton onClick={handleStartRun}>Try Again</GameButton>
               </div>
             </motion.div>
           </motion.div>
@@ -6570,13 +7219,13 @@ function GamePageInner() {
                           Rs. {formatNumber(bundle.priceNpr)}
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        className="game-btn game-btn-green game-btn-sm game-coin-buy-btn"
+                      <GameButton
+                        size="sm"
+                        className="game-coin-buy-btn"
                         onClick={() => openBuyRedirectConfirm(bundle)}
                       >
                         Buy
-                      </button>
+                      </GameButton>
                     </li>
                   ))}
                 </ul>
@@ -6633,22 +7282,19 @@ function GamePageInner() {
                 </p>
               )}
               <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
+                <GameButton
+                  variant="neutral"
                   onClick={closeBuyRedirectConfirm}
                   disabled={buyRedirecting}
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  className="game-btn game-btn-green"
+                </GameButton>
+                <GameButton
                   onClick={handleContinueToShop}
                   disabled={buyRedirecting || iosShopRedirectBlocked}
                 >
                   {buyRedirecting ? 'Opening…' : 'Continue to Shop'}
-                </button>
+                </GameButton>
               </div>
             </motion.div>
           </motion.div>
@@ -6688,7 +7334,7 @@ function GamePageInner() {
           storeChoice.category === 'EMOTE' &&
           (() => {
             const price = storeChoice.priceFahhcoin || 0
-            const balance = profile?.fahhcoinBalance ?? 0
+            const balance = fahhcoin ?? 0
             const short = price > balance
             // EMOTE slides open this same showcase popup whether owned or
             // not (see HeroDetailModal's HeroEmoteStage onShowcase) - an
@@ -6783,7 +7429,7 @@ function GamePageInner() {
           storeChoice.category !== 'EMOTE' &&
           (() => {
             const price = storeChoice.priceFahhcoin || 0
-            const balance = profile?.fahhcoinBalance ?? 0
+            const balance = fahhcoin ?? 0
             const short = price > balance
             return (
               <motion.div
@@ -6849,34 +7495,29 @@ function GamePageInner() {
                     </p>
                   )}
                   <div className="game-confirm-actions">
-                    <button
-                      type="button"
-                      className="btn btn-outline"
+                    <GameButton
+                      variant="neutral"
                       onClick={closeStoreChoice}
                       disabled={purchasing}
                     >
                       Cancel
-                    </button>
+                    </GameButton>
                     {short ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
+                      <GameButton
                         onClick={() => {
                           closeStoreChoice()
                           openCoinShop()
                         }}
                       >
                         Get Fahhcoin
-                      </button>
+                      </GameButton>
                     ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
+                      <GameButton
                         onClick={() => handlePurchase(storeChoice)}
                         disabled={purchasing}
                       >
                         {purchasing ? 'Buying…' : 'Buy'}
-                      </button>
+                      </GameButton>
                     )}
                   </div>
                 </motion.div>
@@ -6903,7 +7544,7 @@ function GamePageInner() {
               item={item}
               kind={colorPreview.kind}
               ownedItems={ownedItems}
-              balance={profile?.fahhcoinBalance ?? 0}
+              balance={fahhcoin ?? 0}
               level={profile?.level}
               purchasing={purchasing}
               purchaseError={purchaseError}
@@ -6958,20 +7599,15 @@ function GamePageInner() {
                 </div>
               </div>
               <div className="game-confirm-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
+                <GameButton
+                  variant="neutral"
                   onClick={() => setAvatarChoice(null)}
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => handleChooseAvatar(avatarChoice)}
-                >
+                </GameButton>
+                <GameButton onClick={() => handleChooseAvatar(avatarChoice)}>
                   Set This Avatar
-                </button>
+                </GameButton>
               </div>
             </motion.div>
           </motion.div>

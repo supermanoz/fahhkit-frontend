@@ -200,19 +200,15 @@
   background: #15803d;
 }
 .game-tour-mode.is-pvp .game-tour-mode-icon {
-  background: #b91c1c;
+  background: #6a4be0;
 }
 
 .game-tour-nav {
   display: flex;
   gap: 10px;
 }
-.game-tour-nav .gb {
+.game-tour-nav .gbtn {
   flex: 1;
-  min-height: 48px;
-}
-.game-tour .gb {
-  min-height: 48px;
 }
 
 /* Body font for everything readable (the /game page forces the display font

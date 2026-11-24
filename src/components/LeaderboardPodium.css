@@ -329,15 +329,118 @@
    following list content otherwise) is what reads it as "floating above"
    rather than just another row. */
 .lb-pinned-you {
+  /* DOCKED footer: the last item of the card. The menu sheet is the one and
+     only scroller (banner, tabs, podium, rows, pager all scroll with it); the
+     footer sticks to the bottom edge of the viewport while the card is on
+     screen and ends flush at the card's bottom. Solid card-coloured
+     background + a thin divider (no shadow/glow), same width as the rows. */
   position: sticky;
-  bottom: 8px;
+  bottom: 0;
   z-index: 5;
-  margin-top: 4px;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+  flex: 0 0 auto;
+  margin-top: 2px;
+  padding: 10px 0 2px;
+  background: var(--game-panel);
+  border-top: 1px solid rgba(43, 42, 36, 0.18);
+}
+
+/* No nested scroller and no clipping: the Top 1 medal and name are never cut
+   off, and there is nothing here that can trap touch scrolling. */
+.lb-scroll {
+  display: contents;
 }
 
 .lb-pinned-you .lb-row {
   width: 100%;
+  box-shadow: none;
+  /* existing peach/orange highlight + orange border, same radius as rows */
+  background:
+    linear-gradient(180deg, rgba(255, 170, 80, 0.32), rgba(255, 140, 50, 0.2)),
+    #fff6e6;
+}
+.lb-pinned-you .lb-col-name {
+  color: var(--game-ink);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+
+/* Large ranks ("1,178") shrink to fit the round chip; dark plain digits (an
+   outline would smear at this size). */
+.lb-row .lb-col-rank.is-long,
+.lb-row .lb-col-rank.is-xlong {
+  color: var(--game-ink);
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  letter-spacing: -0.03em;
+}
+.lb-row .lb-col-rank.is-long {
+  font-size: 10.5px;
+}
+.lb-row .lb-col-rank.is-xlong {
+  font-size: 9px;
+}
+
+/* Keep the old page visible (dimmed) while the next one loads. */
+.lb-page {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.15s ease;
+}
+.lb-page.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Prev / Next + "Page 2 · 21-40" */
+.lb-pager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lb-pager-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+}
+.lb-pager-row .gbtn {
+  min-width: 76px;
+}
+.lb-pager-row .gbtn:first-child {
+  justify-self: start;
+}
+.lb-pager-row .gbtn:last-child {
+  justify-self: end;
+}
+.lb .lb-pager .lb-pager-label {
+  color: var(--game-ink);
+  font-weight: 800;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+}
+.lb .lb-pager .lb-pager-range {
+  color: rgba(43, 42, 36, 0.62);
+  font-weight: 700;
+}
+.lb .lb-pager .lb-pager-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--game-red-dark);
+  background: rgba(220, 60, 50, 0.14);
+  color: var(--game-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
 }
 
 /* --- Loading skeleton (see LeaderboardPodium.jsx's LeaderboardSkeleton) --- */
@@ -425,4 +528,11 @@
     width: 34px;
     height: 34px;
   }
+}
+
+/* Plain (un-outlined) text for everything in the pager on the light card */
+.game-root .lb .lb-pager span {
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
 }

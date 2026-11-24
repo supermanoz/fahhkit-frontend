@@ -1,0 +1,16 @@
+/* The HUD's coin amount look, shared. Outline via paint-order so the digits
+   stay solid white and readable on light AND dark backgrounds. Size comes from
+   font-size on the element (default 20px, as in the HUD). */
+.coin-amount {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  -webkit-text-stroke: 2.5px var(--game-ink, #2b2a24);
+  paint-order: stroke fill;
+  text-shadow: none;
+}

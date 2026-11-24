@@ -37,6 +37,7 @@ import './ClubPanel.css'
 import { playerNameOf } from '../utils/playerName'
 import { formatNumber } from '../utils/format'
 import { visibleInterval } from '../utils/visibleInterval'
+import GameButton from './ui/GameButton'
 
 // While queued or at war, re-check this often - matching and the phase
 // changes happen server-side on a schedule, with no push event for them.
@@ -603,9 +604,8 @@ export default function ClubWarPanel({
           </p>
           {completed && (
             <div className="club-war-result-actions">
-              <button
-                type="button"
-                className="game-btn game-btn-wood"
+              <GameButton
+                variant="neutral"
                 onClick={() => {
                   saveLastWarId(club.id, null)
                   setWar(null)
@@ -613,14 +613,13 @@ export default function ClubWarPanel({
                 }}
               >
                 Back to War Room
-              </button>
-              <button
-                type="button"
-                className="game-btn game-btn-wood"
+              </GameButton>
+              <GameButton
+                variant="neutral"
                 onClick={() => setHistoryOpen(true)}
               >
                 War History
-              </button>
+              </GameButton>
             </div>
           )}
         </section>
@@ -691,9 +690,10 @@ export default function ClubWarPanel({
                   with {heroName(me.lockedHeroStoreItemId)}.
                 </p>
                 {!lockedHeroEquipped ? (
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood game-btn-lg"
+                  <GameButton
+                    variant="neutral"
+                    size="lg"
+                    fullWidth
                     disabled={!lockedHeroOwned || busy === 'equip'}
                     onClick={() =>
                       runAction(
@@ -704,11 +704,11 @@ export default function ClubWarPanel({
                     }
                   >
                     Equip {heroName(me.lockedHeroStoreItemId)} First
-                  </button>
+                  </GameButton>
                 ) : (
-                  <button
-                    type="button"
-                    className="game-btn game-btn-green game-btn-lg"
+                  <GameButton
+                    size="lg"
+                    fullWidth
                     disabled={racing}
                     onClick={() =>
                       onStartWarRun(war, {
@@ -718,7 +718,7 @@ export default function ClubWarPanel({
                     }
                   >
                     {racing ? 'Finish your current run first' : 'Start War Run'}
-                  </button>
+                  </GameButton>
                 )}
               </>
             )}
@@ -795,14 +795,13 @@ export default function ClubWarPanel({
             {queueEntry.squadSize}-member squad
           </p>
           {isLeader && (
-            <button
-              type="button"
-              className="game-btn game-btn-wood"
+            <GameButton
+              variant="neutral"
               onClick={handleCancelQueue}
               disabled={busy === 'cancel'}
             >
               {busy === 'cancel' ? 'Cancelling…' : 'Cancel & Refund'}
-            </button>
+            </GameButton>
           )}
           {actionError && (
             <p className="game-controls-hint game-controls-hint-error">
@@ -830,9 +829,8 @@ export default function ClubWarPanel({
             battle - it just isn&apos;t showing up here yet. Try refreshing in a
             moment; if it still won&apos;t show, contact support.
           </p>
-          <button
-            type="button"
-            className="game-btn game-btn-wood"
+          <GameButton
+            variant="neutral"
             onClick={async () => {
               setBusy('recheck')
               const found = await refresh()
@@ -842,7 +840,7 @@ export default function ClubWarPanel({
             disabled={busy === 'recheck'}
           >
             {busy === 'recheck' ? 'Checking…' : 'Refresh'}
-          </button>
+          </GameButton>
         </section>
         {rules}
         {historyButton}
@@ -903,15 +901,15 @@ export default function ClubWarPanel({
             <p className="game-menu-section-title">
               Pick the Squad ({selected.length}/{size})
             </p>
-            <button
-              type="button"
-              className="game-btn game-btn-wood game-btn-sm"
+            <GameButton
+              variant="neutral"
+              size="sm"
               onClick={() =>
                 setSelected(roster.slice(0, size).map((m) => m.userId))
               }
             >
               Auto-pick
-            </button>
+            </GameButton>
           </div>
           <ul className="game-rows">
             {roster.map((m) => {
@@ -943,9 +941,9 @@ export default function ClubWarPanel({
             })}
           </ul>
 
-          <button
-            type="button"
-            className="game-btn game-btn-green game-btn-lg"
+          <GameButton
+            size="lg"
+            fullWidth
             onClick={handleQueue}
             disabled={
               busy === 'queue' || selected.length !== size || !canAfford
@@ -958,7 +956,7 @@ export default function ClubWarPanel({
                 : selected.length !== size
                   ? `Pick ${size - selected.length} more`
                   : `Find Opponent · ${fee} Fahhcoin`}
-          </button>
+          </GameButton>
           {actionError && (
             <p className="game-controls-hint game-controls-hint-error">
               {actionError}

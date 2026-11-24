@@ -257,3 +257,32 @@ test('Log out asks for confirmation first; Stay keeps you signed in', async ({
   await expect(dialog).toBeHidden()
   await expect(page.getByTestId('settings-account')).toBeVisible()
 })
+
+test('hidden map debug switch on the version text: 7 quick taps, or a 1.5 s hold', async ({
+  mockedPage: page,
+  context,
+}) => {
+  await openSettings(page, context, SMALL)
+  const ver = page.getByTestId('app-version')
+  await ver.scrollIntoViewIfNeeded()
+  const flag = () =>
+    page.evaluate(() => localStorage.getItem('fahhkit_debug_map'))
+  expect(await flag()).toBeNull()
+  await ver.evaluate((el) => {
+    for (let i = 0; i < 7; i += 1) {
+      for (const type of ['pointerdown', 'pointerup']) {
+        el.dispatchEvent(
+          new PointerEvent(type, { bubbles: true, pointerType: 'touch' })
+        )
+      }
+    }
+  })
+  await expect.poll(flag).toBe('1')
+  // hold toggles it back off (mouse down, wait, up)
+  const box = await ver.boundingBox()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(1800)
+  await page.mouse.up()
+  await expect.poll(flag).toBe('0')
+})

@@ -1,19 +1,21 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { mailDisplayBody } from '../utils/mailDetails'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import {
   IconChevronRight,
   IconEnvelope,
   IconEnvelopeOpen,
-  IconGift,
   IconMegaphone,
   IconTrash,
-  IconUsers,
 } from './GameIcons'
+import { MAIL_ICONS } from './mailIcons'
 import { useToast } from '../game/ui/Toast'
-import Tabs from '../game/ui/Tabs'
+import Badge from '../game/ui/Badge'
 import MailDetail from './MailDetail'
 import { MailEmpty, MailError, MailSkeleton } from './MailStates'
+// The Leaderboard's own row/skeleton recipe (.lb-row) is reused for mail rows.
+import './LeaderboardPodium.css'
 import './MailPanel.css'
 import {
   formatMailDate,
@@ -22,17 +24,18 @@ import {
   mailPreview,
 } from '../utils/mailView'
 import {
+  mailCategory,
+  mailTitle,
+  mailTypeClass,
+  mailTypeInfo,
+} from '../utils/mailTypes'
+import {
   MAIL_ACTIONS,
   MAIL_STATUS_LABEL,
   MAIL_TABS,
   NEWS_TAG,
 } from '../constants/mailCopy'
-
-const TYPE_ICON = {
-  NOTICE: IconEnvelope,
-  CLUB_INVITE: IconUsers,
-  STORE_ITEM_GRANT: IconGift,
-}
+import GameButton from './ui/GameButton'
 
 // Neither list has its own scroll box - the whole menu sheet scrolls (see
 // GamePage.css's .game-menu-sheet) - so this watches a sentinel row at the
@@ -105,6 +108,7 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
     decline,
     remove,
     removeAllRead,
+    markAllRead,
     openBroadcast,
     refresh,
     mailPage,
@@ -200,11 +204,14 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
     if (updated) onClaimed?.(updated)
   }
 
-  // Only a per-item read endpoint exists server-side (see api/mail.js) - no
-  // bulk "mark all read" call - so this is what tapping into every unread row
-  // one at a time would do, just fired together (current page only).
-  function handleMarkAllRead() {
-    mail.filter((m) => m.status === 'UNREAD').forEach((item) => open(item))
+  // See useMailbox.markAllRead: instant local update, then the per-mail read
+  // calls (the server has no bulk endpoint).
+  async function handleMarkAllRead() {
+    const count = await markAllRead()
+    if (count > 0)
+      pushToast(`Marked ${count} mail${count === 1 ? '' : 's'} as read`, {
+        type: 'success',
+      })
   }
 
   // The open item always comes from the live lists, so a claim/read shows up
@@ -220,6 +227,20 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
   }
 
   const showingInbox = view === 'inbox'
+  const mailTabs = [
+    {
+      id: 'inbox',
+      label: MAIL_TABS.inbox,
+      icon: <IconEnvelope aria-hidden="true" />,
+      badge: unreadInbox > 0 ? unreadInbox : undefined,
+    },
+    {
+      id: 'news',
+      label: MAIL_TABS.news,
+      icon: <IconMegaphone aria-hidden="true" />,
+      badge: unreadNews > 0 ? unreadNews : undefined,
+    },
+  ]
 
   return (
     <div className="mail-panel game-cards" ref={rootRef}>
@@ -227,54 +248,61 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
         {/* One sticky block (header actions + tabs): the menu sheet this
             lives in is the scroll container, and sticky pins against it. */}
         <div className="mail-panel-sticky-head" ref={headRef}>
-          {showingInbox && (readOnPage > 0 || unreadInbox > 0) && (
+          {/* The Leaderboard's own tab row (same markup/classes as its Top
+              Players / Top Clubs switch): selected = filled slate, with the
+              unread count inside the tab. */}
+          <div
+            className="game-menu-subtabs game-shop-tabs game-leaderboard-mode mail-tabs"
+            role="tablist"
+            aria-label="Mail"
+          >
+            {mailTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={view === tab.id}
+                className={`game-menu-subtab ${view === tab.id ? 'active' : ''}`}
+                onClick={() => switchView(tab.id)}
+              >
+                {tab.icon}
+                <span className="game-menu-subtab-label">{tab.label}</span>
+                {tab.badge != null && (
+                  <span className="g-tab-badge">
+                    <Badge kind="count">{tab.badge}</Badge>
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Inbox only, below the tabs: two equal secondary buttons. Each is
+              muted when it has nothing to do. */}
+          {showingInbox && mail.length > 0 && (
             <div className="mail-panel-header">
-              {readOnPage > 0 && (
-                <button
-                  type="button"
-                  className="mail-delete-read-btn"
-                  onClick={() =>
-                    setConfirmDelete({ kind: 'bulk', count: readOnPage })
-                  }
-                >
-                  <IconTrash aria-hidden="true" /> {MAIL_ACTIONS.deleteRead}
-                </button>
-              )}
-              {unreadInbox > 0 && (
-                <button
-                  type="button"
-                  className="mail-mark-all-btn"
-                  onClick={handleMarkAllRead}
-                >
-                  {MAIL_ACTIONS.markAllRead}
-                </button>
-              )}
+              <GameButton
+                variant="neutral"
+                size="sm"
+                className="mail-mark-all-btn"
+                onClick={handleMarkAllRead}
+                disabled={unreadInbox === 0}
+              >
+                {MAIL_ACTIONS.markAllRead}
+              </GameButton>
+              <GameButton
+                variant="danger"
+                size="sm"
+                className="mail-delete-read-btn"
+                icon={<IconTrash aria-hidden="true" />}
+                onClick={() =>
+                  setConfirmDelete({ kind: 'bulk', count: readOnPage })
+                }
+                disabled={readOnPage === 0}
+              >
+                {MAIL_ACTIONS.deleteRead}
+              </GameButton>
             </div>
           )}
-
-          {/* One style for both tabs: the same icon family, the shop purple
-              for the selected one, and the unread count on each. */}
-          <Tabs
-            className="mail-tabs"
-            accent="shop"
-            ariaLabel="Mail"
-            value={view}
-            onChange={switchView}
-            tabs={[
-              {
-                id: 'inbox',
-                label: MAIL_TABS.inbox,
-                icon: <IconEnvelope aria-hidden="true" />,
-                badge: unreadInbox > 0 ? unreadInbox : undefined,
-              },
-              {
-                id: 'news',
-                label: MAIL_TABS.news,
-                icon: <IconMegaphone aria-hidden="true" />,
-                badge: unreadNews > 0 ? unreadNews : undefined,
-              },
-            ]}
-          />
         </div>
 
         {error ? (
@@ -285,7 +313,7 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
           mail.length === 0 ? (
             <MailEmpty kind="inbox" />
           ) : (
-            <div ref={inboxRef}>
+            <div ref={inboxRef} className="g-readable">
               {mailGroups.map((group) => (
                 <div key={group.label} className="mail-date-group">
                   <p className="mail-date-group-label">{group.label}</p>
@@ -295,8 +323,11 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
                       const Icon =
                         !unread && item.type === 'NOTICE'
                           ? IconEnvelopeOpen
-                          : TYPE_ICON[item.type] || IconEnvelope
-                      const preview = mailPreview(toClubRoleWords(item.body))
+                          : MAIL_ICONS[mailTypeInfo(item.type).icon] ||
+                            IconEnvelope
+                      const preview = mailPreview(
+                        toClubRoleWords(mailDisplayBody(item))
+                      )
                       return (
                         <li
                           key={item.id}
@@ -304,12 +335,12 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
                         >
                           <button
                             type="button"
-                            className="mail-item-row"
+                            className="lb-row mail-item-row"
                             onClick={() => openMail(item)}
                             aria-haspopup="dialog"
                           >
                             <span
-                              className={`mail-item-icon type-${item.type}`}
+                              className={`mail-item-icon cat-${mailCategory(item.type)} type-${mailTypeClass(item.type)}`}
                             >
                               <Icon />
                             </span>
@@ -322,7 +353,7 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
                                   />
                                 )}
                                 <span className="mail-item-title">
-                                  {toClubRoleWords(item.title)}
+                                  {toClubRoleWords(mailTitle(item))}
                                 </span>
                               </span>
                               {preview && (
@@ -358,27 +389,27 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
                   (see findMyMail in src/api/mail.js). */}
               {mailTotalPages > 1 && (
                 <div className="game-route-pager">
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood game-btn-sm"
+                  <GameButton
+                    variant="neutral"
+                    size="sm"
                     aria-label="Previous page"
                     disabled={mailPage <= 1 || loadingMail}
                     onClick={() => goToMailPage(mailPage - 1)}
                   >
                     ◀
-                  </button>
+                  </GameButton>
                   <span className="game-route-pager-label">
                     Page {mailPage} of {mailTotalPages}
                   </span>
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood game-btn-sm"
+                  <GameButton
+                    variant="neutral"
+                    size="sm"
                     aria-label="Next page"
                     disabled={mailPage >= mailTotalPages || loadingMail}
                     onClick={() => goToMailPage(mailPage + 1)}
                   >
                     ▶
-                  </button>
+                  </GameButton>
                 </div>
               )}
             </div>
@@ -386,7 +417,7 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
         ) : broadcasts.length === 0 ? (
           <MailEmpty kind="news" />
         ) : (
-          <ul className="news-card-list" ref={newsRef}>
+          <ul className="news-card-list g-readable" ref={newsRef}>
             {broadcasts.map((item) => (
               <NewsCard key={item.id} item={item} onOpen={openNews} />
             ))}
@@ -466,20 +497,19 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
               </>
             )}
             <div className="game-confirm-actions">
-              <button
-                type="button"
-                className="btn btn-outline"
+              <GameButton
+                variant="neutral"
                 onClick={() => setConfirmDelete(null)}
               >
                 Cancel
-              </button>
-              <button
-                type="button"
+              </GameButton>
+              <GameButton
+                variant="danger"
                 className="mail-confirm-delete-btn"
                 onClick={handleConfirmDelete}
               >
                 Delete
-              </button>
+              </GameButton>
             </div>
           </div>
         </div>

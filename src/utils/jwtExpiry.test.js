@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { isTokenUsable, tokenExpiryMs } from './jwtExpiry'
+import {
+  REFRESH_GRACE_MS,
+  isTokenExpired,
+  isTokenUsable,
+  tokenExpiryMs,
+} from './jwtExpiry'
 
 const b64 = (o) =>
   btoa(JSON.stringify(o))
@@ -17,9 +22,16 @@ describe('jwtExpiry', () => {
     expect(isTokenUsable(null)).toBe(false)
     expect(isTokenUsable('')).toBe(false)
   })
-  it('expired = signed out; future = usable', () => {
-    expect(isTokenUsable(jwt({ exp: NOW / 1000 - 1 }), NOW)).toBe(false)
+  it('past expiry + refresh grace = signed out; future or within grace = usable', () => {
+    const graceS = REFRESH_GRACE_MS / 1000
+    expect(isTokenUsable(jwt({ exp: NOW / 1000 - graceS - 1 }), NOW)).toBe(
+      false
+    )
     expect(isTokenUsable(jwt({ exp: NOW / 1000 + 60 }), NOW)).toBe(true)
+    // expired an hour ago: the backend still refreshes it
+    expect(isTokenUsable(jwt({ exp: NOW / 1000 - 3600 }), NOW)).toBe(true)
+    expect(isTokenExpired(jwt({ exp: NOW / 1000 - 1 }), NOW)).toBe(true)
+    expect(isTokenExpired(jwt({ exp: NOW / 1000 + 60 }), NOW)).toBe(false)
   })
   it('an opaque or unreadable token is usable until the server says otherwise', () => {
     expect(isTokenUsable('mock-token', NOW)).toBe(true)

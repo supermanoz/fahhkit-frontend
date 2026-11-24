@@ -13,6 +13,7 @@ import {
   initialGameAuthState,
   gameAuthReducer,
 } from '../../utils/gameAuthState'
+import { isOnline } from '../../utils/connectivity'
 import GameWelcomeScreen from './GameWelcomeScreen'
 import GameSignInScreen from './GameSignInScreen'
 import GameSignUpScreen from './GameSignUpScreen'
@@ -82,6 +83,18 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
     dispatch({ type: 'CLEAR_BANNER' })
   }
 
+  // Sign-in / sign-up / Google / Apple / password reset all need the server:
+  // offline they stop here with a plain line instead of a doomed request.
+  function blockedOffline() {
+    if (isOnline()) return false
+    dispatch({
+      type: 'SUBMIT_ERROR',
+      kind: 'warning',
+      message: 'Needs internet - connect to Wi-Fi or mobile data to continue.',
+    })
+    return true
+  }
+
   // One place turns any failure into what the player sees: logged for
   // developers (console only), mapped to a friendly line by
   // utils/authErrors.js - never a code, a plugin message or server text.
@@ -117,6 +130,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   }
 
   async function handleSignIn(mobileNumber, password) {
+    if (blockedOffline()) return
     dispatch({ type: 'SUBMIT_START' })
     try {
       const data = await auth.signIn(mobileNumber, password)
@@ -132,6 +146,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   }
 
   async function handleGoogleCredential(idToken) {
+    if (blockedOffline()) return
     dispatch({ type: 'SUBMIT_START' })
     try {
       const data = await auth.signInWithGoogle(idToken)
@@ -142,6 +157,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   }
 
   async function handleAppleCredential(identityToken, fullName, extra) {
+    if (blockedOffline()) return
     dispatch({ type: 'SUBMIT_START' })
     try {
       const data = await auth.signInWithApple(identityToken, fullName, extra)
@@ -163,6 +179,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   }
 
   async function handleSignUp(formValues) {
+    if (blockedOffline()) return
     dispatch({ type: 'SUBMIT_START' })
     try {
       const data = await auth.signUpAthlete(formValues)
@@ -180,6 +197,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   // password, so re-sending them is exactly what forgot-password already
   // does. Reusing it here instead of inventing a fake resend call.
   async function handleResend() {
+    if (blockedOffline()) return
     if (state.resendCooldownSeconds > 0) return
     try {
       await auth.forgotPassword(state.pendingMobile)
@@ -192,6 +210,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   }
 
   async function handleForgot(mobileNumber) {
+    if (blockedOffline()) return
     dispatch({ type: 'SUBMIT_START' })
     try {
       await auth.forgotPassword(mobileNumber)
@@ -202,6 +221,7 @@ export default function GameAuthGate({ onAuthenticated, onBackStateChange }) {
   }
 
   async function handleSetPassword({ mobileNumber, oldPassword, newPassword }) {
+    if (blockedOffline()) return
     dispatch({ type: 'SUBMIT_START' })
     try {
       await auth.completePasswordSetup({

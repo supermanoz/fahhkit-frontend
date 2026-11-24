@@ -363,6 +363,63 @@
   text-shadow: var(--game-text-shadow);
 }
 
+/* ---------- Outlined-text convention (READ BEFORE ADDING A LIGHT POPUP) ----------
+   The rule above gives EVERY element under .game-root a white-style outline:
+   a black text stroke plus a hard drop shadow. That look is only right on DARK
+   or BUSY backgrounds (map labels, HUD numbers, coloured ribbons/banners, button
+   faces). Dark text with that outline on a LIGHT panel smears into a blur.
+
+   Because the rule hits each element on its own (not just the popup's wrapper),
+   an opt-out on a <p> never reaches the <span>/<strong>/<a> inside it. So light
+   surfaces opt out ONCE, at the surface, by zeroing the two tokens the rule
+   reads - custom properties inherit, so every descendant resolves to
+   "no outline". Rules for this:
+     1. A new light popup/dialog/card face: add its class to the list below.
+        (tests: src/game/styles/outlineConvention.test.js enforces it.)
+     2. Never put -webkit-text-stroke / hard text-shadow on dark text. An
+        explicit outline is only for a light fill on a dark/coloured background.
+     3. A coloured thing INSIDE a light surface that needs the outline (button
+        face, ribbon, count badge) is restored in the second list.
+     4. Body copy in popups uses --font-body (see gameSkin.css "Text inside
+        popups"); --font-display is for the title banner, short headings and
+        numbers only. */
+:is(
+  .gm-panel-inner,
+  .game-confirm-card,
+  .g-panel.g-modal,
+  .bcast-card,
+  .dr-panel,
+  .pvp-pr-panel,
+  .game-territory-popup,
+  .hero-modal,
+  .prize-info-card,
+  .run-rewards-card,
+  .shop-confirm-card,
+  .game-legal-panel,
+  .set-card,
+  .cs-sheet,
+  .g-toast,
+  .game-claim-toast,
+  .game-highlight-toast
+) {
+  --game-text-stroke-width: 0px;
+  --game-text-shadow: none;
+}
+/* Coloured faces inside a light surface keep the outline (their own fill is
+   dark/saturated, so the white label needs it). */
+:is(
+  .gbtn,
+  .btn,
+  .game-btn,
+  .g-badge,
+  .gm-ribbon,
+  .g-modal-ribbon,
+  .hero-modal-ribbon
+) {
+  --game-text-stroke-width: var(--game-text-size-step);
+  --game-text-shadow: 0 var(--game-text-size-step) 0 #000;
+}
+
 .game-text {
   color: var(--game-text);
 }

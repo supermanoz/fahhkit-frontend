@@ -1,21 +1,21 @@
-/* Mail page (Inbox / News). Copy: constants/mailCopy.js. Tabs are the shared
-   Tabs (shop purple when selected); rows and news posts are clean cards with
-   plain ink text in the readable body font - no white outlines. */
+/* Mail page (Inbox / News). Built from the Leaderboard's own pieces: the same
+   panel (.game-card), tab row (.game-leaderboard-mode), row cards (.lb-row,
+   from LeaderboardPodium.css) and tokens; buttons are the shared GameButton.
+   Only what the Leaderboard doesn't have lives here: the mail icon badges,
+   unread emphasis, news cards and the loading/empty/error states.
+   Copy: constants/mailCopy.js. */
 
 /* /game forces the display font on everything via
-   `.game-page :not(code):not(pre)` (specificity 0,3,0); the Mail text uses the
-   readable body font, so these selectors out-rank it. */
+   `.game-page :not(code):not(pre)` (specificity 0,3,0). Titles and labels keep
+   that display font like the Leaderboard names; only running sentences
+   (previews, summaries, the opened message) use the readable body font, so
+   these selectors out-rank it. */
 .game-page.game-root
   .mail-panel
   :where(
-    .mail-item-title,
     .mail-item-preview,
     .mail-item-date,
     .mail-item-status,
-    .mail-date-group-label,
-    .mail-mark-all-btn,
-    .mail-delete-read-btn,
-    .news-card-title,
     .news-card-summary,
     .news-card-meta,
     .news-card-tag,
@@ -26,10 +26,10 @@
   .mail-detail
   :where(
     .mail-detail-text,
+    .mail-detail-text *,
     .mail-detail-link,
     .mail-chip,
-    .mail-reward-chip,
-    .mail-delete-btn
+    .mail-reward-chip
   ) {
   font-family: var(--font-body);
   text-shadow: none;
@@ -38,13 +38,19 @@
   text-transform: none;
 }
 
-.mail-panel {
-  --mail-head-h: 56px;
+.mail-panel,
+.mail-detail {
+  --mail-line: var(--divider, #d6d2c3);
   --mail-ink: var(--text-title-dark, #2b2a24);
   --mail-muted: var(--text-muted-dark, #6b6759);
-  --mail-line: var(--divider, #d6d2c3);
-  --mail-purple: var(--shop-accent, #be2ed6);
-  --mail-purple-dark: var(--shop-accent-dark, #8f1fa3);
+}
+
+.mail-panel {
+  --mail-head-h: 56px;
+  /* Same tokens the Leaderboard (.lb) resolves. */
+  --lb-gold: var(--game-gold, #ff7a29);
+  --lb-gold-light: var(--game-gold-light, #ffb15c);
+  --lb-cream: var(--game-cream, #fff6e6);
 }
 
 .mail-panel-card {
@@ -52,77 +58,74 @@
 }
 
 /* Header actions + tabs pinned together as one sticky block; the menu sheet
-   is the scroll container. An opaque background so rows scrolled under it
+   is the scroll container. Same colour as the panel so rows scrolled under it
    don't show through. */
 .mail-panel-sticky-head {
   position: sticky;
   top: 0;
   z-index: 3;
-  margin: -4px -4px 10px;
-  padding: 4px 4px 8px;
+  margin: -4px -4px 12px;
+  padding: 4px 4px 0;
   background: var(--game-panel);
-}
-
-.mail-panel-header {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Tabs: two equal buttons across the full width. */
+.game-page .mail-tabs.game-leaderboard-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+.game-page .mail-tabs.game-leaderboard-mode .game-menu-subtab {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 10px;
+  white-space: nowrap;
+}
+/* Toolbar under the tabs: two equal, shorter secondary buttons. */
+.mail-panel-header {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding-bottom: 8px;
 }
-.mail-mark-all-btn,
-.mail-delete-read-btn {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+.mail-panel-header .gbtn {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  height: 38px;
+  white-space: nowrap;
 }
-.mail-mark-all-btn {
-  color: var(--mail-ink);
-  background: #fffdf8;
-  border: 2px solid var(--mail-line);
+.mail-panel-header .gbtn-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.mail-delete-read-btn {
-  color: #a12b1e;
-  background: #fdecea;
-  border: 2px solid #d9958c;
-}
-.mail-delete-read-btn svg {
-  font-size: 14px;
-}
-.mail-mark-all-btn:active,
-.mail-delete-read-btn:active {
-  transform: translateY(1px);
-}
-.mail-mark-all-btn:focus-visible,
-.mail-delete-read-btn:focus-visible,
+
 .mail-item-row:focus-visible,
-.news-card-trigger:focus-visible,
-.mail-delete-btn:focus-visible {
-  outline: 3px solid var(--mail-purple-dark);
+.news-card-trigger:focus-visible {
+  outline: 3px solid var(--lb-gold);
   outline-offset: 2px;
 }
 
-.mail-tabs {
-  align-self: stretch;
-}
-/* Unread count on each tab (the shared Tabs badge). */
+/* The Leaderboard's tab row; the unread count sits inline after the label
+   (the tab clips its overflow, so no corner badge). */
 .mail-tabs .g-tab-badge {
-  top: -7px;
-  right: -2px;
+  position: static;
+  display: inline-flex;
+  flex-shrink: 0;
+  z-index: 1;
 }
 
-/* ---------------- Inbox: date groups + message cards ---------------- */
+/* ---------------- Inbox: date groups + message rows ---------------- */
 .mail-date-group + .mail-date-group {
   margin-top: 6px;
 }
+/* Same look as the Leaderboard's list head. */
 .mail-date-group-label {
   position: sticky;
   top: var(--mail-head-h);
@@ -130,11 +133,9 @@
   margin: 0;
   padding: 8px 4px 6px;
   background: var(--game-panel);
-  color: var(--mail-muted);
+  color: #4a473d;
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .mail-list {
@@ -146,60 +147,62 @@
   gap: 8px;
 }
 
-.mail-item {
-  border-radius: 16px;
-  border: 2px solid var(--mail-line);
-  background: #faf8f2;
-  overflow: hidden;
+/* A row is a .lb-row (border, chunky edge, radius, padding, hover); only the
+   columns differ: icon badge | text | time + chevron. */
+.lb-row.mail-item-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  min-height: 60px;
 }
-/* Unread: white card, purple edge, bolder title and a purple dot. */
-.mail-item.is-unread {
-  background: #fff;
-  border-color: #d9a7e6;
-  box-shadow: inset 4px 0 0 var(--mail-purple);
+/* Unread = the Leaderboard's "you" highlight treatment: warm fill + gold edge. */
+.mail-item.is-unread .lb-row {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 173, 92, 0.3) 0%,
+    rgba(255, 122, 41, 0.14) 100%
+  );
+  border-color: var(--lb-gold);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 3px 0 var(--game-ink),
+    0 0 0 2px var(--lb-gold-light);
 }
-
-.mail-item-row {
-  all: unset;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 64px;
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 12px;
-  padding: 10px 12px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.mail-item-row:hover {
-  background: rgba(43, 42, 36, 0.05);
-}
-.mail-item-row:active {
-  background: rgba(43, 42, 36, 0.1);
+/* Read = muted: flat, quieter. */
+.mail-item.is-read .lb-row {
+  box-shadow: 0 2px 0 var(--game-ink);
 }
 
-/* Type icon in a coloured circle (real mail types only). */
+/* Type icon in a coloured round badge, same size/ring as .lb-row-avatar. */
 .mail-item-icon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #2f6fb5; /* NOTICE */
+  background: #5b6b7e; /* system */
   color: #fff;
-  font-size: 22px;
-  border: 2px solid rgba(43, 42, 36, 0.35);
+  font-size: 20px;
+  border: 2px solid var(--game-ink);
+  box-shadow: 0 0 0 2px rgba(246, 236, 217, 0.35);
 }
-.mail-item-icon.type-CLUB_INVITE {
-  background: #2e7d32;
+.mail-item-icon.cat-challenge {
+  background: #d9482b;
 }
-.mail-item-icon.type-STORE_ITEM_GRANT {
-  background: #c2570c;
+.mail-item-icon.cat-result {
+  background: #2e9e5b;
+}
+.mail-item-icon.cat-territory {
+  background: #2f6fb5;
+}
+.mail-item-icon.cat-reward {
+  background: #c98a10;
+}
+.mail-item-icon.cat-news {
+  background: #7a45c9;
 }
 .mail-item.is-read .mail-item-icon {
-  opacity: 0.8;
+  opacity: 0.65;
+  filter: saturate(0.7);
 }
 
 .mail-item-main {
@@ -216,35 +219,46 @@
 }
 .mail-item-title {
   min-width: 0;
+  /* Up to two lines, so a title is never cut mid-word ("Run complete"). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
   color: var(--mail-ink);
   font-size: 15px;
   line-height: 1.3;
+  padding: 1px 1px 2px;
 }
 .mail-item.is-unread .mail-item-title {
   font-weight: 800;
 }
 .mail-item.is-read .mail-item-title {
-  font-weight: 600;
+  color: #4a473d;
 }
 .mail-item-dot {
   flex-shrink: 0;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--mail-purple-dark);
+  background: var(--lb-gold);
+  border: 2px solid var(--game-ink);
+  box-sizing: border-box;
 }
 .mail-item-preview {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--mail-muted);
+  color: #4a473d;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
+}
+.mail-item.is-read .mail-item-preview {
+  opacity: 0.85;
 }
 
 .mail-item-side {
@@ -254,7 +268,7 @@
   gap: 4px;
 }
 .mail-item-date {
-  color: var(--mail-muted);
+  color: #5a5648;
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
@@ -262,12 +276,13 @@
 .mail-item-chevron {
   width: 16px;
   height: 16px;
-  color: var(--mail-muted);
+  color: var(--text-muted);
 }
 .mail-item-status {
   padding: 1px 8px;
   border-radius: 999px;
   background: #e1f3e5;
+  border: 1.5px solid #9cd0a8;
   color: #17602a;
   font-size: 11px;
   font-weight: 800;
@@ -276,7 +291,7 @@
 .mail-list-sentinel {
   padding: 8px;
   text-align: center;
-  color: var(--mail-muted);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -289,16 +304,34 @@
   flex-direction: column;
   gap: 12px;
 }
+/* Same card recipe as a .lb-row (border, radius, chunky edge). */
 .news-card {
-  border-radius: 16px;
-  border: 2px solid var(--mail-line);
-  background: #faf8f2;
   overflow: hidden;
+  border-radius: 14px;
+  border: 2.5px solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 236, 217, 0.12) 0%,
+    rgba(246, 236, 217, 0.04) 100%
+  );
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 var(--game-ink);
 }
 .news-card.is-unread {
-  background: #fff;
-  border-color: #d9a7e6;
-  box-shadow: 0 0 0 2px rgba(190, 46, 214, 0.18);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 173, 92, 0.3) 0%,
+    rgba(255, 122, 41, 0.14) 100%
+  );
+  border-color: var(--lb-gold);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 3px 0 var(--game-ink),
+    0 0 0 2px var(--lb-gold-light);
+}
+.news-card:not(.is-unread) {
+  box-shadow: 0 2px 0 var(--game-ink);
 }
 .news-card-trigger {
   all: unset;
@@ -309,6 +342,9 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.news-card-trigger:hover {
+  background: rgba(246, 236, 217, 0.1);
+}
 .news-card-trigger:active {
   background: rgba(43, 42, 36, 0.06);
 }
@@ -318,7 +354,8 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: linear-gradient(135deg, #5b2a8a, var(--mail-purple-dark));
+  border-bottom: 2.5px solid var(--game-ink);
+  background: linear-gradient(135deg, #5b2a8a, #7a45c9);
 }
 .news-card-media img {
   position: absolute;
@@ -342,7 +379,8 @@
   left: 8px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: rgba(20, 16, 44, 0.9);
+  border: 2px solid var(--game-ink);
+  background: var(--lb-gold);
   color: #fff;
   font-size: 12px;
   font-weight: 800;
@@ -351,7 +389,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 12px 12px;
+  padding: 10px 14px 12px;
 }
 .news-card-head {
   display: flex;
@@ -360,24 +398,28 @@
 }
 .news-card-title {
   min-width: 0;
-  color: var(--mail-ink);
+  color: var(--lb-cream);
   font-size: 16px;
   font-weight: 800;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+.news-card:not(.is-unread) .news-card-title {
+  color: var(--text-muted);
+  font-weight: 700;
 }
 .news-card-summary {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  color: var(--mail-muted);
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
 }
 .news-card-meta {
-  color: var(--mail-muted);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -386,7 +428,7 @@
 .mail-skeleton {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .mail-skel-block {
   display: block;
@@ -400,20 +442,29 @@
   background-size: 200% 100%;
   animation: mail-skel-shimmer 1.4s ease-in-out infinite;
 }
+/* Same box as a real .lb-row so nothing jumps when mail arrives. */
+.mail-skel-row,
+.mail-skel-news {
+  border-radius: 14px;
+  border: 2.5px solid var(--game-ink);
+  box-shadow: 0 2px 0 var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 236, 217, 0.12) 0%,
+    rgba(246, 236, 217, 0.04) 100%
+  );
+}
 .mail-skel-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
-  column-gap: 12px;
-  min-height: 64px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  border: 2px solid var(--mail-line);
-  background: #faf8f2;
+  column-gap: 10px;
+  min-height: 60px;
+  padding: 10px 14px;
 }
 .mail-skel-circle {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
 }
 .mail-skel-lines {
@@ -432,9 +483,6 @@
   flex-direction: column;
   gap: 8px;
   padding-bottom: 12px;
-  border-radius: 16px;
-  border: 2px solid var(--mail-line);
-  background: #faf8f2;
   overflow: hidden;
 }
 .mail-skel-banner {
@@ -443,7 +491,7 @@
   border-radius: 0;
 }
 .mail-skel-news .mail-skel-line {
-  margin: 0 12px;
+  margin: 0 14px;
 }
 @keyframes mail-skel-shimmer {
   0% {
@@ -467,6 +515,7 @@
   padding: 28px 18px;
   text-align: center;
 }
+/* Game-style medallion: ink ring + chunky edge, in the Leaderboard's slate. */
 .mail-illustration {
   width: 96px;
   height: 96px;
@@ -474,14 +523,18 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #f4e3f8;
+  background: linear-gradient(
+    180deg,
+    var(--lb-accent-light, #cbd5e1),
+    var(--lb-accent, #64748b)
+  );
   border: 3px solid var(--game-ink);
   box-shadow: 0 3px 0 var(--game-ink);
 }
 .mail-illustration-art {
-  width: 64px;
-  height: 64px;
-  background-color: var(--mail-purple-dark);
+  width: 60px;
+  height: 60px;
+  background-color: #fff;
   -webkit-mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -498,7 +551,7 @@
 }
 .mail-state-hint {
   margin: 0;
-  color: var(--mail-muted);
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
 }
@@ -612,52 +665,52 @@
   color: #c2570c;
 }
 
-/* ---------------- Delete ---------------- */
-.mail-delete-btn {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Event-mail facts (run / race / war / territory / level / reward details). */
+.mail-detail-facts {
+  margin: 10px 0 0;
+  display: grid;
   gap: 6px;
-  min-height: 44px;
-  padding: 0 14px;
+}
+.mail-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
   border-radius: 10px;
-  color: #a12b1e;
+  background: rgba(0, 0, 0, 0.05);
   font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
 }
-.mail-delete-btn svg {
-  font-size: 16px;
+.mail-fact dt {
+  margin: 0;
+  opacity: 0.7;
 }
-.mail-delete-btn:hover:not(:disabled) {
-  background: #fdecea;
-}
-.mail-delete-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.mail-fact dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
 }
 
-/* Confirm popup's red Delete (same shape as the other confirm actions). */
-.mail-confirm-delete-btn {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 9px 20px;
-  border-radius: 999px;
-  background: var(--game-red);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
+/* Group label stays upper-case even inside .g-readable (which resets it);
+   same specificity trick as the block at the top of this file. */
+.game-page.game-root .mail-panel .mail-date-group-label {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.mail-confirm-delete-btn:hover {
-  background: var(--game-red-dark);
+
+/* The two header buttons are small: body font so the label reads at a glance
+   (the game font + outline smudged at this size). */
+.game-page.game-root .mail-panel .mail-panel-header .gbtn,
+.game-page.game-root .mail-panel .mail-panel-header .gbtn * {
+  font-family: var(--font-body);
+  font-weight: 800;
+  letter-spacing: normal;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
+  text-shadow: none;
 }
-.mail-confirm-delete-btn:active {
-  transform: translateY(1px);
+.mail-mark-all-btn:disabled,
+.mail-mark-all-btn[aria-disabled='true'],
+.mail-delete-read-btn:disabled,
+.mail-delete-read-btn[aria-disabled='true'] {
+  opacity: 0.5;
 }

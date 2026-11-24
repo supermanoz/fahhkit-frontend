@@ -7,11 +7,13 @@ import VolumeSlider from '../game/ui/VolumeSlider'
 import { TOUR_ACTIONS } from '../constants/tourCopy'
 import { GAME_CONTACT_EMAIL } from '../constants/gameLegal'
 import { isNative } from '../utils/geo'
+import { toggleMapDebug } from '../utils/mapDebug'
 import { copyText, openExternal, openMailto } from '../utils/externalLink'
 import { playSfx } from '../utils/gameSound'
 import {
   IconBook,
   IconChevronRight,
+  IconCompassNeedle,
   IconCopy,
   IconCrosshairs,
   IconEnvelope,
@@ -24,8 +26,13 @@ import {
 import MapStylePicker from './MapStylePicker'
 import NotificationsSection from './NotificationsSection'
 import { mapConfig } from '../config/mapProvider'
+import {
+  setRotateWhileRunning,
+  useRotateWhileRunning,
+} from '../utils/mapRotationSetting'
 import { RowLabel, SettingsCard, SwitchRow } from './SettingsParts'
 import './GameSettings.css'
+import GameButton from './ui/GameButton'
 
 const INSTAGRAM_URL = 'https://www.instagram.com/runconquest.game/'
 const INSTAGRAM_HANDLE = '@runconquest.game'
@@ -66,6 +73,51 @@ function SliderRow({ title, sub, children }) {
 // The pieces that own behaviour stay where they were and arrive as props:
 // audio (hooks/useAudioVolumes), push, map style, PvP visibility, and the
 // handlers for edit-profile / how-to-play / legal pages / log out.
+// Secret switch on the version text: hold ~1.5 s OR tap it 7 times quickly.
+// Mobile browsers start text selection / a context menu on a long press and
+// cancel the pointer events, so: no selection (user-select none), the context
+// menu is swallowed (and counts as the hold finishing), pointercancel does not
+// abort it, and the tap count is a second way in. Module-level state, because
+// the props below are rebuilt on every render.
+const secret = { timer: null, taps: 0, lastTap: 0, fired: false }
+function secretSwitchProps(fn, ms = 1500) {
+  const fire = () => {
+    if (secret.fired) return
+    secret.fired = true
+    clearTimeout(secret.timer)
+    fn()
+  }
+  return {
+    style: {
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTouchCallout: 'none',
+      touchAction: 'manipulation',
+    },
+    onPointerDown: () => {
+      secret.fired = false
+      clearTimeout(secret.timer)
+      secret.timer = setTimeout(fire, ms)
+    },
+    onPointerUp: () => {
+      clearTimeout(secret.timer)
+      const now = Date.now()
+      secret.taps = now - secret.lastTap < 800 ? secret.taps + 1 : 1
+      secret.lastTap = now
+      if (secret.taps >= 7) {
+        secret.taps = 0
+        secret.fired = false
+        fire()
+      }
+    },
+    onPointerLeave: () => clearTimeout(secret.timer),
+    onContextMenu: (e) => {
+      e.preventDefault()
+      fire()
+    },
+  }
+}
+
 export default function GameSettings({
   audio,
   push,
@@ -79,6 +131,7 @@ export default function GameSettings({
   onLogout,
 }) {
   const toast = useToast()
+  const rotateMap = useRotateWhileRunning()
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [version, setVersion] = useState(null)
   const lastTick = useRef(0)
@@ -168,6 +221,18 @@ export default function GameSettings({
           styles={mapStyles}
           selectedId={mapStyleId}
           onSelect={onSelectMapStyle}
+        />
+        <SwitchRow
+          Icon={IconCompassNeedle}
+          title="Rotate map while running"
+          sub={
+            rotateMap
+              ? 'The map turns to face the way you run'
+              : 'The map always keeps north up'
+          }
+          checked={rotateMap}
+          onToggle={() => setRotateWhileRunning(!rotateMap)}
+          testId="rotate-map-switch"
         />
       </SettingsCard>
 
@@ -281,7 +346,14 @@ export default function GameSettings({
       <SettingsCard id="about" title="About">
         <div className="game-settings-row set-static-row">
           <RowLabel Icon={IconInfo} title="Version" />
-          <span className="set-static-value" data-testid="app-version">
+          <span
+            className="set-static-value"
+            data-testid="app-version"
+            {...secretSwitchProps(() => {
+              const on = toggleMapDebug()
+              toast.push(on ? 'Map debug panel ON' : 'Map debug panel off')
+            })}
+          >
             {version || 'Web'}
           </span>
         </div>
@@ -301,16 +373,11 @@ export default function GameSettings({
           You&apos;ll return to the sign-in screen.
         </p>
         <GameActions>
-          <button
-            type="button"
-            className="game-btn game-btn-wood"
-            onClick={() => setConfirmLogout(false)}
-          >
+          <GameButton variant="neutral" onClick={() => setConfirmLogout(false)}>
             Stay
-          </button>
-          <button
-            type="button"
-            className="game-btn game-btn-red"
+          </GameButton>
+          <GameButton
+            variant="danger"
             data-testid="logout-confirm"
             onClick={() => {
               setConfirmLogout(false)
@@ -318,7 +385,7 @@ export default function GameSettings({
             }}
           >
             Log out
-          </button>
+          </GameButton>
         </GameActions>
       </GameModal>
     </div>

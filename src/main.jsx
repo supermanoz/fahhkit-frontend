@@ -8,23 +8,30 @@ import { ThemeProvider } from './context/ThemeContext.jsx'
 import { initNativeShell } from './utils/nativeShell.js'
 import { removeLegacyReminders } from './utils/legacyReminderCleanup.js'
 import { hydrateAuthStorage } from './utils/authStorage.js'
+import { start as startConnectivity } from './utils/connectivity.js'
+import { recoverActiveRun } from './utils/run.js'
 import { startSessionKeeper } from './utils/sessionKeeper.js'
 import './utils/appActivity.js'
+import { installPageZoomGuard } from './utils/pageZoomGuard.js'
 
 initNativeShell()
+installPageZoomGuard()
 removeLegacyReminders()
 
 // Load the stored session BEFORE the first render, so no route guard / auth
 // gate ever decides "signed out" just because the session hasn't loaded yet.
-hydrateAuthStorage().finally(() => {
-  startSessionKeeper()
-  createRoot(document.getElementById('root')).render(
-    <StrictMode>
-      <ThemeProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ThemeProvider>
-    </StrictMode>
-  )
-})
+hydrateAuthStorage()
+  .then(() => recoverActiveRun())
+  .finally(() => {
+    startSessionKeeper()
+    startConnectivity()
+    createRoot(document.getElementById('root')).render(
+      <StrictMode>
+        <ThemeProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ThemeProvider>
+      </StrictMode>
+    )
+  })

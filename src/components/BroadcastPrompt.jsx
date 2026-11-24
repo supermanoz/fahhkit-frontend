@@ -17,6 +17,7 @@ import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import { openExternal } from '../utils/externalLink'
 import { safeHref } from '../utils/safeUrl'
 import './BroadcastPrompt.css'
+import GameButton from './ui/GameButton'
 
 // News/announcement broadcasts, front and center the moment the game opens
 // (see GamePage's useAnnouncementNotices). Look only - what is shown, when,
@@ -224,23 +225,20 @@ export default function BroadcastPrompt({ notices, onDismiss }) {
 
         <div className="bcast-actions">
           {linkUrl && (
-            <a
-              className="game-btn game-btn-wood bcast-open"
+            <GameButton
+              variant="neutral"
+              className="bcast-open"
               href={safeHref(linkUrl)}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => openExternal(linkUrl, e)}
             >
               Open
-            </a>
+            </GameButton>
           )}
-          <button
-            type="button"
-            className="game-btn game-btn-green bcast-got-it"
-            onClick={dismissCurrent}
-          >
+          <GameButton className="bcast-got-it" onClick={dismissCurrent}>
             Got it
-          </button>
+          </GameButton>
         </div>
       </motion.div>
     </motion.div>

@@ -74,3 +74,11 @@ describe('foregroundToastText', () => {
     expect(foregroundToastText({})).toBeNull()
   })
 })
+
+import { routeForPush as _route } from './pushRouting'
+import { it as _it, expect as _expect } from 'vitest'
+_it('a push that names a mail opens the inbox', () => {
+  _expect(_route({ type: 'MAIL' })).toEqual({ tab: 'mail' })
+  _expect(_route({ type: 'PVP_RESULT', mailId: 'm1' })).toEqual({ tab: 'mail' })
+  _expect(_route({ type: 'WHO_KNOWS' })).toBeNull()
+})

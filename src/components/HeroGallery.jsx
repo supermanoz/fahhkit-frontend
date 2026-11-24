@@ -13,6 +13,8 @@ import { getHeroSprite } from '../utils/heroSprites'
 import { resolveHeroEquipState } from '../utils/heroEquipState'
 import { getHeroUnlockPrice } from '../utils/price'
 import { PriceLabel } from './Price'
+import { useUnlockReveal } from '../hooks/useUnlockReveal'
+import './heroLocked.css'
 import './HeroGallery.css'
 
 // A swipe distance/velocity past either of these commits to the next/prev
@@ -52,6 +54,12 @@ function HeroGallery({
   // reused true/false can't go stale across the swap either.
   const [equippingHeroId, setEquippingHeroId] = useState(null)
   const draggedRef = useRef(false)
+  // Locked -> owned while this hero is on screen (just bought): a short reveal.
+  const current = heroes[index]
+  const currentLocked = current
+    ? resolveHeroEquipState(current, ownedItems, activeHeroId, level).locked
+    : false
+  const unlocking = useUnlockReveal(current?.id, currentLocked)
 
   // Keep a valid index if the roster shrinks (or loads in) under us.
   useEffect(() => {
@@ -119,6 +127,7 @@ function HeroGallery({
     tier,
     levelLocked,
     unlockLevel,
+    locked,
   } = resolveHeroEquipState(hero, ownedItems, activeHeroId, level)
   const equipping = equippingHeroId === hero.id
   const animated = Boolean(getHeroSprite(hero.name))
@@ -160,7 +169,7 @@ function HeroGallery({
               role="button"
               tabIndex={0}
               aria-label={`${hero.name} - view details`}
-              className={`hero-card tier-${tier} ${animated ? 'is-animated' : ''}`}
+              className={`hero-card tier-${tier} ${animated ? 'is-animated' : ''} ${locked ? 'is-hero-locked' : ''}`}
               onClick={() => {
                 if (draggedRef.current) {
                   draggedRef.current = false
@@ -175,7 +184,9 @@ function HeroGallery({
                 }
               }}
             >
-              <span className="hero-card-stage">
+              <span
+                className={`hero-card-stage ${unlocking ? 'is-unlocking' : ''}`}
+              >
                 <HeroStage hero={hero.name} className="hero-card-stage-bg">
                   {(h) => (
                     // Idle only - Hip Hop is a purchasable emote (see
@@ -190,6 +201,7 @@ function HeroGallery({
                       pose="idle"
                       height={h || 240}
                       releaseGraceMs={0}
+                      locked={locked}
                     />
                   )}
                 </HeroStage>

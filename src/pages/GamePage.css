@@ -1312,12 +1312,24 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* --- End/Discard - side by side, thumb-sized (48px), End clearly the
-   primary action and Discard deliberately quieter so it's never the one
-   that gets tapped by accident. --- */
+/* --- End/Discard (+ Pause/Resume in Training) - one equal-width row. End and
+   Discard are the shared GameButton; the slot class only shares the row. --- */
 .game-run-actions {
   width: 100%;
   gap: 10px;
+}
+
+.game-run-slot {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 380px) {
+  /* 3-up (Training) on 360px: tighter padding so labels never ellipsise */
+  .game-run-actions .game-run-slot {
+    gap: 4px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
 }
 
 .game-run-btn {
@@ -1356,42 +1368,14 @@
   font-size: 16px;
 }
 
-.game-run-btn-end {
-  border: 3px solid var(--game-ink);
-  color: #fff;
-  background: linear-gradient(
-    180deg,
-    var(--game-green-light) 0%,
-    var(--game-green) 45%,
-    var(--game-green-dark) 100%
-  );
-  box-shadow:
-    inset 0 -4px 0 var(--game-green-dark),
-    0 3px 0 var(--game-ink);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-}
-
-/* Discard = destructive = red (same triad as .game-btn-red), Pause/Resume =
-   the one blue secondary (--pause-*). Same slab recipe as End so none of
-   them read as greyed-out/disabled. */
-.game-run-btn-discard,
+/* Pause/Resume = the one blue secondary (--pause-*), same slab recipe as the
+   shared GameButton. End/Discard are GameButton (primary/danger) - see
+   .game-run-slot below. */
 .game-run-btn-pause,
 .game-run-btn-resume {
   border: 3px solid var(--game-ink);
   color: #fff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-}
-
-.game-run-btn-discard {
-  background: linear-gradient(
-    180deg,
-    var(--game-red-light) 0%,
-    var(--game-red) 45%,
-    var(--game-red-dark) 100%
-  );
-  box-shadow:
-    inset 0 -4px 0 var(--game-red-dark),
-    0 3px 0 var(--game-ink);
 }
 
 .game-run-btn-pause,
@@ -1488,9 +1472,8 @@
   margin-top: 6px;
 }
 
-.game-end-run-actions .game-btn {
+.game-end-run-actions .gbtn {
   flex: 1;
-  min-height: 48px;
 }
 
 /* Buttons inside the game match the shared .game-btn look (see
@@ -2415,6 +2398,17 @@
     0 5px 0 var(--game-ink);
 }
 
+/* PvP: violet (same accent as the PvP result popup), distinct from the
+   green Conquer / gold Training / red Play button. White icon on the fill. */
+.game-radial-btn.radial-violet {
+  background: #6a4be0;
+  color: #fff;
+  box-shadow:
+    inset 0 -9px 0 #4a30b0,
+    inset 0 3px 0 #8f78f0,
+    0 5px 0 var(--game-ink);
+}
+
 .game-radial-btn.radial-stone {
   background: var(--game-stone);
   /* var(--game-stone) aliases to a light tan token now - this had no own
@@ -2493,6 +2487,13 @@
   box-shadow:
     inset 0 -9px 0 var(--shop-accent-dark),
     inset 0 3px 0 var(--shop-accent-light),
+    0 1px 0 var(--game-ink);
+}
+
+.game-radial-btn.radial-violet:active {
+  box-shadow:
+    inset 0 -9px 0 #4a30b0,
+    inset 0 3px 0 #8f78f0,
     0 1px 0 var(--game-ink);
 }
 
@@ -4964,34 +4965,31 @@
 
 /* --- Text labels under the icon-only nav buttons -------------------------
    The radial menu items and the run-mode follow button are bare icons; each
-   carries its name in data-label and this draws it as a small pill
-   under the icon (no DOM change, the icon and its tap target are untouched).
-   A solid navy pill with plain white text (no stroke/shadow) keeps 12px bold
-   text readable over any map colour and over the dimmed menu scrim. One
-   line, ellipsis if it ever doesn't fit. */
+   carries its name in data-label (only set while SHOW_ICON_LABELS is on, see
+   config/iconLabels.js) and this draws it under the icon: pure text, no pill.
+   Game display font, white fill, thick dark outline (stroke painted under the
+   fill) plus a soft drop shadow, so it reads on both bright and dark map
+   tiles and over the menu scrim. Not clipped (overflow visible) so the
+   outline and shadow are never cut. */
 .game-page :is(.game-radial-btn, .game-locate-btn)[data-label]::after {
   content: attr(data-label);
   position: absolute;
   top: var(--nav-label-top, calc(100% + 9px));
   left: 50%;
   transform: translateX(-50%);
-  box-sizing: border-box;
-  max-width: 96px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(27, 35, 71, 0.92);
+  background: none;
   color: #fff;
-  font-family: var(--font-body, system-ui, sans-serif);
-  font-size: 12px;
-  font-weight: 800;
+  font-family: var(--font-display, 'Lilita One', sans-serif);
+  font-size: 13px;
+  font-weight: 400;
   line-height: 18px;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
-  paint-order: normal;
+  -webkit-text-stroke: 3.5px #0a0e28;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 0 #0a0e28,
+    0 2px 3px rgba(0, 0, 0, 0.55);
   pointer-events: none;
 }
 /* 4px-bordered round buttons: clear the border plus the hard drop shadow. */
@@ -5005,14 +5003,76 @@
 /* The follow button's label hangs below it, so lift the button by the label's
    height instead of letting it run into the action sheet underneath. (The
    menu FAB and the Recenter button have no label: original position.) */
-.game-page .game-locate-btn {
+.game-page .game-locate-btn[data-label] {
   bottom: calc(var(--sheet-h, 90px) + 34px + env(safe-area-inset-bottom, 0px));
+}
+/* Run mode: Follow button spans sheet+34 .. sheet+80 (+safe inset, which the
+   button adds on top of --sheet-h). Put the compass 16px above it - the old
+   +82 left only ~2px because of the lifted, labelled button. :has() keeps it
+   tied to the Follow button actually being on screen. */
+.game-page:has(.game-locate-btn) .territory-map-compass {
+  --stack-bottom: calc(
+    var(--sheet-h, 90px) + 96px + env(safe-area-inset-bottom, 0px)
+  );
+}
+.game-page:has(.game-locate-btn) .territory-map-rotation-hint {
+  --stack-bottom-hint: calc(
+    var(--sheet-h, 90px) + 154px + env(safe-area-inset-bottom, 0px)
+  );
 }
 @media (max-width: 380px) {
   .game-page :is(.game-radial-btn, .game-locate-btn)[data-label]::after {
-    max-width: 84px;
-    padding: 0 6px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 16px;
+    -webkit-text-stroke-width: 3px;
   }
+}
+
+/* Daily reward: "claimable" dot on the menu button + the Me-tab reopen row. */
+.game-menu-btn-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 3px solid #000;
+  box-shadow: 0 0 0 2px #fff;
+  animation: game-menu-dot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes game-menu-dot-pulse {
+  50% {
+    transform: scale(1.18);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-menu-btn-dot {
+    animation: none;
+  }
+}
+
+/* Offline: online-only entries stay visible but dimmed, with a cloud-off badge.
+   Still tappable (aria-disabled, not disabled) - a tap explains "Needs
+   internet" instead of doing nothing. */
+.game-radial-btn.is-offline-locked,
+.game-menu-tab.is-offline-locked {
+  opacity: 0.55;
+  filter: saturate(0.35);
+}
+.game-offline-lock-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #353c58;
+  border: 2px solid var(--game-ink, #0a0e28);
+  color: #fff;
+  filter: none;
+  pointer-events: none;
 }

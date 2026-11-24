@@ -1,10 +1,12 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import CoinAmount from './CoinAmount'
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   IconBolt,
   IconChevronRight,
   IconClock,
+  IconClose,
   IconCrosshairs,
   IconFlag,
   IconInfo,
@@ -18,6 +20,8 @@ import {
 import { PVP_MODES, getPvpMode, getPvpModeByMeters } from '../api/pvp'
 import { resolveFileUrl } from '../api/client'
 import { mySide } from '../hooks/usePvp'
+import { useRivalHeroes } from '../hooks/useRivalHeroes'
+import { useRaceDetail } from '../hooks/useRaceDetail'
 import { playerNameOf } from '../utils/playerName'
 import {
   distanceAwayLabel,
@@ -26,6 +30,7 @@ import {
   modeInfo,
   needCoinsLine,
   potSummary,
+  raceEndedView,
   raceOutcome,
   recordLabel,
   statusChip,
@@ -35,12 +40,11 @@ import {
 import { useNumberRollup } from '../game/ui/useNumberRollup'
 import GameButton from '../game/ui/GameButton'
 import StatChip from '../game/ui/StatChip'
-import Avatar from '../game/ui/Avatar'
 import {
   ArenaEmptyArt,
   BackRow,
   Coin,
-  RivalFigure,
+  RivalHero,
   StatusChip,
   StepRail,
   VsStage,
@@ -56,6 +60,12 @@ import './PvpPanel.css'
 // straight to its race screen. All state, APIs and stake rules are unchanged
 // from the previous version - this file is presentation only (copy and the
 // small pure helpers are in utils/pvpCopy.js).
+
+// A nearby runner's hero, when the server sends one (heroName/heroId/heroColor).
+const heroOfPlayer = (p) =>
+  p?.heroName || p?.heroId
+    ? { name: p.heroName, id: p.heroId, color: p.heroColor }
+    : null
 
 const modeLabel = (c) =>
   getPvpModeByMeters(c.distanceMeters)?.label || `${c.distanceMeters} m`
@@ -101,6 +111,7 @@ export default function PvpPanel({
   heroName,
   avatarSrc,
   playerName,
+  heroCatalog,
   onClose,
   onGetCoins,
   onOpenSettings,
@@ -131,8 +142,33 @@ export default function PvpPanel({
   const inQueue = queueEntry?.status === 'WAITING'
   const active = challenges.filter(isLive)
   const past = challenges.filter((c) => !isLive(c)).slice(0, 12)
-  const race = raceId ? challenges.find((c) => c.id === raceId) : null
+  // The open race: the list/socket copy when there is one, otherwise (and
+  // after a decline drops it from the list) straight from the server.
+  const {
+    race,
+    phase: racePhase,
+    retry: retryRace,
+  } = useRaceDetail(
+    raceId,
+    raceId ? challenges.find((c) => c.id === raceId) : null
+  )
+  // Races I declined on this device (the server does not say who declined).
+  const declinedByMe = useRef(new Set())
   const me = playerName || 'You'
+  // Rival heroes come from each rival's public profile (the PvP responses don't
+  // carry them). Most relevant rivals first - the hook caps how many it loads.
+  const rivalIds = [
+    target?.userId,
+    queueEntry?.opponentId,
+    race && mySide(race, userId).opponentId,
+    ...active.map((c) => mySide(c, userId).opponentId),
+    ...(nearby || []).map((p) => p.userId),
+    ...past.map((c) => mySide(c, userId).opponentId),
+  ]
+  const rivalHeroes = useRivalHeroes(rivalIds)
+  const heroFor = (id, fromServer) => fromServer || rivalHeroes[id] || null
+  const heroLoading = (id, fromServer) =>
+    !fromServer && Boolean(id) && rivalHeroes[id] === undefined
 
   function openRace(id) {
     setRaceId(id)
@@ -294,9 +330,8 @@ export default function PvpPanel({
     const matchedRace = found
       ? challenges.find((c) => c.id === queueEntry.matchedChallengeId)
       : null
-    const rivalName = matchedRace
-      ? mySide(matchedRace, userId).opponentName
-      : ''
+    const matchedSide = matchedRace ? mySide(matchedRace, userId) : null
+    const rivalName = matchedSide?.opponentName || ''
     body = (
       <>
         {found ? (
@@ -305,7 +340,20 @@ export default function PvpPanel({
             <VsStage
               you={youFigure(76)}
               rival={
-                <RivalFigure name={rivalName} size={76} unknown={!rivalName} />
+                <RivalHero
+                  hero={heroFor(
+                    matchedSide?.opponentId,
+                    matchedSide?.opponentHero
+                  )}
+                  loading={heroLoading(
+                    matchedSide?.opponentId,
+                    matchedSide?.opponentHero
+                  )}
+                  catalog={heroCatalog}
+                  name={rivalName}
+                  size={76}
+                  unknown={!rivalName}
+                />
               }
               youLabel={me}
               rivalLabel={rivalName || 'A rival'}
@@ -562,7 +610,10 @@ export default function PvpPanel({
             compact
             you={youFigure(56)}
             rival={
-              <RivalFigure
+              <RivalHero
+                hero={heroFor(target.userId, heroOfPlayer(target))}
+                loading={heroLoading(target.userId, heroOfPlayer(target))}
+                catalog={heroCatalog}
                 name={playerNameOf(target)}
                 src={resolveFileUrl(target.profilePictureUrl)}
                 size={56}
@@ -587,6 +638,10 @@ export default function PvpPanel({
             <label className="pvp-stake-field">
               <Coin />
               <input
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 type="number"
                 inputMode="numeric"
                 min="1"
@@ -700,11 +755,14 @@ export default function PvpPanel({
                     className="pvp-rival"
                     onClick={() => pickTarget(p)}
                   >
-                    <Avatar
+                    <RivalHero
+                      hero={heroFor(p.userId, heroOfPlayer(p))}
+                      loading={heroLoading(p.userId, heroOfPlayer(p))}
+                      catalog={heroCatalog}
                       name={playerNameOf(p)}
                       src={resolveFileUrl(p.profilePictureUrl)}
-                      size={46}
-                      ring="#4da3ff"
+                      size={34}
+                      photoFallback
                     />
                     <span className="pvp-rival-info">
                       <span className="pvp-rival-name pvp-display">
@@ -743,11 +801,114 @@ export default function PvpPanel({
   // --- 4. Race screen ---
   else if (screen === 'race') {
     step = 4
+    const ended = race
+      ? raceEndedView(race, {
+          userId,
+          rivalName: mySide(race, userId).opponentName,
+          declinedByMe: declinedByMe.current.has(race.id) ? true : undefined,
+        })
+      : null
     if (!race) {
       body = (
         <>
           <h2 className="pvp-screen-title pvp-display">Your race</h2>
-          <p className="pvp-sentence">Loading the match…</p>
+          {racePhase === 'loading' && (
+            <p className="pvp-sentence" role="status">
+              Loading the match…
+            </p>
+          )}
+          {racePhase === 'notfound' && (
+            <>
+              <Notice tone="error">
+                We could not find that race. It may have been removed.
+              </Notice>
+              <div className="pvp-actions-col">
+                <GameButton
+                  variant="primary"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={beginNewMatch}
+                >
+                  Find a rival
+                </GameButton>
+                <GameButton
+                  variant="secondary"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={() => setScreen('home')}
+                >
+                  Back to PvP
+                </GameButton>
+              </div>
+            </>
+          )}
+          {racePhase === 'error' && (
+            <>
+              <Notice tone="error">
+                Could not load this race. Check your connection and try again.
+              </Notice>
+              <div className="pvp-actions-col">
+                <GameButton
+                  variant="primary"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={retryRace}
+                >
+                  Retry
+                </GameButton>
+                <GameButton
+                  variant="secondary"
+                  size="lg"
+                  className="g-full-width"
+                  onClick={() => setScreen('home')}
+                >
+                  Back to PvP
+                </GameButton>
+              </div>
+            </>
+          )}
+        </>
+      )
+    } else if (ended) {
+      const rivalName = mySide(race, userId).opponentName
+      const rivalHero = mySide(race, userId).opponentHero
+      const rid = mySide(race, userId).opponentId
+      body = (
+        <>
+          <div className={`pvp-ended is-${ended.kind}`} data-testid="pvp-ended">
+            <span className="pvp-ended-icon" aria-hidden="true">
+              {ended.kind === 'expired' ? <IconClock /> : <IconClose />}
+            </span>
+            <h2 className="pvp-screen-title pvp-display">{ended.title}</h2>
+            <p className="pvp-sentence is-strong">{ended.message}</p>
+            {ended.kind === 'declined' && rid && (
+              <RivalHero
+                hero={heroFor(rid, rivalHero)}
+                loading={heroLoading(rid, rivalHero)}
+                catalog={heroCatalog}
+                name={rivalName || 'Rival'}
+                size={56}
+              />
+            )}
+          </div>
+          <div className="pvp-actions-col">
+            <GameButton
+              variant="primary"
+              size="lg"
+              className="g-full-width"
+              onClick={beginNewMatch}
+            >
+              Find another rival
+            </GameButton>
+            <GameButton
+              variant="secondary"
+              size="lg"
+              className="g-full-width"
+              onClick={() => setScreen('home')}
+            >
+              Back to PvP
+            </GameButton>
+          </div>
         </>
       )
     } else {
@@ -780,7 +941,15 @@ export default function PvpPanel({
           )}
           <VsStage
             you={youFigure(done ? 56 : 68)}
-            rival={<RivalFigure name={rival} size={done ? 56 : 68} />}
+            rival={
+              <RivalHero
+                hero={heroFor(side.opponentId, side.opponentHero)}
+                loading={heroLoading(side.opponentId, side.opponentHero)}
+                catalog={heroCatalog}
+                name={rival}
+                size={done ? 56 : 68}
+              />
+            }
             youLabel={me}
             rivalLabel={rival}
             compact={done}
@@ -840,7 +1009,10 @@ export default function PvpPanel({
                   variant="danger"
                   size="lg"
                   className="g-full-width"
-                  onClick={() => pvp.review(race, false)}
+                  onClick={() => {
+                    declinedByMe.current.add(race.id)
+                    pvp.review(race, false)
+                  }}
                   disabled={busy === `review-${race.id}`}
                 >
                   Decline
@@ -935,7 +1107,13 @@ export default function PvpPanel({
           <ul className="pvp-rival-list">
             {past.map((c) => (
               <li key={c.id}>
-                <PastRaceRow c={c} userId={userId} onOpen={openRace} />
+                <PastRaceRow
+                  c={c}
+                  userId={userId}
+                  onOpen={openRace}
+                  heroCatalog={heroCatalog}
+                  rivalHeroes={rivalHeroes}
+                />
               </li>
             ))}
           </ul>
@@ -956,14 +1134,36 @@ export default function PvpPanel({
       (c) => c.winnerId && c.winnerId !== userId
     ).length
     const draws = played.length - wins - losses
+    // The next rival = the opponent of the race that is due soonest (not yet
+    // finished); nobody yet -> the "?" silhouette, as before.
+    const nextRival = [...active]
+      .filter((c) => c.status === 'PENDING' || c.status === 'IN_PROGRESS')
+      .sort(
+        (a, b) =>
+          new Date(a.expiresAt || 8.64e15) - new Date(b.expiresAt || 8.64e15)
+      )
+      .map((c) => mySide(c, userId))
+      .find((side) => side.opponentName)
     body = (
       <>
         <section className="pvp-banner" aria-label="You against a rival">
           <VsStage
             you={youFigure(72)}
-            rival={<RivalFigure unknown size={72} />}
+            rival={
+              <RivalHero
+                hero={heroFor(nextRival?.opponentId, nextRival?.opponentHero)}
+                loading={heroLoading(
+                  nextRival?.opponentId,
+                  nextRival?.opponentHero
+                )}
+                catalog={heroCatalog}
+                name={nextRival?.opponentName}
+                size={72}
+                unknown={!nextRival}
+              />
+            }
             youLabel={me}
-            rivalLabel="Your next rival"
+            rivalLabel={nextRival?.opponentName || 'Your next rival'}
           />
           <p className="pvp-sentence">
             Pick a distance, find a rival. The fastest runner takes the pot.
@@ -1026,10 +1226,16 @@ export default function PvpPanel({
                       className={`pvp-rival pvp-race${needsMe ? ' needs-me' : ''}`}
                       onClick={() => openRace(c.id)}
                     >
-                      <Avatar
+                      <RivalHero
+                        hero={heroFor(side.opponentId, side.opponentHero)}
+                        loading={heroLoading(
+                          side.opponentId,
+                          side.opponentHero
+                        )}
+                        catalog={heroCatalog}
                         name={side.opponentName || 'Rival'}
-                        size={46}
-                        ring="#4da3ff"
+                        size={34}
+                        photoFallback
                       />
                       <span className="pvp-rival-info">
                         <span className="pvp-rival-name pvp-display">
@@ -1069,7 +1275,12 @@ export default function PvpPanel({
             <ul className="pvp-rival-list">
               {past.slice(0, 3).map((c) => (
                 <li key={c.id}>
-                  <PastRaceRow c={c} userId={userId} onOpen={openRace} />
+                  <PastRaceRow
+                    c={c}
+                    userId={userId}
+                    onOpen={openRace}
+                    heroCatalog={heroCatalog}
+                  />
                 </li>
               ))}
             </ul>
@@ -1120,12 +1331,23 @@ export default function PvpPanel({
 }
 
 // One finished race: rival, distance, the outcome chip and the coins it moved.
-function PastRaceRow({ c, userId, onOpen }) {
+function PastRaceRow({ c, userId, onOpen, heroCatalog, rivalHeroes }) {
   const side = mySide(c, userId)
   const o = raceOutcome(c, userId)
   return (
     <button type="button" className="pvp-rival" onClick={() => onOpen(c.id)}>
-      <Avatar name={side.opponentName || 'Rival'} size={46} ring="#4da3ff" />
+      <RivalHero
+        hero={side.opponentHero || rivalHeroes?.[side.opponentId] || null}
+        loading={
+          !side.opponentHero &&
+          Boolean(side.opponentId) &&
+          rivalHeroes?.[side.opponentId] === undefined
+        }
+        catalog={heroCatalog}
+        name={side.opponentName || 'Rival'}
+        size={34}
+        photoFallback
+      />
       <span className="pvp-rival-info">
         <span className="pvp-rival-name pvp-display">
           vs {side.opponentName || 'a rival'}
@@ -1167,7 +1389,7 @@ function ResultHero({ outcome }) {
         <p className="pvp-payout">
           <span className={outcome.coins > 0 ? 'is-plus' : 'is-minus'}>
             {outcome.coins > 0 ? '+' : '−'}
-            <span className="pvp-num">{counted}</span>
+            <CoinAmount className="pvp-num" value={counted} />
           </span>{' '}
           <Coin />
         </p>

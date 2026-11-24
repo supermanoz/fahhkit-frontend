@@ -13,7 +13,7 @@ import { isTokenUsable } from './jwtExpiry'
 
 export const TOKEN_KEY = 'fahhkit_token'
 export const USER_KEY = 'fahhkit_user'
-const HYDRATE_TIMEOUT_MS = 1500
+const HYDRATE_TIMEOUT_MS = 3000
 
 function lsGet(key) {
   try {
@@ -77,7 +77,21 @@ export function hydrateAuthStorage() {
     hydration = !isNative
       ? Promise.resolve('local')
       : Promise.race([
-          restoreFromPreferences().catch(() => 'error'),
+          restoreFromPreferences()
+            .catch(() => 'error')
+            .then((result) => {
+              // Finished AFTER the timeout already let the app render: the
+              // auth gate is listening for this event, so a slow storage read
+              // signs the player in instead of leaving them on the login screen.
+              if (result === 'restored') {
+                try {
+                  window.dispatchEvent(new Event('fahhkit:auth-changed'))
+                } catch {
+                  // No window (tests).
+                }
+              }
+              return result
+            }),
           new Promise((resolve) =>
             setTimeout(() => resolve('timeout'), HYDRATE_TIMEOUT_MS)
           ),

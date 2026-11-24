@@ -398,6 +398,19 @@ export function IconCoins(props) {
   )
 }
 
+// A territory: a dashed parcel outline with a tinted fill (the "area" stat).
+export function IconArea(props) {
+  return (
+    <GameIcon {...props}>
+      <path d="M5 6.5 12 4l7 3.5-1.5 10L11 20 4.5 15.5z" {...TINT} />
+      <path
+        d="M5 6.5 12 4l7 3.5-1.5 10L11 20 4.5 15.5z"
+        strokeDasharray="3 3"
+      />
+    </GameIcon>
+  )
+}
+
 export function IconCrosshairs(props) {
   return (
     <GameIcon {...props}>

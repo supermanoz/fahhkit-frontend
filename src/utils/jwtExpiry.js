@@ -24,10 +24,23 @@ export function tokenExpiryMs(token) {
   }
 }
 
-// Missing -> no. Expired -> no. Anything else (including an opaque token) ->
-// yes: only a server rejection can prove it dead.
+// The backend (jwt.refresh-grace-days=7) still exchanges a correctly signed
+// token for a fresh one for this long AFTER it expired - a phone that slept or
+// an app closed for days. Inside that window the session is recoverable, so the
+// client must keep the token and refresh it, not sign the player out.
+export const REFRESH_GRACE_MS = 7 * 24 * 60 * 60 * 1000
+
+// Has the access token itself passed its exp? (Still refreshable, see above.)
+export function isTokenExpired(token, now = Date.now()) {
+  const exp = tokenExpiryMs(token)
+  return exp != null && exp <= now
+}
+
+// Missing -> no. Past expiry AND past the refresh grace window -> no (the
+// server would refuse it too). Anything else - fresh, expired-but-refreshable,
+// or an opaque token - yes: only a server rejection can prove it dead.
 export function isTokenUsable(token, now = Date.now()) {
   if (!token) return false
   const exp = tokenExpiryMs(token)
-  return exp == null || exp > now
+  return exp == null || exp + REFRESH_GRACE_MS > now
 }

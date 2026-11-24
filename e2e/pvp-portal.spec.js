@@ -1,6 +1,7 @@
 import { test, expect, seedSession } from './fixtures/base.js'
 import { ok } from './fixtures/mockApi.js'
 import { VETERAN } from './mocks/personas.js'
+import { scriptGps } from './helpers/gps.js'
 
 // The way into PvP: enterPvp -> rollout/run rules -> location -> Visibility
 // gate -> cloud transition -> hub, and the way out. API calls are mocked.
@@ -40,6 +41,7 @@ async function prep(
   } = {}
 ) {
   await seedSession(page, VETERAN)
+  await scriptGps(page)
   await page.addInitScript((on) => {
     if (on) localStorage.setItem('fahhkit_pvp_discoverable', 'true')
   }, discoverable)
@@ -128,10 +130,10 @@ test.describe('Visibility gate', () => {
     await expect(clouds(page)).toHaveCount(0)
     // Buttons: green primary, neutral secondary.
     await expect(page.getByRole('button', { name: 'Turn On' })).toHaveClass(
-      /gb-success/
+      /gbtn-primary/
     )
     await expect(page.getByRole('button', { name: 'Not Now' })).toHaveClass(
-      /gb-secondary/
+      /gbtn-neutral/
     )
     await page.screenshot({ path: `${OUT}/gate-visibility-360x640.png` })
     // It was NOT turned on silently.

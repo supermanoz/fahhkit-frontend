@@ -185,7 +185,7 @@ for (const vp of VIEWPORTS) {
     await expectNoHorizontalScroll(page)
   })
 
-  test(`tabs + inbox cards: icons, purple selection, unread counts, day groups, rows (${vp.width}x${vp.height})`, async ({
+  test(`tabs + inbox cards: icons, leaderboard-style selection, unread counts, day groups, rows (${vp.width}x${vp.height})`, async ({
     mockedPage: page,
     context,
   }) => {
@@ -194,13 +194,15 @@ for (const vp of VIEWPORTS) {
     const tabs = page.locator('.mail-tabs [role="tab"]')
     await expect(tabs.nth(0)).toContainText('Inbox')
     await expect(tabs.nth(1)).toContainText('News')
-    // one icon style: an SVG of the same family on both, selected = shop purple
+    // one icon style: an SVG of the same family on both; same tab row as the
+    // Leaderboard (selected = filled slate, unselected = plain dark text)
     for (const i of [0, 1])
       await expect(tabs.nth(i).locator('svg')).toHaveCount(1)
     await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true')
-    await expect(tabs.nth(0)).toHaveCSS('background-color', 'rgb(190, 46, 214)')
+    await expect(tabs.nth(0)).toHaveClass(/active/)
+    await expect(tabs.nth(1)).not.toHaveClass(/active/)
     await expect(tabs.nth(0)).toHaveCSS('color', 'rgb(255, 255, 255)')
-    await expect(tabs.nth(1)).toHaveCSS('color', 'rgb(43, 42, 36)')
+    await expect(tabs.nth(1)).toHaveCSS('color', 'rgb(43, 43, 43)')
     await expect(tabs.nth(1)).toHaveCSS('-webkit-text-stroke-width', '0px')
     // unread counts on the tabs (inbox: 2 unread, news: 1 unread)
     await expect(page.locator('.mail-tabs .g-tab-badge').nth(0)).toHaveText('2')
@@ -221,7 +223,7 @@ for (const vp of VIEWPORTS) {
     await expect(rows).toHaveCount(4)
     for (const row of await rows.all())
       expect((await row.boundingBox()).height).toBeGreaterThanOrEqual(56)
-    // unread: purple dot + bolder title; read: no dot, lighter title
+    // unread: accent dot + bolder title; read: no dot, lighter title
     const gift = page.locator('.mail-item', { hasText: 'A gift for you' })
     const notice = page.locator('.mail-item', { hasText: 'Season update' })
     await expect(gift.locator('.mail-item-dot')).toHaveCount(1)
@@ -232,7 +234,22 @@ for (const vp of VIEWPORTS) {
     )
     await expect(notice.locator('.mail-item-title')).toHaveCSS(
       'font-weight',
-      '600'
+      '700'
+    )
+    // readable: body font, dark, no outline/shadow on titles, previews, dates
+    for (const sel of [
+      '.mail-item-title',
+      '.mail-item-preview',
+      '.mail-item-date',
+    ]) {
+      const el = gift.locator(sel)
+      await expect(el).toHaveCSS('font-family', /Nunito/)
+      await expect(el).toHaveCSS('-webkit-text-stroke-width', '0px')
+      await expect(el).toHaveCSS('text-shadow', 'none')
+    }
+    await expect(page.locator('.mail-date-group-label').first()).toHaveCSS(
+      '-webkit-text-stroke-width',
+      '0px'
     )
     // one-line preview, relative time, resolved status, type icon circle
     await expect(gift.locator('.mail-item-preview')).toHaveCSS(
@@ -246,13 +263,10 @@ for (const vp of VIEWPORTS) {
         .locator('.mail-item-status')
     ).toHaveText('Claimed')
     const icon = gift.locator('.mail-item-icon')
-    expect((await icon.boundingBox()).width).toBe(44)
-    // body font, ink text, no outline
-    for (const sel of [
-      '.mail-item-title',
-      '.mail-item-preview',
-      '.mail-item-date',
-    ]) {
+    expect((await icon.boundingBox()).width).toBe(40)
+    // sentences (preview, time) use the body font, no outline; the title keeps
+    // the game display font like the Leaderboard names
+    for (const sel of ['.mail-item-preview', '.mail-item-date']) {
       const l = gift.locator(sel)
       await expect(l).toHaveCSS('font-family', /Nunito/)
       await expect(l).toHaveCSS('-webkit-text-stroke-width', '0px')
@@ -271,6 +285,10 @@ test('detail popup: ribbon title, chips, readable body with safe links, closes; 
     reads.push(r.request().url())
     return r.fulfill(ok({ ...INBOX[2], status: 'READ' }))
   })
+  // The idle "Fight me!" nudge can appear on a slow machine and cover the page.
+  await page.addLocatorHandler(page.locator('.idle-nudge-backdrop'), () =>
+    page.getByText('Not now').click()
+  )
   await boot(page, context, VIEWPORTS[0])
   await openMail(page)
   await page.locator('.mail-item-row', { hasText: 'Season update' }).click()
@@ -300,7 +318,12 @@ test('detail popup: ribbon title, chips, readable body with safe links, closes; 
   const box = await dialog.boundingBox()
   expect(box.y).toBeGreaterThanOrEqual(0)
   expect(box.y + box.height).toBeLessThanOrEqual(640)
-  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+  // A personal mail has no Close button (only Delete / Claim): tap-outside or Escape.
+  await expect(
+    dialog.getByRole('button', { name: 'Close', exact: true })
+  ).toHaveCount(0)
+  // Tapping the scrim closes it.
+  await page.locator('.mail-detail-overlay').click({ position: { x: 4, y: 4 } })
   await expect(page.getByRole('dialog')).toHaveCount(0)
   // Escape closes it too
   await page.locator('.mail-item-row', { hasText: 'Old message' }).click()
@@ -334,7 +357,7 @@ test('reward mail: icon chip + green Claim; claiming calls the same endpoint and
   await expect(dialog.locator('.gm-ribbon')).toHaveText('A gift for you')
   await expect(dialog.locator('.mail-reward-chip')).toContainText('Gift item') // catalog not loaded -> generic name
   const claim = dialog.getByRole('button', { name: 'Claim', exact: true })
-  await expect(claim).toHaveClass(/gb-success/) // the green primary
+  await expect(claim).toHaveClass(/gbtn-primary/) // the green primary
   await expect(claim).toBeEnabled()
   await claim.click()
   expect(calls).toEqual(['claim'])
@@ -364,7 +387,7 @@ test('club invite keeps Join Club + Decline (Decline calls the same endpoint)', 
   const dialog = page.getByRole('dialog')
   await expect(dialog.locator('.mail-reward-chip')).toContainText('Club invite')
   await expect(dialog.getByRole('button', { name: 'Join Club' })).toHaveClass(
-    /gb-success/
+    /gbtn-primary/
   )
   await dialog.getByRole('button', { name: 'Decline' }).click()
   expect(declined).toBe(true)
@@ -397,7 +420,7 @@ for (const vp of VIEWPORTS) {
     // tag only where the data has one (IMPORTANT_NOTICE)
     await expect(cards.nth(0).locator('.news-card-tag')).toHaveText('Important')
     await expect(cards.nth(1).locator('.news-card-tag')).toHaveCount(0)
-    // unread card: purple dot; read card: none
+    // unread card: accent dot; read card: none
     await expect(cards.nth(0).locator('.mail-item-dot')).toHaveCount(1)
     await expect(cards.nth(1).locator('.mail-item-dot')).toHaveCount(0)
     // 2-line summary, readable font, date
@@ -508,3 +531,65 @@ test('error: friendly message with Retry; Retry loads the mail', async ({
   await expect(page.locator('.mail-item-row')).toHaveCount(4)
   await expect(page.locator('.mail-error')).toHaveCount(0)
 })
+
+for (const vp of [
+  { width: 360, height: 640 },
+  { width: 430, height: 932 },
+]) {
+  test(`layout: tabs first (50/50), toolbar below (50/50, shorter), list aligned (${vp.width}x${vp.height})`, async ({
+    mockedPage: page,
+    context,
+  }) => {
+    await page.addLocatorHandler(page.locator('.idle-nudge-backdrop'), () =>
+      page.getByText('Not now').click()
+    )
+    await boot(page, context, vp)
+    await openMail(page)
+    await page.waitForTimeout(1200) // let the menu's open animation settle
+    const box = (sel) => page.locator(sel).first().boundingBox()
+    const tabs = await page
+      .locator('.mail-tabs .game-menu-subtab')
+      .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))
+    const btns = await page
+      .locator('.mail-panel-header .gbtn')
+      .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))
+    const row = await box('.mail-item-row')
+    expect(tabs).toHaveLength(2)
+    expect(btns).toHaveLength(2)
+    // tabs equal, 8px gap, fill the row width
+    expect(Math.abs(tabs[0].width - tabs[1].width)).toBeLessThan(1)
+    expect(Math.round(tabs[1].left - tabs[0].right)).toBe(8)
+    expect(Math.abs(tabs[0].left - row.x)).toBeLessThan(2)
+    expect(Math.abs(tabs[1].right - (row.x + row.width))).toBeLessThan(2)
+    // toolbar: Mark all read left, Delete read right, equal, shorter than tabs
+    expect(Math.abs(btns[0].width - btns[1].width)).toBeLessThan(1)
+    expect(Math.round(btns[1].left - btns[0].right)).toBe(8)
+    expect(btns[0].height).toBeLessThanOrEqual(40)
+    expect(btns[0].height).toBeLessThan(tabs[0].height)
+    expect(Math.abs(btns[0].left - tabs[0].left)).toBeLessThan(2)
+    expect(Math.abs(btns[1].right - tabs[1].right)).toBeLessThan(2)
+    expect(btns[0].top).toBeGreaterThan(tabs[0].bottom)
+    // order + one-line labels
+    await expect(page.locator('.mail-panel-header .gbtn').nth(0)).toContainText(
+      'Mark all read'
+    )
+    await expect(page.locator('.mail-panel-header .gbtn').nth(1)).toContainText(
+      'Delete read'
+    )
+    for (const t of await page
+      .locator('.mail-panel-header .gbtn-label')
+      .all()) {
+      const h = await t.evaluate((e) => e.getBoundingClientRect().height)
+      expect(h).toBeLessThan(30)
+    }
+    // nothing wider than the viewport
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    ).toBe(true)
+    // News: no toolbar
+    await page.locator('.mail-tabs [role="tab"]').nth(1).click()
+    await expect(page.locator('.mail-panel-header')).toHaveCount(0)
+  })
+}

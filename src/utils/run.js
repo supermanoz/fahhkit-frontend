@@ -1,3 +1,6 @@
+import { getUser } from '../api/client'
+import { getDb, STORE_ACTIVE } from './offlineDb'
+
 // Points noisier than this (in meters) are dropped client-side, mirroring the
 // backend's MAX_ACCEPTABLE_ACCURACY_METERS so the live distance shown during a
 // run matches what actually gets stored.
@@ -95,14 +98,52 @@ export function formatRunDate(value) {
 
 const ACTIVE_RUN_STORAGE_KEY = 'fahhkit_active_run'
 
+// Durable copy of the in-progress run in IndexedDB (utils/offlineDb.js). The
+// synchronous localStorage record stays the fast path the tracker restores
+// from; this mirror is what survives a full localStorage (quota), a WebView
+// that evicted it, or a bad write - see recoverActiveRun() at app start.
+// Throttled (trailing) because a point arrives every second; the final record
+// of a run (`stopped`) is written at once.
+const MIRROR_KEY = 'current'
+const MIRROR_EVERY_MS = 2500
+let mirrorTimer = null
+let mirrorPending = null
+
+function flushMirror() {
+  clearTimeout(mirrorTimer)
+  mirrorTimer = null
+  const record = mirrorPending
+  mirrorPending = null
+  if (!record) return Promise.resolve()
+  return getDb()
+    .put(STORE_ACTIVE, MIRROR_KEY, record)
+    .catch(() => {})
+}
+
+function mirrorActiveRun(record) {
+  let userId = null
+  try {
+    userId = getUser()?.id ?? null
+  } catch {
+    // unreadable user record - recovery just won't match an account
+  }
+  mirrorPending = { ...record, mirroredForUserId: userId }
+  if (record.stopped) {
+    flushMirror()
+  } else if (!mirrorTimer) {
+    mirrorTimer = setTimeout(flushMirror, MIRROR_EVERY_MS)
+  }
+}
+
 // Persists the in-progress run so a page refresh (or the tab being reopened)
 // can resume tracking instead of losing everything collected so far.
 export function saveActiveRun(record) {
   try {
     localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, JSON.stringify(record))
   } catch {
-    // Storage full/unavailable — tracking still works for this page load, it just won't survive a refresh.
+    // Storage full/unavailable - the IndexedDB mirror below still has it.
   }
+  mirrorActiveRun(record)
 }
 
 export function loadActiveRun() {
@@ -121,6 +162,30 @@ export function clearActiveRun() {
     localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY)
   } catch {
     // no-op
+  }
+  clearTimeout(mirrorTimer)
+  mirrorTimer = null
+  mirrorPending = null
+  getDb()
+    .del(STORE_ACTIVE, MIRROR_KEY)
+    .catch(() => {})
+}
+
+// App start (before the tracker mounts): if localStorage lost the active run
+// but IndexedDB still has it - and it belongs to the signed-in account - put
+// it back, so the tracker resumes it exactly as after any other app kill.
+export async function recoverActiveRun() {
+  try {
+    if (loadActiveRun()) return false
+    const record = await getDb().get(STORE_ACTIVE, MIRROR_KEY)
+    if (!record?.startedAt) return false
+    const { mirroredForUserId, ...run } = record
+    const current = getUser()?.id ?? null
+    if (!current || mirroredForUserId !== current) return false
+    localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, JSON.stringify(run))
+    return true
+  } catch {
+    return false
   }
 }
 

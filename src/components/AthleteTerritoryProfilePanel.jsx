@@ -16,6 +16,10 @@ import { DEFAULT_HERO_NAME, isPlaceholderHero } from '../utils/hero'
 import { resolveAthleteProfileHero } from '../utils/athleteProfileHero'
 import defaultAvatarImage from '../assets/avatars/blaze.png'
 import './AthleteTerritoryProfilePanel.css'
+import GameButton from './ui/GameButton'
+
+// Club action tones (from ClubPanel's memberActions) -> shared button variants.
+const TONE_VARIANT = { green: 'primary', red: 'danger', wood: 'neutral' }
 
 // TEMP: the territory flag tally and the Medals section are hidden on other
 // players' profiles for now. Flip to true to bring both back.
@@ -306,9 +310,7 @@ export default function AthleteTerritoryProfilePanel({
                 that could never work. */}
             {canInvite && onInvite && !profile.clubName && (
               <div className="athlete-profile-invite">
-                <button
-                  type="button"
-                  className="btn btn-primary"
+                <GameButton
                   onClick={handleInvite}
                   disabled={
                     inviteState?.phase === 'sending' ||
@@ -320,7 +322,7 @@ export default function AthleteTerritoryProfilePanel({
                     : inviteState?.phase === 'sending'
                       ? 'Sending…'
                       : 'Invite to my club'}
-                </button>
+                </GameButton>
                 {inviteState?.phase === 'error' && (
                   <p className="game-controls-hint game-controls-hint-error">
                     {inviteState.message}
@@ -337,10 +339,10 @@ export default function AthleteTerritoryProfilePanel({
                   aria-label="Club actions"
                 >
                   {actions.map((action) => (
-                    <button
+                    <GameButton
                       key={action.id}
-                      type="button"
-                      className={`game-btn game-btn-sm game-btn-${action.tone}`}
+                      size="sm"
+                      variant={TONE_VARIANT[action.tone] || 'neutral'}
                       disabled={actionBusy !== null}
                       onClick={() => handleAction(action)}
                     >
@@ -349,7 +351,7 @@ export default function AthleteTerritoryProfilePanel({
                         : actionConfirm === action.id
                           ? action.confirm
                           : action.label}
-                    </button>
+                    </GameButton>
                   ))}
                 </div>
                 {actionError && (

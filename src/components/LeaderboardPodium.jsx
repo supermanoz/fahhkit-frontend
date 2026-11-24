@@ -1,7 +1,8 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useEffect, useRef, useState } from 'react'
 import Avatar from '../game/ui/Avatar'
 import RankBadge from './RankBadge'
+import GameButton from './ui/GameButton'
+import { formatRank } from '../utils/leaderboardPaging'
 import './LeaderboardPodium.css'
 
 // Top-3 podium (2 · 1 · 3, winner raised) above a ranked list for everyone
@@ -60,9 +61,17 @@ function PodiumSpot({ entry, place, innerRef }) {
 // everyone else gets" (see GamePage.jsx's brief) can't drift between the
 // two call sites.
 function RowContent({ entry }) {
+  // Large ranks ("1,178") shrink to fit the round chip; an unknown rank is a
+  // dash, never an invented number.
+  const rankText =
+    typeof entry.rank === 'number' || entry.rank == null
+      ? formatRank(entry.rank)
+      : String(entry.rank)
+  const rankSize =
+    rankText.length > 5 ? ' is-xlong' : rankText.length > 3 ? ' is-long' : ''
   return (
     <>
-      <span className="lb-col-rank">{entry.rank}</span>
+      <span className={`lb-col-rank${rankSize}`}>{rankText}</span>
       {entry.badge ? (
         <span className="lb-row-badge">{entry.badge}</span>
       ) : (
@@ -119,106 +128,114 @@ export function LeaderboardSkeleton() {
   )
 }
 
+// Prev / Next + "Page 2 · 21-40". The list above keeps showing the current
+// page while the next one loads; a failed load keeps it too and offers Retry.
+function Pager({ pager }) {
+  const { page, hasPrev, hasNext, loading, error, range, onPrev, onNext } =
+    pager
+  if (!hasPrev && !hasNext && !error) return null
+  return (
+    <div className="lb-pager" data-testid="lb-pager">
+      {error && (
+        <div className="lb-pager-error" role="alert">
+          <span>{error.message || "Couldn't load that page."}</span>
+          <GameButton size="sm" variant="neutral" onClick={pager.onRetry}>
+            Retry
+          </GameButton>
+        </div>
+      )}
+      <div className="lb-pager-row">
+        <GameButton
+          size="sm"
+          variant="neutral"
+          onClick={onPrev}
+          disabled={!hasPrev || loading}
+          aria-label="Previous page"
+        >
+          Prev
+        </GameButton>
+        <span className="lb-pager-label" aria-live="polite">
+          Page {page}
+          {range && <span className="lb-pager-range"> · {range}</span>}
+        </span>
+        <GameButton
+          size="sm"
+          variant="neutral"
+          onClick={onNext}
+          disabled={!hasNext}
+          loading={loading}
+          aria-label="Next page"
+        >
+          Next
+        </GameButton>
+      </div>
+    </div>
+  )
+}
+
 export default function LeaderboardPodium({
   entries,
   nameLabel = 'Runner',
   statLabel = 'Territory',
+  page = 1,
+  pager = null,
+  // The player's own standing, always pinned at the bottom of the card:
+  // { rank (number | null = unranked), name, avatarSrc?, badge?, area,
+  //   onClick? }. null = nothing to pin (e.g. no club yet).
+  me = null,
 }) {
-  const [first, second, third] = entries
-  const rest = entries.slice(3)
-  // Whichever one of these is actually `isPlayer` - the leaderboard rows
-  // already carry that flag (see GamePage.jsx), never recomputed here.
-  const myEntry = entries.find((entry) => entry.isPlayer)
-
-  // Pins a duplicate of the player's own row to the bottom of the panel
-  // once their real row (wherever it lands - a podium spot or a list row)
-  // scrolls out of view, so their standing is always visible without
-  // hunting for it. `root: null` (the browser viewport) is correct here,
-  // not just a shortcut - GamePage.css's .game-menu-sheet, which this
-  // panel always lives inside, is itself `position: fixed; inset: 0`
-  // with its own scrolling, so its scrollable bounds already ARE the
-  // viewport; there's no narrower clipping ancestor in between that would
-  // make a viewport-rooted observer report the wrong thing.
-  const myRowRef = useRef(null)
-  const [myRowVisible, setMyRowVisible] = useState(true)
-  useEffect(() => {
-    const el = myRowRef.current
-    if (!myEntry || !el) {
-      setMyRowVisible(true)
-      return undefined
-    }
-    const observer = new IntersectionObserver(
-      ([intersection]) => setMyRowVisible(intersection.isIntersecting),
-      { threshold: 0.4 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-    // Re-observe whenever which entry is "me" changes (a new page of
-    // results, a different scope) - the DOM node from a previous render
-    // may no longer exist. Keyed on myEntry?.key, not the whole object -
-    // `entries` is a fresh array/object every render (GamePage builds it
-    // inline), so depending on `myEntry` itself would tear down and
-    // recreate the observer on every render instead of only when it's
-    // actually a different row.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myEntry?.key])
-
-  const showPinned = Boolean(myEntry) && !myRowVisible
+  // The podium (top 3) belongs to page 1 only; later pages are plain rows.
+  const showPodium = page === 1
+  const [first, second, third] = showPodium ? entries : []
+  const rest = showPodium ? entries.slice(3) : entries
 
   return (
     <div className="lb">
-      <div className="lb-podium">
-        <PodiumSpot
-          entry={second}
-          place={2}
-          innerRef={second?.isPlayer ? myRowRef : undefined}
-        />
-        <PodiumSpot
-          entry={first}
-          place={1}
-          innerRef={first?.isPlayer ? myRowRef : undefined}
-        />
-        <PodiumSpot
-          entry={third}
-          place={3}
-          innerRef={third?.isPlayer ? myRowRef : undefined}
-        />
+      <div className="lb-scroll" key={page}>
+        {showPodium && (
+          <div className="lb-podium">
+            <PodiumSpot entry={second} place={2} />
+            <PodiumSpot entry={first} place={1} />
+            <PodiumSpot entry={third} place={3} />
+          </div>
+        )}
+
+        {rest.length > 0 && (
+          <div className={pager?.loading ? 'lb-page is-loading' : 'lb-page'}>
+            <div className="lb-list-head">
+              <span className="lb-col-rank">Rank</span>
+              <span className="lb-col-name">{nameLabel}</span>
+              <span className="lb-col-area">{statLabel}</span>
+            </div>
+            <ul className="lb-list" aria-busy={pager?.loading || undefined}>
+              {rest.map((entry) => (
+                <li key={entry.key}>
+                  <button
+                    type="button"
+                    className={`lb-row ${entry.isPlayer ? 'is-player' : ''}`}
+                    onClick={entry.onClick}
+                    disabled={!entry.onClick}
+                  >
+                    <RowContent entry={entry} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
-      {rest.length > 0 && (
-        <>
-          <div className="lb-list-head">
-            <span className="lb-col-rank">Rank</span>
-            <span className="lb-col-name">{nameLabel}</span>
-            <span className="lb-col-area">{statLabel}</span>
-          </div>
-          <ul className="lb-list">
-            {rest.map((entry) => (
-              <li key={entry.key}>
-                <button
-                  type="button"
-                  ref={entry.isPlayer ? myRowRef : undefined}
-                  className={`lb-row ${entry.isPlayer ? 'is-player' : ''}`}
-                  onClick={entry.onClick}
-                  disabled={!entry.onClick}
-                >
-                  <RowContent entry={entry} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      {pager && <Pager pager={pager} />}
 
-      {showPinned && (
-        <div className="lb-pinned-you">
+      {me && (
+        <div className="lb-pinned-you" data-testid="lb-pinned-you">
           <button
             type="button"
             className="lb-row is-player"
-            onClick={myEntry.onClick}
-            disabled={!myEntry.onClick}
+            onClick={me.onClick}
+            disabled={!me.onClick}
           >
-            <RowContent entry={myEntry} />
+            <RowContent entry={{ ...me, isPlayer: true }} />
           </button>
         </div>
       )}

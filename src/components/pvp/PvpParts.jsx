@@ -1,8 +1,12 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { useCallback, useEffect, useState } from 'react'
 import { IconChevronLeft, IconSwords, IconUser } from '../GameIcons'
 import Avatar from '../../game/ui/Avatar'
 import HeroStage from '../HeroStage'
 import HeroSprite from '../HeroSprite'
+import HeroFigure from '../HeroFigure'
+import { resolveFileUrl } from '../../api/client'
+import { getAvatarByName } from '../../constants/avatars'
 import { hasHero } from '../../utils/heroManifest'
 import { STEPS } from '../../utils/pvpCopy'
 
@@ -75,6 +79,121 @@ export function RivalFigure({ name, src, size = 72, unknown = false }) {
   return <Avatar name={name} src={src} size={size} ring="#4da3ff" />
 }
 
+// Which hero art an opponent's hero maps to: a bundled animated hero (shown as
+// its STATIC first frame), else a catalogue portrait (by id, then by name),
+// else the same-named character art, else nothing (caller falls back).
+export function resolveRivalHero(hero, catalog = []) {
+  if (!hero || (!hero.name && !hero.id)) return null
+  const name = typeof hero.name === 'string' ? hero.name.trim() : ''
+  const entry =
+    catalog.find((h) => hero.id && h.id === hero.id) ||
+    catalog.find(
+      (h) => name && h.name?.trim().toLowerCase() === name.toLowerCase()
+    )
+  const label = entry?.name || name
+  if (label && hasHero(label)) return { kind: 'sprite', name: label }
+  const src =
+    resolveFileUrl(entry?.portraitUrl) ||
+    resolveFileUrl(hero.assetUrl) ||
+    (label ? getAvatarByName(label)?.src : null)
+  return src ? { kind: 'image', name: label, src } : null
+}
+
+// Shown when a rival's hero is not known (the server doesn't send it yet, or it
+// is a hero this app has no art for): the default hero, never a bare letter.
+export const DEFAULT_RIVAL_HERO = 'comet'
+
+// The rival's equipped hero as a STATIC picture (first idle frame / portrait -
+// never the animated sheet, and only this one hero is fetched), standing on the
+// SAME stage frame as the player's own hero (YouFigure). A shimmer box stands in
+// while it loads. A hero that is unknown or whose image breaks falls back to the
+// default hero. `src` (the rival's photo) is only used by compact list rows
+// (`photoFallback`) so a known photo isn't replaced by a made-up hero.
+export function RivalHero({
+  hero,
+  catalog,
+  name,
+  src,
+  size = 72,
+  unknown = false,
+  photoFallback = false,
+  loading = false, // hero lookup still in flight: shimmer, no made-up hero yet
+}) {
+  const [state, setState] = useState('loading') // loading | ready | failed
+  const markReady = useCallback(() => setState('ready'), [])
+  if (unknown) {
+    return <RivalFigure unknown size={size} />
+  }
+  if (loading && !hero) {
+    return (
+      <span
+        className="pvp-hero-fig pvp-rival-hero is-loading"
+        style={{ '--s': `${size * 1.35}px` }}
+        role="img"
+        aria-label="Loading rival hero"
+      >
+        <span className="pvp-hero-stage" />
+      </span>
+    )
+  }
+  const known = state === 'failed' ? null : resolveRivalHero(hero, catalog)
+  if (!known && photoFallback && src) {
+    return <RivalFigure name={name} src={src} size={size} />
+  }
+  const art = known || {
+    kind: 'sprite',
+    name: DEFAULT_RIVAL_HERO,
+    isDefault: true,
+  }
+  if (!hasHero(art.name) && art.kind === 'sprite') {
+    // Not even the default art is bundled (can't happen today): last resort.
+    return <RivalFigure name={name} src={src} size={size} />
+  }
+  return (
+    <span
+      className={`pvp-hero-fig pvp-rival-hero${state === 'loading' ? ' is-loading' : ''}`}
+      style={{ '--s': `${size * 1.35}px` }}
+      data-hero={art.name || undefined}
+      data-hero-default={art.isDefault ? 'true' : undefined}
+      data-hero-color={hero?.color || undefined}
+      role="img"
+      aria-label={name ? `${name}'s hero` : 'Rival hero'}
+    >
+      <HeroStage hero={art.name} className="pvp-hero-stage">
+        {(h) =>
+          art.kind === 'sprite' ? (
+            <>
+              <HeroFigure hero={{ name: art.name }} locked height={h || size} />
+              <HeroReady onReady={markReady} />
+            </>
+          ) : (
+            <img
+              className="pvp-rival-hero-img"
+              src={art.src}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              style={{ height: h || size }}
+              onLoad={markReady}
+              onError={() => setState('failed')}
+            />
+          )
+        }
+      </HeroStage>
+    </span>
+  )
+}
+
+// HeroFigure's first frame is a plain image fetch with no callback: treat the
+// sprite as ready shortly after so the shimmer never sticks.
+function HeroReady({ onReady }) {
+  useEffect(() => {
+    const t = setTimeout(onReady, 250)
+    return () => clearTimeout(t)
+  }, [onReady])
+  return null
+}
+
 // Your side of a VS banner: the animated hero when it has art, else your
 // profile photo / initial.
 export function YouFigure({ heroName, avatarSrc, name, size = 72 }) {
@@ -123,38 +242,17 @@ export function StatusChip({ label, tone = 'slate' }) {
   return <span className={`pvp-chip is-${tone}`}>{label}</span>
 }
 
-// Empty state illustration: a small arena with a faint "?" rival.
+// Empty-state illustration: the same crossed swords as the PvP header / VS
+// badge, solid brand blue, centred in a dotted circle with a soft oval shadow
+// centred under it. Plain HTML + CSS (no viewBox/transform tricks) so nothing
+// can clip, and the swords' crossing sits at the circle's centre.
 export function ArenaEmptyArt() {
   return (
-    <svg
-      className="pvp-empty-art"
-      viewBox="0 0 160 96"
-      role="img"
-      aria-label="An empty arena"
-    >
-      <ellipse cx="80" cy="76" rx="64" ry="14" fill="rgba(77,163,255,0.18)" />
-      <ellipse
-        cx="80"
-        cy="76"
-        rx="44"
-        ry="8"
-        fill="none"
-        stroke="rgba(77,163,255,0.55)"
-        strokeWidth="2"
-      />
-      <g fill="none" stroke="#9db8ff" strokeWidth="3.5" strokeLinecap="round">
-        <path d="M58 22l30 30M62 52L92 22" opacity="0.9" />
-        <path d="M54 18l8 4-4 8M96 18l-8 4 4 8" opacity="0.9" />
-      </g>
-      <circle
-        cx="80"
-        cy="38"
-        r="26"
-        fill="none"
-        stroke="rgba(157,184,255,0.25)"
-        strokeWidth="2"
-        strokeDasharray="4 6"
-      />
-    </svg>
+    <div className="pvp-empty-art" role="img" aria-label="An empty arena">
+      <span className="pvp-empty-ring">
+        <IconSwords />
+      </span>
+      <span className="pvp-empty-shadow" aria-hidden="true" />
+    </div>
   )
 }

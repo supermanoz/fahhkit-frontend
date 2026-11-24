@@ -39,9 +39,10 @@
   gap: 8px;
   padding: 8px 16px;
   border-radius: 999px;
-  background: var(--brand-light);
-  border: 1px solid var(--brand);
-  color: var(--text);
+  /* Dark gold so the shared white outlined amount reads (same as PvP chip). */
+  background: linear-gradient(180deg, #a8710f 0%, #7a4f06 100%);
+  border: 2px solid #2b2a24;
+  color: #fff;
   font-weight: 700;
   font-size: 15px;
   white-space: nowrap;
@@ -52,7 +53,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: #ffe9b0;
 }
 
 .shop-retry-link {

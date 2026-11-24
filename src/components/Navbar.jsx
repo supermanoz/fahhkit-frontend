@@ -9,7 +9,7 @@ import {
 } from '../api/client'
 import { googleSignOut } from '../utils/googleSession'
 import { useCurrentUser } from '../hooks/useCurrentUser'
-import { getTerritoryProfile } from '../api/territory'
+import { useCoinsSession } from '../state/coins'
 import { formatCoins } from '../utils/format'
 import ThemeToggle from './ThemeToggle'
 import CoinStack from './CoinStack'
@@ -40,22 +40,7 @@ export default function Navbar() {
   // Fahhcoin balance for the pill next to the profile menu - same
   // /v1/territory/profile the game's own HUD reads, so it's never a second
   // source of truth.
-  const [balance, setBalance] = useState(null)
-  useEffect(() => {
-    if (!isAuthed) {
-      setBalance(null)
-      return
-    }
-    let cancelled = false
-    getTerritoryProfile()
-      .then((profile) => {
-        if (!cancelled) setBalance(profile?.fahhcoinBalance ?? 0)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [isAuthed])
+  const balance = useCoinsSession(isAuthed ? user?.id : null)
 
   useEffect(() => {
     function onScroll() {

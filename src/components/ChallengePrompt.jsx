@@ -2,7 +2,8 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { IconInfo } from './GameIcons'
 import { getPvpModeByMeters } from '../api/pvp'
-import { playerName } from '../utils/playerName'
+import { getDisplayName } from '../utils/playerName'
+import { partyOf } from '../hooks/usePvp'
 import GameButton from '../game/ui/GameButton'
 import Avatar from '../game/ui/Avatar'
 import { Coin, VsBadge } from './pvp/PvpParts'
@@ -23,7 +24,7 @@ export default function ChallengePrompt({
   const distance =
     getPvpModeByMeters(challenge.distanceMeters)?.label ||
     `${challenge.distanceMeters} m`
-  const rival = playerName(null, challenge.challengerName) || 'A runner'
+  const rival = getDisplayName(partyOf(challenge, 'challenger')) || 'A runner'
 
   return (
     <motion.div

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { ApiError } from '../api/client'
 import { NICKNAME_PATTERN, setNickname } from '../api/user'
+import GameButton from './ui/GameButton'
 
 // Me tab prompt for players with no nickname yet: pick a runner tag, which
 // then shows everywhere in the game instead of the first name. Hidden once
@@ -59,13 +60,9 @@ export default function NicknameCard({ onSaved }) {
           aria-label="Nickname"
           aria-invalid={trimmed !== '' && !valid}
         />
-        <button
-          type="submit"
-          className="game-btn game-btn-green game-btn-sm"
-          disabled={!valid || saving}
-        >
+        <GameButton type="submit" size="sm" disabled={!valid || saving}>
           {saving ? 'Saving…' : 'Save'}
-        </button>
+        </GameButton>
       </div>
       <p
         className={`nickname-card-hint ${trimmed !== '' && !valid ? 'is-error' : ''}`}

@@ -132,7 +132,7 @@ for (const d of SEEDED) {
     await expect(pop(page).locator('.hero-perk-chip')).toHaveText(d.modes)
     await expect(pop(page).locator('.hero-perk-status')).toHaveText('Equipped')
     await expect(pop(page).getByRole('button', { name: 'OK' })).toHaveClass(
-      /gb-success/
+      /gbtn-primary/
     )
     // Sits on top of the hero card and fits the small screen.
     const box = await page.locator('.g-modal').boundingBox()

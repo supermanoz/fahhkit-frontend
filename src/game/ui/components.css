@@ -8,132 +8,11 @@
    any button colour); plain body text/labels are ink-coloured directly -
    see GameStyleGuidePage's contrast table for the pairs checked. */
 
-/* ---------- GameButton ---------- */
-.gb {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: 48px;
-  padding: var(--space-2) var(--space-6);
-  border-radius: var(--radius-md);
-  border: var(--border-md) solid var(--ink);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-lg);
-  color: var(--white);
-  -webkit-text-stroke: 2px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  user-select: none;
-  box-shadow: var(--inner-highlight), var(--inner-shade), var(--press-drop);
-  transition:
-    transform var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out),
-    filter var(--dur-fast) var(--ease-out);
-  overflow: hidden;
-}
-.gb:active:not(:disabled):not(.gb-loading) {
-  transform: translateY(3px);
-  box-shadow:
-    var(--inner-highlight), var(--inner-shade), var(--press-drop-active);
-}
-.gb:focus-visible {
-  outline: 3px solid var(--green-500);
-  outline-offset: 2px;
-}
-.gb:disabled {
-  cursor: not-allowed;
-  filter: saturate(0.4) brightness(0.85);
-  opacity: 0.75;
-}
-
-/* Static state demos for the style guide (real hover/press are the actual
-   pseudo-classes above - these just let the guide show what they look like
-   without requiring the viewer to move a mouse). */
-.gb-demo-hover {
-  filter: brightness(1.08);
-}
-.gb-demo-active {
-  transform: translateY(3px);
-  box-shadow:
-    var(--inner-highlight), var(--inner-shade), var(--press-drop-active);
-}
-
 .g-full-width {
   width: 100%;
 }
 
-.gb-sm {
-  min-height: 40px;
-  padding: var(--space-1) var(--space-4);
-  font-size: var(--text-md);
-  border-width: var(--border-sm);
-}
-.gb-lg {
-  min-height: 56px;
-  padding: var(--space-3) var(--space-8);
-  font-size: var(--text-xl);
-}
-
-/* Green is the default/primary button colour - .gb-success is the same
-   gradient (the old system split "primary action" from "success" into two
-   colours; this one doesn't need to). .gb-premium has no colour of its own
-   any more either - no 4th accent exists in this palette - so it reuses
-   the same green gradient too, just keeping the class as a hook for future
-   styling. */
-.gb-primary,
-.gb-success,
-.gb-premium {
-  background: linear-gradient(
-    180deg,
-    var(--green-300) 0%,
-    var(--green-500) 55%,
-    var(--green-700) 100%
-  );
-}
-.gb-danger {
-  background: linear-gradient(
-    180deg,
-    var(--red-300) 0%,
-    var(--red-500) 55%,
-    var(--red-700) 100%
-  );
-  /* color/stroke inherited from .gb above - white-on-red needs the same
-     treatment as every other variant, not a separate override. */
-}
-.gb-secondary {
-  background: var(--white);
-  color: var(--game-text);
-}
-.gb-ghost {
-  background: transparent;
-  color: var(--game-text);
-  box-shadow: var(--inner-shade);
-}
-.gb-ghost:active:not(:disabled) {
-  box-shadow: var(--inner-shade);
-  transform: translateY(2px);
-}
-
-/* Shine sweep - primary (brand) buttons only, every ~4s, disabled under
-   reduced motion */
-.gb-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 40%,
-    rgba(255, 255, 255, 0.35) 50%,
-    transparent 60%
-  );
-  transform: translateX(-120%);
-  animation: gb-shine 4s ease-in-out infinite;
-  pointer-events: none;
-}
+/* Shine sweep keyframes - used by the rarity tiles' legendary shimmer. */
 @keyframes gb-shine {
   0%,
   92% {
@@ -142,39 +21,6 @@
   100% {
     transform: translateX(120%);
   }
-}
-
-.gb-icon {
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-}
-
-.gb-spinner {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 3px solid rgba(26, 26, 26, 0.25);
-  border-top-color: var(--ink);
-  animation: gb-spin 0.7s linear infinite;
-}
-.gb-danger .gb-spinner,
-.gb-ghost .gb-spinner {
-  border: 3px solid rgba(255, 255, 255, 0.35);
-  border-top-color: var(--white);
-}
-.gb-ghost .gb-spinner {
-  border: 3px solid rgba(26, 26, 26, 0.2);
-  border-top-color: var(--ink);
-}
-@keyframes gb-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.gb-label-hidden {
-  opacity: 0;
 }
 
 /* ---------- Panel / Modal ---------- */
@@ -930,7 +776,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gb-primary::after,
   .g-rarity-legendary::after,
   .g-badge-new,
   .g-idle-bob,
@@ -940,7 +785,6 @@
   .g-toast {
     animation: none !important;
   }
-  .gb,
   .g-icon-btn,
   .g-press,
   .g-progress-fill {

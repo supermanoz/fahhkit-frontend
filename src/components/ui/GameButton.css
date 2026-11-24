@@ -1,0 +1,232 @@
+/* GameButton - the one shared button recipe (see GameButton.jsx). Built from the
+   Leaderboard "Top Players" button (.game-menu-subtab.active in GamePage.css):
+   vertical gradient, light top highlight, thick ink outline, chunky bottom edge,
+   white display-font label with a dark stroke. Colours come from the game tokens
+   each context already uses (--game-green/-red/-gold, --lb-accent, the cream
+   panel family) - set per variant through --b-a/--b-b/--b-c. */
+.gbtn {
+  --b-a: var(--game-green-light);
+  --b-b: var(--game-green);
+  --b-c: var(--game-green-dark);
+  --b-ink: #fff; /* label colour */
+  --b-shadow:
+    1px 0 0 var(--game-ink), -1px 0 0 var(--game-ink), 0 1px 0 var(--game-ink),
+    0 -1px 0 var(--game-ink), 0 2px 0 var(--game-ink); /* the dark label outline */
+  --b-edge: 4px; /* chunky bottom edge */
+  --b-drop: 3px; /* dark drop under the button */
+  --b-border: 3px;
+  --b-h: 44px;
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: var(--b-h);
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: var(--b-border) solid var(--game-ink);
+  background: linear-gradient(
+    180deg,
+    var(--b-a) 0%,
+    var(--b-b) 45%,
+    var(--b-c) 100%
+  );
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    inset 0 calc(var(--b-edge) * -1) 0 var(--b-c),
+    0 var(--b-drop) 0 var(--game-ink);
+  color: var(--b-ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-decoration: none;
+  text-shadow: var(--b-shadow);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    filter 0.12s ease;
+}
+/* The label never wraps or overflows: it shrinks/ellipsises instead. It sets its
+   own text-shadow (higher specificity) so a screen-wide "text-shadow: none" rule
+   on its children can't strip the outline. */
+.gbtn .gbtn-label {
+  text-shadow: var(--b-shadow);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gbtn-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 1.25em;
+  height: 1.25em;
+}
+.gbtn-icon > svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Variants ---- */
+.gbtn-accent {
+  --b-a: var(--lb-accent-light);
+  --b-b: var(--lb-accent);
+  --b-c: var(--lb-accent-dark);
+}
+.gbtn-gold {
+  --b-a: var(--game-gold-light);
+  --b-b: var(--game-gold);
+  --b-c: var(--game-gold-dark);
+}
+.gbtn-danger {
+  --b-a: var(--game-red-light);
+  --b-b: var(--game-red);
+  --b-c: var(--game-red-dark);
+}
+/* Light faces: dark label, no stroke (white-on-cream would vanish). */
+.gbtn-neutral,
+.gbtn-tab:not(.is-selected) {
+  --b-a: var(--game-wood-light);
+  --b-b: var(--game-wood);
+  --b-c: var(--game-wood-dark);
+  --b-ink: var(--text-title-dark);
+  --b-shadow: none;
+  text-shadow: none;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
+}
+/* the game-wide white text stroke is set per element, so opt the label out too */
+.gbtn-neutral *,
+.gbtn-tab:not(.is-selected) * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+/* Tab / segmented toggle: same slab, selected = the filled primary look. */
+.gbtn-tab {
+  flex: 1;
+}
+
+/* ---- Sizes ---- */
+.gbtn-sm {
+  --b-edge: 3px;
+  --b-drop: 2px;
+  --b-border: 2px;
+  --b-h: 34px;
+  padding: 4px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+/* Small buttons keep a 44px touch target without looking big. */
+.gbtn-sm::after {
+  content: '';
+  position: absolute;
+  inset: -6px -3px;
+}
+.gbtn-lg {
+  --b-edge: 5px;
+  --b-drop: 4px;
+  --b-h: 54px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 20px;
+}
+.gbtn-full {
+  display: flex;
+  width: 100%;
+}
+
+/* Icon-only: round 44px (close X, GPS, gear). Defaults to the neutral face;
+   pass variant="danger" for the red close button. */
+.gbtn-icon-only {
+  width: var(--b-h);
+  padding: 0;
+  border-radius: 50%;
+  --b-h: 44px;
+}
+.gbtn-icon-only .gbtn-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---- States ---- */
+@media (hover: hover) and (pointer: fine) {
+  .gbtn:hover:not(:disabled):not([aria-disabled='true']) {
+    filter: brightness(1.07);
+  }
+}
+.gbtn:active:not(:disabled):not([aria-disabled='true']):not(.is-loading) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 calc(var(--b-edge) * -1 + 1px) 0 var(--b-c),
+    0 1px 0 var(--game-ink);
+}
+.gbtn:focus-visible {
+  outline: 3px solid var(--game-gold);
+  outline-offset: 2px;
+}
+.gbtn:disabled,
+.gbtn[aria-disabled='true'] {
+  cursor: not-allowed;
+  filter: saturate(0.4) brightness(0.92);
+  opacity: 0.75;
+}
+.gbtn.is-loading {
+  cursor: progress;
+}
+/* Loading: the label stays (invisible) so the width never jumps; the spinner
+   sits on top. */
+.gbtn.is-loading .gbtn-label,
+.gbtn.is-loading .gbtn-icon {
+  visibility: hidden;
+}
+.gbtn-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  animation: gbtn-spin 0.7s linear infinite;
+}
+.gbtn-neutral .gbtn-spinner,
+.gbtn-tab:not(.is-selected) .gbtn-spinner {
+  border-color: rgba(26, 26, 26, 0.2);
+  border-top-color: var(--game-ink);
+}
+@keyframes gbtn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 380px) {
+  .gbtn {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .gbtn-lg {
+    font-size: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gbtn {
+    transition: none;
+  }
+  .gbtn-spinner {
+    animation-duration: 1.6s;
+  }
+}

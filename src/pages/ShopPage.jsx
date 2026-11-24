@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import CoinAmount from '../components/CoinAmount'
 import { navigateToPayment } from '../utils/safeUrl'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ApiError } from '../api/client'
 import { getFahhcoinBundles, initiateCoinPurchase } from '../api/coinPurchase'
-import { getTerritoryProfile } from '../api/territory'
+import { useCoinsSession } from '../state/coins'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { withBundleExtras } from '../utils/coinBundles'
 import { formatCoins, formatNumber } from '../utils/format'
@@ -24,7 +25,8 @@ const SKELETON_COUNT = 6
 // /payment-status is what resolves success/failure (see PaymentStatusPage) -
 // there's no separate purchase flow to keep in sync.
 export default function ShopPage() {
-  const { isAuthed } = useCurrentUser()
+  const { isAuthed, user } = useCurrentUser()
+  const balance = useCoinsSession(isAuthed ? user?.id : null)
   const navigate = useNavigate()
   // ?pack=<fahhcoinAmount> - the in-game Buy-redirect popup's "Continue to
   // Shop" (GamePage.jsx's handleContinueToShop/openShopPack) lands here
@@ -37,7 +39,6 @@ export default function ShopPage() {
 
   const [bundles, setBundles] = useState(null)
   const [bundlesError, setBundlesError] = useState(null)
-  const [balance, setBalance] = useState(null)
 
   const [selectedBundle, setSelectedBundle] = useState(null)
   const [buying, setBuying] = useState(false)
@@ -46,25 +47,6 @@ export default function ShopPage() {
   useEffect(() => {
     loadBundles()
   }, [])
-
-  useEffect(() => {
-    if (!isAuthed) {
-      setBalance(null)
-      return
-    }
-    let cancelled = false
-    getTerritoryProfile()
-      .then((profile) => {
-        if (!cancelled) setBalance(profile?.fahhcoinBalance ?? 0)
-      })
-      .catch(() => {
-        // Balance pill just stays hidden - not worth an error banner for a
-        // secondary bit of chrome on what's otherwise a browsable catalog.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [isAuthed])
 
   // Fires once bundles actually load (the highlighted card's ref doesn't
   // exist before then) - hasScrolledToHighlight guards against re-scrolling
@@ -134,7 +116,7 @@ export default function ShopPage() {
           {isAuthed && balance != null && (
             <span className="shop-balance-pill">
               <CoinStack tier={0} size={20} />
-              {formatCoins(balance)}
+              <CoinAmount value={balance} />
               <span className="shop-balance-label">Fahhcoin</span>
             </span>
           )}

@@ -4,6 +4,7 @@ import {
   postForm,
   getJson,
   setToken,
+  logAuthEvent,
   clearToken,
   setUser,
   clearSession,
@@ -29,6 +30,7 @@ export function useAuthFlow() {
     // the stored user is replaced, never merged.
     clearSession()
     setToken(authResponse.tokenId)
+    logAuthEvent('login', { userType: authResponse.userType ?? null })
     const user = await getJson('/v1/user/find/logged-in')
     setUser(user)
     return user
@@ -122,6 +124,7 @@ export function useAuthFlow() {
   const signOut = useCallback(async () => {
     // Push token first (needs the auth token still valid; bounded, never
     // throws), then forget the Google account, then wipe local state.
+    logAuthEvent('logout', 'user signed out')
     await unregisterPushToken()
     await googleSignOut()
     clearSession()

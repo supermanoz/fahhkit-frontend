@@ -11,7 +11,38 @@ export function playerName(nickname, fullName) {
   return full ? full.split(/\s+/)[0] : ''
 }
 
-// Same, from an object with `nickname` / `fullName` fields.
-export function playerNameOf(person) {
-  return playerName(person?.nickname, person?.fullName)
+// THE helper for showing anyone's name - use it for every person's name that
+// reaches the screen or is built into text ("X took this one", "vs X"). Rule:
+//   1. the nickname, trimmed - if it is non-empty (a blank / whitespace-only
+//      nickname counts as none);
+//   2. else the real name: first word of fullName / name / username
+//      ("Manoj Basnet" -> "Manoj"), or firstName + lastName;
+//   3. else `fallback` ('' by default so callers can say 'a rival' / 'your
+//      rival' in their own words; <DisplayName> defaults to "Runner").
+// Accepts a user-like object, a plain string (treated as the real name), null
+// or undefined. Field names seen in the API: nickname (UserResponse,
+// UserPublicProfileResponse, ClubMembershipResponse, ClubWarParticipant*) with
+// fullName beside it; name-only responses: fullName (leaderboards, nearby
+// players, raid leaderboard), challengerName / opponentName, ownerName,
+// senderName, requesterName, leaderName, authorName. `nickName` / `username`
+// are accepted too. The player's own record works the same.
+export const DEFAULT_NAME = 'Runner'
+
+const text = (v) => (typeof v === 'string' ? v.trim() : '')
+
+export function getDisplayName(person, fallback = '') {
+  if (typeof person === 'string') return playerName(null, person) || fallback
+  if (!person || typeof person !== 'object') return fallback
+  const nick = text(person.nickname) || text(person.nickName)
+  if (nick) return nick
+  const real =
+    text(person.fullName) ||
+    text(person.name) ||
+    text(person.username) ||
+    text(person.userName) ||
+    `${text(person.firstName)} ${text(person.lastName)}`.trim()
+  return real ? real.split(/\s+/)[0] : fallback
 }
+
+// Older name, kept so existing call sites don't churn - same function.
+export const playerNameOf = getDisplayName

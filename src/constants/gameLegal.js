@@ -2,9 +2,7 @@
 // SEPARATE from the website's FahhKit terms (constants/terms.js, /terms/:type),
 // which stay as they are. Rendered by components/game-legal/*.
 //
-// Anything the operator must confirm is marked [CHECK ...] (shown highlighted
-// in the page). The contact address is GAME_CONTACT_EMAIL (rendered as a
-// mailto: link).
+// The contact address is GAME_CONTACT_EMAIL (rendered as a mailto: link).
 // Bump GAME_TERMS_VERSION whenever either document changes materially: it is
 // what the sign-up screen records as "accepted".
 
@@ -28,7 +26,7 @@ export const GAME_LEGAL_DOCS = {
         id: 'age',
         title: 'Who can play',
         paras: [
-          `You must be ${GAME_MIN_AGE} or older. Under 18s need a parent or guardian's OK. [CHECK: age; stores often expect 13+.]`,
+          `You must be ${GAME_MIN_AGE} or older. Under 18s need a parent or guardian's OK.`,
         ],
       },
       {
@@ -49,7 +47,7 @@ export const GAME_LEGAL_DOCS = {
         id: 'fahhcoin',
         title: 'Fahhcoin and payments',
         paras: [
-          'Fahhcoin is virtual currency with no cash value and cannot be transferred. You pay in NPR through Khalti, and the price is shown first. Purchases are final except where the law or Khalti requires a refund. [CHECK: refund policy.]',
+          'Fahhcoin is virtual currency with no cash value and cannot be transferred. You pay in NPR through Khalti, and the price is shown first. Purchases are final except where the law or Khalti requires a refund.',
         ],
       },
       {
@@ -103,14 +101,14 @@ export const GAME_LEGAL_DOCS = {
         id: 'share',
         title: 'Who we share it with',
         paras: [
-          'Hosting providers, Firebase (push notifications), Khalti (payments) and map providers (OpenFreeMap / OpenStreetMap). Other players see your name, photo and territory. [CHECK: hosting provider.]',
+          'Our web and server hosting providers (Netlify or Vercel for the web app, and our own API server), Firebase (push notifications), Khalti (payments) and map providers (OpenFreeMap / OpenStreetMap). Other players see your name, photo and territory.',
         ],
       },
       {
         id: 'keep',
         title: 'How long we keep it',
         paras: [
-          'While your account is active, then deleted or anonymised, except records we must keep by law. [CHECK: retention period.]',
+          'We keep it while your account is active. When you delete your account we delete or anonymise your data, except records we must keep by law.',
         ],
       },
       {
@@ -129,19 +127,4 @@ export const GAME_LEGAL_DOCS = {
       },
     ],
   },
-}
-
-// Every [CHECK ...] marker, for the report / a pre-launch checklist.
-export function listCheckItems() {
-  const out = []
-  for (const [key, doc] of Object.entries(GAME_LEGAL_DOCS)) {
-    for (const s of doc.sections) {
-      const texts = [...(s.paras || []), ...(s.list || []), s.after || '']
-      for (const t of texts) {
-        for (const m of t.matchAll(/\[CHECK[^\]]*\]/g))
-          out.push(`${key} / ${s.title}: ${m[0]}`)
-      }
-    }
-  }
-  return out
 }

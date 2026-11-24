@@ -116,6 +116,7 @@ export function tourWaitReason(ctx) {
     ['intro', ctx.introPlaying],
     ['run', ctx.running],
     ['rollout-popup', ctx.rolloutPopup],
+    ['welcome', ctx.welcome],
     ['broadcast', ctx.broadcast],
     ['challenge', ctx.challenge],
     ['nudge', ctx.nudge],

@@ -65,6 +65,9 @@ function schedule() {
 export function startSessionKeeper() {
   if (started) return
   started = true
+  // A token that expired while the app was closed (still refreshable for 7
+  // days) is renewed right away, not after the first request fails.
+  refreshIfDue('startup').then(schedule)
   schedule()
   subscribeAuth(schedule)
   const onForeground = async () => {

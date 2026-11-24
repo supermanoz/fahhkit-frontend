@@ -261,7 +261,81 @@
   min-width: 0;
 }
 
+/* ---------- Readable text on light cards (shared) ----------
+   The game-wide rule above forces the outlined display font on every element,
+   which is unreadable on light cards (mail rows, lists). Put .g-readable on a
+   light-card container: its text (and everything inside) becomes the body
+   font, dark, weight 700, no stroke/shadow. Reuse this - don't add one-off
+   overrides per screen. */
+.game-page .g-readable,
+.game-page .g-readable :not(svg):not(svg *) {
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
+  text-shadow: none;
+}
+
 /* ---------- Text inside popups ---------- */
+/* Message/body copy is the readable body font, dark, regular-to-semibold, no
+   outline - for the paragraph AND everything inline inside it (<strong>,
+   <span>, <a>, <em>): the game-wide font/outline rules hit each element on
+   its own, so styling only the <p> left its children in the outlined display
+   font. Specificity beats `.game-page *:not(code):not(pre)` (0,1,2). */
+.game-page :is(.gm-panel-inner, .game-confirm-card) :is(p, p *) {
+  font-family: var(--font-body);
+  line-height: 1.4;
+  letter-spacing: normal;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
+  text-shadow: none;
+}
+/* Same for the popups' own message/description classes (their own
+   `font-family: var(--font-body)` is a single class, which the game-wide
+   display-font rule outranks). Add a new sentence-style popup text class
+   here, not a new one-off override. */
+.game-page
+  :is(
+    .g-modal-body,
+    .bcast-body,
+    .game-tour-body,
+    .game-tour-mode-text,
+    .prize-info-text,
+    .prize-info-footer,
+    .pvp-pr-note,
+    .pvp-pr-sub,
+    .rollout-modal-body,
+    .rollout-modal-success-text,
+    .rollout-modal-error,
+    .run-result-note,
+    .run-rewards-perk-text,
+    .set-confirm-text,
+    .tp-hint,
+    .wb-line
+  ),
+.game-page
+  :is(
+    .g-modal-body,
+    .bcast-body,
+    .game-tour-body,
+    .prize-info-text,
+    .rollout-modal-body,
+    .run-result-note,
+    .tp-hint
+  )
+  * {
+  font-family: var(--font-body);
+  line-height: 1.4;
+  letter-spacing: normal;
+  -webkit-text-stroke-width: 0;
+  paint-order: normal;
+  text-shadow: none;
+}
+.game-page :is(.gm-panel-inner, .game-confirm-card) :is(strong, b) {
+  font-weight: 800;
+}
 .gm-panel-inner p,
 .game-confirm-card p:not([class]),
 .game-confirm-card .game-end-run-summary {
@@ -305,11 +379,8 @@
 
 /* ---------- Buttons (3D chunky) ---------- */
 .game-confirm-card .btn,
-.game-confirm-card .game-btn,
 .gm-panel .btn,
-.gm-panel .game-btn,
 .g-modal .btn,
-.game-controls .game-btn,
 .game-controls .btn {
   --btn-a: var(--cream-50);
   --btn-b: var(--cream-200);
@@ -351,10 +422,7 @@
   display: none; /* drop the site's shine/gradient overlays */
 }
 .game-confirm-card .btn:active:not(:disabled),
-.game-confirm-card .game-btn:active:not(:disabled),
-.gm-panel .btn:active:not(:disabled),
-.gm-panel .game-btn:active:not(:disabled),
-.game-controls .game-btn:active:not(:disabled) {
+.gm-panel .btn:active:not(:disabled) {
   transform: translateY(3px);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.5),
@@ -362,19 +430,14 @@
     0 1px 0 3px var(--navy-950);
 }
 .game-confirm-card .btn:disabled,
-.game-confirm-card .game-btn:disabled,
-.gm-panel .btn:disabled,
-.game-controls .game-btn:disabled {
+.gm-panel .btn:disabled {
   filter: saturate(0.4) brightness(0.9);
   opacity: 0.7;
   cursor: not-allowed;
 }
 /* Semantic fills: green primary, red destructive, cream neutral. */
 .game-confirm-card .btn-primary,
-.game-confirm-card .game-btn-green,
-.gm-panel .btn-primary,
-.gm-panel .game-btn-green,
-.game-controls .game-btn-green {
+.gm-panel .btn-primary {
   --btn-a: var(--tone-success-a);
   --btn-b: var(--tone-success-b);
   --btn-edge: #1b6a2c;
@@ -383,10 +446,7 @@
   paint-order: stroke fill;
   text-shadow: 0 2px 0 rgba(15, 21, 48, 0.5);
 }
-.game-confirm-card .game-btn-red,
-.game-confirm-card .btn-danger,
-.gm-panel .game-btn-red,
-.game-controls .game-btn-red {
+.game-confirm-card .btn-danger {
   --btn-a: var(--tone-danger-a);
   --btn-b: var(--tone-danger-b);
   --btn-edge: #8f1810;
@@ -412,9 +472,7 @@
   paint-order: stroke fill;
 }
 .game-confirm-card .btn-outline,
-.game-confirm-card .game-btn-wood,
-.gm-panel .btn-outline,
-.game-controls .game-btn-wood {
+.gm-panel .btn-outline {
   /* neutral cream = the defaults above */
 }
 
@@ -516,9 +574,7 @@
     animation: none;
   }
   .game-confirm-card .btn,
-  .game-confirm-card .game-btn,
-  .gm-panel .btn,
-  .gm-panel .game-btn {
+  .gm-panel .btn {
     transition: none;
   }
 }
@@ -536,8 +592,7 @@
   .gm-stat-value {
     font-size: 21px;
   }
-  .game-confirm-card .btn,
-  .game-confirm-card .game-btn {
+  .game-confirm-card .btn {
     font-size: 18px;
   }
 }
@@ -587,7 +642,6 @@
 .bcast-counter {
   color: var(--ink-navy-soft);
 }
-.bcast-card .game-btn,
 .bcast-card .btn {
   --btn-a: var(--cream-50);
   --btn-b: var(--cream-200);
@@ -610,22 +664,6 @@
   transition:
     transform 80ms ease-out,
     box-shadow 80ms ease-out;
-}
-.bcast-card .game-btn-green {
-  --btn-a: var(--tone-success-a);
-  --btn-b: var(--tone-success-b);
-  --btn-edge: #1b6a2c;
-  color: #fff;
-  -webkit-text-stroke: 4px var(--navy-950);
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 rgba(15, 21, 48, 0.5);
-}
-.bcast-card .game-btn:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.5),
-    0 1px 0 var(--btn-edge),
-    0 1px 0 3px var(--navy-950);
 }
 @media (prefers-reduced-motion: reduce) {
   .bcast-card,

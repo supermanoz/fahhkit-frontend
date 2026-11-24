@@ -8,11 +8,10 @@ import {
 import { openMailto } from '../../utils/externalLink'
 import './GameLegal.css'
 
-// [CHECK ...] markers are highlighted so they are impossible to miss before
-// launch; the contact address becomes a mailto: link (opened through the
-// system in the native app, never inside the WebView).
+// The contact address becomes a mailto: link (opened through the system in
+// the native app, never inside the WebView).
 const ESCAPED_EMAIL = GAME_CONTACT_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const TEXT_SPLIT = new RegExp(`(\\[CHECK[^\\]]*\\]|${ESCAPED_EMAIL})`)
+const TEXT_SPLIT = new RegExp(`(${ESCAPED_EMAIL})`)
 function Text({ children }) {
   const parts = String(children).split(TEXT_SPLIT)
   return parts.map((p, i) => {
@@ -28,13 +27,7 @@ function Text({ children }) {
         </a>
       )
     }
-    return /^\[CHECK/.test(p) ? (
-      <mark key={i} className="game-legal-check">
-        {p}
-      </mark>
-    ) : (
-      p
-    )
+    return p
   })
 }
 

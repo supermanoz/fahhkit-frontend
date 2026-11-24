@@ -17,6 +17,7 @@ import {
   ITEM_STATE,
   needsClaim,
 } from '../utils/itemState'
+import './heroLocked.css'
 
 // Swipeable "pick your war hero" slider - CSS scroll-snap (real native
 // swipe/momentum, no drag-gesture library), one full-width card visible at
@@ -192,7 +193,7 @@ export default function ClubWarHeroPicker({
                 {/* Display only now - swiping/arrows/dots change `index`,
                     a card itself no longer does anything on tap. */}
                 <div
-                  className={`club-war-hero-card ${!owned ? 'is-locked' : ''}`}
+                  className={`club-war-hero-card ${!owned ? 'is-locked is-hero-locked' : ''}`}
                 >
                   <span className="club-war-hero-card-stage">
                     {/* Only the centred card actually animates - every
@@ -205,6 +206,7 @@ export default function ClubWarHeroPicker({
                         hero={{ name: item.name }}
                         pose="idle"
                         height={160}
+                        locked={!owned}
                       />
                     ) : item.assetUrl ? (
                       <img
@@ -222,6 +224,7 @@ export default function ClubWarHeroPicker({
                           hero={{ name: item.name }}
                           pose="idle"
                           height={160}
+                          locked={!owned}
                         />
                       )
                     )}

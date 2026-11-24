@@ -11,13 +11,26 @@ import {
   mirrorRemove,
   mirrorSet,
 } from '../utils/authStorage'
-import { tokenExpiryMs } from '../utils/jwtExpiry'
+import {
+  isTokenExpired,
+  isTokenUsable,
+  tokenExpiryMs,
+} from '../utils/jwtExpiry'
+import {
+  reportNetworkFailure,
+  reportNetworkSuccess,
+  setProbeUrlProvider,
+} from '../utils/connectivity'
 
 const PRIMARY_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const FALLBACK_API_BASE_URL = import.meta.env.VITE_API_FALLBACK_URL || ''
 const FILE_BASE_URL = import.meta.env.VITE_FILE_BASE_URL || PRIMARY_API_BASE_URL
 const ACTIVE_BASE_URL_KEY = 'fahhkit_active_api_base_url'
+
+// The connectivity store probes the API host we actually talk to.
+// (/v1/ping needn't exist - any HTTP answer, even a 404, proves we're online.)
+setProbeUrlProvider(() => `${getActiveApiBaseUrl()}/v1/ping`)
 
 function getCandidateBaseUrls() {
   const candidates = [PRIMARY_API_BASE_URL, FALLBACK_API_BASE_URL].filter(
@@ -41,11 +54,13 @@ async function fetchWithFallback(path, options) {
     try {
       const response = await fetch(`${baseUrl}${path}`, options)
       sessionStorage.setItem(ACTIVE_BASE_URL_KEY, baseUrl)
+      reportNetworkSuccess() // any HTTP answer = the server is reachable
       return response
     } catch (err) {
       lastError = err
     }
   }
+  reportNetworkFailure() // asks the connectivity store to confirm with a probe
   throw lastError
 }
 
@@ -93,6 +108,13 @@ export class ApiError extends Error {
     super(toClubRoleWords(message))
     this.status = status
   }
+}
+
+// The request never got an HTTP answer (no connection, DNS, timeout, blocked):
+// status 0. NOT a server error - callers queue/retry instead of reporting a
+// failure, and it never signs anyone out.
+export function isNetworkError(err) {
+  return err instanceof ApiError && err.status === 0
 }
 
 export function getToken() {
@@ -228,10 +250,14 @@ function authHeaders(token = getToken()) {
 // Network errors, timeouts and 5xx never sign anyone out.
 // ---------------------------------------------------------------------------
 const ME_PATH = '/v1/user/find/logged-in'
-// Backend token refresh (POST, Bearer = current token, answers like
-// /v1/authenticate: {data:{tokenId}}). The backend does not have it yet - a
-// 404 is remembered for the session and the flow falls through to the probe.
-// Set VITE_AUTH_REFRESH_PATH to '' to switch refresh off entirely.
+// Backend token refresh: POST /v1/auth/refresh, public, Bearer = the CURRENT
+// access token (it may already be expired, up to 7 days: jwt.refresh-grace-days).
+// There is no separate refresh token. It answers like /v1/authenticate:
+// {data:{tokenType, tokenId, expiresIn, userType, isFirstLogin}} - a fresh
+// access token each time (the old one is not revoked) - and a plain 401 when
+// the token is unusable (bad signature, past the grace window, user inactive).
+// A 404/405/501 is remembered for the session (older backend) and the flow
+// falls through to the probe. Set VITE_AUTH_REFRESH_PATH to '' to switch off.
 const REFRESH_PATH =
   import.meta.env.VITE_AUTH_REFRESH_PATH ?? '/v1/auth/refresh'
 // Requests made while signed OUT / signing in: a 401/403 there is a wrong
@@ -258,6 +284,20 @@ export function logTokenExpiry(token, label = 'token') {
 // One line per redirect to login / sign-out, with the reason.
 export function logAuthRedirect(reason, detail) {
   console.warn(`[auth] redirect to login - ${reason}`, detail ?? '')
+  // Kept after the wipe so "why was I logged out?" can be answered from the
+  // device (DevTools / Safari inspector): localStorage.fahhkit_last_auth_end.
+  try {
+    localStorage.setItem(
+      'fahhkit_last_auth_end',
+      JSON.stringify({
+        reason,
+        detail: detail ?? null,
+        at: new Date().toISOString(),
+      })
+    )
+  } catch {
+    // Debug aid only.
+  }
 }
 
 let refreshUnsupported = false
@@ -267,7 +307,14 @@ export function isRefreshSupported() {
   return Boolean(REFRESH_PATH) && !refreshUnsupported
 }
 
-// -> 'refreshed' | 'unsupported' | 'rejected' | 'unreachable'
+// One dev-log line per token event. Never prints the token itself.
+export function logAuthEvent(event, detail) {
+  console.info(`[auth] ${event}`, detail ?? '')
+}
+
+// -> 'refreshed' | 'unsupported' | 'rejected' (401: the server says the token
+// is unusable - the only answer that ends a session) | 'forbidden' (403: could
+// be a proxy, not authoritative) | 'unreachable' (network, timeout, 5xx).
 async function doRefresh(tokenUsed) {
   if (!isRefreshSupported() || !tokenUsed) return 'unsupported'
   let response
@@ -277,21 +324,42 @@ async function doRefresh(tokenUsed) {
       headers: authHeaders(tokenUsed),
     })
   } catch {
+    logAuthEvent('refresh failed: network unreachable (session kept)')
     return 'unreachable'
   }
   if ([404, 405, 501].includes(response.status)) {
     refreshUnsupported = true
-    console.info('[auth] backend has no token refresh endpoint')
+    logAuthEvent('backend has no token refresh endpoint')
     return 'unsupported'
   }
-  if (response.status === 401 || response.status === 403) return 'rejected'
-  if (!response.ok) return 'unreachable'
+  if (response.status === 401) {
+    logAuthEvent('refresh rejected (401): token invalid/expired for good')
+    return 'rejected'
+  }
+  if (response.status === 403) {
+    logAuthEvent('refresh answered 403 (not authoritative)')
+    return 'forbidden'
+  }
+  if (!response.ok) {
+    logAuthEvent(`refresh failed: HTTP ${response.status} (session kept)`)
+    return 'unreachable'
+  }
   const body = await response.json().catch(() => null)
   const next = body?.data?.tokenId
-  if (!next) return 'unsupported'
+  if (!next) {
+    logAuthEvent('refresh answered without a tokenId (session kept)')
+    return 'unreachable'
+  }
   // The player signed out / in as someone else meanwhile: drop the result.
-  if (getToken() === tokenUsed) setToken(next)
-  console.info('[auth] token refreshed')
+  if (getToken() === tokenUsed) {
+    setToken(next) // logs the new expiry
+    logAuthEvent('refresh ok', {
+      rotated: next !== tokenUsed,
+      serverExpiresIn: body.data.expiresIn ?? null,
+    })
+  } else {
+    logAuthEvent('refresh ok but session changed meanwhile - result dropped')
+  }
   return 'refreshed'
 }
 
@@ -305,40 +373,64 @@ export function refreshSession(tokenUsed = getToken()) {
   return refreshInFlight
 }
 
+// A rejection must be CONFIRMED before it ends a session: the backend's JwtFilter
+// keeps the request's token in shared instance fields, so under parallel
+// requests a perfectly good token can be answered 401/403 now and then. Ask
+// up to PROBE_ATTEMPTS times, a moment apart; one 200 = alive, any
+// network/5xx answer = unknown (never a sign-out), only every attempt being
+// rejected = dead.
+const PROBE_ATTEMPTS = 3
+let probeDelayMs = 700
+export function __setProbeDelayForTests(ms) {
+  probeDelayMs = ms
+}
+
 // -> 'alive' | 'dead' | 'unknown'
 async function probeSession(token) {
-  try {
-    const response = await fetchWithFallback(ME_PATH, {
-      headers: authHeaders(token),
-    })
-    if (response.ok) return 'alive'
-    if (response.status === 401 || response.status === 403) return 'dead'
-    return 'unknown'
-  } catch {
-    return 'unknown'
+  for (let attempt = 0; attempt < PROBE_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, probeDelayMs))
+      // Signed out / replaced while waiting: nothing left to confirm.
+      if (getToken() !== token) return 'unknown'
+    }
+    try {
+      const response = await fetchWithFallback(ME_PATH, {
+        headers: authHeaders(token),
+      })
+      if (response.ok) return 'alive'
+      if (response.status !== 401 && response.status !== 403) return 'unknown'
+    } catch {
+      return 'unknown'
+    }
   }
+  return 'dead'
 }
 
 const verifying = new Map()
 
 // -> 'retry' (a newer token exists - resend), 'dead', 'alive', 'unknown' or
 // 'gone' (already signed out meanwhile).
-async function doVerify(tokenUsed, conclusive) {
+async function doVerify(tokenUsed) {
   const current = getToken()
   if (current !== tokenUsed) return current ? 'retry' : 'gone'
   const refreshed = await refreshSession(tokenUsed)
   if (refreshed === 'refreshed') return 'retry'
-  const exp = tokenExpiryMs(tokenUsed)
-  if (exp != null && exp <= Date.now()) return 'dead'
-  if (refreshed === 'rejected' || conclusive) return 'dead'
+  // The refresh endpoint itself said 401: that is the authoritative answer
+  // (the backend's JwtFilter race is fixed), no second opinion needed.
+  if (refreshed === 'rejected') return 'dead'
+  // Past expiry AND past the grace window: the server could not refresh it.
+  if (!isTokenUsable(tokenUsed)) return 'dead'
+  // Network/5xx on refresh: unknown, never a sign-out. Old backend without a
+  // refresh endpoint, or a 403: ask the server whether the session is alive.
+  if (refreshed === 'unreachable') return 'unknown'
   return probeSession(tokenUsed)
 }
 
-function verifySession(tokenUsed, conclusive) {
+function verifySession(tokenUsed) {
   if (!verifying.has(tokenUsed)) {
     verifying.set(
       tokenUsed,
-      doVerify(tokenUsed, conclusive).finally(() => verifying.delete(tokenUsed))
+      doVerify(tokenUsed).finally(() => verifying.delete(tokenUsed))
     )
   }
   return verifying.get(tokenUsed)
@@ -385,22 +477,35 @@ async function request(path, { method, headers = {}, body, unreachable }) {
       throw new ApiError(unreachable, 0)
     })
 
-  const response = await send(sent)
+  // An already-expired token is refreshed BEFORE the call (the backend would
+  // answer it as anonymous and we would only learn that after a wasted trip).
+  let first = sent
+  if (
+    sent &&
+    isTokenExpired(sent) &&
+    isRefreshSupported() &&
+    !NO_RECOVERY_PREFIXES.some((p) => path.startsWith(p))
+  ) {
+    if ((await refreshSession(sent)) === 'refreshed') first = getToken()
+  }
+  const response = await send(first)
   const rejected = response.status === 401 || response.status === 403
   if (
     !rejected ||
-    !sent ||
+    !first ||
     NO_RECOVERY_PREFIXES.some((p) => path.startsWith(p))
   ) {
     return parseResponse(response)
   }
 
   console.warn(
-    `[auth] ${response.status} ${method} ${path} - token ${describeTokenExpiry(sent)}`
+    `[auth] ${response.status} ${method} ${path} - token ${describeTokenExpiry(first)}`
   )
-  const verdict = await verifySession(sent, path === ME_PATH)
+  const verdict = await verifySession(first)
   if (verdict === 'retry') return parseResponse(await send(getToken()))
-  if (verdict === 'dead') {
+  // Only the first request to learn the session is dead ends it; the rest
+  // find the token already gone (or replaced by a new sign-in) and just fail.
+  if (verdict === 'dead' && getToken() === first) {
     endSession(`server rejected the session (${response.status} on ${path})`)
   }
   // 'alive' / 'unknown' / 'gone': a plain error for this call, session kept.
@@ -430,10 +535,10 @@ export async function postForm(path, rawFormData) {
   })
 }
 
-export function postJson(path, payload) {
+export function postJson(path, payload, extraHeaders = {}) {
   return request(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify(payload),
     unreachable: UNREACHABLE,
   })

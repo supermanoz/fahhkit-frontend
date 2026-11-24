@@ -128,3 +128,45 @@ export function statusChip(challenge, needsMe) {
   const o = raceOutcome(challenge, null)
   return { label: o.headline, tone: 'slate' }
 }
+
+// The screen for a race that ended WITHOUT being run: declined, cancelled or
+// timed out while waiting. `declinedByMe` is what this device knows (the
+// server does not say who declined). Without it: a challenger can only have
+// been declined BY the rival (their own screen offers Cancel, not Decline);
+// the person challenged is the one who declined.
+// Returns null for anything that was actually raced / still live.
+export function raceEndedView(challenge, { userId, rivalName, declinedByMe }) {
+  if (!challenge) return null
+  const rival = rivalName || 'Your rival'
+  const iAmChallenger = challenge.challengerId === userId
+  if (challenge.status === 'DECLINED') {
+    const byMe = declinedByMe ?? !iAmChallenger
+    return byMe
+      ? {
+          kind: 'declined',
+          title: 'Challenge declined',
+          message: `You declined ${rivalName ? `${rivalName}'s` : 'the'} challenge.`,
+        }
+      : {
+          kind: 'declined',
+          title: 'Challenge declined',
+          message: `${rival} declined your challenge.`,
+        }
+  }
+  if (challenge.status === 'CANCELLED') {
+    const exp = challenge.expiresAt ? new Date(challenge.expiresAt) : null
+    const timedOut = exp && exp.getTime() <= Date.now()
+    return timedOut
+      ? {
+          kind: 'expired',
+          title: 'Challenge expired',
+          message: `${rival} did not answer in time.`,
+        }
+      : {
+          kind: 'cancelled',
+          title: 'Challenge cancelled',
+          message: 'This challenge was cancelled.',
+        }
+  }
+  return null
+}

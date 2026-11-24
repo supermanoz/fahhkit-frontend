@@ -62,7 +62,13 @@ export function resolveHeroEquipState(hero, ownedItems, activeHeroId, level) {
   // True when the hero counts as owned by rule but the backend has no row
   // yet: Equip has to claim it (free purchase) first.
   const claimable = !ownedHeroItem && needsClaim(heroItem, ownedItems, level)
+  // THE one "show the locked look" flag (shaded art + dimmed stage, see
+  // components/heroLocked.css): not in play and not owned - which covers
+  // price-locked, level-locked, limited and coming-soon heroes alike. Derived
+  // from the fields above only; no extra ownership logic.
+  const locked = !equipped && !owned
   return {
+    locked,
     equipped,
     owned,
     ownedHeroItem,

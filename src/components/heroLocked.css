@@ -1,0 +1,35 @@
+/* The ONE locked-hero look (reference = Nova's level-locked card): the art is
+   desaturated and shaded, the stage behind it dims with it, the tier glow goes
+   grey. Driven by a single flag - `locked` from utils/heroEquipState.js - which
+   each surface turns into its own `is-hero-locked` class. Owned/equipped heroes
+   stay full colour.
+
+   Performance: this filter is only ever applied to a STATIC frame. A locked
+   hero's sprite is rendered with `locked` (HeroFigure/EmoteGlyph active=false),
+   so nothing under a filter repaints per frame. */
+:root {
+  --hero-locked-filter: grayscale(0.85) brightness(0.82);
+  --hero-locked-tier: #6d6f72;
+  --hero-locked-tier-light: #b8babd;
+}
+
+/* Unlock reveal: the filter eases away (transition on the filtered element)
+   and the art pops once. transform/opacity only. */
+@keyframes hero-unlock-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  55% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-card-stage,
+  .hero-card-stage.is-unlocking {
+    transition: none;
+    animation: none;
+  }
+}

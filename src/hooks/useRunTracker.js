@@ -17,9 +17,11 @@ import {
   compressSegments,
   buildPauseResumeJumpSegment,
 } from '../utils/vehicleDetection'
+import { newClientRunId } from '../utils/clientRunId'
 import { isAccessibilityModeEnabled } from '../utils/antiCheatSettings'
 import { useWakeLock } from './useWakeLock'
 import { watchPosition, clearWatch } from '../utils/geo'
+import { publishFix } from '../utils/gpsFeed'
 import {
   startRunNotification,
   updateRunNotification,
@@ -117,6 +119,8 @@ export function useRunTracker() {
   const timerRef = useRef(null)
   const startedAtRef = useRef(null)
   const eventIdRef = useRef(null)
+  // Idempotency key for this run - created at start, persisted with it.
+  const clientRunIdRef = useRef(null)
   const detectorRef = useRef(null)
   // Flat per-fix segment log, compressed into runs at stop() - see
   // compressSegments in utils/vehicleDetection.js. Sent to the backend with
@@ -366,6 +370,15 @@ export function useRunTracker() {
           position.coords
         fixCountRef.current += 1
         lastAccuracyRef.current = accuracy ?? null
+        // Every raw fix, unfiltered, for the heading-up map (see gpsFeed).
+        publishFix({
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy ?? null,
+          speed: validDeviceSpeed(speed),
+          heading: Number.isFinite(heading) && heading >= 0 ? heading : null,
+          t: position.timestamp,
+        })
         if (accuracy != null && accuracy > MAX_ACCEPTABLE_ACCURACY_METERS)
           return
 
@@ -498,6 +511,7 @@ export function useRunTracker() {
         saveActiveRun({
           startedAt: startedAtRef.current.toISOString(),
           eventId: eventIdRef.current,
+          clientRunId: clientRunIdRef.current,
           challengeId: challengeIdRef.current,
           clubWarId: clubWarIdRef.current,
           isTraining: isTrainingRef.current,
@@ -551,6 +565,7 @@ export function useRunTracker() {
       setElapsedSeconds(saved.duration ?? 0)
       setPendingRun({
         eventId: saved.eventId ?? null,
+        clientRunId: saved.clientRunId ?? null,
         challengeId: saved.challengeId ?? null,
         clubWarId: saved.clubWarId ?? null,
         isTraining: saved.isTraining ?? false,
@@ -577,6 +592,7 @@ export function useRunTracker() {
     distanceRef.current = saved.distance || 0
     startedAtRef.current = new Date(saved.startedAt)
     eventIdRef.current = saved.eventId ?? null
+    clientRunIdRef.current = saved.clientRunId ?? null
     challengeIdRef.current = saved.challengeId ?? null
     clubWarIdRef.current = saved.clubWarId ?? null
     isTrainingRef.current = saved.isTraining ?? false
@@ -694,6 +710,7 @@ export function useRunTracker() {
       setVehicleDiscarded(false)
       startedAtRef.current = new Date()
       eventIdRef.current = eventId ?? null
+      clientRunIdRef.current = newClientRunId()
       challengeIdRef.current = challengeId
       clubWarIdRef.current = clubWarId
       isTrainingRef.current = isTraining
@@ -701,6 +718,7 @@ export function useRunTracker() {
       saveActiveRun({
         startedAt: startedAtRef.current.toISOString(),
         eventId: eventIdRef.current,
+        clientRunId: clientRunIdRef.current,
         challengeId: challengeIdRef.current,
         clubWarId: clubWarIdRef.current,
         isTraining: isTrainingRef.current,
@@ -745,6 +763,7 @@ export function useRunTracker() {
       consideredMeters > 0 ? vehicleExcludedMeters / consideredMeters : 0
     const result = {
       eventId: eventIdRef.current,
+      clientRunId: clientRunIdRef.current,
       challengeId: challengeIdRef.current,
       clubWarId: clubWarIdRef.current,
       isTraining: isTrainingRef.current,
@@ -786,6 +805,7 @@ export function useRunTracker() {
       saveActiveRun({
         startedAt: startedAt.toISOString(),
         eventId: result.eventId,
+        clientRunId: result.clientRunId,
         challengeId: result.challengeId,
         clubWarId: result.clubWarId,
         isTraining: result.isTraining,
@@ -850,6 +870,7 @@ export function useRunTracker() {
     saveActiveRun({
       startedAt: startedAtRef.current.toISOString(),
       eventId: eventIdRef.current,
+      clientRunId: clientRunIdRef.current,
       challengeId: challengeIdRef.current,
       clubWarId: clubWarIdRef.current,
       isTraining: isTrainingRef.current,

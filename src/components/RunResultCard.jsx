@@ -14,6 +14,7 @@ import {
   submittedCopy,
 } from '../utils/postRun'
 import './RunResultCard.css'
+import GameButton from './ui/GameButton'
 
 // Distance / pace / time of the finished run - the shared StatChip row.
 export function CompletedRunStats({ run }) {
@@ -94,14 +95,13 @@ export default function RunResultCard({
               <p className="run-result-note is-error">{rollout.error}</p>
             )}
             {!rollout.result && (
-              <button
-                type="button"
-                className="btn btn-outline"
+              <GameButton
+                variant="neutral"
                 disabled={rollout.busy}
                 onClick={rollout.onRequest}
               >
                 {rollout.busy ? 'Sending…' : 'Request Rollout'}
-              </button>
+              </GameButton>
             )}
           </>
         )}
@@ -151,13 +151,13 @@ export default function RunResultCard({
         <CompletedRunStats run={run} />
         {body}
         {dismissLabel && (
-          <button
-            type="button"
-            className="btn btn-outline run-result-ok"
+          <GameButton
+            variant="neutral"
+            className="run-result-ok"
             onClick={onClose}
           >
             {dismissLabel}
-          </button>
+          </GameButton>
         )}
       </div>
     </GamePanel>

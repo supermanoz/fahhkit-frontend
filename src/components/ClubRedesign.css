@@ -104,9 +104,6 @@
   outline: 3px solid var(--shop-accent-dark);
   outline-offset: -3px;
 }
-.club-page .game-btn-sm {
-  min-height: 44px;
-}
 
 /* --- Banner (my club / other club) ------------------------------------- */
 .club-page .club-banner {
@@ -499,9 +496,6 @@
   height: 100%;
   background: #7be08a;
   transition: width 0.4s ease;
-}
-.club-page .club-war-banner .game-btn-wood {
-  min-height: 44px;
 }
 
 /* Matchup rosters sit on cream cards under the banner. */

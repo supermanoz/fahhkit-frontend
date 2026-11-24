@@ -1,0 +1,287 @@
+/* Territory popup - same light panel language as Daily Reward / Run Complete:
+   off-white panel, ink border + chunky bottom edge, dark readable body text in
+   the UI font, display font only for the name and the numbers. The owner's
+   territory colour (--tp-accent) rims the panel and rings the avatar.
+   Overrides the legacy .game-highlight-toast / .game-territory-popup rules. */
+.game-territory-popup.tp-card {
+  --tp-ink: var(--game-ink, #2b2a24);
+  --tp-text: var(--text-body-dark, #3a382f);
+  --tp-muted: #5c5848;
+  width: min(100%, 380px);
+  padding: 16px 14px 16px;
+  text-align: left;
+  color: var(--tp-text);
+  font-family: var(--font-body);
+  background: linear-gradient(180deg, #ffffff 0%, var(--row, #f6f5ef) 100%);
+  border: 3px solid var(--tp-ink);
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 4px var(--tp-accent),
+    0 0 0 7px var(--tp-ink),
+    0 9px 0 7px var(--tp-ink),
+    0 20px 28px rgba(0, 0, 0, 0.4);
+  overflow: visible;
+  max-height: none;
+  margin-bottom: 14px; /* room for the chunky bottom edge */
+}
+/* Dark readable text: no outline strokes anywhere on the light panel. */
+.game-territory-popup.tp-card,
+.game-territory-popup.tp-card * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+/* Buttons keep their own outlined white label. */
+.game-territory-popup.tp-card .gbtn,
+.game-territory-popup.tp-card .gbtn * {
+  -webkit-text-stroke-width: revert;
+  text-shadow: revert;
+  paint-order: revert;
+}
+
+.tp-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 52px; /* the close button */
+  min-width: 0;
+}
+.tp-avatar {
+  flex: none;
+}
+.tp-level {
+  position: absolute;
+  left: 40px;
+  top: 40px;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 2px solid var(--tp-ink);
+  background: linear-gradient(180deg, #4fa6ff, #1f6fe0);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1;
+}
+.tp-level,
+.tp-level * {
+  -webkit-text-stroke-width: 0;
+}
+.tp-owner {
+  min-width: 0;
+  flex: 1;
+}
+.game-territory-popup.tp-card .tp-caption {
+  margin: 0 0 2px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tp-muted);
+}
+.game-territory-popup.tp-card .tp-owner h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--tp-ink);
+  overflow-wrap: anywhere;
+}
+.tp-club {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tp-muted);
+}
+.game-territory-popup.tp-card .tp-close {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.tp-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.tp-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px 9px;
+  border-radius: 14px;
+  border: 2px solid #d8d4c4;
+  background: #fff;
+  box-shadow: 0 3px 0 #d8d4c4;
+}
+.tp-tile-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--tp-accent);
+  filter: drop-shadow(0 0 0.5px var(--tp-ink));
+}
+.tp-tile-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--tp-ink);
+}
+.tp-tile-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tp-muted);
+}
+
+.tp-distance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: #efece0;
+  color: var(--tp-text);
+}
+.tp-distance-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: #fff;
+  background: var(--tp-ink);
+}
+.tp-distance.is-near .tp-distance-icon {
+  background: #2f9e44;
+}
+.tp-distance-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--tp-muted);
+}
+.tp-distance-text strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--tp-ink);
+}
+
+.tp-hint,
+.tp-reason {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--tp-muted);
+}
+.tp-hint.is-warn {
+  color: #a3320f;
+  font-weight: 700;
+}
+.tp-reason {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 12px;
+}
+
+.tp-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.tp-actions.is-row {
+  flex-direction: row;
+}
+.tp-actions.is-row > * {
+  flex: 1;
+}
+.tp-actions .gbtn {
+  min-height: 48px;
+}
+
+.tp-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 2px;
+  font-weight: 700;
+}
+.tp-state p {
+  margin: 0;
+}
+
+/* Skeletons */
+.tp-skel {
+  display: block;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #e7e3d3 25%, #f4f1e6 50%, #e7e3d3 75%);
+  background-size: 200% 100%;
+  animation: tp-shimmer 1.2s linear infinite;
+}
+.tp-skel-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  flex: none;
+}
+.tp-skel-name {
+  width: 140px;
+  height: 22px;
+}
+.tp-skel-tile {
+  height: 78px;
+  border-radius: 14px;
+}
+@keyframes tp-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tp-skel {
+    animation: none;
+  }
+}
+
+/* Backdrop: a soft scrim behind the card; tapping it closes the popup. */
+.game-popup-layer:has(> .tp-card) {
+  pointer-events: auto;
+  background: rgba(10, 14, 36, 0.35);
+}
+/* iOS: no bottom edge clipping under the home indicator. */
+@media (max-width: 640px) {
+  .game-popup-layer:has(> .tp-card) {
+    padding-bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px));
+  }
+}
+
+/* Beat the legacy flex rules of the old popup (same class names are reused). */
+.game-territory-popup.tp-card .tp-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  justify-content: stretch;
+}
+.game-territory-popup.tp-card .tp-tile {
+  width: auto;
+  min-width: 0;
+}

@@ -91,7 +91,7 @@ async function checkStep(page, id, vp) {
     const panel = document.querySelector('.game-tour-panel')
     const clipped = panel.scrollHeight - panel.clientHeight
     const btns = [
-      ...document.querySelectorAll('.game-tour button, .game-tour .gb'),
+      ...document.querySelectorAll('.game-tour button, .game-tour .gbtn'),
     ].map((b) => ({ t: b.textContent.trim(), ...r(b) }))
     // Tapping where the target is must hit the tour, not the game.
     let blocked = null

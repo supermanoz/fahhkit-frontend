@@ -9,13 +9,15 @@
 export function routeForPush(data) {
   switch (data?.type) {
     case 'BROADCAST':
+    case 'MAIL':
       return { tab: 'mail' }
     case 'CLUB_WAR':
       return { tab: 'club' }
     case 'TERRITORY_ATTACK':
       return { map: true }
     default:
-      return null
+      // Any push that names a mail (data.mailId) opens the inbox.
+      return data?.mailId ? { tab: 'mail' } : null
   }
 }
 

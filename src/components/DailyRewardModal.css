@@ -1,0 +1,648 @@
+/* Daily reward popup - light "leaderboard" look: off-white panel with the
+   game's ink border + offset shadow, accent-orange banner and ring, dark body
+   text, outlined (white + ink stroke) numbers. Buttons are the existing
+   .game-btn / .game-close-btn slabs (no new button styles here). */
+.dr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(40px + env(safe-area-inset-top, 0px)) 18px
+    calc(24px + env(safe-area-inset-bottom, 0px));
+  background: rgba(10, 14, 36, 0.7);
+  overflow-y: auto;
+}
+.dr-panel {
+  --dr-ink: var(--game-ink, #2b2a24);
+  --dr-accent: var(--game-gold, #ff7a29);
+  --dr-text: var(--text-body-dark, #3a382f);
+  --dr-muted: #5c5848;
+  position: relative;
+  width: min(100%, 380px);
+  margin: auto;
+  padding: 40px 14px 16px;
+  border-radius: 20px;
+  border: 3px solid var(--dr-ink);
+  background: linear-gradient(180deg, #ffffff 0%, var(--row, #f6f5ef) 100%);
+  box-shadow:
+    0 0 0 4px var(--dr-accent),
+    0 0 0 7px var(--dr-ink),
+    0 11px 0 7px var(--dr-ink),
+    0 22px 30px rgba(0, 0, 0, 0.45);
+  color: var(--dr-text);
+  font-family: var(--font-body);
+  font-weight: 800;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Dark readable text on white: switch the game's white-stroked text off for
+   everything inside, then re-apply outlines only where they are wanted. */
+.dr-panel,
+.dr-panel * {
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+}
+.dr-panel .dr-outline,
+.dr-panel .dr-bit,
+.dr-panel .dr-banner-text,
+.dr-panel .dr-float {
+  color: #fff;
+  -webkit-text-stroke: 3px var(--dr-ink);
+  paint-order: stroke fill;
+}
+
+.dr-banner {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 30px 8px;
+  border-radius: 14px;
+  border: 3px solid var(--dr-ink);
+  background: linear-gradient(
+    180deg,
+    var(--game-gold-light, #ffb15c) 0%,
+    var(--dr-accent) 55%,
+    var(--game-gold-dark, #d95a00) 100%
+  );
+  box-shadow:
+    0 4px 0 var(--dr-ink),
+    inset 0 3px 0 rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+.dr-banner-text {
+  font-family: var(--font-display);
+  font-size: 23px;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+/* the leaderboard's own red close button, perched on the panel corner */
+.dr-x {
+  position: absolute !important;
+  top: -22px;
+  right: -16px;
+  z-index: 3;
+}
+
+.dr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dr-streak {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 17px;
+  color: var(--dr-ink);
+}
+.dr-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dr-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 2.5px solid var(--dr-ink);
+  background: var(--dr-ink);
+  color: #fff;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dr-pill-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dr-pill-xp {
+  background: #1f56c4;
+  border-color: var(--dr-ink);
+  font-size: 14px;
+  padding: 3px 9px;
+}
+
+/* ---- animated flame ---- */
+.dr-flame {
+  position: relative;
+  width: 22px;
+  height: 28px;
+  display: inline-block;
+  filter: drop-shadow(0 0 4px rgba(255, 140, 30, 0.8));
+}
+.dr-flame i {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+  transform-origin: 50% 100%;
+}
+.dr-flame-a {
+  width: 20px;
+  height: 27px;
+  margin-left: -10px;
+  background: linear-gradient(180deg, #ff9d2e, #ff4d1f);
+  animation: dr-flicker 0.9s ease-in-out infinite;
+}
+.dr-flame-b {
+  width: 11px;
+  height: 16px;
+  margin-left: -5.5px;
+  background: linear-gradient(180deg, #fff1a1, #ffc233);
+  animation: dr-flicker 0.7s ease-in-out infinite reverse;
+}
+@keyframes dr-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1) rotate(-3deg);
+  }
+  50% {
+    transform: scale(0.9, 1.1) rotate(3deg);
+  }
+}
+
+/* ---- tiles: same border/shadow language as the leaderboard rows ---- */
+.dr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+.dr-tile {
+  position: relative;
+  min-height: 98px;
+  padding: 18px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 14px;
+  border: 2.5px solid var(--dr-ink);
+  background: linear-gradient(180deg, #ffffff 0%, #f1efe6 100%);
+  box-shadow:
+    0 3px 0 var(--dr-ink),
+    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  perspective: 600px;
+}
+.dr-day {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dr-muted);
+}
+.dr-ico {
+  height: 34px;
+  display: grid;
+  place-items: center;
+}
+.dr-coin-lg {
+  width: 30px;
+  height: 30px;
+  border-width: 2px;
+}
+.dr-item-art {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  color: #a83d00;
+}
+.dr-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+.dr-bit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 15px;
+}
+.dr-bit .game-coin {
+  width: 14px;
+  height: 14px;
+}
+.dr-panel .dr-xp {
+  font-size: 12px;
+  color: #1f56c4;
+  -webkit-text-stroke-width: 0;
+}
+.dr-panel .dr-item {
+  font-size: 12px;
+  color: #a83d00;
+  -webkit-text-stroke-width: 0;
+}
+
+/* claimed: soft green + gold check stamp */
+.dr-tile.is-claimed {
+  background: linear-gradient(180deg, #eaf7e2 0%, #cfeebf 100%);
+}
+.dr-tile.is-claimed .dr-ico,
+.dr-tile.is-claimed .dr-reward,
+.dr-tile.is-claimed .dr-day {
+  opacity: 0.5;
+}
+.dr-stamp {
+  position: absolute;
+  top: 19px;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  margin: 0 0 0 -18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #3a2200;
+  background: radial-gradient(circle at 35% 30%, #fff2a8, #ffc233 60%, #d98a00);
+  border: 2.5px solid var(--dr-ink);
+  box-shadow: 0 2px 0 var(--dr-ink);
+  transform: rotate(-12deg);
+}
+.dr-tile.is-special .dr-stamp {
+  top: 24px;
+}
+.dr-stamp svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 4;
+}
+/* locked: muted + small lock */
+.dr-tile.is-locked {
+  background: linear-gradient(180deg, #e9e7de 0%, #dad7cb 100%);
+}
+.dr-tile.is-locked .dr-ico,
+.dr-tile.is-locked .dr-reward {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+.dr-lock {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 16px;
+  height: 16px;
+  color: var(--dr-muted);
+}
+.dr-lock svg {
+  width: 14px;
+  height: 14px;
+}
+/* today: highlighted, glowing pulse, floating icon (scale set in JSX) */
+.dr-tile.is-today {
+  z-index: 2;
+  border-color: var(--dr-ink);
+  background: linear-gradient(180deg, #fff8dc 0%, #ffe08a 100%);
+  box-shadow:
+    0 3px 0 var(--dr-ink),
+    0 0 0 3px var(--dr-accent),
+    0 0 20px 4px rgba(255, 150, 30, 0.6),
+    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  animation: dr-glow 1.4s ease-in-out infinite;
+}
+.dr-tile.is-today .dr-day {
+  color: #8a3a00;
+}
+.dr-tile.is-today .dr-ico {
+  animation: dr-float 1.6s ease-in-out infinite;
+}
+@keyframes dr-glow {
+  50% {
+    box-shadow:
+      0 3px 0 var(--dr-ink),
+      0 0 0 3px var(--dr-accent),
+      0 0 32px 8px rgba(255, 150, 30, 0.85),
+      inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  }
+}
+@keyframes dr-float {
+  50% {
+    transform: translateY(-4px) scale(1.08);
+  }
+}
+/* day 7: special highlighted tile with the gift / Golden Trail preview */
+.dr-tile.is-special {
+  grid-column: 1 / -1;
+  min-height: 92px;
+  padding: 20px 10px 8px;
+  overflow: hidden;
+  border-color: var(--dr-ink);
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd27a 100%);
+  box-shadow:
+    0 3px 0 var(--dr-ink),
+    0 0 0 3px var(--dr-accent),
+    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+}
+.dr-tile.is-special .dr-day {
+  color: #8a3a00;
+  font-size: 13px;
+}
+.dr-tile.is-special .dr-ico {
+  height: 40px;
+}
+.dr-tile.is-special .dr-item-art {
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25));
+}
+.dr-tile.is-special .dr-reward {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 10px;
+}
+.dr-tile.is-special.is-locked {
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd27a 100%);
+}
+.dr-tile.is-special.is-locked .dr-ico,
+.dr-tile.is-special.is-locked .dr-reward {
+  opacity: 0.95;
+  filter: none;
+}
+.dr-tile.is-special.is-claimed {
+  background: linear-gradient(180deg, #eaf7e2 0%, #cfeebf 100%);
+}
+.dr-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 140, 20, 0.22) 0 8deg,
+    transparent 8deg 20deg
+  );
+  -webkit-mask-image: radial-gradient(circle, #000 0, transparent 68%);
+  mask-image: radial-gradient(circle, #000 0, transparent 68%);
+  animation: dr-spin 14s linear infinite;
+  pointer-events: none;
+}
+.dr-tile.is-special::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.7) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  animation: dr-shine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.dr-tile.is-special.is-claimed .dr-rays,
+.dr-tile.is-special.is-claimed::after {
+  display: none;
+}
+.dr-tile.is-special
+  > :not(.dr-rays):not(.dr-stamp):not(.dr-lock):not(.dr-sparks) {
+  position: relative;
+}
+@keyframes dr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dr-shine {
+  60%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+/* claim: flip + spark burst */
+.dr-tile.is-flip {
+  animation: dr-flip 0.7s ease both;
+}
+@keyframes dr-flip {
+  0% {
+    transform: scale(1.08) rotateY(0);
+  }
+  50% {
+    transform: scale(1.2) rotateY(90deg);
+  }
+  100% {
+    transform: scale(1) rotateY(0);
+  }
+}
+.dr-sparks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+}
+.dr-sparks i {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3px;
+  border-radius: 50%;
+  background: #ffb800;
+  border: 1.5px solid var(--dr-ink);
+  animation: dr-spark 0.8s ease-out 0.35s both;
+}
+@keyframes dr-spark {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(var(--d)) scale(0.3);
+  }
+}
+
+/* ---- flying coins / floating number ---- */
+.dr-fly {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.dr-fly-coin {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  width: 20px;
+  height: 20px;
+}
+.dr-float {
+  position: absolute;
+  left: -22px;
+  top: -12px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  white-space: nowrap;
+}
+
+/* ---- results / states ---- */
+/* the result chip is light-yellow: dark numbers, no outline */
+.dr-panel .dr-got .dr-bit {
+  color: var(--dr-ink);
+  -webkit-text-stroke-width: 0;
+}
+.dr-got {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 6px 14px;
+  border-radius: 14px;
+  border: 2.5px solid var(--dr-ink);
+  background: linear-gradient(180deg, #fff8dc 0%, #ffe08a 100%);
+  box-shadow: 0 3px 0 var(--dr-ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--dr-ink);
+}
+.dr-reveal {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 2.5px solid var(--dr-ink);
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd27a 100%);
+  box-shadow:
+    0 3px 0 var(--dr-ink),
+    0 0 0 3px var(--dr-accent);
+}
+.dr-reveal-art {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  color: #a83d00;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25));
+}
+.dr-reveal span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.dr-reveal small {
+  font-size: 12px;
+  color: var(--dr-muted);
+}
+.dr-reveal strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--dr-ink);
+}
+.dr-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.dr-claim {
+  width: 100%;
+  margin-top: 14px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dr-state {
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--dr-muted);
+}
+.dr-error p,
+.dr-inline-error {
+  margin: 0 0 10px;
+  color: #b3261e;
+}
+.dr-inline-error {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 14px;
+}
+.dr-wait {
+  margin-top: 14px;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 14px;
+  border: 2.5px solid var(--dr-ink);
+  background: linear-gradient(180deg, #ffffff 0%, #ebe9de 100%);
+  box-shadow: 0 3px 0 var(--dr-ink);
+}
+.dr-wait-label {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 16px;
+  color: var(--dr-muted);
+}
+.dr-timer {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 28px;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--dr-ink);
+}
+.dr-skip {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--dr-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-tile.is-today,
+  .dr-tile.is-today .dr-ico,
+  .dr-rays,
+  .dr-tile.is-special::after,
+  .dr-flame i {
+    animation: none;
+  }
+}
+@media (max-width: 380px) {
+  .dr-panel {
+    padding: 38px 12px 14px;
+  }
+  .dr-tile {
+    min-height: 90px;
+  }
+  .dr-bit {
+    font-size: 14px;
+  }
+  .dr-banner-text {
+    font-size: 21px;
+  }
+}

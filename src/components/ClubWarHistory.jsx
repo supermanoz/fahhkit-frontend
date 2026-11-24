@@ -27,6 +27,7 @@ import {
 } from './GameIcons'
 import { playerNameOf } from '../utils/playerName'
 import { formatNumber } from '../utils/format'
+import GameButton from './ui/GameButton'
 
 // 10 per page - matches the backend's own default noOfRecords for this
 // endpoint (see api/clubWar.js's getClubWarHistory).
@@ -549,27 +550,27 @@ export default function ClubWarHistory({ userId, onClose, onViewProfile }) {
 
           {totalPages > 1 && (
             <div className="game-route-pager">
-              <button
-                type="button"
-                className="game-btn game-btn-wood game-btn-sm"
+              <GameButton
+                variant="neutral"
+                size="sm"
                 aria-label="Show previous wars"
                 disabled={page <= 1}
                 onClick={() => load(page - 1)}
               >
                 ◀
-              </button>
+              </GameButton>
               <span className="game-route-pager-label">
                 Page {page} of {totalPages}
               </span>
-              <button
-                type="button"
-                className="game-btn game-btn-wood game-btn-sm"
+              <GameButton
+                variant="neutral"
+                size="sm"
                 aria-label="Show more wars"
                 disabled={page >= totalPages}
                 onClick={() => load(page + 1)}
               >
                 ▶
-              </button>
+              </GameButton>
             </div>
           )}
         </>

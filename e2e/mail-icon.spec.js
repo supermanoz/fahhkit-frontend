@@ -1,6 +1,7 @@
 import { test, expect, seedSession } from './fixtures/base.js'
 import { ok } from './fixtures/mockApi.js'
 import { VETERAN } from './mocks/personas.js'
+import { scriptGps } from './helpers/gps.js'
 
 // The Mail tab icon sits in the same .game-menu-picker-medal ring as the other
 // tabs (same border, shadow, size). Checks the ring box matches Me's, the
@@ -18,6 +19,7 @@ for (const unread of [0, 3]) {
     await context.grantPermissions(['geolocation'])
     await context.setGeolocation({ latitude: 27.7172, longitude: 85.324 })
     await seedSession(page, VETERAN)
+    await scriptGps(page)
     await page.route('**/v1/mail/find', (r) =>
       r.fulfill(
         ok({

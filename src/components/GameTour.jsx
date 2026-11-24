@@ -9,6 +9,7 @@ import {
 import { GamePanel, GameActions } from '../game/ui/GameModal'
 import GameButton from '../game/ui/GameButton'
 import { IconFlag, IconRunning, IconSwords } from './GameIcons'
+import { SHOW_PVP_ENTRY } from '../config/features'
 import { TOUR_ACTIONS, TOUR_COPY, tourStepLabel } from '../constants/tourCopy'
 import {
   measureTarget,
@@ -230,19 +231,24 @@ export default function GameTour({
             </div>
             {copy.modes && (
               <ul className="game-tour-modes">
-                {copy.modes.map((m) => {
-                  const Icon = MODE_ICON[m.id]
-                  return (
-                    <li key={m.id} className={`game-tour-mode is-${m.id}`}>
-                      <span className="game-tour-mode-icon" aria-hidden="true">
-                        <Icon />
-                      </span>
-                      <span className="game-tour-mode-text">
-                        <b>{m.name}</b> <span>{m.line}</span>
-                      </span>
-                    </li>
-                  )
-                })}
+                {copy.modes
+                  .filter((m) => m.id !== 'pvp' || SHOW_PVP_ENTRY)
+                  .map((m) => {
+                    const Icon = MODE_ICON[m.id]
+                    return (
+                      <li key={m.id} className={`game-tour-mode is-${m.id}`}>
+                        <span
+                          className="game-tour-mode-icon"
+                          aria-hidden="true"
+                        >
+                          <Icon />
+                        </span>
+                        <span className="game-tour-mode-text">
+                          <b>{m.name}</b> <span>{m.line}</span>
+                        </span>
+                      </li>
+                    )
+                  })}
               </ul>
             )}
             {last ? (

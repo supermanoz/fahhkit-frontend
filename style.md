@@ -31,3 +31,21 @@ the Territory Run game (`GamePage`, `TerritoryMap`), not the rest of the site.
 Cel-shading recipe used throughout: a flat base color plus one hard-edged inset shadow band
 (`box-shadow: inset 0 -Npx 0 <dark tone>`) for the shaded half, and a chunky solid offset drop
 shadow (`box-shadow: 0 Npx 0 var(--game-ink)`) beneath the whole shape — never a blurred gradient.
+
+## Outlined text (read before adding a popup)
+
+The game-wide text style (`tokens.css`, the `:where(.game-root) :where(*)` rule) is a black text stroke
+plus a hard drop shadow on **every element**. It is for **dark or busy backgrounds only**: map labels, HUD
+numbers, coloured ribbons/banners, button faces. Dark text with that outline on a light panel blurs.
+
+- Because the rule hits each element on its own, a `<p>` opt-out never reaches the `<span>`/`<strong>`/`<a>`
+  inside it. Light surfaces opt out **once, at the surface**, by zeroing `--game-text-stroke-width` /
+  `--game-text-shadow` (custom properties inherit). A new light popup/dialog/toast/sheet class goes in the
+  `:is(...)` list under "Outlined-text convention" in `src/game/styles/tokens.css`.
+- Coloured things inside a light surface that need the outline (`.gbtn`, `.gm-ribbon`, `.g-badge`) are in the
+  second list there and keep it.
+- Message/body copy in a popup uses `--font-body` (Nunito, dark, regular-to-semibold, line-height 1.4+).
+  `--font-display` is for the title banner, short headings and numbers. Add new sentence-style popup text
+  classes to the body-font rule in `src/game/ui/gameSkin.css` ("Text inside popups").
+- `src/game/styles/outlineConvention.test.js` fails if a rule outlines dark text or text on a light
+  background, or if a new light popup surface is missing from the opt-out list.

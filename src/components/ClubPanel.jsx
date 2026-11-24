@@ -1,4 +1,7 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import CoinAmount from './CoinAmount'
+import { formatCoins } from '../utils/format'
+import { applyDelta, refresh as refreshCoins } from '../state/coins'
 import { useEffect, useState } from 'react'
 import {
   IconChevronRight,
@@ -45,11 +48,12 @@ import { GameActions, GameModal } from '../game/ui/GameModal'
 import ClubWarPanel from './ClubWarPanel'
 import { ClubError } from './ClubStates'
 import ClubBadge from './ClubBadge'
-import { playerName, playerNameOf } from '../utils/playerName'
+import { getDisplayName, playerNameOf } from '../utils/playerName'
 import './GameCards.css'
 import './game-auth/GameAuth.css'
 import './ClubPanel.css'
 import './ClubRedesign.css'
+import GameButton from './ui/GameButton'
 
 // How much of the season leaderboard the invite search scans. Name search
 // filters leaderboard pages client-side (/v1/athlete/find and /v1/user/find
@@ -414,6 +418,8 @@ export default function ClubPanel({
       setTreasury(await donateToClubTreasury(amount))
       setDonateAmount('')
       // The donation came out of the player's own balance.
+      applyDelta(-amount, 'club-donate')
+      refreshCoins({ force: true })
       onClubChanged?.()
     } catch (err) {
       setDonateError(errorText(err, 'Could not donate right now.'))
@@ -463,6 +469,8 @@ export default function ClubPanel({
       await createClub(createName.trim(), createDescription.trim())
       setCreateName('')
       setCreateDescription('')
+      applyDelta(-CLUB_CREATION_COST, 'club-create')
+      refreshCoins({ force: true })
       onClubChanged?.()
     } catch (err) {
       setCreateError(
@@ -690,7 +698,11 @@ export default function ClubPanel({
                 <div className="club-banner-info">
                   <h3 className="game-card-title">{myClub.name}</h3>
                   <p className="game-row-meta">
-                    Captain {playerName(null, myClub.leaderName)}
+                    Captain{' '}
+                    {getDisplayName({
+                      nickname: myClub.leaderNickname,
+                      fullName: myClub.leaderName,
+                    })}
                   </p>
                   {myRole && (
                     <span className={`club-role role-${myRole.toLowerCase()}`}>
@@ -719,6 +731,10 @@ export default function ClubPanel({
                   onSubmit={handleSaveDescription}
                 >
                   <textarea
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     className="game-club-input club-desc-input"
                     placeholder="Tell runners what your crew is about…"
                     value={descDraft}
@@ -731,9 +747,9 @@ export default function ClubPanel({
                     <span className="game-row-meta">
                       {descDraft.length}/200
                     </span>
-                    <button
-                      type="button"
-                      className="game-btn game-btn-wood game-btn-sm"
+                    <GameButton
+                      variant="neutral"
+                      size="sm"
                       onClick={() => {
                         setDescDraft(null)
                         setDescError(null)
@@ -741,17 +757,17 @@ export default function ClubPanel({
                       disabled={savingDesc}
                     >
                       Cancel
-                    </button>
-                    <button
+                    </GameButton>
+                    <GameButton
                       type="submit"
-                      className="game-btn game-btn-green game-btn-sm"
+                      size="sm"
                       disabled={
                         savingDesc ||
                         descDraft.trim() === (myClub.description ?? '').trim()
                       }
                     >
                       {savingDesc ? 'Saving…' : 'Save'}
-                    </button>
+                    </GameButton>
                   </div>
                   {descError && (
                     <p className="game-controls-hint game-controls-hint-error">
@@ -788,14 +804,19 @@ export default function ClubPanel({
                     <IconCoins />
                   </span>
                   <span>
-                    <span className="club-treasury-value">
-                      {treasury ? treasury.balance : '—'}
-                    </span>
+                    <CoinAmount
+                      className="club-treasury-value"
+                      text={treasury ? formatCoins(treasury.balance) : '—'}
+                    />
                     <span className="game-row-meta">Club treasury</span>
                   </span>
                 </div>
                 <form className="club-donate" onSubmit={handleDonate}>
                   <input
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     type="number"
                     className="game-club-input"
                     placeholder={`Amount (you have ${balance})`}
@@ -805,9 +826,9 @@ export default function ClubPanel({
                     value={donateAmount}
                     onChange={(e) => setDonateAmount(e.target.value)}
                   />
-                  <button
+                  <GameButton
                     type="submit"
-                    className="game-btn game-btn-green"
+
                     disabled={
                       donating ||
                       !donateValue ||
@@ -816,7 +837,7 @@ export default function ClubPanel({
                     }
                   >
                     {donating ? '…' : 'Donate'}
-                  </button>
+                  </GameButton>
                 </form>
                 {donateError && (
                   <p className="game-controls-hint game-controls-hint-error">
@@ -837,6 +858,7 @@ export default function ClubPanel({
                       onViewProfile?.({
                         userId: req.requesterId,
                         fullName: req.requesterName,
+                        nickname: req.requesterNickname,
                         fromJoinRequest: true,
                       })
                     return (
@@ -847,7 +869,10 @@ export default function ClubPanel({
                           className="game-row game-row-clickable"
                           role="button"
                           tabIndex={0}
-                          aria-label={`View ${playerName(null, req.requesterName)}'s profile`}
+                          aria-label={`View ${getDisplayName({
+                            nickname: req.requesterNickname,
+                            fullName: req.requesterName,
+                          })}'s profile`}
                           onClick={openProfile}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
@@ -857,16 +882,18 @@ export default function ClubPanel({
                           }}
                         >
                           <span className="game-row-name">
-                            {playerName(null, req.requesterName)}
+                            {getDisplayName({
+                              nickname: req.requesterNickname,
+                              fullName: req.requesterName,
+                            })}
                           </span>
                           <span
                             className="game-row-actions"
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
                           >
-                            <button
-                              type="button"
-                              className="game-btn game-btn-green game-btn-sm"
+                            <GameButton
+                              size="sm"
                               disabled={busyId === req.id}
                               onClick={() =>
                                 runAction(
@@ -877,10 +904,10 @@ export default function ClubPanel({
                               }
                             >
                               Accept
-                            </button>
-                            <button
-                              type="button"
-                              className="game-btn game-btn-wood game-btn-sm"
+                            </GameButton>
+                            <GameButton
+                              variant="neutral"
+                              size="sm"
                               disabled={busyId === req.id}
                               onClick={() =>
                                 runAction(
@@ -891,7 +918,7 @@ export default function ClubPanel({
                               }
                             >
                               Decline
-                            </button>
+                            </GameButton>
                           </span>
                         </div>
                       </li>
@@ -909,28 +936,33 @@ export default function ClubPanel({
                 <form className="club-search" onSubmit={searchPlayersByName}>
                   <IconSearch className="club-search-icon" />
                   <input
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     type="text"
                     className="game-club-input"
                     placeholder="Search by name or exact nickname"
                     value={inviteQuery}
                     onChange={(e) => setInviteQuery(e.target.value)}
                   />
-                  <button
+                  <GameButton
                     type="submit"
-                    className="game-btn game-btn-wood"
+                    variant="neutral"
                     disabled={inviteSearching || !inviteQuery.trim()}
                   >
                     Search
-                  </button>
+                  </GameButton>
                 </form>
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood game-btn-sm club-nearby-btn"
+                <GameButton
+                  variant="neutral"
+                  size="sm"
+                  className="club-nearby-btn"
                   onClick={findPlayersNearby}
                   disabled={inviteSearching}
                 >
                   Find runners near me
-                </button>
+                </GameButton>
 
                 {inviteSearchError ? (
                   <p className="game-card-empty">{inviteSearchError}</p>
@@ -991,9 +1023,8 @@ export default function ClubPanel({
                                     {failed ? state : player.meta}
                                   </span>
                                 </span>
-                                <button
-                                  type="button"
-                                  className="game-btn game-btn-green game-btn-sm"
+                                <GameButton
+                                  size="sm"
                                   disabled={
                                     state === 'sending' || state === 'sent'
                                   }
@@ -1008,7 +1039,7 @@ export default function ClubPanel({
                                     : state === 'sending'
                                       ? 'Sending…'
                                       : 'Invite'}
-                                </button>
+                                </GameButton>
                               </div>
                             </li>
                           )
@@ -1139,22 +1170,20 @@ export default function ClubPanel({
                 </p>
               )}
               <GameActions>
-                <button
-                  type="button"
-                  className="game-btn game-btn-wood"
+                <GameButton
+                  variant="neutral"
                   onClick={() => setConfirmingLeave(false)}
                   disabled={leaving}
                 >
                   Stay
-                </button>
-                <button
-                  type="button"
-                  className="game-btn game-btn-red"
+                </GameButton>
+                <GameButton
+                  variant="danger"
                   onClick={handleLeave}
                   disabled={leaving}
                 >
                   {leaving ? 'Leaving…' : 'Yes, leave'}
-                </button>
+                </GameButton>
               </GameActions>
             </GameModal>
           </div>
@@ -1168,13 +1197,13 @@ export default function ClubPanel({
     const full = viewingClub.memberCount >= CLUB_MAX_MEMBERS
     return (
       <div className="game-cards club-page">
-        <button
-          type="button"
-          className="game-btn game-btn-wood club-back"
+        <GameButton
+          variant="neutral"
+          className="club-back"
           onClick={() => setViewingClub(null)}
         >
           ‹ All Clubs
-        </button>
+        </GameButton>
 
         <section className="game-card club-card club-banner">
           <div className="club-banner-top">
@@ -1183,7 +1212,11 @@ export default function ClubPanel({
               <h3 className="game-card-title">{viewingClub.name}</h3>
               {viewingClub.leaderName && (
                 <p className="game-row-meta">
-                  Captain {playerName(null, viewingClub.leaderName)}
+                  Captain{' '}
+                  {getDisplayName({
+                    nickname: viewingClub.leaderNickname,
+                    fullName: viewingClub.leaderName,
+                  })}
                 </p>
               )}
             </div>
@@ -1199,9 +1232,9 @@ export default function ClubPanel({
           {viewingClub.description && (
             <p className="club-description">{viewingClub.description}</p>
           )}
-          <button
-            type="button"
-            className="game-btn game-btn-green game-btn-lg"
+          <GameButton
+            size="lg"
+            fullWidth
             onClick={() => handleJoin(viewingClub)}
             disabled={joiningId === viewingClub.id || requested || full}
           >
@@ -1212,7 +1245,7 @@ export default function ClubPanel({
                 : joiningId === viewingClub.id
                   ? 'Sending…'
                   : 'Request to Join'}
-          </button>
+          </GameButton>
           {joinError && (
             <p className="game-controls-hint game-controls-hint-error">
               {joinError}
@@ -1333,6 +1366,10 @@ export default function ClubPanel({
                 Club name
               </label>
               <input
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 id="club-create-name"
                 type="text"
                 className="game-auth-input"
@@ -1348,6 +1385,10 @@ export default function ClubPanel({
                 Description (optional)
               </label>
               <input
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 id="club-create-desc"
                 type="text"
                 className="game-auth-input"
@@ -1361,9 +1402,11 @@ export default function ClubPanel({
             {!createName.trim() && (
               <p className="club-hint">Give your club a name to continue.</p>
             )}
-            <button
+            <GameButton
               type="submit"
-              className="game-btn game-btn-green game-btn-lg club-create-btn"
+              size="lg"
+              fullWidth
+              className="club-create-btn"
               disabled={
                 creating || !createName.trim() || balance < CLUB_CREATION_COST
               }
@@ -1377,7 +1420,7 @@ export default function ClubPanel({
                   {CLUB_CREATION_COST}
                 </>
               )}
-            </button>
+            </GameButton>
             {balance < CLUB_CREATION_COST && (
               <div className="club-need-coins">
                 <p className="game-card-empty">
@@ -1385,13 +1428,9 @@ export default function ClubPanel({
                   {balance}.
                 </p>
                 {onGetCoins && (
-                  <button
-                    type="button"
-                    className="game-btn game-btn-wood game-btn-sm"
-                    onClick={onGetCoins}
-                  >
+                  <GameButton variant="neutral" size="sm" onClick={onGetCoins}>
                     Get Fahhcoin
-                  </button>
+                  </GameButton>
                 )}
               </div>
             )}
@@ -1409,6 +1448,10 @@ export default function ClubPanel({
         <div className="club-search">
           <IconSearch className="club-search-icon" />
           <input
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             type="text"
             className="game-club-input"
             placeholder="Search by name"
@@ -1418,14 +1461,13 @@ export default function ClubPanel({
               if (e.key === 'Enter') loadClubs(searchText.trim())
             }}
           />
-          <button
-            type="button"
-            className="game-btn game-btn-wood"
+          <GameButton
+            variant="neutral"
             onClick={() => loadClubs(searchText.trim())}
             disabled={loadingClubs}
           >
             Search
-          </button>
+          </GameButton>
         </div>
 
         {browseError ? (
@@ -1470,9 +1512,8 @@ export default function ClubPanel({
                         {club.memberCount} / {CLUB_MAX_MEMBERS} members
                       </span>
                     </span>
-                    <button
-                      type="button"
-                      className="game-btn game-btn-green game-btn-sm"
+                    <GameButton
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleJoin(club)
@@ -1485,7 +1526,7 @@ export default function ClubPanel({
                         : joiningId === club.id
                           ? 'Sending…'
                           : 'Join'}
-                    </button>
+                    </GameButton>
                   </div>
                 </li>
               )

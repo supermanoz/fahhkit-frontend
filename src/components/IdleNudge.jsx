@@ -51,11 +51,19 @@ const NUDGE_LINES = [
 // game's other pop-ups (ChallengePrompt, the confirm/buy cards), with Blaze
 // leaning over the top of the speech bubble instead of standing beside it.
 // Tapping the scrim dismisses it, same as everywhere else in the game.
-export default function IdleNudge({ onRun, onBattle, onDismiss, character }) {
-  const { shout, line, cta, action } = useMemo(
-    () => NUDGE_LINES[Math.floor(Math.random() * NUDGE_LINES.length)],
-    []
-  )
+export default function IdleNudge({
+  onRun,
+  onBattle,
+  onDismiss,
+  character,
+  showBattle = true, // false = PvP hidden: only the "run" lines
+}) {
+  const { shout, line, cta, action } = useMemo(() => {
+    const lines = showBattle
+      ? NUDGE_LINES
+      : NUDGE_LINES.filter((l) => l.action !== 'battle')
+    return lines[Math.floor(Math.random() * lines.length)]
+  }, [showBattle])
 
   return (
     <motion.div

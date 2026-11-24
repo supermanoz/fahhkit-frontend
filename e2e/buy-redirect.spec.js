@@ -169,7 +169,7 @@ test.describe('Buy Fahhcoin redirect confirmation', () => {
     ])
     await page.evaluate(() => {
       document
-        .querySelector('.game-buy-redirect-card .game-btn.game-btn-green')
+        .querySelector('.game-buy-redirect-card .gbtn.gbtn-primary')
         ?.click()
     })
     await newPage.waitForLoadState('domcontentloaded')

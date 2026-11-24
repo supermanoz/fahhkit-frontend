@@ -1,10 +1,16 @@
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useEffect, useState } from 'react'
 import { navigateToPayment, numericId } from '../utils/safeUrl'
 import { Link, useSearchParams } from 'react-router-dom'
 import { FaEnvelopeOpenText } from 'react-icons/fa'
 import { ApiError, getJson, postJson } from '../api/client'
-import { getTerritoryProfile } from '../api/territory'
+import { refresh as refreshFahhcoin, useCoinsSession } from '../state/coins'
 import { formatCoins } from '../utils/format'
+import {
+  COIN_STATUS_CONTENT,
+  GAME_APP_SCHEME_URL,
+  normalizeCoinStatus,
+} from '../utils/paymentStatus'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import CoinStack from '../components/CoinStack'
@@ -35,48 +41,21 @@ const STATUS_CONTENT = {
   },
 }
 
-// Fahhcoin top-ups (CoinPurchaseController) share this same redirect page
-// with event registration payments, but resolve to a `purchaseId` +
-// `status` pair instead of a `registrationId` — and the coin-purchase
-// backend has no GET-by-id lookup, so the already-resolved `status` query
-// param is all there is to show here (no follow-up fetch needed/possible).
-const COIN_STATUS_CONTENT = {
-  PAID: {
-    kind: 'success',
-    title: 'Fahhcoin added!',
-    message: 'Your payment went through and your balance is topped up.',
-  },
-  PENDING: {
-    kind: 'success',
-    title: 'Payment pending',
-    message:
-      "We're still confirming your payment with Khalti. This can take a moment — check back shortly.",
-  },
-  FAILED: {
-    kind: 'error',
-    title: "Payment didn't go through",
-    message: 'Your payment could not be completed. You can try again below.',
-  },
-  CANCELLED: {
-    kind: 'error',
-    title: 'Payment cancelled',
-    message:
-      'You cancelled the payment before it completed. You can try again below.',
-  },
-}
-
 export default function PaymentStatusPage() {
   const [searchParams] = useSearchParams()
   const registrationId = numericId(searchParams.get('registrationId'))
   const purchaseId = searchParams.get('purchaseId')
-  const coinStatus = searchParams.get('status')
+  const coinStatus = normalizeCoinStatus(searchParams.get('status'))
+  const [appHint, setAppHint] = useState(false)
   const [registration, setRegistration] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState(null)
   const [showEmailPopup, setShowEmailPopup] = useState(false)
-  const [balance, setBalance] = useState(null)
+  // The shared balance store; refreshed below once a PAID top-up is shown.
+  const { user } = useCurrentUser()
+  const balance = useCoinsSession(user?.id ?? null)
 
   useEffect(() => {
     // Coin-purchase redirects carry everything needed (status) in the URL
@@ -88,9 +67,7 @@ export default function PaymentStatusPage() {
     if (purchaseId) {
       setLoading(false)
       if (coinStatus === 'PAID') {
-        getTerritoryProfile()
-          .then((profile) => setBalance(profile?.fahhcoinBalance ?? null))
-          .catch(() => {})
+        refreshFahhcoin({ force: true })
       }
       return
     }
@@ -138,7 +115,18 @@ export default function PaymentStatusPage() {
   const content = registration
     ? STATUS_CONTENT[registration.paymentStatus]
     : null
-  const coinContent = purchaseId ? COIN_STATUS_CONTENT[coinStatus] : null
+  const coinContent =
+    purchaseId && coinStatus ? COIN_STATUS_CONTENT[coinStatus] : null
+  const retryable = ['FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'].includes(
+    coinStatus
+  )
+
+  function returnToGame() {
+    // Phone browser: ask the OS to bring the app forward. If it is not
+    // installed nothing happens, so show the manual hint too.
+    setAppHint(true)
+    window.location.href = GAME_APP_SCHEME_URL
+  }
 
   return (
     <div className="payment-status-page">
@@ -206,13 +194,26 @@ export default function PaymentStatusPage() {
               </dl>
 
               <div className="payment-status-actions">
-                <Link to="/game" className="btn btn-primary">
-                  Back to Territory Run
-                </Link>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={returnToGame}
+                >
+                  Return to the game
+                </button>
                 <Link to="/shop" className="btn btn-outline">
-                  Buy More Fahhcoin
+                  {retryable ? 'Try Again' : 'Buy More Fahhcoin'}
+                </Link>
+                <Link to="/game" className="btn btn-outline">
+                  Play on the web
                 </Link>
               </div>
+              {appHint && (
+                <p className="payment-status-muted">
+                  If the game did not open, switch back to the Run Conquest app
+                  yourself. Your Fahhcoin balance updates when you return.
+                </p>
+              )}
             </>
           )}
 

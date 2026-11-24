@@ -5,7 +5,8 @@ import GameButton from '../game/ui/GameButton'
 import { resolveFileUrl, toClubRoleWords } from '../api/client'
 import { openExternal } from '../utils/externalLink'
 import { formatMailDateTime, splitLinks } from '../utils/mailView'
-import { playerName } from '../utils/playerName'
+import { mailDisplayBody, mailFacts } from '../utils/mailDetails'
+import { getDisplayName } from '../utils/playerName'
 import {
   IconCheck,
   IconEnvelope,
@@ -14,28 +15,16 @@ import {
   IconTrash,
   IconUsers,
 } from './GameIcons'
+import { MAIL_ICONS } from './mailIcons'
+import { isMailClaimable, mailTitle, mailTypeInfo } from '../utils/mailTypes'
 import {
   MAIL_ACTIONS,
   MAIL_DEFAULT_SENDER,
   MAIL_REWARD,
   MAIL_STATUS_LABEL,
-  MAIL_TYPE_FALLBACK,
-  MAIL_TYPE_LABEL,
   NEWS_AUTHOR,
   NEWS_TAG,
 } from '../constants/mailCopy'
-
-const TYPE_ICON = {
-  NOTICE: IconEnvelope,
-  CLUB_INVITE: IconUsers,
-  STORE_ITEM_GRANT: IconGift,
-}
-// Ribbon colour by what the mail is.
-const TYPE_TONE = {
-  NOTICE: 'info',
-  CLUB_INVITE: 'success',
-  STORE_ITEM_GRANT: 'warning',
-}
 
 // Body text: paragraphs on blank lines, http(s) links styled and safe (only
 // URLs that pass utils/safeUrl.js become anchors).
@@ -81,18 +70,21 @@ export default function MailDetail({
   const [imageFailed, setImageFailed] = useState(false)
   if (!item) return null
   const isNews = kind === 'news'
-  const title = toClubRoleWords(item.title || '')
+  const info = mailTypeInfo(item.type)
+  const title = toClubRoleWords(mailTitle(item))
 
-  let Icon = isNews ? IconMegaphone : TYPE_ICON[item.type] || IconEnvelope
-  let typeLabel = isNews
-    ? NEWS_TAG[item.type] || 'News'
-    : MAIL_TYPE_LABEL[item.type] || MAIL_TYPE_FALLBACK
+  let Icon = isNews ? IconMegaphone : MAIL_ICONS[info.icon] || IconEnvelope
+  let typeLabel = isNews ? NEWS_TAG[item.type] || 'News' : info.label
   const sender = isNews
     ? NEWS_AUTHOR
-    : playerName(null, item.senderName) || MAIL_DEFAULT_SENDER
+    : getDisplayName(
+        { nickname: item.senderNickname, fullName: item.senderName },
+        MAIL_DEFAULT_SENDER
+      )
   const when = formatMailDateTime(isNews ? item.publishedAt : item.createdDate)
-  const resolved = item.status === 'CLAIMED' || item.status === 'DECLINED'
-  const claimable = !isNews && item.type !== 'NOTICE' && !resolved
+  const facts = isNews ? [] : mailFacts(item)
+  // Only types that really have a claim action (never unknown/read-only ones).
+  const claimable = !isNews && isMailClaimable(item)
 
   // What claiming gives, from fields the mail really has: a gift's store item
   // (named from the already-loaded catalog when it is there), or a club invite.
@@ -108,7 +100,7 @@ export default function MailDetail({
     <GameModal
       open
       onClose={onClose}
-      tone={isNews ? 'info' : TYPE_TONE[item.type] || 'info'}
+      tone={isNews ? 'info' : info.tone}
       title={title}
       className="mail-detail"
       overlayClassName="mail-detail-overlay"
@@ -139,8 +131,19 @@ export default function MailDetail({
       </div>
 
       <div className="mail-detail-body">
-        <Body text={item.body} />
+        <Body text={isNews ? item.body : mailDisplayBody(item)} />
       </div>
+
+      {facts.length > 0 && (
+        <dl className="mail-detail-facts" data-testid="mail-facts">
+          {facts.map((f) => (
+            <div key={f.label} className="mail-fact">
+              <dt>{f.label}</dt>
+              <dd>{f.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {reward && (
         <div className="mail-detail-rewards" aria-label="What you get">
@@ -176,20 +179,25 @@ export default function MailDetail({
             {MAIL_ACTIONS.decline}
           </GameButton>
         )}
-        <GameButton
-          variant={claimable ? 'ghost' : 'secondary'}
-          className="g-full-width"
-          onClick={onClose}
-        >
-          {MAIL_ACTIONS.close}
-        </GameButton>
+        {/* A personal mail keeps only Delete (+ Claim when there is something
+            to claim); tapping outside the card or Escape closes it. */}
+        {isNews && (
+          <GameButton
+            variant="secondary"
+            className="g-full-width"
+            onClick={onClose}
+          >
+            {MAIL_ACTIONS.close}
+          </GameButton>
+        )}
         {!isNews && (
           // Always offered once the mail is no longer UNREAD (the backend's own
           // rule - see api/mail.js's deleteMail); deleting never claims or
           // declines an invite/gift. Disabled while still UNREAD.
-          <button
-            type="button"
-            className="mail-delete-btn"
+          <GameButton
+            variant="danger"
+            className="g-full-width mail-delete-btn"
+            icon={<IconTrash aria-hidden="true" />}
             onClick={() => onDelete?.(item)}
             disabled={busy || item.status === 'UNREAD'}
             title={
@@ -197,8 +205,8 @@ export default function MailDetail({
             }
             aria-label="Delete mail"
           >
-            <IconTrash aria-hidden="true" /> Delete
-          </button>
+            Delete
+          </GameButton>
         )}
       </GameActions>
     </GameModal>

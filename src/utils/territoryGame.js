@@ -20,6 +20,18 @@ export const LOOP_MIN_POINTS = 10
 export const LOOP_MIN_AREA_SQ_METERS = 2000
 export const LOOP_CLOSURE_THRESHOLD_METERS = 25
 
+// True while the path hasn't come back within LOOP_CLOSURE_THRESHOLD_METERS of
+// where it started (also true for fewer than 2 points: nothing to close yet).
+// Used live (End during a Conquer run) and on the finished draft.
+export function isLoopOpen(points) {
+  return (
+    !points ||
+    points.length < 2 ||
+    haversineDistance(points[0], points[points.length - 1]) >
+      LOOP_CLOSURE_THRESHOLD_METERS
+  )
+}
+
 // Radius around the player that findParcelsNear queries for territory to
 // show on the map. The view itself isn't fenced to this (see
 // ZoomRangeLimiter in TerritoryMap.jsx) — panning further out just shows an
@@ -76,8 +88,10 @@ function findEquippedAsset(equippedItems, category, field) {
 // Converts a backend TerritoryParcelResponse (GeoJSON-style rings of
 // [lng, lat] pairs — see TerritoryServiceImpl#toRingCoordinates) into the
 // {lat, lng} point-array shape TerritoryMap already renders. Interior rings
-// (holes) are dropped — this game's map view doesn't render donut parcels,
-// same simplification the old client-only model made.
+// (holes) are NOT drawn - this game's map view doesn't render donut parcels,
+// same simplification the old client-only model made - but they are kept
+// (`holes`) so tap hit-testing treats a hole as not belonging to the parcel
+// (see utils/territoryPicker.js: whoever sits inside the hole gets the tap).
 //
 // ownerEquippedItems carries the parcel owner's equipped cosmetics
 // (TERRITORY_SHADE/TERRITORY_EMOJI) straight from the API - using those
@@ -102,6 +116,8 @@ export function toDisplayParcel(parcel, currentUserId) {
     id: parcel.id,
     ownerId: parcel.ownerId,
     ownerName: parcel.ownerName,
+    // not sent by the backend yet (TerritoryParcelResponse has ownerName only)
+    ownerNickname: parcel.ownerNickname ?? null,
     color: isMine
       ? PLAYER_COLOR
       : equippedShade || colorForOwner(parcel.ownerId),
@@ -118,6 +134,9 @@ export function toDisplayParcel(parcel, currentUserId) {
     // colored-initial fallback) until then.
     ownerProfilePictureUrl: parcel.ownerProfilePictureUrl || null,
     points: exteriorRing.map(([lng, lat]) => ({ lat, lng })),
+    holes: (parcel.geometry || [])
+      .slice(1)
+      .map((ring) => ring.map(([lng, lat]) => ({ lat, lng }))),
     area: parcel.areaSqMeters || 0,
     // TerritoryParcel.currentScore - a per-PARCEL run score (what the
     // conflict-resolution engine compares a challenger's score against),
@@ -281,6 +300,9 @@ export function mergeTouchingParcels(parcels) {
   }
   return unioned.map((polygon, i) => {
     const points = polygon[0].map(([lat, lng]) => ({ lat, lng }))
+    const holes = polygon
+      .slice(1)
+      .map((ring) => ring.map(([lat, lng]) => ({ lat, lng })))
     // A parcel's own centroid always lands inside whichever output cluster
     // it fed into, disjoint clusters for the same owner included.
     const sourceIds = parcels
@@ -289,6 +311,7 @@ export function mergeTouchingParcels(parcels) {
     return {
       id: `merged-${i}`,
       points,
+      holes,
       area: polygonAreaSqMeters(points),
       sourceIds,
     }

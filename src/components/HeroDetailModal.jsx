@@ -34,6 +34,7 @@ import {
   resolveEmoteAsset,
   resolveEquippedEmoteItem,
 } from '../utils/emotes'
+import './heroLocked.css'
 import './HeroDetailModal.css'
 
 // Stat bars fill against this boost - no hero perk goes near it, so a +10%
@@ -73,6 +74,9 @@ function HeroEmoteStage({
   // Level-locked hero: every emote shows locked and can't be opened/bought
   // (the backend wants the hero owned first).
   levelLocked = false,
+  // Not owned (any reason): the shared locked look - shaded static art on a
+  // matching dimmed stage (heroLocked.css). Nothing animates while locked.
+  heroLocked = false,
 }) {
   const stageRef = useRef(null)
   const [stageHeight, setStageHeight] = useState(0)
@@ -214,7 +218,7 @@ function HeroEmoteStage({
     <>
       <div
         ref={stageRef}
-        className={`hero-modal-stage ${sprite ? '' : 'is-flat'}`}
+        className={`hero-modal-stage ${sprite ? '' : 'is-flat'} ${heroLocked ? 'is-hero-locked' : ''}`}
       >
         <HeroStage hero={hero.name} className="hero-modal-stage-bg" fullBleed>
           <AnimatePresence mode="popLayout" custom={direction} initial={false}>
@@ -263,10 +267,15 @@ function HeroEmoteStage({
                 hero's `emotes`, not `poses`), so the idle slide itself
                 can't free-preview anything past idle. */}
               <span
-                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''} ${levelLocked ? 'is-level-locked' : ''}`}
+                className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''}`}
               >
                 {slide.kind === 'idle' ? (
-                  <HeroFigure hero={hero} pose="idle" height={spriteHeight} />
+                  <HeroFigure
+                    hero={hero}
+                    pose="idle"
+                    height={spriteHeight}
+                    locked={heroLocked}
+                  />
                 ) : (
                   // Plays regardless of ownership - only the current slide is
                   // ever mounted at all (AnimatePresence swaps one slide at a
@@ -279,7 +288,7 @@ function HeroEmoteStage({
                     heroName={hero.name}
                     emoteName={slide.item.name}
                     size={spriteHeight}
-                    active
+                    active={!heroLocked}
                   />
                 )}
                 {slide.kind === 'emote' && !slide.owned && (
@@ -371,7 +380,7 @@ export default function HeroDetailModal({
   onShowcase,
 }) {
   const sprite = getHeroSprite(hero.name)
-  const { ownedHeroItem, claimable, state, levelLocked, unlockLevel } =
+  const { ownedHeroItem, claimable, state, levelLocked, unlockLevel, locked } =
     resolveHeroEquipState(hero, ownedItems, activeHeroId, level)
   // The hero-unlock item itself - mixed into `hero.skins` (the backend's
   // field name for every active store item tied to this hero, categories
@@ -523,6 +532,7 @@ export default function HeroDetailModal({
           ownedItems={ownedItems}
           onShowcase={onShowcase}
           levelLocked={levelLocked}
+          heroLocked={locked}
         />
 
         <div className="hero-modal-body">

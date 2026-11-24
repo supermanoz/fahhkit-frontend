@@ -19,6 +19,9 @@ export default function HeroFigure({
   pose = 'idle',
   height = 170,
   releaseGraceMs,
+  // Locked hero: draw the static first frame only - no sheet decode, no rAF
+  // loop - so the locked (filtered) look is painted once, never per frame.
+  locked = false,
 }) {
   const sprite = getHeroSprite(hero?.name)
   if (sprite) {
@@ -28,7 +31,7 @@ export default function HeroFigure({
         {...poseData}
         height={height}
         releaseGraceMs={releaseGraceMs}
-        active
+        active={!locked}
       />
     )
   }

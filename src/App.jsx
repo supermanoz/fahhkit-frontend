@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AOS from 'aos'
 import GamePage from './pages/GamePage'
 import GameLegalPage from './pages/GameLegalPage'
@@ -12,11 +12,24 @@ import OfflineOverlay from './components/OfflineOverlay'
 // emitted into the native bundle. The website build keeps all its routes.
 const APP_SHELL = import.meta.env.VITE_APP_SHELL === 'true'
 const WebShell = APP_SHELL ? null : lazy(() => import('./WebShell'))
+// Dev-only visual review of the shared button (never in a production build).
+const DevButtonsPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevButtonsPage'))
+  : null
 
 export default function App() {
+  const { pathname } = useLocation()
   useEffect(() => {
     AOS.init({ duration: 700, once: true, offset: 40 })
   }, [])
+
+  if (DevButtonsPage && pathname === '/dev/buttons') {
+    return (
+      <Suspense fallback={null}>
+        <DevButtonsPage />
+      </Suspense>
+    )
+  }
 
   return (
     <>

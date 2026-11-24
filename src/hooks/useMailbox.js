@@ -10,6 +10,7 @@ import {
   readBroadcastMail,
   readMail,
 } from '../api/mail'
+import { isMailClaimable } from '../utils/mailTypes'
 
 // Inbox: page-NUMBERED now (see MailPanel's .game-route-pager, the same
 // control the Me tab's My Territories/My Routes lists use - reused rather
@@ -21,6 +22,8 @@ const MAIL_PAGE_SIZE = 15
 // Broadcasts (News tab) keep their original infinite-scroll behavior -
 // only the personal inbox was asked to paginate.
 const BROADCAST_PAGE_SIZE = 20
+// Mark-all-read looks at most this many inbox pages for unread mail.
+const MARK_ALL_MAX_PAGES = 10
 
 // Inbox state lives here (not inside MailPanel) so the game's menu tab can
 // show an unread badge before the panel is ever opened, and so socket pushes
@@ -158,6 +161,9 @@ export function useMailbox() {
   }
 
   async function claim(item) {
+    // Nothing to claim -> never ask the server (its answer would be the
+    // "nothing to claim" error, which a player must never see).
+    if (!isMailClaimable(item)) return null
     const updated = await run(
       item.id,
       () => claimMail(item.id),
@@ -174,6 +180,65 @@ export function useMailbox() {
       'Could not decline that invite.'
     )
     if (updated) replace(updated)
+  }
+
+  // Mark every unread inbox mail read. The server only has a per-mail read
+  // endpoint, so: the list updates AT ONCE (badge / count follow), then one
+  // read request per unread mail - on this page and on the later pages (fetched
+  // just for their ids, capped) - at most 4 at a time. A mail whose request
+  // fails goes back to unread. Resolves to how many were marked.
+  const markingRef = useRef(false)
+  async function markAllRead() {
+    if (markingRef.current) return 0
+    const unreadHere = mail.filter((m) => m.status === 'UNREAD')
+    if (unreadHere.length === 0) return 0
+    markingRef.current = true
+    setActionError(null)
+    const stamp = new Date().toISOString()
+    const ids = new Set(unreadHere.map((m) => m.id))
+    setMail((prev) =>
+      prev.map((m) =>
+        ids.has(m.id) ? { ...m, status: 'READ', readAt: stamp } : m
+      )
+    )
+    const failed = new Set()
+    try {
+      const queue = unreadHere.map((m) => m.id)
+      // Unread mail on the other pages.
+      for (let p = 1; p <= Math.min(mailTotalPages, MARK_ALL_MAX_PAGES); p++) {
+        if (p === mailPage) continue
+        try {
+          const page = await findMyMail(p, MAIL_PAGE_SIZE)
+          for (const m of page?.content || [])
+            if (m.status === 'UNREAD') queue.push(m.id)
+        } catch {
+          /* that page's mail simply stays unread */
+        }
+      }
+      let next = 0
+      const worker = async () => {
+        while (next < queue.length) {
+          const id = queue[next++]
+          try {
+            await readMail(id)
+          } catch {
+            failed.add(id)
+          }
+        }
+      }
+      await Promise.all([worker(), worker(), worker(), worker()])
+      if (failed.size > 0) {
+        setMail((prev) =>
+          prev.map((m) =>
+            failed.has(m.id) ? { ...m, status: 'UNREAD', readAt: null } : m
+          )
+        )
+        setActionError('Could not mark some mail as read.')
+      }
+      return queue.length - failed.size
+    } finally {
+      markingRef.current = false
+    }
   }
 
   // Optimistic - the row disappears immediately (not after the request
@@ -255,6 +320,7 @@ export function useMailbox() {
     decline,
     remove,
     removeAllRead,
+    markAllRead,
     openBroadcast,
     mailPage,
     mailTotalPages,

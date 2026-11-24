@@ -44,7 +44,14 @@ const EPSILON = 1e-6
 // the route is then drawn smaller than the box and centred.
 export function projectRoute(
   points,
-  { width, height, padding = 40, minSpan = EPSILON }
+  {
+    width,
+    height,
+    padding = 40,
+    paddingX = padding,
+    paddingY = padding,
+    minSpan = EPSILON,
+  }
 ) {
   if (!points || points.length === 0) return []
 
@@ -62,14 +69,14 @@ export function projectRoute(
   const spanX = Math.max(realX, minSpan)
   const spanY = Math.max(realY, minSpan)
 
-  const availW = Math.max(width - padding * 2, 1)
-  const availH = Math.max(height - padding * 2, 1)
+  const availW = Math.max(width - paddingX * 2, 1)
+  const availH = Math.max(height - paddingY * 2, 1)
   const scale = Math.min(availW / spanX, availH / spanY)
 
   const routeW = spanX * scale
   const routeH = spanY * scale
-  const offsetX = padding + (availW - routeW) / 2
-  const offsetY = padding + (availH - routeH) / 2
+  const offsetX = paddingX + (availW - routeW) / 2
+  const offsetY = paddingY + (availH - routeH) / 2
 
   // When minSpan widened the box, keep the real route centred inside it.
   const padX = ((spanX - realX) / 2) * scale
@@ -223,15 +230,15 @@ export function drawStatsRow(
   if (chipBg) {
     ctx.save()
     ctx.fillStyle = chipBg
-    roundRect(ctx, x, y - 32, width, 54, 14)
+    roundRect(ctx, x, y - 36, width, 62, 14)
     ctx.fill()
     ctx.restore()
   }
 
   // labelFirst mirrors the Strava-style share card: a small caption sits
   // above the bold value, rather than below it.
-  const valueDy = labelFirst ? 12 : -6
-  const labelDy = labelFirst ? -11 : 13
+  const valueDy = labelFirst ? 13 : -6
+  const labelDy = labelFirst ? -14 : 13
 
   stats.forEach((stat, i) => {
     const cx = x + colWidth * i + colWidth / 2
@@ -274,7 +281,7 @@ function drawStatsStack(
     ctx.fillStyle = color
     ctx.globalAlpha = 0.75
     ctx.font = '600 11px -apple-system, sans-serif'
-    ctx.fillText(stat.label.toUpperCase(), x, cy - 13)
+    ctx.fillText(stat.label.toUpperCase(), x, cy - 17)
     ctx.globalAlpha = 1
     const px = fitFontSize(
       ctx,
@@ -446,7 +453,13 @@ function shadowScale(ctx) {
   return Math.hypot(m.a, m.b) || 1
 }
 
-function drawOutlinedText(ctx, text, x, y, { font, fill, maxWidth, size }) {
+function drawOutlinedText(
+  ctx,
+  text,
+  x,
+  y,
+  { font, fill, maxWidth, size, outline = 2 }
+) {
   // Auto-shrink so long values never leave the canvas.
   let px = size
   ctx.font = font(px)
@@ -459,7 +472,7 @@ function drawOutlinedText(ctx, text, x, y, { font, fill, maxWidth, size }) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
   ctx.lineJoin = 'round'
-  ctx.lineWidth = 2
+  ctx.lineWidth = outline
   ctx.strokeStyle = OVERLAY_INK
   ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'
   ctx.shadowBlur = 6 * k
@@ -474,68 +487,120 @@ function drawOutlinedText(ctx, text, x, y, { font, fill, maxWidth, size }) {
   ctx.restore()
 }
 
+// Overlay layout, in 1x logical px. Three bands that can never overlap
+// because each gets its own slice of the canvas:
+//   top    - the logo, OVERLAY_MARGIN from the edges
+//   middle - the route, whatever height is left between logo and stats,
+//            12% padding on every side (room for the neon glow too)
+//   bottom - Distance | Pace | Time in one row of three equal columns
+// Text sizes are fixed (the route's size never scales them); only a value
+// too wide for its column steps down, all three together, to OVERLAY_VALUE_MIN.
+export const OVERLAY_MARGIN = 24
+export const OVERLAY_LABEL = 12
+export const OVERLAY_VALUE = 30
+export const OVERLAY_VALUE_MIN = 18
+export const OVERLAY_LABEL_VALUE_GAP = 14 // label baseline -> value cap top
+export const OVERLAY_BLOCK_GAP = 16 // between the three stat columns
+export const OVERLAY_BAND_GAP = 12 // between logo/route/stats bands
+const OVERLAY_ROUTE_PAD = 0.12
+// label cap + gap + value cap + a little room for descenders
+const OVERLAY_STATS_H =
+  OVERLAY_LABEL * 0.75 + OVERLAY_LABEL_VALUE_GAP + OVERLAY_VALUE * 0.74 + 8
+
+export function overlayLayout(width, height, logoAspect) {
+  const m = OVERLAY_MARGIN
+  let logoW = brandLogoWidth(width, 'overlay')
+  // never let the logo eat more than ~17% of the height (square card)
+  logoW = Math.min(logoW, (height * 0.17) / logoAspect)
+  const logoH = logoW * logoAspect
+  const logo = { x: (width - logoW) / 2, y: m, w: logoW, h: logoH }
+
+  const statsTop = height - m - OVERLAY_STATS_H
+  const colW = (width - m * 2 - OVERLAY_BLOCK_GAP * 2) / 3
+  const cols = [0, 1, 2].map((i) => ({
+    x: m + i * (colW + OVERLAY_BLOCK_GAP),
+    w: colW,
+  }))
+  const valueBaseline = height - m - 8
+  const labelBaseline =
+    valueBaseline - OVERLAY_VALUE * 0.74 - OVERLAY_LABEL_VALUE_GAP
+
+  const routeTop = logo.y + logo.h + OVERLAY_BAND_GAP
+  const routeBottom = statsTop - OVERLAY_BAND_GAP
+  const route = {
+    x: 0,
+    y: routeTop,
+    w: width,
+    h: Math.max(routeBottom - routeTop, 1),
+  }
+  return {
+    logo,
+    stats: { top: statsTop, cols, valueBaseline, labelBaseline },
+    route,
+  }
+}
+
 export function drawOverlayCard(
   ctx,
   { width, height, points, distance, duration, pace, logo }
 ) {
-  // (1) Route, back layer: ~85% of the canvas, centred, room left for the
-  // glow so it is never clipped at the edges.
-  const pad = width * 0.075
+  const L = overlayLayout(width, height, logo.naturalHeight / logo.naturalWidth)
+
+  // (1) Route: centred in its own band, 12% padding, never under any text.
   const projected = projectRoute(points, {
-    width,
-    height,
-    padding: pad,
+    width: L.route.w,
+    height: L.route.h,
+    paddingX: L.route.w * OVERLAY_ROUTE_PAD,
+    paddingY: L.route.h * OVERLAY_ROUTE_PAD,
     minSpan: 0.0015,
-  })
+  }).map((p) => ({ x: p.x, y: p.y + L.route.y }))
   drawNeonRoutePath(ctx, projected, { lineWidth: 4 })
 
-  // (2)+(3) Logo then stacked stats, centred as one column.
-  const rows = [
+  // (2) Logo, top centre.
+  drawBrandLogo(ctx, logo, {
+    x: L.logo.x,
+    y: L.logo.y,
+    width: L.logo.w,
+    align: 'left',
+    valign: 'alphabetic',
+    shadow: true,
+  })
+
+  // (3) Stats: label small and muted above a large value.
+  const stats = [
     { label: 'Distance', value: formatDistance(distance) },
     { label: 'Pace', value: formatPace(pace) },
     { label: 'Time', value: formatDurationLabel(duration) },
   ]
-
-  const logoW = brandLogoWidth(width, 'overlay')
-  const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)
-  const LABEL = 14
-  const VALUE = 32
-  const ROW = 68 // label baseline to next label baseline
-  // Visible height of the last row (label top to value descender); the
-  // trailing gap after it is not counted, so the stack is optically centred.
-  const LAST_ROW_H = LABEL + 9 + VALUE * 0.8 + 8
-  const natural = logoH + 18 + (rows.length - 1) * ROW + LAST_ROW_H
-  const avail = height * 0.9
-  const k = Math.min(1, avail / natural)
-  const total = natural * k
-  const cx = width / 2
-  let y = (height - total) / 2
-
-  drawBrandLogo(ctx, logo, {
-    x: cx,
-    y,
-    width: logoW * k,
-    align: 'center',
-    valign: 'alphabetic',
-    shadow: true,
-  })
-  y += (logoH + 18) * k
-
-  const maxW = width * 0.78
-  rows.forEach((row) => {
-    drawOutlinedText(ctx, row.label, cx, y + LABEL * k, {
-      font: (px) => `600 ${px}px 'Poppins', -apple-system, sans-serif`,
-      fill: 'rgba(255, 255, 255, 0.88)',
-      maxWidth: maxW,
-      size: LABEL * k,
+  const valueFont = (px) => `800 ${px}px 'Poppins', sans-serif`
+  // One shared size so the three values read as a set; the widest decides.
+  let px = OVERLAY_VALUE
+  for (const stat of stats) {
+    ctx.font = valueFont(px)
+    while (
+      px > OVERLAY_VALUE_MIN &&
+      ctx.measureText(stat.value).width > L.stats.cols[0].w
+    ) {
+      px -= 1
+      ctx.font = valueFont(px)
+    }
+  }
+  stats.forEach((stat, i) => {
+    const col = L.stats.cols[i]
+    const cx = col.x + col.w / 2
+    drawOutlinedText(ctx, stat.label.toUpperCase(), cx, L.stats.labelBaseline, {
+      font: (n) => `600 ${n}px 'Poppins', -apple-system, sans-serif`,
+      fill: 'rgba(255, 255, 255, 0.78)',
+      maxWidth: col.w,
+      size: OVERLAY_LABEL,
+      outline: 1,
     })
-    drawOutlinedText(ctx, row.value, cx, y + (LABEL + 9 + VALUE * 0.8) * k, {
-      font: (px) => `800 ${px}px 'Poppins', sans-serif`,
+    drawOutlinedText(ctx, stat.value, cx, L.stats.valueBaseline, {
+      font: valueFont,
       fill: '#ffffff',
-      maxWidth: maxW,
-      size: (row.size || VALUE) * k,
+      maxWidth: col.w,
+      size: px,
     })
-    y += ROW * k
   })
 }
 
@@ -639,6 +704,8 @@ export async function drawShareCard(
       width: width - padding * 2,
       color: '#ffffff',
       chipBg: 'rgba(255,255,255,0.18)',
+      labelFirst: true,
+      valueFontSize: 18,
     })
   } else if (variant === SHARE_VARIANTS.MAP) {
     const logoH = logoW * (logo.naturalHeight / logo.naturalWidth)

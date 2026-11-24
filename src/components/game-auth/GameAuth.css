@@ -1,7 +1,7 @@
 /* In-game auth screens (Welcome, Sign In, Create Account, Forgot / Reset).
    Rendered inside .game-page / .game-root, so the --game-* / --green-* /
    --shop-accent-* tokens (src/game/styles/tokens.css) are in scope, and the
-   buttons are the shared GameButton (.gb) - this file only styles the panel,
+   buttons are the shared GameButton (.gbtn) - this file only styles the panel,
    fields, notices, links and the Google / Apple buttons.
 
    Rules this file follows:
@@ -62,29 +62,12 @@
 
 /* The game-wide white-text-with-dark-stroke recipe turns small dark text on
    this light card into a smear: switch it off for everything in the card,
-   then give it back only to the chunky buttons (.gb). */
+   then give it back only to the chunky buttons (.gbtn). */
 .game-auth-card,
 .game-auth-card * {
   -webkit-text-stroke-width: 0;
   text-shadow: none;
   paint-order: normal;
-}
-.game-auth-card .gb,
-.game-auth-card .gb * {
-  -webkit-text-stroke: 2px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-}
-/* Secondary = cream with dark text (no outline recipe, which is white-on-
-   white here). */
-.game-auth-card .gb-secondary {
-  background: #fbf6e9;
-}
-.game-auth-card .gb-secondary,
-.game-auth-card .gb-secondary * {
-  color: var(--ink);
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
 }
 
 /* ---- logo (float animation kept) ---- */
@@ -413,14 +396,6 @@
 }
 .game-auth-actions {
   margin-top: 2px;
-}
-
-/* Disabled / submitting = grey (with the GameButton spinner), whatever the
-   variant. */
-.game-auth-card .gb:disabled {
-  filter: grayscale(1);
-  opacity: 0.8;
-  cursor: not-allowed;
 }
 
 /* Text links: shop purple, 44px tap target, underline on press. */
@@ -787,22 +762,12 @@
 /* The game forces the display font on EVERY element (.game-page
    *:not(code):not(pre) in GamePage.css, specificity 0,1,2 - children
    included), so the body font is re-applied here to every descendant with a
-   higher-specificity selector. Titles and the chunky buttons (.gb) keep the
+   higher-specificity selector. Titles and the chunky buttons (.gbtn) keep the
    display font. */
 .game-auth-card
-  *:not(.gb):not(.gb *):not(.game-auth-title):not(svg):not(svg *) {
+  *:not(.gbtn):not(.gbtn *):not(.game-auth-title):not(svg):not(svg *) {
   font-family: var(--font-body);
 }
 .game-auth-card .game-auth-title {
   font-family: var(--font-display);
-}
-
-/* Every game button in the card is exactly 56px tall (the Google / Apple
-   buttons match). */
-.game-auth-card .gb {
-  height: 56px;
-  min-height: 56px;
-  padding: 0 14px;
-  font-size: 19px;
-  white-space: nowrap;
 }

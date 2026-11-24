@@ -6,6 +6,7 @@ import HeroStage from './HeroStage'
 import './EmoteShowcase.css'
 import { PriceLabel } from './Price'
 import { formatPrice } from '../utils/price'
+import GameButton from './ui/GameButton'
 
 // Full-screen "first screen shown after clicking an emote" - replaces the
 // old shared buy-confirm card for EMOTE specifically (see GamePage.jsx's
@@ -98,38 +99,20 @@ export default function EmoteShowcase({
         <div className="emote-showcase-actions">
           {owned ? (
             owned.equipped ? (
-              <button
-                type="button"
-                className="btn btn-primary emote-showcase-equipped"
+              <GameButton
+                className="emote-showcase-equipped"
                 disabled
                 aria-label="Equipped"
               >
                 <IconCheck aria-hidden="true" />
-              </button>
+              </GameButton>
             ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={onEquip}
-              >
-                Equip
-              </button>
+              <GameButton onClick={onEquip}>Equip</GameButton>
             )
           ) : short ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onGetCoins}
-            >
-              Get Fahhcoin
-            </button>
+            <GameButton onClick={onGetCoins}>Get Fahhcoin</GameButton>
           ) : (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onBuy}
-              disabled={purchasing}
-            >
+            <GameButton onClick={onBuy} disabled={purchasing}>
               {purchasing ? (
                 'Buying…'
               ) : price > 0 ? (
@@ -139,7 +122,7 @@ export default function EmoteShowcase({
               ) : (
                 'Unlock free'
               )}
-            </button>
+            </GameButton>
           )}
         </div>
       </motion.div>

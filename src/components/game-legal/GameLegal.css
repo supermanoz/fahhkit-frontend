@@ -138,15 +138,6 @@
   text-shadow: none;
 }
 
-/* Operator to-do markers: [CHECK ...]. */
-.game-legal-check {
-  background: var(--red-tint);
-  color: var(--red-text);
-  padding: 0 4px;
-  border-radius: 4px;
-  font-weight: 700;
-}
-
 /* Terms agreement line on the Create Account screen. */
 .game-auth-terms {
   display: flex;

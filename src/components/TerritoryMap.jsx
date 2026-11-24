@@ -10,6 +10,10 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCrosshairs } from './GameIcons'
+import { MapCompass, MapRotationController, RotationHint } from './MapRotation'
+import { useRotateWhileRunning } from '../utils/mapRotationSetting'
+import { useMapDebug } from '../utils/mapDebug'
+import MapDebugPanel from './MapDebugPanel'
 import MapAttribution from './MapAttribution'
 import { mapConfig } from '../config/mapProvider'
 import { nextSpriteFacing } from '../utils/spriteFacing'
@@ -52,6 +56,12 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import './TerritoryMap.css'
 import { isAppActive } from '../utils/appActivity'
 import { visibleInterval } from '../utils/visibleInterval'
+import {
+  buildPickIndex,
+  choosePick,
+  metersPerPixel,
+  pickTerritories,
+} from '../utils/territoryPicker'
 
 // A free, keyless vector basemap (OpenFreeMap) instead of a raster tile
 // provider — lets us drop most text/icon labels ourselves, keeping only
@@ -239,7 +249,8 @@ function buildPlayerMarkerIcon(avatarSrc, fallbackSrc) {
   return L.divIcon({
     className: 'territory-map-player-icon',
     html:
-      `<span style="--s:${PLAYER_MARKER_SCALE}">` +
+      `<span class="territory-map-upright territory-map-upright-fill" style="--s:${PLAYER_MARKER_SCALE};transform-origin:50% 50%">` +
+      '<span class="territory-map-heading-cone"></span>' +
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
       `<img class="territory-map-player-avatar" src="${avatarSrc}" alt="" onerror="this.onerror=null;this.src='${fallbackSrc}';" />` +
@@ -304,8 +315,9 @@ function buildAnimatedMarkerIcon(heroKey, moving) {
   return L.divIcon({
     className: 'territory-map-player-icon territory-map-blaze-icon',
     html:
-      `<span class="territory-map-blaze-body" style="--s:${PLAYER_MARKER_SCALE}">` +
+      `<span class="territory-map-blaze-body territory-map-upright" style="--s:${PLAYER_MARKER_SCALE}">` +
       '<span class="territory-map-blaze-ground">' +
+      '<span class="territory-map-heading-cone"></span>' +
       '<span class="territory-map-player-pulse"></span>' +
       '<span class="territory-map-player-pulse territory-map-player-pulse-b"></span>' +
       '</span>' +
@@ -326,7 +338,7 @@ function buildAnimatedMarkerIcon(heroKey, moving) {
 function buildRouteAnchorIcon() {
   return L.divIcon({
     className: 'territory-map-route-anchor-icon',
-    html: '<span class="territory-map-route-anchor">🏁</span>',
+    html: '<span class="territory-map-route-anchor territory-map-upright" style="transform-origin:15px 28px">🏁</span>',
     iconSize: [30, 30],
     iconAnchor: [15, 28],
   })
@@ -353,14 +365,21 @@ function mergeOwnerTerritories(territories) {
 
   const merged = []
   for (const parcels of byOwner.values()) {
-    const { ownerId, ownerName, ownerProfilePictureUrl, color, emojiUrl } =
-      parcels[0]
+    const {
+      ownerId,
+      ownerName,
+      ownerNickname,
+      ownerProfilePictureUrl,
+      color,
+      emojiUrl,
+    } = parcels[0]
     for (const m of mergeTouchingParcels(parcels)) {
       merged.push({
         ...m,
         id: `${ownerId}-${m.id}`,
         ownerId,
         ownerName,
+        ownerNickname,
         ownerProfilePictureUrl,
         color,
         emojiUrl,
@@ -531,18 +550,15 @@ function FocusHighlight({
 
 // One claimed parcel's polygon. A tap also kicks off the gold lap flourish
 // around it (see TapEffect.jsx).
-function TerritoryPolygon({
-  t,
-  isMine,
-  isHighlighted,
-  playerColor,
-  onParcelClick,
-  onTapEffect,
-  drawActive,
-}) {
+function TerritoryPolygon({ t, isMine, isHighlighted, playerColor }) {
   return (
     <Polygon
       positions={toLatLngs(t.points)}
+      // Purely visual (a direct prop: react-leaflet applies pathOptions via
+      // setStyle, which ignores `interactive`). Taps are resolved once, by
+      // point, in TerritoryHitLayer - an interactive filled path would swallow
+      // every tap inside it, including those meant for a territory inside it.
+      interactive={false}
       pathOptions={{
         color: isHighlighted
           ? '#FFFFFF'
@@ -553,27 +569,67 @@ function TerritoryPolygon({
         fillColor: isMine ? playerColor || PLAYER_COLOR : t.color,
         fillOpacity: isHighlighted ? 0.65 : isMine ? 0.5 : 0.35,
         className: isHighlighted
-          ? 'territory-poly-highlight territory-poly-clickable'
+          ? 'territory-poly-highlight'
           : isMine
-            ? 'territory-poly-player territory-poly-clickable'
-            : 'territory-poly-clickable',
-      }}
-      eventHandlers={{
-        click: (e) => {
-          // While drawing a route, a tap on a parcel is a draw point like
-          // anywhere else on the map - routes aren't claims, so there's no
-          // reason someone else's territory should block a tap from
-          // reaching DrawClickCatcher the way it normally does (stopping
-          // propagation here is what makes the parcel "claim-able" from a
-          // tap in every other context).
-          if (drawActive) return
-          L.DomEvent.stopPropagation(e)
-          onTapEffect(t.points)
-          onParcelClick?.(t)
-        },
+            ? 'territory-poly-player'
+            : undefined,
       }}
     />
   )
+}
+
+// The ONE place a tap on the map becomes "which territory". Every territory
+// polygon is non-interactive (above), so a tap reaches the map and we resolve
+// it by point: every territory containing it (holes respected, small ones
+// padded for a fingertip), innermost = smallest area wins, and tapping the same
+// spot again walks outward (utils/territoryPicker.js). While drawing a route a
+// tap is a draw point instead (DrawClickCatcher) and this stays out of the way.
+function TerritoryHitLayer({
+  territories,
+  drawActive,
+  onParcelClick,
+  onTapEffect,
+}) {
+  const map = useMap()
+  const index = useMemo(() => buildPickIndex(territories), [territories])
+  const lastPickRef = useRef(null)
+  const frameRef = useRef(0)
+
+  function hitsAt(latlng, zoom) {
+    return pickTerritories({ lat: latlng.lat, lng: latlng.lng }, index, {
+      mpp: metersPerPixel(latlng.lat, zoom),
+    })
+  }
+
+  useMapEvents({
+    click(e) {
+      if (drawActive) return
+      const hits = hitsAt(e.latlng, map.getZoom())
+      const { hit, state } = choosePick(hits, lastPickRef.current, {
+        x: e.containerPoint.x,
+        y: e.containerPoint.y,
+        now: Date.now(),
+      })
+      lastPickRef.current = state
+      if (!hit) return
+      onTapEffect(hit.territory.points)
+      onParcelClick?.(hit.territory)
+    },
+    // Desktop only: the pointer cursor is the hint that a shape is tappable
+    // (the polygons themselves no longer carry it).
+    mousemove(e) {
+      if (drawActive || L.Browser.mobile) return
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = requestAnimationFrame(() => {
+        const el = map.getContainer()
+        el.style.cursor = hitsAt(e.latlng, map.getZoom()).length
+          ? 'pointer'
+          : ''
+      })
+    },
+  })
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), [])
+  return null
 }
 
 // Zoom level (the max zoom ZoomRangeLimiter allows) at which
@@ -1216,7 +1272,26 @@ function useHeroPaintGuard(markerRef) {
   }, [map, markerRef])
 }
 
-function PlayerMarker({ playerLocation, icon, heading, emote, snap }) {
+// Direction cue for when the map is NOT turned with the runner (north-up, or
+// the setting off): a soft cone on the ground under the feet that points the
+// way he is travelling on screen, while the character itself stays upright.
+// `deg` is the on-screen heading (null = hidden: standing still, or the map
+// is heading-up where travel is already "up"). Imperative (a CSS variable on
+// the marker element) - no React re-render per heading change.
+function useHeadingCone(markerRef, deg, icon) {
+  useEffect(() => {
+    const el = markerRef.current?.getElement()
+    if (!el) return
+    if (deg == null) {
+      el.classList.remove('is-cone-on')
+      return
+    }
+    el.style.setProperty('--cone-deg', `${deg}deg`)
+    el.classList.add('is-cone-on')
+  }, [markerRef, deg, icon])
+}
+
+function PlayerMarker({ playerLocation, icon, heading, emote, snap, coneDeg }) {
   const markerRef = useRef(null)
   // The marker's icon element is rebuilt by Leaflet whenever `icon` changes
   // (idle <-> run), so the emote slot inside it is looked up again then.
@@ -1249,6 +1324,7 @@ function PlayerMarker({ playerLocation, icon, heading, emote, snap }) {
   }
   useSmoothMarkerPosition(markerRef, playerLocation, snap)
   useSpriteFacing(markerRef, heading, icon)
+  useHeadingCone(markerRef, coneDeg, icon)
   useWarnOnDuplicateCharacter()
   useHeroPaintGuard(markerRef)
   return (
@@ -1657,6 +1733,8 @@ export default function TerritoryMap({
   heroEmoteAsset = null,
   heroEmotePaused = false,
   playerMoving,
+  runView = 'idle', // shared RUN / IDLE state of the run (utils/runView.js)
+  movingSlowly = false, // moving at all - drives the ground direction cone
   isFollowing,
   isTracking = false,
   onUserPan,
@@ -1672,6 +1750,7 @@ export default function TerritoryMap({
   routeAnchorPoint,
   onParcelClick,
   onMapReady,
+  onRequestFollow,
 }) {
   const routeAnchorIcon = useMemo(() => buildRouteAnchorIcon(), [])
   // The dashed closing preview only makes sense for a territory-conquer loop
@@ -1680,6 +1759,25 @@ export default function TerritoryMap({
   const showPreview = isLoopRun && livePath.length >= 3
   const rootRef = useRef(null)
   const tiltRef = useRef(null)
+  // Heading-up rotation during a run (see MapRotation.jsx). `rotInfo` only
+  // changes a few times per run (bucketed), never per GPS fix.
+  const rotateSetting = useRotateWhileRunning()
+  const rotationEnabled = rotateSetting && isTracking
+  const compassControlRef = useRef(null)
+  const mapDebugRef = useRef(null)
+  const mapDebug = useMapDebug()
+  const [rotInfo, setRotInfo] = useState({ rot: 0, userNorth: false })
+  const [showRotationHint, setShowRotationHint] = useState(false)
+  const handleRotationInfo = useCallback((info) => {
+    setRotInfo({ rot: info.rot, userNorth: info.userNorth })
+    if (info.hint) setShowRotationHint(true)
+  }, [])
+  const hideRotationHint = useCallback(() => setShowRotationHint(false), [])
+  const toggleNorthUp = useCallback(
+    () => compassControlRef.current?.toggleNorth(),
+    []
+  )
+  const mapTurned = Math.abs((((rotInfo.rot % 360) + 540) % 360) - 180) > 1
   // Shared between NavigationCameraEffect and UserPanDetector so the
   // latter can ignore the former's own programmatic re-center.
   const programmaticMoveRef = useRef(false)
@@ -1768,7 +1866,14 @@ export default function TerritoryMap({
   // as before, for a hero with no real directional sprite - a flat round
   // avatar photo has no "facing" to show (see useSpriteFacing's own null
   // guard).
-  const markerHeading = animatedMarkerHero && isTracking ? playerHeading : null
+  // Which way he faces ON SCREEN: with the map turned to the runner's
+  // heading that is ~straight up (no mirror); with north up it is the real
+  // heading.
+  const screenHeading = (((playerHeading + rotInfo.rot) % 360) + 360) % 360
+  const markerHeading = animatedMarkerHero && isTracking ? screenHeading : null
+  // The ground cone: only while moving on a map that is not turned.
+  const coneDeg =
+    isTracking && movingSlowly && !mapTurned ? screenHeading : null
   // Equipped emote on the HUD hero - only on the home screen: a run (or any
   // moving state) keeps the run/idle sprite exactly as before. Memoized so
   // the sprite layer only sees a new object when something real changes.
@@ -1805,8 +1910,13 @@ export default function TerritoryMap({
     setActiveTapEffects((effects) => effects.filter((e) => e.id !== id))
   }
 
+  // Biggest first = drawn first, so a smaller territory always paints ON TOP of
+  // the bigger one it sits inside (SVG paints in document order).
   const mergedTerritories = useMemo(
-    () => mergeOwnerTerritories(territories),
+    () =>
+      mergeOwnerTerritories(territories).sort(
+        (a, b) => (b.area || 0) - (a.area || 0)
+      ),
     [territories]
   )
 
@@ -1849,12 +1959,15 @@ export default function TerritoryMap({
                 isMine={isMine}
                 isHighlighted={isHighlighted}
                 playerColor={playerColor}
-                onParcelClick={onParcelClick}
-                onTapEffect={handleTapEffect}
-                drawActive={drawActive}
               />
             )
           })}
+          <TerritoryHitLayer
+            territories={mergedTerritories}
+            drawActive={drawActive}
+            onParcelClick={onParcelClick}
+            onTapEffect={handleTapEffect}
+          />
 
           {livePath.length > 0 && (
             <Polyline
@@ -1881,6 +1994,7 @@ export default function TerritoryMap({
               playerLocation={markerLocation}
               icon={playerMarkerIcon}
               heading={markerHeading}
+              coneDeg={coneDeg}
               emote={hudEmote}
               snap={snapToPlayer}
             />
@@ -2000,6 +2114,18 @@ export default function TerritoryMap({
             programmaticMoveRef={programmaticMoveRef}
             onUserPan={onUserPan}
           />
+          <MapRotationController
+            rotorRef={tiltRef}
+            rootRef={rootRef}
+            glMapRef={baseGlMapRef}
+            enabled={rotationEnabled}
+            runView={runView}
+            following={isFollowing}
+            debugRef={mapDebugRef}
+            controlRef={compassControlRef}
+            onInfo={handleRotationInfo}
+            onRequestFollow={onRequestFollow}
+          />
           <CaptureMapInstance onReady={setMapInstance} />
           <WeatherLayer ambience={ambience} />
           {activeTapEffects.map((effect) => (
@@ -2031,6 +2157,15 @@ export default function TerritoryMap({
           hasFix={hasFix}
           onLocated={() => exitGlobe()}
         />
+      )}
+      <MapCompass
+        visible={rotationEnabled && (mapTurned || rotInfo.userNorth)}
+        userNorth={rotInfo.userNorth}
+        onClick={toggleNorthUp}
+      />
+      {mapDebug && isTracking && <MapDebugPanel debugRef={mapDebugRef} />}
+      {showRotationHint && rotationEnabled && (
+        <RotationHint onDone={hideRotationHint} />
       )}
       {/* Leaflet's own attribution control lives inside .territory-map-tilt
           (attributionControl={false} above) - this renders instead of it,

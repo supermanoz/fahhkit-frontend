@@ -155,6 +155,58 @@ html {
   scroll-behavior: smooth;
 }
 
+/* --- No accidental page zoom -----------------------------------------------
+   viewport meta (index.html) + these. `manipulation` keeps pan/scroll but
+   drops double-tap zoom; the Leaflet map keeps the touch-action Leaflet puts on
+   .leaflet-container itself (its own pinch/zoom, clamped by the map's
+   min/max zoom), so it is not touched here. Page-level pinch on iOS (which
+   ignores user-scalable) is stopped in utils/pageZoomGuard.js. */
+html,
+body,
+#root {
+  touch-action: manipulation;
+}
+html,
+body {
+  overscroll-behavior: none;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+/* App UI is not text-selectable / has no long-press callout (native shell
+   and the game); typing fields keep both - iOS can't focus an input inside
+   user-select:none. Website pages in a browser keep normal selection. */
+:root[data-native='true'],
+:root[data-native='true'] body,
+.game-root {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+:root[data-native='true']
+  :is(input, textarea, select, [contenteditable='true']),
+.game-root :is(input, textarea, select, [contenteditable='true']) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* iOS zooms the page when a field under 16px is focused. On touch devices
+   every text field / textarea / select is at least 16px (most were 13-14px).
+   Desktop (fine pointer) is unchanged. The PvP stake box is already 26px, so
+   it is left alone. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+      [type='file']
+    ):not([type='color']):not([type='button']):not([type='submit']):not(
+      [type='reset']
+    ):not([type='image']):not(.pvp-stake-input),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 body {
   margin: 0;
   font-family:

@@ -103,15 +103,11 @@
   --tier-light: #9ef0a4;
 }
 
-.hero-card.tier-soon {
-  --tier: #6d6f72;
-  --tier-light: #b8babd;
-}
-
-/* Limited (not for sale) heroes: gold-tinged floor, art stays in colour. */
-.hero-card.tier-limited {
-  --tier: #d4a017;
-  --tier-light: #ffe58a;
+/* Every hero that isn't owned/equipped (price-locked, level-locked, limited,
+   coming soon) shares the one locked look - see heroLocked.css. */
+.hero-card.is-hero-locked {
+  --tier: var(--hero-locked-tier);
+  --tier-light: var(--hero-locked-tier-light);
 }
 
 .hero-card-stage {
@@ -150,19 +146,16 @@
   font-size: 64px;
 }
 
-.hero-card.tier-soon .hero-card-stage {
-  filter: grayscale(1) brightness(0.7);
+.hero-card-stage {
+  transition: filter 0.6s ease;
 }
-
-/* Level-locked: greyed slightly (art still readable - it can be previewed),
-   no green/owned glow. */
-.hero-card.tier-level-locked {
-  --tier: #6d6f72;
-  --tier-light: #b8babd;
+/* The stage background AND the (static) sprite shade together. */
+.hero-card.is-hero-locked .hero-card-stage {
+  filter: var(--hero-locked-filter);
 }
-
-.hero-card.tier-level-locked .hero-card-stage {
-  filter: grayscale(0.85) brightness(0.82);
+/* Just unlocked: the shade eases away (above) and the hero pops once. */
+.hero-card-stage.is-unlocking {
+  animation: hero-unlock-pop 0.7s ease-out;
 }
 
 /* "Unlocks at level N" chip under the name - same shape as the Equipped chip
