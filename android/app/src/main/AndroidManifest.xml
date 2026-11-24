@@ -20,6 +20,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- "Return to the game" from the web payment-status page. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="runconquest" android:host="payment-return" />
+            </intent-filter>
         </activity>
 
         <!-- FCM push (backend FcmPushSender): the small status-bar icon (monochrome, same

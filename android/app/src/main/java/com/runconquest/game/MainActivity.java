@@ -21,5 +21,10 @@ public class MainActivity extends BridgeActivity {
         // background music (GamePage.jsx) autoplay the instant loading
         // finishes instead of waiting for the first tap.
         getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+        // No page zoom (pinch or the built-in zoom controls): the game's own map
+        // handles its zoom in JS. Matches the viewport meta (user-scalable=no).
+        getBridge().getWebView().getSettings().setSupportZoom(false);
+        getBridge().getWebView().getSettings().setBuiltInZoomControls(false);
+        getBridge().getWebView().getSettings().setDisplayZoomControls(false);
     }
 }
