@@ -31,6 +31,15 @@
 				<string>com.googleusercontent.apps.373328807298-u3i1175icm5sf0t5btqll3q76eg97s9n</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.runconquest.game.return</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- "Return to the game" from the web payment-status page (no data in the link) -->
+				<string>runconquest</string>
+			</array>
+		</dict>
 	</array>
 	<!-- Live Activity (lock screen + Dynamic Island) for active runs; iOS 16.2+ -->
 	<key>NSSupportsLiveActivities</key>

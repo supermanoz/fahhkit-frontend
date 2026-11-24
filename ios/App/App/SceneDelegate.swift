@@ -11,6 +11,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        UIApplication.shared.applicationSupportsShakeToEdit = false
         // Cold launch from a URL / universal link: the callbacks below aren't invoked for these.
         if !connectionOptions.urlContexts.isEmpty {
             self.scene(scene, openURLContexts: connectionOptions.urlContexts)
@@ -18,6 +19,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         for activity in connectionOptions.userActivities {
             self.scene(scene, continue: activity)
         }
+    }
+
+    // Shake to Undo ("Undo Typing" alert from running motion) stays off every time the app
+    // comes back: under scenes these are the callbacks that actually fire.
+    func sceneWillEnterForeground(_ scene: UIScene) {
+        UIApplication.shared.applicationSupportsShakeToEdit = false
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        UIApplication.shared.applicationSupportsShakeToEdit = false
     }
 
     // Custom URL schemes - including the Google sign-in callback
