@@ -1,3 +1,4 @@
+import { visibleInterval } from '../utils/visibleInterval'
 import { useEffect, useState } from 'react'
 
 // Milliseconds until `target` (epoch ms, or null), corrected by the server's
@@ -8,8 +9,7 @@ export function useCountdown(target, skew = 0, active = true) {
   useEffect(() => {
     if (!active || !target) return undefined
     setNow(Date.now())
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
+    return visibleInterval(() => setNow(Date.now()), 1000, 'countdown')
   }, [active, target])
   return target ? target - (now + skew) : 0
 }

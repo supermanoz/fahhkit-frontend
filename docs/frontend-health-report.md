@@ -32,4 +32,19 @@ It counts errors, it does not fail on them. All 10 steps pass.
 
 E2E baseline (core subset, mobile-390): see the Phase 5 table.
 
-_The rest of this file is filled in phase by phase._
+## Phase 1 - Stability (partial)
+
+| Severity | File                           | Issue                                                                        | Change                                                                                                              |
+| -------- | ------------------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| High     | `src/main.jsx`                 | No error boundary: any render error blanked the app                          | Top-level `ErrorBoundary` (`src/components/ErrorBoundary.jsx`) with a "Reload" fallback, plus a unit test           |
+| Medium   | `src/utils/globalErrors.js`    | No `window.onerror` / `unhandledrejection` handling                          | Handlers log name, message and stack only; URL query strings and JWT/bearer values are scrubbed; capped at 20 lines |
+| High     | `src/api/client.js`            | `getUser()` `JSON.parse` unguarded: corrupt stored user crashed every screen | try/catch, non-object returns null                                                                                  |
+| High     | `src/api/client.js`            | `fetch` had no timeout: a hung connection meant an endless spinner           | 45 s `AbortSignal.timeout` (when supported); a timeout takes the existing fallback-host / offline path              |
+| Low      | `src/api/client.js`            | `sessionStorage` access could throw when storage is blocked                  | wrapped                                                                                                             |
+| Low      | `useCountdown`, `VehicleAlert` | 1 s / 0.5 s intervals kept running while the app was hidden                  | now `visibleInterval` (pauses when hidden, catches up on return)                                                    |
+
+Not done yet (needs `GamePage.jsx`, which another session is editing in this folder): per-feature boundaries
+(map, shop, club, PvP, mail, post-run popups), the PvP queue poll and 5 s distance interval in `GamePage`/`usePvp`,
+WebSocket pause while offline/hidden, modal stacking review.
+
+_The remaining phases are not done yet._

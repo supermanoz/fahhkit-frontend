@@ -13,7 +13,10 @@ import { recoverActiveRun } from './utils/run.js'
 import { startSessionKeeper } from './utils/sessionKeeper.js'
 import './utils/appActivity.js'
 import { installPageZoomGuard } from './utils/pageZoomGuard.js'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { installGlobalErrorHandlers } from './utils/globalErrors.js'
 
+installGlobalErrorHandlers()
 initNativeShell()
 installPageZoomGuard()
 removeLegacyReminders()
@@ -27,11 +30,13 @@ hydrateAuthStorage()
     startConnectivity()
     createRoot(document.getElementById('root')).render(
       <StrictMode>
-        <ThemeProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ThemeProvider>
+        <ErrorBoundary name="app">
+          <ThemeProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ThemeProvider>
+        </ErrorBoundary>
       </StrictMode>
     )
   })

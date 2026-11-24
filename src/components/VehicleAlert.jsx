@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { visibleInterval } from '../utils/visibleInterval'
 import { useEffect, useState } from 'react'
 import { VehicleState } from '../utils/vehicleDetection'
 import './VehicleAlert.css'
@@ -13,8 +14,7 @@ function useSecondsLeft(deadline) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (deadline == null) return undefined
-    const id = setInterval(() => setNow(Date.now()), 500)
-    return () => clearInterval(id)
+    return visibleInterval(() => setNow(Date.now()), 500, 'vehicle-alert')
   }, [deadline])
   if (deadline == null) return null
   return Math.max(0, Math.ceil((deadline - now) / 1000))

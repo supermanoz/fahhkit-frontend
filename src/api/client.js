@@ -32,11 +32,25 @@ const ACTIVE_BASE_URL_KEY = 'fahhkit_active_api_base_url'
 // (/v1/ping needn't exist - any HTTP answer, even a 404, proves we're online.)
 setProbeUrlProvider(() => `${getActiveApiBaseUrl()}/v1/ping`)
 
+const REQUEST_TIMEOUT_MS = 45_000
+
+// AbortSignal.timeout is missing on older WebViews - then no timeout (as before).
+function timeoutSignal() {
+  return typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+    ? AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    : undefined
+}
+
 function getCandidateBaseUrls() {
   const candidates = [PRIMARY_API_BASE_URL, FALLBACK_API_BASE_URL].filter(
     (url, index, arr) => url && arr.indexOf(url) === index
   )
-  const cached = sessionStorage.getItem(ACTIVE_BASE_URL_KEY)
+  let cached = null
+  try {
+    cached = sessionStorage.getItem(ACTIVE_BASE_URL_KEY)
+  } catch {
+    // storage blocked
+  }
   if (cached && candidates.includes(cached)) {
     return [cached, ...candidates.filter((url) => url !== cached)]
   }
@@ -52,8 +66,16 @@ async function fetchWithFallback(path, options) {
   let lastError
   for (const baseUrl of candidates) {
     try {
-      const response = await fetch(`${baseUrl}${path}`, options)
-      sessionStorage.setItem(ACTIVE_BASE_URL_KEY, baseUrl)
+      // A hung connection must fail (-> offline/queue path), not spin forever.
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        signal: options?.signal ?? timeoutSignal(),
+      })
+      try {
+        sessionStorage.setItem(ACTIVE_BASE_URL_KEY, baseUrl)
+      } catch {
+        // storage blocked
+      }
       reportNetworkSuccess() // any HTTP answer = the server is reachable
       return response
     } catch (err) {
@@ -160,8 +182,14 @@ export function clearToken() {
 }
 
 export function getUser() {
-  const raw = localStorage.getItem(USER_KEY)
-  return raw ? JSON.parse(raw) : null
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    const user = raw ? JSON.parse(raw) : null
+    return user && typeof user === 'object' ? user : null
+  } catch {
+    // Corrupt / unreadable stored user: treat as signed-out data, don't crash.
+    return null
+  }
 }
 
 export function setUser(user) {
