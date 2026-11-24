@@ -32,6 +32,14 @@ base('health smoke: mocked run + every menu screen', async ({ page }) => {
     if (m.type() === 'error') errors.push(norm(m.text()))
     if (m.type() === 'warning') warnings.push(norm(m.text()))
   })
+  const reqs = new Map()
+  let reqBytesTotal = 0
+  page.on('request', (r) => {
+    if (!/\/v1\//.test(r.url())) return
+    const k = `${r.method()} ${r.url().replace(/^https?:\/\/[^/]+/, '')} ${r.postData() || ''}`
+    reqs.set(k, (reqs.get(k) || 0) + 1)
+    reqBytesTotal += 1
+  })
   page.on('pageerror', (e) => pageErrors.push(norm(e.message)))
   page.on('requestfailed', (r) => {
     if (r.failure()?.errorText === 'net::ERR_ABORTED') return
@@ -168,6 +176,16 @@ base('health smoke: mocked run + every menu screen', async ({ page }) => {
   }
   const summary = {
     steps,
+    apiRequests: reqBytesTotal,
+    apiDuplicates: [...reqs.values()].reduce(
+      (a, n) => a + (n > 1 ? n - 1 : 0),
+      0
+    ),
+    topDuplicated: [...reqs.entries()]
+      .filter(([, n]) => n > 1)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([k, n]) => [k.slice(0, 90), n]),
     consoleErrors: errors.length,
     consoleWarnings: warnings.length,
     pageErrors: pageErrors.length,
