@@ -19,6 +19,8 @@ export default [
       'e2e-report',
       'test-results',
       'playwright-report',
+      // A local conda install living inside the repo - not project source.
+      'clear',
     ],
   },
   {

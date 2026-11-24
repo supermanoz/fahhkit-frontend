@@ -11,31 +11,34 @@ import UpdatePasswordPage from './pages/UpdatePasswordPage'
 import EditProfilePage from './pages/EditProfilePage'
 import EventsPage from './pages/EventsPage'
 import EventDetailPage from './pages/EventDetailPage'
-import CreateEventPage from './pages/CreateEventPage'
-import EditEventPage from './pages/EditEventPage'
-import CreateModeratorPage from './pages/CreateModeratorPage'
-import ModeratorsPage from './pages/ModeratorsPage'
-import EditModeratorPage from './pages/EditModeratorPage'
-import AthleteSearchPage from './pages/AthleteSearchPage'
-import AthleteProfilePage from './pages/AthleteProfilePage'
-import EditAthletePage from './pages/EditAthletePage'
-import HistoryPage from './pages/HistoryPage'
-import TrackRunPage from './pages/TrackRunPage'
-import RunDetailPage from './pages/RunDetailPage'
 import ContactPage from './pages/ContactPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
-import EventRegistrantsPage from './pages/EventRegistrantsPage'
-import EventReportPage from './pages/EventReportPage'
-import DashboardPage from './pages/DashboardPage'
-import GameMechanicsPage from './pages/GameMechanicsPage'
-import FraudFlagsPage from './pages/FraudFlagsPage'
-import SponsorReportPage from './pages/SponsorReportPage'
 import LiveEventRunPrompt from './components/LiveEventRunPrompt'
 import RequireAuth from './components/RequireAuth'
 
 // Public storefront - only visited from "Continue to Shop"/the website, so
 // it stays out of the main bundle.
 const ShopPage = lazy(() => import('./pages/ShopPage'))
+
+// Admin / organiser / account pages: loaded on demand so the website's first
+// load (and recharts, used only by the sponsor report) stays small.
+const CreateEventPage = lazy(() => import('./pages/CreateEventPage'))
+const EditEventPage = lazy(() => import('./pages/EditEventPage'))
+const CreateModeratorPage = lazy(() => import('./pages/CreateModeratorPage'))
+const ModeratorsPage = lazy(() => import('./pages/ModeratorsPage'))
+const EditModeratorPage = lazy(() => import('./pages/EditModeratorPage'))
+const AthleteSearchPage = lazy(() => import('./pages/AthleteSearchPage'))
+const AthleteProfilePage = lazy(() => import('./pages/AthleteProfilePage'))
+const EditAthletePage = lazy(() => import('./pages/EditAthletePage'))
+const HistoryPage = lazy(() => import('./pages/HistoryPage'))
+const TrackRunPage = lazy(() => import('./pages/TrackRunPage'))
+const RunDetailPage = lazy(() => import('./pages/RunDetailPage'))
+const EventRegistrantsPage = lazy(() => import('./pages/EventRegistrantsPage'))
+const EventReportPage = lazy(() => import('./pages/EventReportPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const GameMechanicsPage = lazy(() => import('./pages/GameMechanicsPage'))
+const FraudFlagsPage = lazy(() => import('./pages/FraudFlagsPage'))
+const SponsorReportPage = lazy(() => import('./pages/SponsorReportPage'))
 
 // Every website route (marketing home, events, shop, admin, ...). Lazy-loaded
 // from App.jsx and only on the website build: the native app build

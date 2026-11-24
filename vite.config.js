@@ -52,4 +52,29 @@ export default defineConfig({
   // mangles that worker's own import (it never resolves, stalling every
   // vector tile fetch on the /game map), so it has to run un-bundled.
   optimizeDeps: { exclude: ['maplibre-gl'] },
+  // Production only: no debugger statements or console.log/debug in the
+  // bundle (warn/error/info stay: the [auth] trail relies on them).
+  esbuild: {
+    drop: process.env.NODE_ENV === 'production' ? ['debugger'] : [],
+    pure:
+      process.env.NODE_ENV === 'production'
+        ? ['console.log', 'console.debug']
+        : [],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Map libraries in their own long-cached chunk (loaded in parallel
+        // with the app code instead of inside one 2 MB file).
+        manualChunks(id) {
+          if (
+            /node_modules\/(maplibre-gl|leaflet|react-leaflet|@maplibre|@react-leaflet)/.test(
+              id
+            )
+          )
+            return 'vendor-map'
+        },
+      },
+    },
+  },
 })
