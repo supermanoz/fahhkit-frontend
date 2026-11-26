@@ -78,7 +78,7 @@ for (const [mode, title] of [
     // 3) image slide
     await next(page).click()
     await expect(page.getByRole('dialog', { name: 'Your run' })).toBeVisible()
-    await expect(page.getByTestId('download-transparent')).toHaveText(
+    await expect(page.getByTestId('download-hero-poster')).toHaveText(
       'Download PNG'
     )
     // 4) Done
@@ -121,7 +121,7 @@ test('Skip only fast-forwards the animation, then the image slide opens', async 
   await skip.click()
   // The image slide is NOT skipped: it is what opens.
   await expect(page.getByRole('dialog', { name: 'Your run' })).toBeVisible()
-  await expect(page.getByTestId('download-transparent')).toBeVisible()
+  await expect(page.getByTestId('download-hero-poster')).toBeVisible()
   expect(await page.evaluate(() => window.__dismissed || 0)).toBe(0)
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   expect(await page.evaluate(() => window.__dismissed)).toBe(1)

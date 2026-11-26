@@ -159,7 +159,7 @@ for (const [mode, cfg] of Object.entries(MODES)) {
     await shot('4-run-image')
     // Slides: Transparent Route / Overlay / map card, each with its own
     // Download PNG. The first one is the visible slide.
-    const download = page.getByTestId('download-transparent')
+    const download = page.getByTestId('download-hero-poster')
     await expect(download).toBeVisible()
     await expect(download).toHaveText('Download PNG')
     await expect(download).toBeEnabled()

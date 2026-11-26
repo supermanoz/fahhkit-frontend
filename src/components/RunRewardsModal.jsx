@@ -67,6 +67,8 @@ export default function RunRewardsModal({
   // "Your run" step - the same ShareRunCarousel Me -> History uses. No route
   // (fewer than 2 points) = no image step.
   run,
+  // The equipped hero - last resort for the Hero Poster share card.
+  heroFallback = null,
   onDismiss,
 }) {
   const hasImage = (run?.points?.length || 0) >= 2
@@ -313,7 +315,7 @@ export default function RunRewardsModal({
             >
               <IconClose />
             </button>
-            <ShareRunCarousel run={shareRun} />
+            <ShareRunCarousel run={shareRun} heroFallback={heroFallback} />
             <GameButton className="run-rewards-action" onClick={onDismiss}>
               Done
             </GameButton>

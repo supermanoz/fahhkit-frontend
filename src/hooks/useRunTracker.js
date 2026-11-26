@@ -145,6 +145,9 @@ export function useRunTracker() {
   const watchIdRef = useRef(null)
   const timerRef = useRef(null)
   const startedAtRef = useRef(null)
+  // The hero the player started this run as (Hero Poster share card needs it
+  // for offline / Training / old runs the server has no loadout for).
+  const heroIdRef = useRef(null)
   const eventIdRef = useRef(null)
   // Idempotency key for this run - created at start, persisted with it.
   const clientRunIdRef = useRef(null)
@@ -602,6 +605,7 @@ export function useRunTracker() {
           challengeId: challengeIdRef.current,
           clubWarId: clubWarIdRef.current,
           isTraining: isTrainingRef.current,
+          heroId: heroIdRef.current,
           points: pointsRef.current,
           distance: distanceRef.current,
           paused: false,
@@ -656,6 +660,7 @@ export function useRunTracker() {
         challengeId: saved.challengeId ?? null,
         clubWarId: saved.clubWarId ?? null,
         isTraining: saved.isTraining ?? false,
+        heroId: saved.heroId ?? null,
         points: saved.points,
         distance: saved.distance || 0,
         duration: saved.duration ?? 0,
@@ -684,6 +689,7 @@ export function useRunTracker() {
     challengeIdRef.current = saved.challengeId ?? null
     clubWarIdRef.current = saved.clubWarId ?? null
     isTrainingRef.current = saved.isTraining ?? false
+    heroIdRef.current = saved.heroId ?? null
     pausedMsRef.current = saved.pausedMs || 0
     distanceFilterRef.current = newDistanceFilter()
     detectorRef.current = createVehicleDetector({
@@ -761,7 +767,12 @@ export function useRunTracker() {
   const start = useCallback(
     (
       eventId,
-      { challengeId = null, clubWarId = null, isTraining = false } = {}
+      {
+        challengeId = null,
+        clubWarId = null,
+        isTraining = false,
+        heroId = null,
+      } = {}
     ) => {
       if (!('geolocation' in navigator)) {
         setStatus('unsupported')
@@ -805,6 +816,7 @@ export function useRunTracker() {
       challengeIdRef.current = challengeId
       clubWarIdRef.current = clubWarId
       isTrainingRef.current = isTraining
+      heroIdRef.current = heroId
 
       saveActiveRun({
         startedAt: startedAtRef.current.toISOString(),
@@ -813,6 +825,7 @@ export function useRunTracker() {
         challengeId: challengeIdRef.current,
         clubWarId: clubWarIdRef.current,
         isTraining: isTrainingRef.current,
+        heroId: heroIdRef.current,
         paused: false,
         pausedMs: 0,
         points: [],
@@ -858,6 +871,7 @@ export function useRunTracker() {
       challengeId: challengeIdRef.current,
       clubWarId: clubWarIdRef.current,
       isTraining: isTrainingRef.current,
+      heroId: heroIdRef.current,
       points: pointsRef.current,
       distance,
       // Moving time, not wall clock - see pause()/resume() and the
@@ -917,6 +931,7 @@ export function useRunTracker() {
         challengeId: result.challengeId,
         clubWarId: result.clubWarId,
         isTraining: result.isTraining,
+        heroId: result.heroId ?? null,
         points: result.points,
         distance: result.distance,
         stopped: true,
@@ -983,6 +998,7 @@ export function useRunTracker() {
       challengeId: challengeIdRef.current,
       clubWarId: clubWarIdRef.current,
       isTraining: isTrainingRef.current,
+      heroId: heroIdRef.current,
       points: pointsRef.current,
       distance: distanceRef.current,
       paused: true,
@@ -1027,6 +1043,7 @@ export function useRunTracker() {
     challengeId: challengeIdRef.current,
     clubWarId: clubWarIdRef.current,
     isTraining: isTrainingRef.current,
+    heroId: heroIdRef.current,
     status,
     elapsedSeconds,
     movingSeconds,

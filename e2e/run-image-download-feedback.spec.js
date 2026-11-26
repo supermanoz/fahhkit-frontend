@@ -75,7 +75,7 @@ test.describe('Run image download feedback', () => {
     mockedPage: page,
   }) => {
     await mockExport(page, { fail: false })
-    const btn = page.getByTestId('download-transparent')
+    const btn = page.getByTestId('download-hero-poster')
     await expect(btn).toHaveAttribute('data-state', 'idle')
     await page.waitForTimeout(800) // the modal's scale-in has settled
     const idleBox = await btn.boundingBox()
@@ -100,7 +100,7 @@ test.describe('Run image download feedback', () => {
     mockedPage: page,
   }) => {
     await mockExport(page, { fail: true })
-    const btn = page.getByTestId('download-transparent')
+    const btn = page.getByTestId('download-hero-poster')
     await btn.click()
     await expect(btn).toHaveAttribute('data-state', 'error', { timeout: 5000 })
     // The button becomes Retry; the plain reason sits under it and a short

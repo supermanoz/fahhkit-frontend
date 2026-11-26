@@ -2960,7 +2960,10 @@ function GamePageInner() {
     setMenuOpen(false)
     setGpsErrorDismissed(false)
     setActiveWarRun({ id: war.id, ourName, theirName })
-    tracker.start(null, { clubWarId: war.id })
+    tracker.start(null, {
+      clubWarId: war.id,
+      heroId: activeHeroId ?? null,
+    })
   }
 
   // Equips the hero a player locked in for a club war (their war run is
@@ -2978,7 +2981,10 @@ function GamePageInner() {
       pot: Number(challenge.stakeAmount) * 2,
     })
     beginCountdownThenStart(() =>
-      tracker.start(null, { challengeId: challenge.id })
+      tracker.start(null, {
+        challengeId: challenge.id,
+        heroId: activeHeroId ?? null,
+      })
     )
   }
 
@@ -3373,7 +3379,9 @@ function GamePageInner() {
   // Plain territory draw - same "3 2 1 GO" pre-run countdown as PvP races
   // and guided route runs (see beginCountdownThenStart).
   function handleStartRun() {
-    beginCountdownThenStart(() => tracker.start(null))
+    beginCountdownThenStart(() =>
+      tracker.start(null, { heroId: activeHeroId ?? null })
+    )
   }
 
   // Training - the exact same plain territory draw as Start Run (same
@@ -3402,10 +3410,18 @@ function GamePageInner() {
     }
     if (blocked) {
       resetForRunStart()
-      tracker.start(null, { isTraining: true })
+      tracker.start(null, {
+        isTraining: true,
+        heroId: activeHeroId ?? null,
+      })
       return
     }
-    beginCountdownThenStart(() => tracker.start(null, { isTraining: true }))
+    beginCountdownThenStart(() =>
+      tracker.start(null, {
+        isTraining: true,
+        heroId: activeHeroId ?? null,
+      })
+    )
   }
 
   // "Run This Route" on the viewingRoute toast - same plain loop run as
@@ -3416,7 +3432,9 @@ function GamePageInner() {
   // territory, the route is only ever a guide, never submitted itself.
   function handleRunViewedRoute() {
     setFollowingRoute(true)
-    beginCountdownThenStart(() => tracker.start(null))
+    beginCountdownThenStart(() =>
+      tracker.start(null, { heroId: activeHeroId ?? null })
+    )
   }
 
   function handleCancelTracking() {
@@ -3703,6 +3721,10 @@ function GamePageInner() {
       duration: run.duration,
       avgPace: created.avgPace,
       startedAt: run.startedAt,
+      // Hero Poster share card: the hero chosen at run start (local), and
+      // the server's loadout when the response carries one.
+      heroId: run.heroId ?? null,
+      loadout: created.loadout ?? null,
     })
     if (!fromQueue) {
       discardDraft()
@@ -5823,6 +5845,7 @@ function GamePageInner() {
             }
             stats={completedRun}
             run={completedRun}
+            heroFallback={{ id: activeHeroId ?? null, name: activeHeroName }}
             xpReward={xpReward}
             scoreBreakdown={runScoreBreakdown}
             onDismiss={() => {
@@ -6963,7 +6986,13 @@ function GamePageInner() {
               >
                 <IconClose />
               </button>
-              <ShareRunCarousel run={viewingRun} />
+              <ShareRunCarousel
+                run={viewingRun}
+                heroFallback={{
+                  id: activeHeroId ?? null,
+                  name: activeHeroName,
+                }}
+              />
             </motion.div>
           </motion.div>
         )}

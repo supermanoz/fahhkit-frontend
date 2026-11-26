@@ -65,20 +65,20 @@ test.describe('Run image download (web)', () => {
       page.waitForEvent('download'),
       page.getByRole('button', { name: 'Download PNG' }).first().click(),
     ])
-    expect(download.suggestedFilename()).toBe(
-      'run-conquest-run-run-1-transparent.png'
-    )
+    expect(download.suggestedFilename()).toBe('run-conquest-hero-run-1.png')
     await page.screenshot({ path: 'screenshots/run-image-download/web.png' })
   })
 
-  test('the Overlay card is the second slide and downloads as run-conquest-overlay-<id>.png', async ({
+  test('the Overlay card is the third slide and downloads as run-conquest-overlay-<id>.png', async ({
     mockedPage: page,
   }) => {
-    await page.getByRole('button', { name: 'Next style' }).click()
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole('button', { name: 'Next style' }).click()
+    }
     await expect(page.getByText('Overlay', { exact: true })).toBeVisible()
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Download PNG' }).nth(1).click(),
+      page.getByRole('button', { name: 'Download PNG' }).nth(2).click(),
     ])
     expect(download.suggestedFilename()).toBe('run-conquest-overlay-run-1.png')
   })
@@ -86,7 +86,7 @@ test.describe('Run image download (web)', () => {
   test('the map card still downloads as a JPG', async ({
     mockedPage: page,
   }) => {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       await page.getByRole('button', { name: 'Next style' }).click()
     }
     const [download] = await Promise.all([

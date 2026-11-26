@@ -23,6 +23,7 @@ const RUN = {
   points: POINTS,
 }
 const SLIDES = [
+  'Hero Poster',
   'Transparent Route',
   'Overlay',
   'Brand Gradient',
@@ -118,9 +119,9 @@ for (const vp of VIEWPORTS) {
         `[fit] ${vp.width}x${vp.height} ${label}: canvas ${Math.round(box.width)}x${Math.round(box.height)}`
       )
       await expectAllInView(page, label)
-      if (vp.height === 640 && (i === 0 || i === 1)) {
+      if (vp.height === 640 && i <= 2) {
         await page.screenshot({
-          path: `screenshots/run-image-modal/${vp.width}x${vp.height}-${i === 0 ? 'transparent' : 'overlay'}.png`,
+          path: `screenshots/run-image-modal/${vp.width}x${vp.height}-${['hero-poster', 'transparent', 'overlay'][i]}.png`,
         })
       }
     }
@@ -133,7 +134,7 @@ test('export states (success, error) keep the popup in view at 360x640', async (
 }) => {
   test.setTimeout(180_000)
   await openViewer(page, context, { width: 360, height: 640 })
-  const download = page.getByTestId('download-transparent')
+  const download = page.getByTestId('download-hero-poster')
 
   const [file] = await Promise.all([
     page.waitForEvent('download'),
@@ -174,7 +175,7 @@ test('landscape phone (640x360): popup scrolls, X not clipped, Download stays re
     await overlay.evaluate((el) => el.scrollHeight > el.clientHeight)
   ).toBe(true)
   // Download is sticky: in view without scrolling...
-  const download = page.getByTestId('download-transparent')
+  const download = page.getByTestId('download-hero-poster')
   await expect(download).toBeInViewport({ ratio: 1 })
   // ...and still in view after scrolling to the bottom; the dots are reachable.
   await overlay.evaluate((el) => el.scrollTo(0, el.scrollHeight))

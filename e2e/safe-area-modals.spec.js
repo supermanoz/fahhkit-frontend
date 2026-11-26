@@ -231,7 +231,7 @@ for (const d of [DEVICES[0], DEVICES[3]]) {
     expect(x.y).toBeGreaterThanOrEqual(d.top + 2)
     const viewer = await page.locator('.game-run-viewer').boundingBox()
     expect(viewer.y).toBeGreaterThanOrEqual(d.top + GAP)
-    const dl = await page.getByTestId('download-transparent').boundingBox()
+    const dl = await page.getByTestId('download-hero-poster').boundingBox()
     expect(dl.y + dl.height).toBeLessThanOrEqual(
       vp.height - d.bottom - GAP + 0.5
     )

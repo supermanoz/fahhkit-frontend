@@ -262,8 +262,8 @@ test('image slide: a run with no XP/score shows the stats card first, then Next 
   await expect(page.getByRole('dialog', { name: 'Your run' })).toBeHidden()
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Your run' })).toBeVisible()
-  await expect(page.getByTestId('download-transparent')).toBeVisible()
-  await expect(page.getByTestId('download-transparent')).toHaveText(
+  await expect(page.getByTestId('download-hero-poster')).toBeVisible()
+  await expect(page.getByTestId('download-hero-poster')).toHaveText(
     'Download PNG'
   )
   await page.waitForTimeout(500)
@@ -300,7 +300,7 @@ test('download button: Download PNG -> Saving... -> Downloaded -> back to idle; 
     training
   )
   await page.getByRole('button', { name: 'Next', exact: true }).click()
-  const btn = page.getByTestId('download-transparent')
+  const btn = page.getByTestId('download-hero-poster')
   await expect(btn).toHaveText('Download PNG')
   const dl = page.waitForEvent('download')
   await btn.click()
@@ -311,7 +311,7 @@ test('download button: Download PNG -> Saving... -> Downloaded -> back to idle; 
   // a second tap while loading does nothing (disabled)
   await btn.click({ force: true, timeout: 1000 }).catch(() => {})
   const file = await dl
-  expect(file.suggestedFilename()).toBe('run-conquest-run-7-transparent.png')
+  expect(file.suggestedFilename()).toBe('run-conquest-hero-7.png')
   await expect(btn).toHaveAttribute('data-state', 'success', {
     timeout: 10_000,
   })
@@ -346,7 +346,7 @@ test('download error: plain message + Retry, then Retry works; other slides unaf
       cb(null)
     }
   })
-  const btn = page.getByTestId('download-transparent')
+  const btn = page.getByTestId('download-hero-poster')
   await btn.click()
   await expect(btn).toHaveAttribute('data-state', 'error', { timeout: 10_000 })
   await expect(btn).toContainText('Retry')
@@ -403,7 +403,8 @@ test('saved file: real PNG with transparency, 1080px wide, and it is what the sl
   // Preview vs export: same drawing - the export scaled down to the preview
   // canvas matches its alpha mask (route + text land in the same places).
   const diff = await page.evaluate(async (run) => {
-    const preview = document.querySelector('.share-carousel-slide canvas')
+    // Slide 0 is the Hero Poster, slide 1 the transparent route.
+    const preview = document.querySelectorAll('.share-carousel-slide canvas')[1]
     const blob = await (async () => {
       const mod = await import('/src/utils/shareCanvas.js')
       return mod.exportShareCardBlob({
@@ -436,6 +437,41 @@ test('saved file: real PNG with transparency, 1080px wide, and it is what the sl
   }, training)
   expect(diff.painted).toBeGreaterThan(500)
   expect(diff.mismatch / diff.painted).toBeLessThan(0.08)
+
+  // Hero Poster (the default slide): preview and exported PNG are the same
+  // drawing - mean per-channel difference after scaling the export down.
+  const poster = await page.evaluate(async (run) => {
+    const preview = document.querySelectorAll('.share-carousel-slide canvas')[0]
+    const mod = await import('/src/utils/shareCanvas.js')
+    const blob = await mod.exportShareCardBlob({
+      points: run.points,
+      distance: run.distance,
+      duration: run.duration,
+      pace: run.avgPace,
+      variant: 'hero-poster',
+      heroKey: 'comet', // no loadout / saved / equipped hero -> the default
+    })
+    const bmp = await createImageBitmap(blob)
+    const c = document.createElement('canvas')
+    c.width = preview.width
+    c.height = preview.height
+    const ctx = c.getContext('2d')
+    ctx.drawImage(bmp, 0, 0, c.width, c.height)
+    const a = ctx.getImageData(0, 0, c.width, c.height).data
+    const b = preview
+      .getContext('2d')
+      .getImageData(0, 0, c.width, c.height).data
+    let sum = 0
+    for (let i = 0; i < a.length; i += 4) {
+      sum +=
+        Math.abs(a[i] - b[i]) +
+        Math.abs(a[i + 1] - b[i + 1]) +
+        Math.abs(a[i + 2] - b[i + 2])
+    }
+    return { mean: sum / (a.length / 4) / 3, opaque: b[3] === 255 }
+  }, training)
+  expect(poster.opaque).toBe(true)
+  expect(poster.mean).toBeLessThan(6)
 })
 
 for (const vp of [

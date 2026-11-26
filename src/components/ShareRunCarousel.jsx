@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { resolveHeroKey } from '../utils/heroPoster'
 import { IconChevronLeft, IconChevronRight } from './GameIcons'
 import { isNative } from '../utils/geo'
 import {
@@ -21,6 +22,14 @@ import {
 import './ShareRunCarousel.css'
 
 const SLIDES = [
+  {
+    // The default: full-bleed hero poster with the stats on the right.
+    variant: SHARE_VARIANTS.HERO_POSTER,
+    label: 'Hero Poster',
+    badge: 'PNG',
+    ext: 'png',
+    mime: 'image/png',
+  },
   {
     variant: SHARE_VARIANTS.TRANSPARENT,
     label: 'Transparent Route',
@@ -60,8 +69,13 @@ const SLIDES = [
 // Swipeable set of downloadable share-card styles for a completed run.
 // Each canvas preview is drawn with the exact same function used to render
 // the downloaded file, so what's shown here is what gets saved.
-export default function ShareRunCarousel({ run }) {
+export default function ShareRunCarousel({ run, heroFallback = null }) {
   const [index, setIndex] = useState(0)
+  // loadout -> hero saved on the run -> equipped hero (see utils/heroPoster).
+  const heroKey = useMemo(
+    () => resolveHeroKey(run, heroFallback),
+    [run, heroFallback?.id, heroFallback?.name] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   // Popup toast (solid card, bottom of the popup) for export success/failure.
   const [toastMsg, setToastMsg] = useState(null)
   const toastTimer = useRef(null)
@@ -116,12 +130,15 @@ export default function ShareRunCarousel({ run }) {
       mimeType: slide.mime,
       quality: slide.quality,
       size: slide.size,
+      heroKey,
     })
   }
   const fileNameFor = (slide) =>
-    slide.variant === SHARE_VARIANTS.OVERLAY
-      ? `run-conquest-overlay-${run.id}.png`
-      : `run-conquest-run-${run.id}-${slide.variant}.${slide.ext}`
+    slide.variant === SHARE_VARIANTS.HERO_POSTER
+      ? `run-conquest-hero-${run.id}.png`
+      : slide.variant === SHARE_VARIANTS.OVERLAY
+        ? `run-conquest-overlay-${run.id}.png`
+        : `run-conquest-run-${run.id}-${slide.variant}.${slide.ext}`
 
   // One export per button (ExportButton / useExportAction own the loading,
   // success and error states). Each returns what the hook needs to report.
@@ -164,7 +181,7 @@ export default function ShareRunCarousel({ run }) {
               key={slide.variant}
               style={{ width: containerWidth || '100%' }}
             >
-              <ShareCardPreview run={run} slide={slide} />
+              <ShareCardPreview run={run} slide={slide} heroKey={heroKey} />
               <div className="share-carousel-slide-footer">
                 <span className="share-carousel-slide-label">
                   {slide.label}
@@ -264,7 +281,7 @@ export default function ShareRunCarousel({ run }) {
   )
 }
 
-function ShareCardPreview({ run, slide }) {
+function ShareCardPreview({ run, slide, heroKey }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -285,8 +302,9 @@ function ShareCardPreview({ run, slide }) {
       duration: run.duration,
       pace: run.avgPace,
       variant: slide.variant,
+      heroKey,
     }).catch(() => {})
-  }, [run, slide.variant, slide.size])
+  }, [run, slide.variant, slide.size, heroKey])
 
   const { w: CARD_W, h: CARD_H } = cardSize(slide.variant, slide.size)
 

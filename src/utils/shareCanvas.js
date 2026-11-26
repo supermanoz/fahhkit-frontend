@@ -1,6 +1,7 @@
 import { formatDistance, formatDurationLabel, formatPace } from './run'
 import brandLogoSrc from '../assets/ui/brand/run_conquest_logo-1200.png'
 import { mapConfig } from '../config/mapProvider'
+import { acquirePoster, posterConfig } from './heroPoster'
 
 // Fixed logical card size (9:16, matches an Instagram Story frame so the
 // download drops straight into a story with no cropping/letterboxing).
@@ -18,6 +19,8 @@ export const SHARE_VARIANTS = {
   // Strava-style sticker: big neon route behind centred stacked stats, on a
   // REAL transparent background, meant to be laid over the player's photo.
   OVERLAY: 'overlay',
+  // Full-bleed hero poster with the stats down the right (the default card).
+  HERO_POSTER: 'hero-poster',
 }
 
 // Logical sizes (432 wide, exported at EXPORT_SCALE -> 1080 wide). The
@@ -110,6 +113,9 @@ export async function ensureWordmarkFontLoaded() {
   if (typeof document === 'undefined' || !document.fonts) return
   try {
     await document.fonts.load('800 32px Poppins')
+    // The Hero Poster card: Medium labels, Bold values.
+    await document.fonts.load('500 33px Poppins')
+    await document.fonts.load('700 86px Poppins')
     await document.fonts.ready
   } catch {
     // Fall back silently to the default font if it's not available.
@@ -604,9 +610,210 @@ export function drawOverlayCard(
   })
 }
 
+// --- Hero Poster -------------------------------------------------------
+// Designed on a 1080x1920 canvas; drawHeroPosterCard scales that space onto
+// whatever ctx it is given (432x768 logical, preview and export alike), so
+// the on-screen card and the exported PNG are the same drawing.
+export const POSTER_W = 1080
+export const POSTER_H = 1920
+// Instagram Story safe zone: nothing (text, logo, route) goes outside it.
+export const STORY_SAFE = { top: 270, bottom: 340, side: 64 }
+// The logo PNG carries transparent padding: 460 drawn = ~300 visible, top of
+// the lettering lands at y~290 (inside the 270 safe line).
+export const POSTER_LOGO_W = 460
+export const POSTER_LOGO_TOP = 268
+export const POSTER_STAT_PITCH = 367
+// First label's centre. The reference image has it at 505 (logo block above,
+// then the stack); 355 would sit on top of the logo (285 -> ~435).
+export const POSTER_FIRST_LABEL_Y = 505
+export const POSTER_LABEL_PX = 33
+export const POSTER_VALUE_PX = 86
+const POSTER_GOLD = '#FCC85C'
+export const POSTER_ROUTE_BOX = { w: 350, h: 860, cy: 925 }
+const POSTER_SCRIM = { none: 0, light: 0.28, medium: 0.45 }
+
+// 4-point star with concave sides, r = tip radius.
+function drawSparkle(ctx, cx, cy, r) {
+  const c = r * 0.16
+  ctx.beginPath()
+  ctx.moveTo(cx, cy - r)
+  ctx.quadraticCurveTo(cx + c, cy - c, cx + r, cy)
+  ctx.quadraticCurveTo(cx + c, cy + c, cx, cy + r)
+  ctx.quadraticCurveTo(cx - c, cy + c, cx - r, cy)
+  ctx.quadraticCurveTo(cx - c, cy - c, cx, cy - r)
+  ctx.closePath()
+  ctx.fill()
+}
+
+// Star in the middle, an 8px gap, then thin lines (22 -> 114 px from the
+// centre) that fade out at their outer ends.
+function drawGoldDivider(ctx, cx, cy) {
+  ctx.fillStyle = POSTER_GOLD
+  drawSparkle(ctx, cx, cy, 15)
+  for (const dir of [-1, 1]) {
+    const near = cx + dir * 22
+    const far = cx + dir * 114
+    const g = ctx.createLinearGradient(near, 0, far, 0)
+    g.addColorStop(0, POSTER_GOLD)
+    g.addColorStop(1, 'rgba(252, 200, 92, 0)')
+    ctx.fillStyle = g
+    ctx.fillRect(Math.min(near, far), cy - 1.75, 92, 3.5)
+  }
+  ctx.fillStyle = POSTER_GOLD
+}
+
+function drawPosterText(ctx, text, x, y, { font, size, maxWidth, fill }) {
+  let px = size
+  ctx.font = font(px)
+  while (px > 12 && ctx.measureText(text).width > maxWidth) {
+    px -= 1
+    ctx.font = font(px)
+  }
+  const k = shadowScale(ctx)
+  ctx.save()
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = fill
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'
+  ctx.shadowBlur = 16 * k
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 3 * k
+  ctx.fillText(text, x, y)
+  ctx.restore()
+}
+
+// Where everything goes, in poster px. Pure, so it can be unit-tested.
+export function posterLayout(heroKey, logoAspect = 0.5) {
+  const cfg = posterConfig(heroKey)
+  const half = cfg.colWidth / 2
+  const cx = Math.min(
+    Math.max(cfg.statsColumnCenterX, STORY_SAFE.side + half),
+    POSTER_W - STORY_SAFE.side - half
+  )
+  const route = {
+    x: cx - POSTER_ROUTE_BOX.w / 2,
+    y: POSTER_ROUTE_BOX.cy - POSTER_ROUTE_BOX.h / 2,
+    w: POSTER_ROUTE_BOX.w,
+    h: POSTER_ROUTE_BOX.h,
+  }
+  const stats = [0, 1, 2].map((i) => {
+    const labelY = POSTER_FIRST_LABEL_Y + POSTER_STAT_PITCH * i
+    return {
+      labelY,
+      dividerY: labelY + 42,
+      valueBaseline: labelY + 150,
+    }
+  })
+  return {
+    cx,
+    colWidth: cfg.colWidth,
+    scrim: cfg.scrim,
+    logo: {
+      x: cx - POSTER_LOGO_W / 2,
+      y: POSTER_LOGO_TOP,
+      w: POSTER_LOGO_W,
+      h: POSTER_LOGO_W * logoAspect,
+    },
+    route,
+    stats,
+  }
+}
+
+export async function drawHeroPosterCard(
+  ctx,
+  { width, height, points, distance, duration, pace, logo, heroKey }
+) {
+  const L = posterLayout(heroKey, logo.naturalHeight / logo.naturalWidth)
+  // The poster is decoded only for this one draw and closed straight after
+  // (utils/heroPoster.js -> spriteSheetCache, graceMs 0).
+  const held = acquirePoster(heroKey)
+  let poster = null
+  try {
+    poster = await held.ready
+  } catch {
+    // No poster: the dark fallback below keeps the card readable.
+  }
+  try {
+    ctx.save()
+    ctx.scale(width / POSTER_W, height / POSTER_H)
+    if (poster) {
+      ctx.drawImage(poster, 0, 0, POSTER_W, POSTER_H)
+    } else {
+      ctx.fillStyle = '#14101f'
+      ctx.fillRect(0, 0, POSTER_W, POSTER_H)
+    }
+
+    // Very soft dark scrim on the right edge only, never over the hero.
+    const alpha = POSTER_SCRIM[L.scrim] ?? POSTER_SCRIM.light
+    if (alpha > 0) {
+      const g = ctx.createLinearGradient(POSTER_W * 0.55, 0, POSTER_W, 0)
+      g.addColorStop(0, 'rgba(0, 0, 0, 0)')
+      g.addColorStop(1, `rgba(0, 0, 0, ${alpha})`)
+      ctx.fillStyle = g
+      ctx.fillRect(POSTER_W * 0.55, 0, POSTER_W * 0.45, POSTER_H)
+    }
+
+    // Route first, so every bit of text sits on top of it.
+    if (points && points.length >= 2) {
+      const projected = projectRoute(points, {
+        width: L.route.w,
+        height: L.route.h,
+        padding: 14, // room for the glow inside the box
+        minSpan: 0.0015,
+      }).map((p) => ({ x: p.x + L.route.x, y: p.y + L.route.y }))
+      drawNeonRoutePath(ctx, projected, { lineWidth: 8 })
+    }
+
+    drawBrandLogo(ctx, logo, {
+      x: L.logo.x,
+      y: L.logo.y,
+      width: L.logo.w,
+      align: 'left',
+      valign: 'alphabetic',
+      shadow: true,
+    })
+
+    const values = [
+      formatDistance(distance),
+      formatPace(pace),
+      formatDurationLabel(duration),
+    ]
+    const labels = ['Distance', 'Pace', 'Time']
+    // Values may use the whole column but never cross the safe zone.
+    const maxW = Math.min(
+      L.colWidth,
+      2 * (L.cx - STORY_SAFE.side),
+      2 * (POSTER_W - STORY_SAFE.side - L.cx)
+    )
+    labels.forEach((label, i) => {
+      const row = L.stats[i]
+      drawPosterText(ctx, label, L.cx, row.labelY + 11, {
+        font: (n) => `500 ${n}px 'Poppins', -apple-system, sans-serif`,
+        size: POSTER_LABEL_PX,
+        maxWidth: maxW,
+        fill: '#ffffff',
+      })
+      ctx.save()
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'
+      ctx.shadowBlur = 8 * shadowScale(ctx)
+      drawGoldDivider(ctx, L.cx, row.dividerY)
+      ctx.restore()
+      drawPosterText(ctx, values[i], L.cx, row.valueBaseline, {
+        font: (n) => `700 ${n}px 'Poppins', -apple-system, sans-serif`,
+        size: POSTER_VALUE_PX,
+        maxWidth: maxW,
+        fill: '#ffffff',
+      })
+    })
+    ctx.restore()
+  } finally {
+    held.release()
+  }
+}
+
 export async function drawShareCard(
   ctx,
-  { width, height, points, distance, duration, pace, variant }
+  { width, height, points, distance, duration, pace, variant, heroKey }
 ) {
   const [, logo] = await Promise.all([
     ensureWordmarkFontLoaded(),
@@ -617,7 +824,18 @@ export async function drawShareCard(
   const padding = 40
   const logoW = brandLogoWidth(width)
 
-  if (variant === SHARE_VARIANTS.OVERLAY) {
+  if (variant === SHARE_VARIANTS.HERO_POSTER) {
+    await drawHeroPosterCard(ctx, {
+      width,
+      height,
+      points,
+      distance,
+      duration,
+      pace,
+      logo,
+      heroKey,
+    })
+  } else if (variant === SHARE_VARIANTS.OVERLAY) {
     drawOverlayCard(ctx, {
       width,
       height,
@@ -816,6 +1034,7 @@ export async function exportShareCardBlob({
   mimeType = 'image/png',
   quality,
   size,
+  heroKey,
 }) {
   const { w, h } = cardSize(variant, size)
   const canvas = document.createElement('canvas')
@@ -831,6 +1050,7 @@ export async function exportShareCardBlob({
     duration,
     pace,
     variant,
+    heroKey,
   })
   return new Promise((resolve, reject) => {
     canvas.toBlob(
