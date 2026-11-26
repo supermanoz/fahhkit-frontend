@@ -77,4 +77,15 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+
+    <!-- Step counting for runs (src/utils/pedometer.js -> RunPedometerPlugin,
+         TYPE_STEP_COUNTER). ACTIVITY_RECOGNITION is a runtime permission on
+         Android 10+ (API 29); it is only requested when the player starts a
+         run / turns on Indoor, after a short explanation, and a "no" never
+         blocks a run. The sensor is optional so devices without a step
+         counter can still install the app. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false" />
 </manifest>

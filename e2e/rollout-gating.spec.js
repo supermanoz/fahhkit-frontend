@@ -97,21 +97,23 @@ test('outside: popup, then greyed controls + banner, then unlocks on entering a 
   await page.screenshot({ path: `${SHOT}/d-back-inside.png` })
 })
 
-test('unknown rollout state (status call fails) never locks the game', async ({
+test('unknown rollout state (status call fails) keeps the game locked until confirmed', async ({
   mockedPage: page,
   context,
 }) => {
   await mockStatus(page, 'error')
   await open(page, context, OUTSIDE)
-  await page.waitForTimeout(2500)
-  await expect(page.locator('.game-rollout-banner')).toHaveCount(0)
+  await expect(page.locator('.game-rollout-banner')).toContainText(
+    /check your area/,
+    { timeout: 20_000 }
+  )
   await orb(page).click()
   await expect(
     page.getByRole('button', { name: 'Play', exact: true })
-  ).toBeEnabled()
+  ).toBeDisabled()
 })
 
-test('location permission denied shows its own message, not the rollout lock', async ({
+test('location permission denied: locked, with its own "Location is off" message', async ({
   mockedPage: page,
   context,
 }) => {
@@ -135,5 +137,5 @@ test('location permission denied shows its own message, not the rollout lock', a
     'Location is off',
     { timeout: 25_000 }
   )
-  await expect(page.locator('.game-rollout-tint')).toHaveCount(0)
+  await expect(page.locator('.game-rollout-tint')).toHaveCount(1)
 })

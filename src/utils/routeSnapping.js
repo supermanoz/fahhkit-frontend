@@ -10,6 +10,7 @@
 // caller still gets the raw segment (a straight line between the two taps) and
 // `snapped: false`, so the player can always keep drawing.
 import { mapConfig, withApiKey } from '../config/mapProvider'
+import { DEBUG_INFO } from '../config/debugInfo'
 
 const PROFILES = ['foot', 'driving']
 // A dead provider must not freeze drawing: give up on one request after this.
@@ -64,21 +65,26 @@ export async function snapSegment(from, to, routing = mapConfig.routing) {
         const points = await requestRoute(profile, from, to, routing)
         return { points, snapped: true }
       } catch (err) {
-        console.warn(
-          `[routeSnapping] ${profile} attempt ${attempt} failed:`,
-          err?.message || err
-        )
+        if (DEBUG_INFO) {
+          console.warn(
+            `[routeSnapping] ${profile} attempt ${attempt} failed:`,
+            err?.message || err
+          )
+        }
         if (attempt < 2) {
           await new Promise((resolve) => setTimeout(resolve, 400))
         }
       }
     }
   }
-  console.warn(
-    '[routeSnapping] falling back to a straight line - every profile/retry failed for',
-    from,
-    '->',
-    to
-  )
+  // Coordinates are only ever printed in debug builds.
+  if (DEBUG_INFO) {
+    console.warn(
+      '[routeSnapping] falling back to a straight line - every profile/retry failed for',
+      from,
+      '->',
+      to
+    )
+  }
   return { points: [from, to], snapped: false }
 }

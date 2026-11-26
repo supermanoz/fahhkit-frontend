@@ -179,9 +179,9 @@ export function Dot({ className = '' }) {
 }
 
 // The HUD button draws the raster art (assets/ui/daily-chest.webp, source in
-// assets-src/): ready = full colour + glow/pulse, cooling down = dimmed.
+// assets-src/): ready = full colour + gold glow/pulse, cooling down = dimmed.
 // ChestIcon (SVG, with its open-lid state) is still used by the welcome popup.
-// Small chest button in the top-right HUD, directly under the Fahhcoin pill.
+// Frameless chest button in the top-right HUD, directly under the Fahhcoin counter.
 // claimable: open glowing chest + red dot; claimed: closed, dimmed, tiny "12h"
 // badge; error: neutral (tap retries). Hidden while loading, while the feature
 // is unavailable, and whenever a run / post-run screen / popup owns the screen.
@@ -216,7 +216,6 @@ export function DailyHudChest({ dr, onOpen }) {
       onClick={() => (mode === 'neutral' ? dr.retry() : onOpen())}
     >
       <span className="dc-hud-art">
-        {shiny && <i className="dc-hud-glow" />}
         <img
           className="dc-hud-img"
           src={chestArt}

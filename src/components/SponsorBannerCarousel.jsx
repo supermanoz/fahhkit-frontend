@@ -5,6 +5,7 @@ import {
   getCurrentSeasonPartners,
   trackPartnerClick,
 } from '../api/sponsorPartners'
+import { centerCardInTrack } from '../utils/scrollTrack'
 import { openExternal } from '../utils/externalLink'
 import { safeHref } from '../utils/safeUrl'
 import SeasonBanner from './SeasonBanner'
@@ -217,12 +218,8 @@ export default function SponsorBannerCarousel() {
   // Scrolls the track to match `index` on every programmatic change (timer
   // tick or dot tap).
   useEffect(() => {
-    const card = trackRef.current?.children[index]
-    card?.scrollIntoView({
-      behavior: 'smooth',
-      inline: 'center',
-      block: 'nearest',
-    })
+    const track = trackRef.current
+    centerCardInTrack(track, track?.children[index])
   }, [index])
 
   useEffect(() => {

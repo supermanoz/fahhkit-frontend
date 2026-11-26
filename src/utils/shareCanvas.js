@@ -224,12 +224,15 @@ export function drawStatsRow(
     labelFirst = false,
     valueFontSize = 17,
     labelFontSize = 10,
+    extraStats = [],
   }
 ) {
   const stats = [
     { value: formatDistance(distance), label: 'Distance' },
     { value: formatPace(pace), label: 'Pace' },
     { value: formatDurationLabel(duration), label: 'Time' },
+    // Steps / climb, only when the run has them ([{label, value}]).
+    ...extraStats,
   ]
   const colWidth = width / stats.length
 
@@ -272,12 +275,23 @@ export function drawStatsRow(
 // each stat gets its own full-width line under the wordmark.
 function drawStatsStack(
   ctx,
-  { distance, duration, pace, x, y, color, rowGap = 56, maxWidth = 340 }
+  {
+    distance,
+    duration,
+    pace,
+    x,
+    y,
+    color,
+    rowGap = 56,
+    maxWidth = 340,
+    extraStats = [],
+  }
 ) {
   const stats = [
     { value: formatDistance(distance), label: 'Distance' },
     { value: formatPace(pace), label: 'Pace' },
     { value: formatDurationLabel(duration), label: 'Time' },
+    ...extraStats,
   ]
 
   stats.forEach((stat, i) => {
@@ -813,7 +827,17 @@ export async function drawHeroPosterCard(
 
 export async function drawShareCard(
   ctx,
-  { width, height, points, distance, duration, pace, variant, heroKey }
+  {
+    width,
+    height,
+    points,
+    distance,
+    duration,
+    pace,
+    variant,
+    extraStats = [],
+    heroKey,
+  }
 ) {
   const [, logo] = await Promise.all([
     ensureWordmarkFontLoaded(),
@@ -875,6 +899,9 @@ export async function drawShareCard(
     })
 
     drawStatsStack(ctx, {
+      extraStats,
+      // Tighter rows when steps / climb are added so five still fit.
+      ...(extraStats.length ? { rowGap: 46 } : {}),
       distance,
       duration,
       pace,
@@ -914,6 +941,7 @@ export async function drawShareCard(
       valign: 'middle',
     })
     drawStatsRow(ctx, {
+      extraStats,
       distance,
       duration,
       pace,
@@ -1034,6 +1062,7 @@ export async function exportShareCardBlob({
   mimeType = 'image/png',
   quality,
   size,
+  extraStats = [],
   heroKey,
 }) {
   const { w, h } = cardSize(variant, size)
@@ -1050,6 +1079,7 @@ export async function exportShareCardBlob({
     duration,
     pace,
     variant,
+    extraStats,
     heroKey,
   })
   return new Promise((resolve, reject) => {

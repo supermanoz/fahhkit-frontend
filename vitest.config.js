@@ -1,9 +1,15 @@
 import { defineConfig } from 'vitest/config'
+import { readFileSync } from 'node:fs'
+
+const pkg = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8')
+)
 
 // Deliberately not reusing vite.config.js's plugins here - basicSsl() and the
 // maplibre worker-copy plugin only matter for `vite`/`vite build` and would
 // just add startup cost (or risk cert generation) for a plain unit-test run.
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // Automatic JSX runtime (matches vite.config.js's @vitejs/plugin-react,
   // without actually loading that plugin here) - every component source
   // file assumes it (none of them import React themselves), so without

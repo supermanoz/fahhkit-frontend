@@ -9,6 +9,7 @@
 //  - any other 4xx (validation, anti-cheat, too old...) -> 'failed' with the
 //    server's reason, never retried automatically, and the next run continues.
 import { RUN_STATUS, listOutbox, pruneDone, updateOutboxRun } from './runOutbox'
+import { runErrorMessage } from './runErrors'
 
 export const BACKOFF_BASE_MS = 5000
 export const BACKOFF_MAX_MS = 5 * 60 * 1000
@@ -20,7 +21,8 @@ export function backoffMs(attempts) {
 // -> { kind: 'network' | 'auth' | 'retry' | 'permanent', message }
 export function classifyError(err) {
   const status = err?.status ?? 0
-  const message = err?.message || 'The server could not accept this run.'
+  // Plain language by the backend's errorCode (never a raw code).
+  const message = runErrorMessage(err)
   if (status === 0) return { kind: 'network', message }
   if (status === 401 || status === 403) return { kind: 'auth', message }
   if (status === 408 || status === 425 || status === 429 || status >= 500) {
@@ -77,7 +79,11 @@ async function run({ userId, send, onSynced, now }) {
       if (kind === 'permanent') {
         await updateOutboxRun(record.clientRunId, {
           status: RUN_STATUS.FAILED,
-          error: { message, status: err?.status ?? null },
+          error: {
+            message,
+            status: err?.status ?? null,
+            errorCode: err?.errorCode ?? null,
+          },
         })
         result.failed += 1
         continue

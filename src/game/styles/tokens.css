@@ -398,6 +398,7 @@
   .game-legal-panel,
   .set-card,
   .cs-sheet,
+  .club-page,
   .g-toast,
   .game-claim-toast,
   .game-highlight-toast
@@ -413,6 +414,7 @@
   .game-btn,
   .g-badge,
   .gm-ribbon,
+  .club-war-banner,
   .g-modal-ribbon,
   .hero-modal-ribbon
 ) {

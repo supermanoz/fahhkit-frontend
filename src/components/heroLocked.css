@@ -4,11 +4,14 @@
    each surface turns into its own `is-hero-locked` class. Owned/equipped heroes
    stay full colour.
 
-   Performance: this filter is only ever applied to a STATIC frame. A locked
-   hero's sprite is rendered with `locked` (HeroFigure/EmoteGlyph active=false),
-   so nothing under a filter repaints per frame. */
+   Locked heroes animate exactly like owned ones; only the look differs.
+   Performance: the filter is grayscale+brightness only (no blur/drop-shadow)
+   and every filtered container is promoted to its own compositor layer
+   (--hero-locked-layer below), so the GPU applies it to the layer instead of
+   the canvas repainting it each frame. */
 :root {
   --hero-locked-filter: grayscale(0.85) brightness(0.82);
+  --hero-locked-layer: translateZ(0);
   --hero-locked-tier: #6d6f72;
   --hero-locked-tier-light: #b8babd;
 }

@@ -51,7 +51,7 @@ const shot = (page, name) =>
   SHOTS ? page.screenshot({ path: `${SHOTS}/${name}.png` }) : null
 
 for (const [mode, title] of [
-  ['training', 'Run saved'],
+  ['training', 'Run Complete'],
   ['territory', 'Run Complete'],
   ['pvp', 'PvP Result'],
   ['club_war', 'War Run Complete'],

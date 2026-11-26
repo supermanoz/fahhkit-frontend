@@ -7,17 +7,24 @@ import {
   requestRollout as requestRolloutApi,
   ALREADY_ROLLED_OUT_MESSAGE,
 } from '../api/territoryRollout'
+import { recordRolloutCheck } from '../utils/rolloutDebug'
 import {
   initialRolloutState,
   rolloutStatusReducer,
   shouldShowRolloutModal,
   shouldShowRolloutChip,
   isRolloutBlocked,
+  isRolloutPending,
   PHASE,
 } from '../utils/rolloutStatusState'
 
 const RECHECK_DISTANCE_M = 1000
 const RETRY_MS = 20000
+// A known answer is never trusted forever: even standing still, the status is
+// asked again once it is this old, so a city a moderator just disabled (or
+// enabled) takes effect without the player moving or reinstalling.
+export const RECHECK_TTL_MS = 5 * 60 * 1000
+const TTL_POLL_MS = 30000
 // Coming back from the background re-checks (the player may have travelled),
 // but not more often than this, so quick app switches never spam the API.
 const RESUME_MIN_INTERVAL_MS = 30000
@@ -37,12 +44,19 @@ const RESUME_MIN_INTERVAL_MS = 30000
 //     last check (walking into a rolled-out city unlocks without a restart);
 //   - on the first FRESH fix after the app returns from the background
 //     (`resumeTick`), at most once per RESUME_MIN_INTERVAL_MS;
-//   - every RETRY_MS while the result is unknown (a failed check).
+//   - every RETRY_MS while the result is unknown (a failed check);
+//   - whenever the last check is older than RECHECK_TTL_MS (5 min), even if
+//     the player hasn't moved.
 // `userId` resets everything when a different player signs in.
 //
 // A failed check (offline, 404 because the backend hasn't deployed the
-// endpoint, ...) is an unknown state: nothing is shown or locked. In dev a
-// console warning says so.
+// endpoint, ...) is an unknown state: `blocked` stays false and no popup
+// shows, but `pending` is true - GamePage keeps the game locked until an
+// answer confirms the area (a re-check that fails after a KNOWN answer keeps
+// that answer). A successful answer
+// with rolledOut:false always wins: popup + lock. Every check is recorded in
+// utils/rolloutDebug.js (coordinates sent, response, decision) and shown in
+// Settings > About on test/dev builds.
 export function useRolloutStatus(
   position,
   { userId = null, resumeTick = 0 } = {}
@@ -68,6 +82,8 @@ export function useRolloutStatus(
   // Bumped by the retry timer so a failed/unknown check is re-attempted even
   // if the player is standing still.
   const [retryTick, setRetryTick] = useState(0)
+  // Bumped by the TTL poll when the last check has gone stale.
+  const [ttlTick, setTtlTick] = useState(0)
 
   // A different player: forget the last one's result and position.
   const userRef = useRef(userId)
@@ -91,6 +107,21 @@ export function useRolloutStatus(
     resumeRef.current = { at: Date.now(), base: positionRef.current }
   }, [resumeTick])
 
+  // Staleness poll: cheap timer, only bumps state once the last check is
+  // older than the TTL (and the app is in the foreground).
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      if (
+        lastCheckAtRef.current &&
+        Date.now() - lastCheckAtRef.current >= RECHECK_TTL_MS
+      ) {
+        setTtlTick((n) => n + 1)
+      }
+    }, TTL_POLL_MS)
+    return () => clearInterval(id)
+  }, [])
+
   useEffect(() => {
     // Never on a missing, 0,0, stale or very coarse fix.
     if (!isUsableFix(position)) return
@@ -100,12 +131,21 @@ export function useRolloutStatus(
       Boolean(resume) &&
       position !== resume.base &&
       (position.timestamp == null || position.timestamp >= resume.at - 1000)
-    const moved =
-      !last ||
-      haversineDistance(last, position) > RECHECK_DISTANCE_M ||
-      last.tick !== retryTick ||
-      freshAfterResume
-    if (!moved || inFlightRef.current) return
+    const stale =
+      lastCheckAtRef.current > 0 &&
+      Date.now() - lastCheckAtRef.current >= RECHECK_TTL_MS
+    const trigger = !last
+      ? 'first'
+      : haversineDistance(last, position) > RECHECK_DISTANCE_M
+        ? 'moved'
+        : last.tick !== retryTick
+          ? 'retry'
+          : freshAfterResume
+            ? 'resume'
+            : stale
+              ? 'ttl'
+              : null
+    if (!trigger || inFlightRef.current) return
     if (freshAfterResume) resumeRef.current = null
     const generation = generationRef.current
     checkedAtRef.current = {
@@ -120,6 +160,19 @@ export function useRolloutStatus(
     getRolloutStatus(position.lat, position.lng)
       .then((result) => {
         if (generation !== generationRef.current) return
+        recordRolloutCheck({
+          trigger,
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy ?? null,
+          ok: true,
+          response: result,
+          decision: result.rolledOut
+            ? 'unlocked'
+            : result.alreadyRequested
+              ? 'locked + already-requested chip'
+              : 'locked + popup',
+        })
         dispatch({
           type: 'CHECK_SUCCESS',
           rolledOut: Boolean(result.rolledOut),
@@ -135,18 +188,27 @@ export function useRolloutStatus(
         // other error: unknown state - treated as available (never locks).
         // Forget where we checked so the retry timer tries again.
         checkedAtRef.current = null
-        if (import.meta.env.DEV) {
-          console.warn(
-            '[rollout] status check failed - not locking the game:',
-            err instanceof ApiError ? `HTTP ${err.status} ${err.message}` : err
-          )
-        }
+        const errorText =
+          err instanceof ApiError
+            ? err.status === 0
+              ? `network/timeout (${err.message})`
+              : `HTTP ${err.status} ${err.message}`
+            : String(err)
+        recordRolloutCheck({
+          trigger,
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy ?? null,
+          ok: false,
+          error: errorText,
+          decision: 'fail-open (unknown: nothing shown or locked, retrying)',
+        })
         dispatch({ type: 'CHECK_FAILED' })
       })
       .finally(() => {
         if (generation === generationRef.current) inFlightRef.current = false
       })
-  }, [position, retryTick])
+  }, [position, retryTick, ttlTick])
 
   // Retry while the state is unknown.
   useEffect(() => {
@@ -188,6 +250,7 @@ export function useRolloutStatus(
     showModal: shouldShowRolloutModal(state),
     showChip: shouldShowRolloutChip(state),
     blocked: isRolloutBlocked(state),
+    pending: isRolloutPending(state),
     request,
     dismiss,
   }

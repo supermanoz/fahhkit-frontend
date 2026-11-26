@@ -29,3 +29,11 @@
   height: 18px;
   flex: none;
 }
+
+/* Apple's HIG: "Sign in with Apple", black or white (with an outline on
+   white), logo and text in the contrast colour. */
+.apple-signin-button.is-white {
+  background: #fff;
+  color: #000;
+  box-shadow: inset 0 0 0 1px #000;
+}

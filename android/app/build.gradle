@@ -23,6 +23,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 20
         versionName "1.0.1"
+        // -Pbackend=test (npm run android:*:test) marks the build as pointing at
+        // the TEST backend: "1.0.1-test" in the app info / Play / Firebase.
+        if (project.findProperty('backend') == 'test') versionNameSuffix "-test"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

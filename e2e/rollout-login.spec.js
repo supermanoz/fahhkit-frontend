@@ -152,12 +152,10 @@ test('inside a rolled-out area, right after login: status fetched, no popup, not
   await page.screenshot({ path: `${SHOT}/2-inside-after-login.png` })
 })
 
-test('endpoint failing (404): no popup, no lock, a dev console warning', async ({
+test('endpoint failing (404): no popup, game stays locked ("Couldn\'t check your area")', async ({
   mockedPage: page,
   context,
 }) => {
-  const warnings = []
-  page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()))
   await context.grantPermissions(['geolocation'])
   await context.setGeolocation(OUTSIDE)
   await mockStatus(page, 'error')
@@ -166,18 +164,15 @@ test('endpoint failing (404): no popup, no lock, a dev console warning', async (
   await expect(page.locator('.game-loading-overlay')).toBeHidden({
     timeout: 40_000,
   })
-  await expect
-    .poll(
-      () => warnings.some((w) => w.includes('[rollout] status check failed')),
-      { timeout: 20_000 }
-    )
-    .toBe(true)
+  await expect(page.locator('.game-rollout-banner')).toContainText(
+    /check your area/,
+    { timeout: 20_000 }
+  )
   await expect(page.getByText(popupText)).toHaveCount(0)
-  await expect(page.locator('.game-rollout-banner')).toHaveCount(0)
   await orb(page).click()
   await expect(
     page.getByRole('button', { name: 'Play', exact: true })
-  ).toBeEnabled()
+  ).toBeDisabled()
   await page.screenshot({ path: `${SHOT}/3-endpoint-failing.png` })
 })
 

@@ -5,6 +5,8 @@ import {
   rolloutStatusReducer,
   shouldShowRolloutModal,
   shouldShowRolloutChip,
+  isRolloutBlocked,
+  isRolloutPending,
 } from './rolloutStatusState'
 
 describe('rolloutStatusReducer', () => {
@@ -158,5 +160,25 @@ describe('rolloutStatusReducer', () => {
     expect(
       rolloutStatusReducer(initialRolloutState, { type: 'NOT_REAL' })
     ).toBe(initialRolloutState)
+  })
+})
+
+describe('isRolloutPending (locked until the area is confirmed)', () => {
+  const at = (phase) => ({ ...initialRolloutState, phase })
+  it('idle, checking and failed are pending - but never "blocked" (no popup)', () => {
+    for (const p of [PHASE.IDLE, PHASE.CHECKING, PHASE.FAILED]) {
+      expect(isRolloutPending(at(p))).toBe(true)
+      expect(isRolloutBlocked(at(p))).toBe(false)
+    }
+  })
+  it('only a confirmed rolled-out area is neither pending nor blocked', () => {
+    expect(isRolloutPending(at(PHASE.ROLLED_OUT))).toBe(false)
+    expect(isRolloutBlocked(at(PHASE.ROLLED_OUT))).toBe(false)
+  })
+  it('a confirmed outside answer is blocked, not pending', () => {
+    for (const p of [PHASE.NEEDS_REQUEST, PHASE.ALREADY_REQUESTED]) {
+      expect(isRolloutBlocked(at(p))).toBe(true)
+      expect(isRolloutPending(at(p))).toBe(false)
+    }
   })
 })

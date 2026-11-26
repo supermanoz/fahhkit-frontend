@@ -1,0 +1,40 @@
+.training-seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius);
+  background: rgba(35, 32, 29, 0.08);
+}
+.training-seg-btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body-dark);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.training-seg-btn.is-on {
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: var(--brand-dark);
+}
+.training-start-copy {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: 1.35;
+  color: var(--text-body-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+}
+.training-start-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

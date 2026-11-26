@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { withBackendLabel } from '../config/backend'
 import { useRef, useState, useEffect } from 'react'
 import { App as CapacitorApp } from '@capacitor/app'
 import { GameActions, GameModal } from '../game/ui/GameModal'
@@ -6,8 +7,19 @@ import { useToast } from '../game/ui/Toast'
 import VolumeSlider from '../game/ui/VolumeSlider'
 import { TOUR_ACTIONS } from '../constants/tourCopy'
 import { GAME_CONTACT_EMAIL } from '../constants/gameLegal'
+import { clearSession, isNetworkError } from '../api/client'
+import { deleteMyAccount } from '../api/user'
+import { DELETE_ACCOUNT_COPY } from '../utils/deleteAccount'
+import { googleSignOut } from '../utils/googleSession'
 import { isNative } from '../utils/geo'
+import { DEBUG_INFO } from '../config/debugInfo'
 import { toggleMapDebug } from '../utils/mapDebug'
+import {
+  formatRolloutCheck,
+  isRolloutDebugEnabled,
+  useRolloutChecks,
+} from '../utils/rolloutDebug'
+import { API_BASE_URL, BACKEND_TARGET } from '../config/backend'
 import { MAP_ROTATION_ENABLED } from '../config/features'
 import { copyText, openExternal, openMailto } from '../utils/externalLink'
 import { playSfx } from '../utils/gameSound'
@@ -74,6 +86,31 @@ function SliderRow({ title, sub, children }) {
 // The pieces that own behaviour stay where they were and arrive as props:
 // audio (hooks/useAudioVolumes), push, map style, PvP visibility, and the
 // handlers for edit-profile / how-to-play / legal pages / log out.
+// Debug builds only (DEBUG_INFO): what the territory-availability
+// check last sent and decided - see utils/rolloutDebug.js.
+// Web build: the package version (injected by vite.config.js). Native builds
+// replace this with the real "version (build)" from the app itself.
+function webVersion() {
+  return typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : ''
+}
+
+function RolloutDebugLines() {
+  const checks = useRolloutChecks()
+  if (!isRolloutDebugEnabled()) return null
+  const last = checks[0]
+  return (
+    <div className="game-settings-credits" data-testid="rollout-debug">
+      <div>
+        API: {BACKEND_TARGET} · {API_BASE_URL}
+      </div>
+      <div>
+        Rollout check:{' '}
+        {last ? formatRolloutCheck(last) : 'not run yet (no usable GPS fix?)'}
+      </div>
+    </div>
+  )
+}
+
 // Secret switch on the version text: hold ~1.5 s OR tap it 7 times quickly.
 // Mobile browsers start text selection / a context menu on a long press and
 // cancel the pointer events, so: no selection (user-select none), the context
@@ -130,12 +167,43 @@ export default function GameSettings({
   onHowToPlay,
   onOpenLegal,
   onLogout,
+  onAccountDeleted,
 }) {
   const toast = useToast()
   const rotateMap = useRotateWhileRunning()
   const [confirmLogout, setConfirmLogout] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [version, setVersion] = useState(null)
   const lastTick = useRef(0)
+
+  function closeDelete() {
+    setConfirmDelete(false)
+    setDeleteError('')
+  }
+  // DELETE /v1/user/me, then wipe the session and go back to sign-in. On any
+  // failure the account is untouched and the dialog stays open to retry.
+  async function confirmDeleteAccount() {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteMyAccount()
+    } catch (err) {
+      setDeleting(false)
+      setDeleteError(
+        isNetworkError(err)
+          ? 'No connection. Check your internet and try again.'
+          : DELETE_ACCOUNT_COPY.failed
+      )
+      return
+    }
+    // Forget the Google account the plugin remembers too, so the next sign-in
+    // (a clean new account) starts from the account chooser.
+    await googleSignOut()
+    clearSession()
+    onAccountDeleted?.()
+  }
 
   useEffect(() => {
     if (!isNative) return undefined
@@ -277,6 +345,17 @@ export default function GameSettings({
             <IconLogout aria-hidden="true" />
             Log out
           </button>
+          <button
+            type="button"
+            className="set-delete-btn"
+            data-testid="delete-account-btn"
+            onClick={() => {
+              setDeleteError('')
+              setConfirmDelete(true)
+            }}
+          >
+            Delete account
+          </button>
         </div>
       </SettingsCard>
 
@@ -352,21 +431,67 @@ export default function GameSettings({
           <span
             className="set-static-value"
             data-testid="app-version"
-            {...(MAP_ROTATION_ENABLED
+            {...(MAP_ROTATION_ENABLED && DEBUG_INFO
               ? secretSwitchProps(() => {
                   const on = toggleMapDebug()
                   toast.push(on ? 'Map debug panel ON' : 'Map debug panel off')
                 })
               : {})}
           >
-            {version || 'Web'}
+            {withBackendLabel(version || webVersion())}
           </span>
         </div>
         {/* No dedicated About page exists in this app - this is the closest
             real equivalent to the "Settings/About page" the map tile credits
             need to show up on. */}
         <p className="game-settings-credits">{mapConfig.creditText}</p>
+        <RolloutDebugLines />
       </SettingsCard>
+
+      <GameModal
+        open={confirmDelete}
+        onClose={() => !deleting && closeDelete()}
+        tone="danger"
+        title={DELETE_ACCOUNT_COPY.title}
+      >
+        <p className="set-confirm-text set-delete-intro">
+          {DELETE_ACCOUNT_COPY.intro}
+        </p>
+        <ul className="set-delete-list" data-testid="delete-account-list">
+          {DELETE_ACCOUNT_COPY.deletes.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="set-confirm-note">{DELETE_ACCOUNT_COPY.note}</p>
+        {deleteError && (
+          <p
+            className="set-confirm-text set-delete-error"
+            role="alert"
+            data-testid="delete-account-error"
+          >
+            {deleteError}
+          </p>
+        )}
+        <GameActions>
+          <GameButton
+            variant="neutral"
+            disabled={deleting}
+            onClick={closeDelete}
+          >
+            {DELETE_ACCOUNT_COPY.keep}
+          </GameButton>
+          <GameButton
+            variant="danger"
+            disabled={deleting}
+            data-testid="delete-account-confirm"
+            onClick={confirmDeleteAccount}
+          >
+            {deleting
+              ? DELETE_ACCOUNT_COPY.working
+              : DELETE_ACCOUNT_COPY.action}
+          </GameButton>
+        </GameActions>
+      </GameModal>
 
       <GameModal
         open={confirmLogout}

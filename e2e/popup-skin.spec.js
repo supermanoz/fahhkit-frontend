@@ -39,6 +39,9 @@ async function tapTraining(page) {
   await page.locator('.game-menu-btn').click()
   await page.getByRole('button', { name: 'Play', exact: true }).click()
   await page.getByRole('button', { name: 'Training', exact: true }).click()
+  // Training's start screen: Outdoor (default, GPS) -> Start.
+  await page.getByRole('radio', { name: 'Outdoor' }).click()
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
 }
 
 const VP =

@@ -14,7 +14,7 @@ export function isIosAppleSignInEnabled() {
 // Bundle id = the identity token's `aud` for the native flow; the backend's
 // apple.oauth.client.ids must contain it. `clientId`/`redirectURI` are
 // required by the plugin's typings but ignored by the native iOS sheet.
-const APPLE_CLIENT_ID = 'com.runconquest.game'
+const APPLE_CLIENT_ID = 'com.runconquest.app'
 
 const ERR_CANCELED = 1001
 

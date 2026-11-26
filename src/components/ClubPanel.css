@@ -177,24 +177,6 @@
   opacity: 0.6;
 }
 
-.club-desc-edit-btn {
-  flex-shrink: 0;
-  padding: 3px 9px;
-  border: 2px solid var(--game-ink);
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--gold-300), var(--gold-700));
-  color: var(--text-title);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  box-shadow: 0 2px 0 var(--game-ink);
-}
-
-.club-desc-edit-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 var(--game-ink);
-}
-
 .club-desc-edit {
   display: flex;
   flex-direction: column;
@@ -606,6 +588,8 @@
   .club-war-hero-card-stage
   > :not(.club-war-hero-card-lock) {
   filter: var(--hero-locked-filter);
+  transform: var(--hero-locked-layer);
+  will-change: transform;
 }
 
 .club-war-hero-card-lock {
@@ -836,42 +820,6 @@
    each state's own primary action. The surrounding .game-menu-sheet
    already carries safe-area bottom padding (see GamePage.css), so this
    only needs its own top clearance from whatever content came before it. */
-.club-war-history-btn {
-  width: 100%;
-  margin-top: 24px;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  border-radius: 12px;
-  border: 2px solid var(--game-ink);
-  background: var(--white);
-  cursor: pointer;
-}
-
-.club-war-history-btn-icon {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  color: var(--text-body-dark);
-}
-
-.club-war-history-btn-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  text-align: left;
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--text-title-dark);
-}
-
-.club-war-history-btn-chevron {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: var(--text-muted-dark);
-}
 
 /* Narrower rows - no room for a second text line under the name (see
    squadList's own comment on when the hero-name line even renders), and
@@ -1864,9 +1812,6 @@
 }
 
 /* My Club / Club Wars switch at the top of the Club tab. */
-.club-section-tabs {
-  margin-bottom: 0;
-}
 
 /* --- Shared Routes (ClubPanel.jsx) --- */
 /* Same shrink-to-fit bug as the old club-war-history-row: a <button> row

@@ -75,7 +75,7 @@ function HeroEmoteStage({
   // (the backend wants the hero owned first).
   levelLocked = false,
   // Not owned (any reason): the shared locked look - shaded static art on a
-  // matching dimmed stage (heroLocked.css). Nothing animates while locked.
+  // matching dimmed stage (heroLocked.css). Still animates: the shade is CSS only.
   heroLocked = false,
 }) {
   const stageRef = useRef(null)
@@ -100,10 +100,13 @@ function HeroEmoteStage({
   // filterVisibleEmotes drops this hero's hidden emotes (see
   // HIDDEN_EMOTES in emotes.js) before any slide/dot/count is built, so
   // they never occupy a slot at all - not even a locked one.
+  // A sprite hero's backend EMOTE row with no built sheet pack (e.g. a row
+  // added before its art was exported) would be a blank lock slot - drop it
+  // instead (utils/heroAssets.test.js guards the packs themselves).
   const emoteItems = filterVisibleEmotes(
     hero.name,
     (hero.skins || []).filter((item) => item.category === 'EMOTE')
-  )
+  ).filter((item) => !sprite || resolveEmoteAsset(hero.name, item.name))
   const isIdleAlias = (item) =>
     Boolean(idlePose) && resolveEmoteAsset(hero.name, item.name) === idlePose
   // The one shared selector every "which emote is equipped" screen uses -
@@ -270,12 +273,7 @@ function HeroEmoteStage({
                 className={`hero-emote-slide-figure ${slide.kind === 'emote' && !slide.owned ? 'is-locked' : ''}`}
               >
                 {slide.kind === 'idle' ? (
-                  <HeroFigure
-                    hero={hero}
-                    pose="idle"
-                    height={spriteHeight}
-                    locked={heroLocked}
-                  />
+                  <HeroFigure hero={hero} pose="idle" height={spriteHeight} />
                 ) : (
                   // Plays regardless of ownership - only the current slide is
                   // ever mounted at all (AnimatePresence swaps one slide at a
@@ -288,7 +286,7 @@ function HeroEmoteStage({
                     heroName={hero.name}
                     emoteName={slide.item.name}
                     size={spriteHeight}
-                    active={!heroLocked}
+                    active
                   />
                 )}
                 {slide.kind === 'emote' && !slide.owned && (

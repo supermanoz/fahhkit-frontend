@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import basicSsl from '@vitejs/plugin-basic-ssl'
-import { mkdirSync, copyFileSync } from 'node:fs'
+import { mkdirSync, copyFileSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+
+const pkg = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8')
+)
 
 // maplibre-gl's worker script imports a sibling "maplibre-gl-shared.mjs"
 // by a hardcoded relative path, so the two files have to be served
@@ -36,6 +40,8 @@ function copyMaplibreWorker() {
 // website's own `dist`; base stays '/' since the app is served from a
 // bundled WebView root either way.
 export default defineConfig({
+  // Web build's Settings > About version (native shows the app's own).
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   base: process.env.GH_PAGES ? '/fahhkit/' : '/',
   // navigator.geolocation (used all over /game and run-tracking) only
   // works in a "secure context" — localhost counts, but a phone hitting the

@@ -8,6 +8,7 @@ import {
   splitUnit,
 } from '../utils/run'
 import { formatArea } from '../utils/territoryGame'
+import { runExtraStats } from '../utils/runMetrics'
 import {
   TERRITORY_CHECKING,
   postRunModeOf,
@@ -40,6 +41,15 @@ export function CompletedRunStats({ run }) {
         value={formatDuration(run.duration)}
         label="Time"
       />
+      {/* Steps / elevation: only the ones the server measured. */}
+      {runExtraStats(run).map((row) => (
+        <StatChip
+          key={row.key}
+          icon={<IconRunning />}
+          value={row.value}
+          label={row.label}
+        />
+      ))}
     </StatRow>
   )
 }
@@ -117,6 +127,18 @@ export default function RunResultCard({
         {runResult.events.length === 1 ? '' : 's'}
       </p>
     )
+  } else if (phase === 'failed') {
+    // Server-side scoring gave up after its retries (score status FAILED).
+    // The run itself is saved.
+    tone = 'warning'
+    title = "We couldn't score this run yet"
+    body = (
+      <p className="run-result-note">
+        Your run is saved, but we hit a problem working out the result. We
+        can&apos;t finish it right now - check back later, and contact support
+        if it never shows up.
+      </p>
+    )
   } else if (phase === 'timeout') {
     tone = 'warning'
     title = 'Still checking your territory…'
@@ -132,7 +154,7 @@ export default function RunResultCard({
   const dismissLabel =
     phase === 'rejected'
       ? 'Got it'
-      : phase === 'timeout'
+      : phase === 'timeout' || phase === 'failed'
         ? 'OK'
         : phase === 'processing'
           ? null

@@ -1,9 +1,11 @@
+import { runExtraStats } from '../utils/runMetrics'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FaMapMarkerAlt } from 'react-icons/fa'
 import { ApiError } from '../api/client'
 import { getRun } from '../api/runs'
 import RunMap from '../components/RunMap'
+import { isIndoorRun } from '../utils/indoorRuns'
 import ShareRunCarousel from '../components/ShareRunCarousel'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -69,19 +71,28 @@ export default function RunDetailPage() {
                 <dt>Avg Pace</dt>
                 <dd>{formatPace(run.avgPace)}</dd>
               </div>
+              {runExtraStats(run).map((row) => (
+                <div key={row.key} data-testid={`run-stat-${row.key}`}>
+                  <dt>{row.label}</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
             </dl>
 
-            <div className="run-detail-actions">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setShowMap((v) => !v)}
-              >
-                <FaMapMarkerAlt /> {showMap ? 'Hide Map' : 'View Map'}
-              </button>
-            </div>
+            {/* An indoor (treadmill) run has no route: no map, no button. */}
+            {!isIndoorRun(run) && (
+              <div className="run-detail-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowMap((v) => !v)}
+                >
+                  <FaMapMarkerAlt /> {showMap ? 'Hide Map' : 'View Map'}
+                </button>
+              </div>
+            )}
 
-            {showMap && <RunMap points={run.points} />}
+            {showMap && !isIndoorRun(run) && <RunMap points={run.points} />}
           </>
         )}
       </div>

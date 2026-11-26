@@ -10,6 +10,7 @@ export const MAIL_EMPTY = Object.freeze({
 
 export const MAIL_LOADING = 'Checking the mailbox…'
 export const MAIL_RETRY = 'Retry'
+export const MAIL_TIMEOUT = 'The mailbox is taking too long.'
 export const MAIL_ERROR_HINT = 'Check your connection and try again.'
 
 // Section labels (Today / Yesterday / Earlier - see utils/mailView.js).

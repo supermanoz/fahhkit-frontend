@@ -14,6 +14,10 @@ vi.mock('../api/territoryRollout', () => ({
 }))
 
 import { useRolloutStatus } from './useRolloutStatus'
+import {
+  clearRolloutChecksForTests,
+  getRolloutChecks,
+} from '../utils/rolloutDebug'
 
 const NOW = new Date('2026-11-20T10:00:00Z').getTime()
 const fix = (lat, lng, extra = {}) => ({
@@ -55,6 +59,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
   vi.setSystemTime(NOW)
   vi.clearAllMocks()
+  clearRolloutChecksForTests()
   api.getRolloutStatus.mockResolvedValue(OUTSIDE)
 })
 afterEach(() => {
@@ -142,22 +147,25 @@ describe('result -> popup / lock', () => {
   })
 })
 
-describe('failure never locks the game (and warns in dev)', () => {
-  it('a failing endpoint (404 / offline): no popup, no lock, a console warning', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+describe('failure never locks the game (and is recorded for debugging)', () => {
+  it('a failing endpoint (404 / offline): no popup, no lock, the failure is recorded', async () => {
     api.getRolloutStatus.mockRejectedValue(new Error('404'))
     const { result } = setup(fix(...POKHARA))
     await flush()
     expect(result.current.showModal).toBe(false)
     expect(result.current.blocked).toBe(false)
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('[rollout] status check failed'),
-      expect.anything()
-    )
+    const [entry] = getRolloutChecks()
+    expect(entry).toMatchObject({
+      ok: false,
+      trigger: 'first',
+      lat: POKHARA[0],
+      lng: POKHARA[1],
+    })
+    expect(entry.error).toContain('404')
+    expect(entry.decision).toMatch(/fail-open/)
   })
 
   it('retries after a while and recovers when the endpoint comes back', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
     api.getRolloutStatus.mockRejectedValueOnce(new Error('503'))
     const { result } = setup(fix(...POKHARA))
     await flush()
@@ -266,5 +274,97 @@ describe('a different player', () => {
     expect(api.getRolloutStatus).toHaveBeenCalledTimes(2)
     expect(result.current.showChip).toBe(false) // u1's "already requested" is gone
     expect(result.current.showModal).toBe(true)
+  })
+})
+
+describe('a successful answer is recorded with the coordinates and decision', () => {
+  it('records what was sent, what came back and what the app decided', async () => {
+    api.getRolloutStatus.mockResolvedValue({
+      rolledOut: false,
+      alreadyRequested: false,
+      cityName: 'Kathmandu',
+      countryName: 'Nepal',
+      requestCount: 0,
+    })
+    setup(fix(...KATHMANDU))
+    await flush()
+    expect(api.getRolloutStatus).toHaveBeenCalledWith(...KATHMANDU)
+    const [entry] = getRolloutChecks()
+    expect(entry).toMatchObject({
+      ok: true,
+      lat: KATHMANDU[0],
+      lng: KATHMANDU[1],
+      decision: 'locked + popup',
+    })
+    expect(entry.response.cityName).toBe('Kathmandu')
+  })
+})
+
+describe('a known answer expires (5 min TTL) so a city disabled later takes effect', () => {
+  it('rolled out at app open, disabled meanwhile: standing still, the next check after 5 min shows the popup and locks', async () => {
+    api.getRolloutStatus.mockResolvedValueOnce(INSIDE)
+    const start = fix(...KATHMANDU)
+    const { result, rerender } = setup(start)
+    await flush()
+    expect(result.current.blocked).toBe(false)
+
+    // the moderator disables the city
+    api.getRolloutStatus.mockResolvedValue({
+      ...OUTSIDE,
+      cityName: 'Kathmandu',
+    })
+
+    // 4 min later: still the cached answer, even with fresh fixes at the same spot
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 60_000)
+    })
+    rerender({ position: fix(...KATHMANDU), opts: {} })
+    await flush()
+    expect(api.getRolloutStatus).toHaveBeenCalledTimes(1)
+    expect(result.current.blocked).toBe(false)
+
+    // past 5 min: re-asked (no movement, no resume needed)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000)
+    })
+    rerender({ position: fix(...KATHMANDU), opts: {} })
+    await flush()
+    expect(api.getRolloutStatus).toHaveBeenCalledTimes(2)
+    expect(result.current.showModal).toBe(true)
+    expect(result.current.blocked).toBe(true)
+    expect(getRolloutChecks()[0].trigger).toBe('ttl')
+  })
+
+  it('a re-check that fails (network) keeps the last known answer', async () => {
+    api.getRolloutStatus.mockResolvedValueOnce(OUTSIDE)
+    const { result, rerender } = setup(fix(...KATHMANDU))
+    await flush()
+    expect(result.current.blocked).toBe(true)
+    api.getRolloutStatus.mockRejectedValue(new Error('offline'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000 + 1000)
+    })
+    rerender({ position: fix(...KATHMANDU), opts: {} })
+    await flush()
+    expect(api.getRolloutStatus).toHaveBeenCalledTimes(2)
+    expect(result.current.blocked).toBe(true) // not flipped by the failure
+  })
+})
+
+describe('pending: the game stays locked until the area is confirmed', () => {
+  it('pending right after login (no fix yet) and while a check fails; cleared by a rolled-out answer', async () => {
+    api.getRolloutStatus.mockRejectedValueOnce(new Error('503'))
+    const { result } = setup(null)
+    expect(result.current.pending).toBe(true) // logged in, no usable GPS fix yet
+    expect(result.current.blocked).toBe(false)
+    const { result: failing } = setup(fix(...KATHMANDU))
+    await flush()
+    expect(failing.current.pending).toBe(true) // check failed: still locked
+    api.getRolloutStatus.mockResolvedValue(INSIDE)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_500)
+    })
+    expect(failing.current.pending).toBe(false)
+    expect(failing.current.blocked).toBe(false)
   })
 })

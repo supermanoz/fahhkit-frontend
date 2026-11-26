@@ -102,7 +102,7 @@ function Surface({ dark }) {
           ))}
         </div>
       </Grid>
-      <Grid title="full width + long label (ellipsis, never wraps)">
+      <Grid title="full width + long label (wraps, never cut off)">
         <GameButton fullWidth size="lg">
           Claim your reward right now
         </GameButton>

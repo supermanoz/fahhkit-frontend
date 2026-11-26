@@ -1,0 +1,130 @@
+/* Skeleton blocks for the Me / Shop screens. Same tones as the real UI:
+   translucent ink on cream panels (the dark Me panel gets the cream variant).
+   The shimmer comes from the shared .g-skeleton and is switched off for
+   prefers-reduced-motion in game/ui/components.css. */
+.g-skeleton.sk {
+  background: linear-gradient(
+    100deg,
+    rgba(43, 42, 36, 0.08) 30%,
+    rgba(43, 42, 36, 0.18) 50%,
+    rgba(43, 42, 36, 0.08) 70%
+  );
+  background-size: 200% 100%;
+}
+.me-skeleton .g-skeleton.sk {
+  background: linear-gradient(
+    100deg,
+    rgba(246, 236, 217, 0.1) 30%,
+    rgba(246, 236, 217, 0.22) 50%,
+    rgba(246, 236, 217, 0.1) 70%
+  );
+  background-size: 200% 100%;
+}
+.g-skeleton.sk-button {
+  border: 3px solid var(--game-ink, #2b2a24);
+  border-radius: 10px;
+}
+.g-skeleton.sk-center {
+  margin-inline: auto;
+}
+.sk-gap {
+  margin-top: 6px;
+}
+
+.sk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 2.5px solid var(--game-ink, #2b2a24);
+  box-shadow: 0 2px 0 var(--game-ink, #2b2a24);
+  background: rgba(246, 236, 217, 0.06);
+}
+.sk-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 60px;
+}
+.sk-row-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sk-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  border-radius: 14px;
+  border: 2.5px solid var(--game-ink, #2b2a24);
+  box-shadow: 0 2px 0 var(--game-ink, #2b2a24);
+  background: rgba(246, 236, 217, 0.06);
+}
+.sk-stat .g-skeleton {
+  margin-inline: auto;
+}
+
+.me-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.me-sk-hero {
+  max-width: 300px;
+}
+.me-sk-name {
+  margin: 0;
+}
+.me-sk-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shop-sk-balance {
+  display: inline-flex;
+  align-items: center;
+  min-height: 29px;
+}
+.shop-sk-hero {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 10px 6px 4px;
+}
+.shop-sk-hero .shop-sk-stage {
+  flex: 1;
+  min-height: 0;
+  border-radius: 14px;
+}
+.shop-sk-card {
+  cursor: default;
+}
+
+/* Failed / timed out */
+.sk-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 18px;
+  text-align: center;
+}
+.sk-failed-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text-title, inherit);
+}
+.sk-failed-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, inherit);
+}

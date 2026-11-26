@@ -22,15 +22,19 @@ import {
   tokenExpiryMs,
 } from '../utils/jwtExpiry'
 import {
+  API_BASE_URL,
+  API_FALLBACK_URL,
+  FILE_BASE_URL,
+} from '../config/backend'
+import {
   reportNetworkFailure,
   reportNetworkSuccess,
   setProbeUrlProvider,
 } from '../utils/connectivity'
 
-const PRIMARY_API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
-const FALLBACK_API_BASE_URL = import.meta.env.VITE_API_FALLBACK_URL || ''
-const FILE_BASE_URL = import.meta.env.VITE_FILE_BASE_URL || PRIMARY_API_BASE_URL
+// All backend URLs come from config/backend.js (per-mode env files).
+const PRIMARY_API_BASE_URL = API_BASE_URL
+const FALLBACK_API_BASE_URL = API_FALLBACK_URL
 const ACTIVE_BASE_URL_KEY = 'fahhkit_active_api_base_url'
 
 // The connectivity store probes the API host we actually talk to.
@@ -131,9 +135,12 @@ export function toClubRoleWords(text) {
 }
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, errorCode = null) {
     super(toClubRoleWords(message))
     this.status = status
+    // The backend's stable machine code (body.errorCode, e.g. NONCE_MISMATCH),
+    // when it sent one. Never shown to players; callers map it to a message.
+    this.errorCode = typeof errorCode === 'string' ? errorCode : null
   }
 }
 
@@ -219,6 +226,10 @@ const USER_SCOPED_KEYS = [
   'fahhkit_territory_avatar_id',
   'fahhkit_seen_medal_ids',
   'fahhkit_pvp_discoverable',
+  // An unfinished indoor (treadmill) run and the ids of indoor runs belong to
+  // the account that made them (hooks/useIndoorRun.js, utils/indoorRuns.js).
+  'fahhkit_indoor_run_v1',
+  'fahhkit_indoor_run_ids_v1',
 ]
 const USER_SCOPED_PREFIXES = [
   'fahhkit_club_war_last_',
@@ -493,7 +504,8 @@ async function parseResponse(response) {
   if (!response.ok) {
     throw new ApiError(
       body?.errorMessage || 'Something went wrong. Please try again.',
-      response.status
+      response.status,
+      body?.errorCode
     )
   }
   harvestNicknames(body?.data)

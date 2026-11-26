@@ -456,11 +456,35 @@
 }
 .mail-skel-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 10px;
   min-height: 60px;
   padding: 10px 14px;
+}
+.mail-skel-time {
+  width: 34px;
+  height: 10px;
+}
+.mail-detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mail-detail-skeleton .mail-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mail-skel-chip {
+  display: inline-block;
+  width: 84px;
+  height: 24px;
+  border-radius: 999px;
+}
+.mail-skel-action {
+  height: 48px;
+  border-radius: 12px;
 }
 .mail-skel-circle {
   width: 40px;

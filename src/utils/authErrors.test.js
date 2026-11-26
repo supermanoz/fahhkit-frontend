@@ -70,9 +70,9 @@ describe('no internet / timeout', () => {
 
 describe('Google / Apple setup or token problems', () => {
   it('plugin codes and the old technical wording never reach the player', () => {
-    for (const code of [10, 12500, 16, 8]) {
+    for (const code of [10, 12500, 16, 8, 9999]) {
       const r = describeAuthError(plugin(code), { flow: AUTH_FLOW.GOOGLE })
-      expect(r.message).toBe(MESSAGES.provider('Google'))
+      expect(r.message).toBeTruthy()
       expect(r.message).not.toMatch(/code|\d{2,}/i)
     }
     const apple = describeAuthError(plugin(1000), { flow: AUTH_FLOW.APPLE })
@@ -286,5 +286,83 @@ describe('logAuthError', () => {
     expect(detail.code).toBe('10')
     expect(JSON.stringify(warn.mock.calls)).not.toContain(jwt)
     expect(detail.message).toContain('[token]')
+  })
+})
+
+describe('native Google error codes', () => {
+  const g = (code, message = 'Something went wrong') =>
+    describeAuthError(
+      Object.assign(new Error(message), { code: String(code) }),
+      {
+        flow: AUTH_FLOW.GOOGLE,
+      }
+    )
+
+  it('12501 cancelled is silent', () => {
+    expect(g(12501, 'The user canceled the sign-in flow.').silent).toBe(true)
+  })
+  it('7 network / 15 timeout: check your connection', () => {
+    for (const c of [7, 15]) expect(g(c).message).toBe(MESSAGES.network)
+  })
+  it('10 DEVELOPER_ERROR, 12500 and 8: "temporarily unavailable", no jargon', () => {
+    for (const c of [10, 12500, 8]) {
+      const r = g(c)
+      expect(r.reason).toBe(REASON.UNAVAILABLE)
+      expect(r.message).toBe(MESSAGES.signInUnavailable)
+      expect(r.message).not.toMatch(/\d{2,}|developer|oauth|sha|client/i)
+    }
+  })
+  it('16 no accounts: tells the player to add an account', () => {
+    expect(g(16).reason).toBe(REASON.NO_ACCOUNT)
+  })
+  it('an unknown code still gets the provider line', () => {
+    expect(g(9999).message).toBe(MESSAGES.provider('Google'))
+  })
+  it('the dev log carries the raw code, its name and message', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const d = logAuthError(
+      AUTH_FLOW.GOOGLE,
+      Object.assign(new Error('Something went wrong'), { code: '10' })
+    )
+    expect(d.native).toBe('10 DEVELOPER_ERROR')
+    expect(d.code).toBe('10')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})
+
+describe('Apple: backend errorCode mapping', () => {
+  const api = (status, code) => new ApiError('server text', status, code)
+  it.each([
+    'NONCE_MISMATCH',
+    'AUDIENCE_MISMATCH',
+    'TOKEN_EXPIRED',
+    'MALFORMED_TOKEN',
+  ])('%s is the friendly "Apple sign-in failed" line', (code) => {
+    const r = describeAuthError(api(400, code), { flow: AUTH_FLOW.APPLE })
+    expect(r.message).toBe(MESSAGES.appleFailed)
+    expect(r.silent).toBe(false)
+    expect(r.message).not.toMatch(/NONCE|AUDIENCE|MALFORMED|server text/)
+  })
+  it('404 / 501 still win with the "not available right now" fallback', () => {
+    for (const status of [404, 501]) {
+      expect(
+        describeAuthError(api(status, 'NONCE_MISMATCH'), {
+          flow: AUTH_FLOW.APPLE,
+        }).message
+      ).toBe(MESSAGES.appleUnavailable)
+    }
+  })
+  it('a network failure stays the network line', () => {
+    expect(
+      describeAuthError(new ApiError('down', 0), { flow: AUTH_FLOW.APPLE })
+        .message
+    ).toBe(MESSAGES.network)
+  })
+  it('an unknown code is the generic line', () => {
+    expect(
+      describeAuthError(api(400, 'SOMETHING_ELSE'), { flow: AUTH_FLOW.APPLE })
+        .message
+    ).toBe(MESSAGES.unknown)
   })
 })

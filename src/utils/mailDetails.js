@@ -74,6 +74,7 @@ const signed = (v) => {
 
 const MODE = {
   CONQUER: 'Conquer',
+  TERRITORY_CAPTURE: 'Conquer',
   TRAINING: 'Training',
   PVP: 'PvP race',
   CLUB_WAR: 'Club war',
@@ -106,7 +107,9 @@ export function mailFacts(item) {
       add('Score', positive(d.score))
       add('XP earned', positive(d.xpEarned))
       add('Coins earned', positive(d.coinsEarned)) // null today: hidden
-      add('Territories claimed', positive(d.territoriesClaimed))
+      // A Training run has no territory side at all - never list one.
+      if (text(d.mode)?.toUpperCase() !== 'TRAINING')
+        add('Territories claimed', positive(d.territoriesClaimed))
       break
     case 'PVP_RESULT':
       add('Result', pick(RESULT, d.result))

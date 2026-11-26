@@ -4,7 +4,7 @@
 // code (see the notes), so edit with care:
 //
 //  - training: the app never judges a Training run as territory
-//    (utils/postRun.js checksTerritory) and it can be paused. We do NOT say
+//    (utils/postRun.js isTerritoryMode) and it can be paused. We do NOT say
 //    "no land" - the backend still processes it like a Conquer run.
 //  - conquer: only a closed loop is evaluated for territory.
 //  - pvp: the fastest runner takes the pot (PvpPanel); starting a NEW match

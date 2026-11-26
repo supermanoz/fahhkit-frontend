@@ -47,7 +47,7 @@ describe('AppleSignInButton visibility', () => {
     vi.stubEnv('VITE_IOS_APPLE_SIGNIN', 'true')
     render(<AppleSignInButton onCredential={vi.fn()} />)
     expect(
-      screen.getByRole('button', { name: 'Continue with Apple' })
+      screen.getByRole('button', { name: 'Sign in with Apple' })
     ).toBeInTheDocument()
   })
   it('renders nothing on Android even with the flag on', () => {
@@ -69,7 +69,7 @@ describe('native Apple sign-in click', () => {
   const click = () =>
     userEvent
       .setup()
-      .click(screen.getByRole('button', { name: 'Continue with Apple' }))
+      .click(screen.getByRole('button', { name: 'Sign in with Apple' }))
 
   it('first-time user: passes token, name, raw nonce, code and email', async () => {
     plugin.authorize.mockResolvedValue(
@@ -161,5 +161,60 @@ describe('native Apple sign-in click', () => {
     expect(onError.mock.calls[0][0]).toBe(
       'Something went wrong. Please try again.'
     )
+  })
+
+  it('backend says "not supported": the friendly unavailable line', async () => {
+    const onError = vi.fn()
+    plugin.authorize.mockResolvedValue({
+      response: { identityToken: 'id.token.jwt', authorizationCode: 'c' },
+    })
+    const onCredential = vi
+      .fn()
+      .mockRejectedValue(new ApiError('Apple login is not supported', 400))
+    render(<AppleSignInButton onCredential={onCredential} onError={onError} />)
+    await click()
+    await waitFor(() => expect(onError).toHaveBeenCalled())
+    expect(onError.mock.calls[0][0]).toBe(
+      "Apple sign-in isn't available right now. Please use another method."
+    )
+  })
+
+  it('network failure: retry message, not the unavailable one', async () => {
+    const onError = vi.fn()
+    plugin.authorize.mockResolvedValue({
+      response: { identityToken: 'id.token.jwt', authorizationCode: 'c' },
+    })
+    const onCredential = vi.fn().mockRejectedValue(new ApiError('offline', 0))
+    render(<AppleSignInButton onCredential={onCredential} onError={onError} />)
+    await click()
+    await waitFor(() => expect(onError).toHaveBeenCalled())
+    expect(onError.mock.calls[0][0]).toMatch(
+      /Check your connection and try again/
+    )
+  })
+
+  it('missing email AND name (relay / later login) still signs in with what exists', async () => {
+    const onCredential = vi.fn().mockResolvedValue(undefined)
+    plugin.authorize.mockResolvedValue(tokenResponse())
+    render(<AppleSignInButton onCredential={onCredential} onError={vi.fn()} />)
+    await click()
+    await waitFor(() => expect(onCredential).toHaveBeenCalled())
+    const [token, name, extra] = onCredential.mock.calls[0]
+    expect(token).toBe('id.token.jwt')
+    expect(name).toBeUndefined()
+    expect(extra.email).toBeUndefined()
+    expect(extra.authorizationCode).toBe('auth-code')
+    expect(extra.nonce).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it('follows Apple wording and style: "Sign in with Apple", black by default, white variant', () => {
+    vi.stubEnv('VITE_IOS_APPLE_SIGNIN', 'true')
+    const { rerender } = render(<AppleSignInButton onCredential={vi.fn()} />)
+    const btn = screen.getByRole('button', { name: 'Sign in with Apple' })
+    expect(btn).toHaveClass('is-black')
+    rerender(<AppleSignInButton onCredential={vi.fn()} variant="white" />)
+    expect(
+      screen.getByRole('button', { name: 'Sign in with Apple' })
+    ).toHaveClass('is-white')
   })
 })

@@ -7,6 +7,8 @@ import {
   formatDuration,
   formatPace,
 } from '../utils/run'
+import { isTerritoryMode } from '../utils/postRun'
+import { LATE_TERRITORY_COPY, MAX_SUBMISSION_AGE_DAYS } from '../utils/runLate'
 import './OfflineRuns.css'
 
 // Shown right after a run ends with no connection (or the upload could not
@@ -49,12 +51,32 @@ export default function OfflineRunSavedModal({ run, onClose }) {
             Waiting for internet to submit
           </p>
           <p className="game-end-run-summary">
-            Turn on Wi-Fi or mobile data to submit your run and get
-            XP/territory.
+            Your run is saved on this phone and will upload by itself when
+            you&apos;re back online.
           </p>
+          <p
+            className="game-end-run-summary"
+            data-testid="offline-saved-deadline"
+          >
+            It has to reach the server within {MAX_SUBMISSION_AGE_DAYS} days of
+            the run.
+          </p>
+          {/* Territory only exists for a Conquer run - Training, PvP and Club
+              War never show it, and only Conquer has the 48 h limit. */}
           <p className="offline-saved-pending">
-            XP · Coins · Territory: <b>pending</b>
+            {isTerritoryMode(s.mode)
+              ? 'XP · Coins · Territory: '
+              : 'XP · Coins: '}
+            <b>pending</b>
           </p>
+          {isTerritoryMode(s.mode) && (
+            <p
+              className="game-end-run-summary"
+              data-testid="offline-saved-late-warning"
+            >
+              {LATE_TERRITORY_COPY.queuedWarning}
+            </p>
+          )}
         </>
       )}
       <GameActions>

@@ -24,6 +24,14 @@ export function getTerritoryProfileByUserId(userId) {
   return getJson(`/v1/territory/profile/${userId}`).then(withLevelDefaults)
 }
 
+// The server's own territory rule constants (closure distance, minimum area,
+// minimum points, speed limits...) so the client never drifts from them. Not
+// built server-side yet (see docs/territory-rules-backend-ask.md): until it
+// is, this 404s and src/game/territoryRules.js keeps its built-in defaults.
+export function fetchTerritoryRules() {
+  return getJson('/v1/territory/rules')
+}
+
 export function findMyParcels(pageNumber = 1, noOfRecords = 100) {
   return postJson('/v1/territory/parcel/find', { pageNumber, noOfRecords })
 }

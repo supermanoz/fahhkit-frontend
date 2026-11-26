@@ -3,6 +3,7 @@
 // unit-testable. Both are TEMP, local-device-only toggles: neither has a
 // backend field yet (see SESSION_NOTES.md's anti-cheat entry for the hook
 // a future per-user accessibility preference would plug into).
+import { DEBUG_INFO } from '../config/debugInfo'
 import {
   ACCESSIBILITY_STORAGE_KEY,
   DEBUG_OVERLAY_STORAGE_KEY,
@@ -30,6 +31,8 @@ export function setAccessibilityModeEnabled(enabled) {
 // driving test won't have the dev server's URL params handy afterwards).
 // `?debug=off` clears it again.
 export function isAntiCheatDebugEnabled() {
+  // Release/staging builds never show the overlay, whatever the URL says.
+  if (!DEBUG_INFO) return false
   try {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)

@@ -93,8 +93,8 @@ describe('HUD daily reward chest', () => {
       chest.querySelector('[data-testid="daily-chest-dot"]')
     ).not.toBeNull()
     expect(screen.queryByTestId('daily-hud-badge')).toBeNull()
-    // Ready = the stronger version: glow + sweep + 5 sparkles.
-    expect(chest.querySelector('.dc-hud-glow')).not.toBeNull()
+    // Ready = the stronger version: sweep + 5 sparkles.
+    expect(chest.querySelector('.dc-hud-glow')).toBeNull() // no ring/circle
     expect(chest.querySelector('.dc-hud-sweep')).not.toBeNull()
     expect(chest.querySelectorAll('.dc-hud-spark')).toHaveLength(5)
     fireEvent.click(chest)
@@ -109,9 +109,9 @@ describe('HUD daily reward chest', () => {
     expect(chest.getAttribute('data-chest')).toBe('claimed')
     expect(chest.querySelector('[data-testid="daily-chest-dot"]')).toBeNull()
     expect(screen.getByTestId('daily-hud-badge').textContent).toBe('12h')
-    // Shiny while cooling down too: glow + sweep + 3 sparkles, no pulse class
+    // Shiny while cooling down too: sweep + 3 sparkles, no pulse class
     // dimming; the timer pill is a sibling of the sparkles, not covered.
-    expect(chest.querySelector('.dc-hud-glow')).not.toBeNull()
+    expect(chest.querySelector('.dc-hud-glow')).toBeNull() // no ring/circle
     expect(chest.querySelector('.dc-hud-sweep')).not.toBeNull()
     expect(chest.querySelectorAll('.dc-hud-spark')).toHaveLength(3)
     expect(chest.getAttribute('aria-label')).toMatch(/next in 12h 30m/i)

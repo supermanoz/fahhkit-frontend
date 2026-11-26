@@ -33,6 +33,13 @@ import {
   isAntiCheatDebugEnabled,
 } from '../utils/antiCheatSettings'
 import { useWakeLock } from './useWakeLock'
+import {
+  getPedometerStatus,
+  readPedometer,
+  startPedometer,
+  stopPedometer,
+} from '../utils/pedometer'
+import { chooseStepsSource } from '../utils/stepsSource'
 import { watchPosition, clearWatch } from '../utils/geo'
 import { publishFix } from '../utils/gpsFeed'
 import {
@@ -165,6 +172,22 @@ export function useRunTracker() {
   const traceSecondsRef = useRef(0)
   const maxSpeedMpsRef = useRef(0)
   const totalStepsRef = useRef(0)
+  const stepsLostRef = useRef(false)
+  // Native pedometer (utils/pedometer.js): the preferred step source. The
+  // accelerometer count above is only the fallback (see stepsSource.js).
+  // pedStepsRef = cumulative steps since the run began (pauses included),
+  // pedPausedStepsRef = steps taken during pauses (taken back out), pedLostRef
+  // = the count can no longer be trusted (resumed after a kill mid-pause).
+  const pedStatusRef = useRef({ available: false, permission: 'unavailable' })
+  const pedStepsRef = useRef(null)
+  const pedPausedStepsRef = useRef(0)
+  const pedAtPauseRef = useRef(null)
+  const pedLostRef = useRef(false)
+  // True once the pedometer is delivering: the distance filter's "no footsteps
+  // for 10 s + slow = standing still" check then reads the pedometer instead
+  // of the accelerometer peaks. pedLastStepAtRef = when its count last grew.
+  const pedLiveRef = useRef(false)
+  const pedLastStepAtRef = useRef(0)
   // "I'm not in a vehicle" taps - sent with the run for moderator review,
   // never trusted client-side to mean the flagged segments weren't real.
   const disputesRef = useRef([])
@@ -297,6 +320,56 @@ export function useRunTracker() {
     detectorRef.current?.dispute()
     applyVehicleState(VehicleState.RUNNING, null)
   }, [applyVehicleState])
+
+  const onPedometerSteps = useCallback((steps) => {
+    if (steps == null) return
+    if (pedStepsRef.current == null || steps > pedStepsRef.current) {
+      pedLastStepAtRef.current = Date.now()
+    }
+    pedStepsRef.current = steps
+    pedLiveRef.current = true
+  }, [])
+
+  // Start counting from the run's (original) start time. Never throws; when the
+  // pedometer is unavailable or not allowed the run just uses the fallback.
+  const beginPedometer = useCallback(
+    async (startedAtMs) => {
+      pedStepsRef.current = null
+      pedLiveRef.current = false
+      pedLastStepAtRef.current = startedAtMs
+      const status = await getPedometerStatus()
+      pedStatusRef.current = status
+      if (!status.available || status.permission !== 'granted') return
+      const ok = await startPedometer(startedAtMs, (r) =>
+        onPedometerSteps(r?.steps ?? null)
+      )
+      if (!ok) return
+      const first = await readPedometer(startedAtMs)
+      if (first?.steps != null) onPedometerSteps(first.steps)
+    },
+    [onPedometerSteps]
+  )
+
+  // The step count a finished run reports (null = leave steps out entirely).
+  const resolveSteps = useCallback((pedometerSteps) => {
+    const ped = pedStatusRef.current
+    const net =
+      pedometerSteps == null || pedLostRef.current
+        ? null
+        : Math.max(0, pedometerSteps - pedPausedStepsRef.current)
+    return chooseStepsSource({
+      pedometer: {
+        available: ped.available,
+        permission: ped.permission,
+        steps: net,
+      },
+      accelerometer: {
+        available: motionAvailableRef.current,
+        steps: totalStepsRef.current,
+        lost: stepsLostRef.current,
+      },
+    })
+  }, [])
 
   // Rough step/cadence detector off the accelerometer, forwarded into the
   // vehicle-detection state machine - see handleMotionSample in
@@ -514,9 +587,9 @@ export function useRunTracker() {
               segment.kind === SegmentKind.JUMP || !distanceFilterRef.current
                 ? segment.distanceMeters
                 : distanceFilterRef.current.process(filterFix, {
-                    secondsSinceStep: detectorRef.current.secondsSinceStep(
-                      point.timestamp
-                    ),
+                    secondsSinceStep: pedLiveRef.current
+                      ? (point.timestamp - pedLastStepAtRef.current) / 1000
+                      : detectorRef.current.secondsSinceStep(point.timestamp),
                   }).meters
           }
           if (segment) {
@@ -646,7 +719,8 @@ export function useRunTracker() {
     if (!saved || !('geolocation' in navigator)) return
 
     if (saved.stopped) {
-      if (!saved.points || saved.points.length === 0) {
+      // An indoor run legitimately has no points (treadmill, no GPS).
+      if ((!saved.points || saved.points.length === 0) && !saved.isIndoor) {
         clearActiveRun()
         return
       }
@@ -661,7 +735,8 @@ export function useRunTracker() {
         clubWarId: saved.clubWarId ?? null,
         isTraining: saved.isTraining ?? false,
         heroId: saved.heroId ?? null,
-        points: saved.points,
+        isIndoor: saved.isIndoor ?? false,
+        points: saved.points ?? [],
         distance: saved.distance || 0,
         duration: saved.duration ?? 0,
         startedAt: savedStartedAt,
@@ -675,7 +750,9 @@ export function useRunTracker() {
         isVehicleInvalid: saved.isVehicleInvalid ?? false,
         maxSpeedMps: saved.maxSpeedMps ?? null,
         avgSpeedMps: saved.avgSpeedMps ?? null,
-        stepCount: saved.stepCount ?? 0,
+        stepCount: saved.stepCount ?? null,
+        stepsSource: saved.stepsSource ?? null,
+        distanceSource: saved.distanceSource ?? null,
         disputes: saved.disputes ?? [],
       })
       return
@@ -702,6 +779,16 @@ export function useRunTracker() {
     traceSecondsRef.current = 0
     maxSpeedMpsRef.current = 0
     totalStepsRef.current = 0
+    // Steps taken before the app was killed are gone: a count from here on
+    // would be a partial one, so this run reports no steps at all.
+    stepsLostRef.current = true
+    // The pedometer, unlike the accelerometer count, survives the kill: it
+    // counts from the run's original start. Only a run that was ever paused
+    // can't be trusted (the steps taken during the pause are unknown now).
+    pedPausedStepsRef.current = 0
+    pedAtPauseRef.current = null
+    pedLostRef.current = Boolean(saved.paused || saved.pausedMs > 0)
+    beginPedometer(startedAtRef.current.getTime())
     disputesRef.current = []
     setPath(pointsRef.current)
     setDistance(distanceRef.current)
@@ -790,6 +877,10 @@ export function useRunTracker() {
       traceSecondsRef.current = 0
       maxSpeedMpsRef.current = 0
       totalStepsRef.current = 0
+      stepsLostRef.current = false
+      pedPausedStepsRef.current = 0
+      pedAtPauseRef.current = null
+      pedLostRef.current = false
       disputesRef.current = []
       distanceFilterRef.current = newDistanceFilter()
       detectorRef.current = createVehicleDetector({
@@ -836,10 +927,44 @@ export function useRunTracker() {
         distanceMeters: 0,
         paceLabel: null,
       }
+      beginPedometer(startedAtRef.current.getTime())
       beginWatch()
     },
-    [beginWatch, applyVehicleState]
+    [beginWatch, applyVehicleState, beginPedometer]
   )
+
+  // The stopped (not yet submitted) run, as it is kept on disk so a reload or
+  // app kill still finds it.
+  const persistStopped = useCallback((result) => {
+    saveActiveRun({
+      startedAt: result.startedAt.toISOString(),
+      eventId: result.eventId,
+      clientRunId: result.clientRunId,
+      challengeId: result.challengeId,
+      clubWarId: result.clubWarId,
+      isTraining: result.isTraining,
+      heroId: result.heroId ?? null,
+      isIndoor: result.isIndoor ?? false,
+      points: result.points,
+      distance: result.distance,
+      stopped: true,
+      endedAt: result.endedAt.toISOString(),
+      duration: result.duration,
+      fixCount: result.fixCount,
+      lowAccuracyFixCount: result.lowAccuracyFixCount,
+      lastAccuracy: result.lastAccuracy,
+      segments: result.segments,
+      vehicleExcludedMeters: result.vehicleExcludedMeters,
+      vehicleSuspiciousRatio: result.vehicleSuspiciousRatio,
+      isVehicleInvalid: result.isVehicleInvalid,
+      maxSpeedMps: result.maxSpeedMps,
+      avgSpeedMps: result.avgSpeedMps,
+      stepCount: result.stepCount,
+      stepsSource: result.stepsSource ?? null,
+      distanceSource: result.distanceSource ?? null,
+      disputes: result.disputes,
+    })
+  }, [])
 
   const stop = useCallback(() => {
     clearTimers()
@@ -865,6 +990,7 @@ export function useRunTracker() {
     const consideredMeters = distance + vehicleExcludedMeters
     const vehicleSuspiciousRatio =
       consideredMeters > 0 ? vehicleExcludedMeters / consideredMeters : 0
+    const stepSelection = resolveSteps(pedStepsRef.current)
     const result = {
       eventId: eventIdRef.current,
       clientRunId: clientRunIdRef.current,
@@ -898,7 +1024,12 @@ export function useRunTracker() {
         traceSecondsRef.current > 0
           ? traceMetersRef.current / traceSecondsRef.current
           : null,
-      stepCount: totalStepsRef.current,
+      // The pedometer's count when it is available and allowed, else the
+      // accelerometer's; null = no reliable source (denied / unsupported /
+      // counted nothing): the payload then omits steps rather than sending a
+      // fake 0. A final pedometer read (below) refines it a moment later.
+      stepCount: stepSelection.steps,
+      stepsSource: stepSelection.source,
       disputes: disputesRef.current,
     }
     // Calibration log (debug flag only, off by default): raw vs credited
@@ -924,36 +1055,43 @@ export function useRunTracker() {
       setPendingRun(null)
       setRunIssue(describeGpsShortfall(result))
     } else {
-      saveActiveRun({
-        startedAt: startedAt.toISOString(),
-        eventId: result.eventId,
-        clientRunId: result.clientRunId,
-        challengeId: result.challengeId,
-        clubWarId: result.clubWarId,
-        isTraining: result.isTraining,
-        heroId: result.heroId ?? null,
-        points: result.points,
-        distance: result.distance,
-        stopped: true,
-        endedAt: endedAt.toISOString(),
-        duration: result.duration,
-        fixCount: result.fixCount,
-        lowAccuracyFixCount: result.lowAccuracyFixCount,
-        lastAccuracy: result.lastAccuracy,
-        segments: result.segments,
-        vehicleExcludedMeters: result.vehicleExcludedMeters,
-        vehicleSuspiciousRatio: result.vehicleSuspiciousRatio,
-        isVehicleInvalid: result.isVehicleInvalid,
-        maxSpeedMps: result.maxSpeedMps,
-        avgSpeedMps: result.avgSpeedMps,
-        stepCount: result.stepCount,
-        disputes: result.disputes,
-      })
+      persistStopped(result)
       setPendingRun(result)
     }
 
+    // The phone's count can lag the last second or two: read it once more and
+    // update the run waiting to be saved (long before anyone taps Submit).
+    pedLiveRef.current = false
+    const stoppedAtMs = startedAt.getTime()
+    if (pedStatusRef.current.permission === 'granted') {
+      readPedometer(stoppedAtMs)
+        .then((res) => {
+          if (res?.steps == null || result.points.length === 0) return
+          const refined = resolveSteps(res.steps)
+          const updated = {
+            ...result,
+            stepCount: refined.steps,
+            stepsSource: refined.source,
+          }
+          persistStopped(updated)
+          setPendingRun((p) =>
+            p && p.clientRunId === result.clientRunId ? updated : p
+          )
+        })
+        .finally(() => stopPedometer())
+    } else {
+      stopPedometer()
+    }
+
     return result
-  }, [clearTimers, wakeLock, distance, applyVehicleState])
+  }, [
+    clearTimers,
+    wakeLock,
+    distance,
+    applyVehicleState,
+    resolveSteps,
+    persistStopped,
+  ])
 
   const clearPendingRun = useCallback(() => {
     clearActiveRun()
@@ -990,6 +1128,15 @@ export function useRunTracker() {
     if (statusRef.current !== 'tracking' || pausedAtRef.current != null) return
     clearTimers()
     pausedAtRef.current = Date.now()
+    pedAtPauseRef.current = pedStepsRef.current
+    if (pedLiveRef.current && startedAtRef.current) {
+      // The cached count can lag a moment: pin the pause point to a real read.
+      const pausedAt = pausedAtRef.current
+      readPedometer(startedAtRef.current.getTime()).then((res) => {
+        if (res?.steps != null && pausedAtRef.current === pausedAt)
+          pedAtPauseRef.current = res.steps
+      })
+    }
     setPaused(true)
     saveActiveRun({
       startedAt: startedAtRef.current.toISOString(),
@@ -1013,6 +1160,21 @@ export function useRunTracker() {
     pausedMsRef.current += Date.now() - pausedAtRef.current
     pausedAtRef.current = null
     setPaused(false)
+    // Steps taken while paused are not part of the run: measure them now (the
+    // pedometer kept counting) and take them back out.
+    const atPause = pedAtPauseRef.current
+    pedAtPauseRef.current = null
+    if (pedLiveRef.current && atPause != null && startedAtRef.current) {
+      readPedometer(startedAtRef.current.getTime()).then((res) => {
+        if (res?.steps != null) {
+          pedPausedStepsRef.current += Math.max(0, res.steps - atPause)
+          onPedometerSteps(res.steps)
+        }
+      })
+    } else if (atPause == null) {
+      // No reading at the pause: the pause's steps are unknown.
+      pedLostRef.current = pedLostRef.current || pedLiveRef.current
+    }
     resumeJumpPendingRef.current = true
     // Fresh detector - the pause itself may include real movement (a water
     // stop, walking off and back), so whatever RUNNING/SUSPECT/VEHICLE
@@ -1036,7 +1198,19 @@ export function useRunTracker() {
       ),
     }
     beginWatch()
-  }, [beginWatch])
+  }, [beginWatch, onPedometerSteps])
+
+  // A finished run that did not come from GPS tracking (the indoor treadmill
+  // run - hooks/useIndoorRun.js) joins the normal save/submit path: it becomes
+  // the pending run, kept on disk like any stopped run, and goes through the
+  // same offline outbox and retry.
+  const adoptRun = useCallback(
+    (result) => {
+      persistStopped(result)
+      setPendingRun(result)
+    },
+    [persistStopped]
+  )
 
   return {
     // Read on render (status/distance changes re-render often enough).
@@ -1058,6 +1232,7 @@ export function useRunTracker() {
     dismissBackgroundGap,
     pendingRun,
     clearPendingRun,
+    adoptRun,
     vehicleState,
     vehicleReason,
     vehicleWarningDeadline,

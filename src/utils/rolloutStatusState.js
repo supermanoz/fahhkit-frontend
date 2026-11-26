@@ -126,3 +126,16 @@ export function isRolloutBlocked(state) {
     state.phase === PHASE.ALREADY_REQUESTED
   )
 }
+
+// Derived helper - the player's area has NOT been confirmed as rolled out yet
+// (never checked, check in flight, or the check failed). After a login the
+// game stays locked while this is true (GamePage.jsx): play is only enabled
+// once the server has positively said the area is live. Unlike
+// isRolloutBlocked this is "locked until proven available" (fail-closed).
+export function isRolloutPending(state) {
+  return (
+    state.phase === PHASE.IDLE ||
+    state.phase === PHASE.CHECKING ||
+    state.phase === PHASE.FAILED
+  )
+}

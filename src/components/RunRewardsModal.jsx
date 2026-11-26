@@ -30,7 +30,7 @@ const PERK_HOLD_MS = 450
 
 const TITLES = {
   territory: 'Run Complete',
-  training: 'Run saved',
+  training: 'Run Complete',
   club_war: 'War Run Complete',
   pvp: 'PvP Result',
 }

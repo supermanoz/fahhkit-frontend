@@ -1,3 +1,4 @@
+import { clearStorageProblem, reportStorageProblem } from './storageHealth'
 import { getUser } from '../api/client'
 import { getDb, STORE_ACTIVE } from './offlineDb'
 
@@ -135,18 +136,62 @@ function mirrorActiveRun(record) {
   }
 }
 
+// localStorage gets the WHOLE record, so writing it on every GPS point costs
+// O(run length) each time. Point-by-point saves are therefore coalesced into
+// one trailing write every LOCAL_EVERY_MS; the moments that matter (stop,
+// pause, the first record of a run, the app going to the background) write at once.
+// At most the last couple of seconds of a crashed run are lost - the same
+// trade the IndexedDB mirror below already makes.
+export const LOCAL_EVERY_MS = 2000
+let localTimer = null
+let localPending = null
+let lastLocalWrite = 0
+
+function writeLocalNow() {
+  clearTimeout(localTimer)
+  localTimer = null
+  const record = localPending
+  localPending = null
+  if (!record) return
+  lastLocalWrite = Date.now()
+  try {
+    localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, JSON.stringify(record))
+    clearStorageProblem()
+  } catch {
+    // Storage full/unavailable - the IndexedDB mirror below may still have
+    // it, but tell the player: the run is at risk if the app is closed.
+    reportStorageProblem('full')
+  }
+}
+
+// Called when the app is hidden / closing: never leave a write pending.
+export function flushActiveRun() {
+  writeLocalNow()
+  if (mirrorPending) flushMirror()
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushActiveRun()
+  })
+  window.addEventListener('pagehide', flushActiveRun)
+}
+
 // Persists the in-progress run so a page refresh (or the tab being reopened)
 // can resume tracking instead of losing everything collected so far.
 export function saveActiveRun(record) {
-  try {
-    localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, JSON.stringify(record))
-  } catch {
-    // Storage full/unavailable - the IndexedDB mirror below still has it.
+  const since = Date.now() - lastLocalWrite
+  localPending = record
+  if (record.stopped || record.paused || since >= LOCAL_EVERY_MS) {
+    writeLocalNow()
+  } else if (!localTimer) {
+    localTimer = setTimeout(writeLocalNow, LOCAL_EVERY_MS - since)
   }
   mirrorActiveRun(record)
 }
 
 export function loadActiveRun() {
+  if (localPending?.startedAt) return localPending
   try {
     const raw = localStorage.getItem(ACTIVE_RUN_STORAGE_KEY)
     if (!raw) return null
@@ -158,6 +203,10 @@ export function loadActiveRun() {
 }
 
 export function clearActiveRun() {
+  clearTimeout(localTimer)
+  localTimer = null
+  localPending = null
+  lastLocalWrite = 0
   try {
     localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY)
   } catch {

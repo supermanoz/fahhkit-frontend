@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { shareExtraStats } from '../utils/runMetrics'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveHeroKey } from '../utils/heroPoster'
 import { IconChevronLeft, IconChevronRight } from './GameIcons'
@@ -126,6 +127,7 @@ export default function ShareRunCarousel({ run, heroFallback = null }) {
       distance: run.distance,
       duration: run.duration,
       pace: run.avgPace,
+      extraStats: shareExtraStats(run),
       variant: slide.variant,
       mimeType: slide.mime,
       quality: slide.quality,
@@ -301,6 +303,7 @@ function ShareCardPreview({ run, slide, heroKey }) {
       distance: run.distance,
       duration: run.duration,
       pace: run.avgPace,
+      extraStats: shareExtraStats(run),
       variant: slide.variant,
       heroKey,
     }).catch(() => {})

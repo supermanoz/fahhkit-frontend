@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { runExtraStats } from '../utils/runMetrics'
 import { Link } from 'react-router-dom'
 import { EVENT_TYPE_LABELS, formatDate } from '../utils/events'
 import { formatDistance, formatDuration, formatPace } from '../utils/run'
@@ -72,6 +73,12 @@ export default function HistoryList({
                   <dt>Pace</dt>
                   <dd>{formatPace(item.run.avgPace)}</dd>
                 </div>
+                {runExtraStats(item.run).map((row) => (
+                  <div key={row.key}>
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
               </dl>
               <Link to={`/runs/${item.run.id}`} className="btn btn-outline">
                 View Run

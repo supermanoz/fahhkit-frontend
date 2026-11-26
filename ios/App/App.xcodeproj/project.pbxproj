@@ -19,6 +19,7 @@
 		7D0E0004A1B2C3D4E5F60004 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7D0E0003A1B2C3D4E5F60003 /* GoogleService-Info.plist */; };
 		7D0E0011A1B2C3D4E5F60011 /* RunActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E0010A1B2C3D4E5F60010 /* RunActivityAttributes.swift */; };
 		7D0E0013A1B2C3D4E5F60013 /* RunLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E0012A1B2C3D4E5F60012 /* RunLiveActivityPlugin.swift */; };
+		7D0E0023A1B2C3D4E5F60023 /* RunPedometerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E0022A1B2C3D4E5F60022 /* RunPedometerPlugin.swift */; };
 		7D0E0015A1B2C3D4E5F60015 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E0014A1B2C3D4E5F60014 /* MainViewController.swift */; };
 		924F401609AB0AA3877E74FA /* RunActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0E0010A1B2C3D4E5F60010 /* RunActivityAttributes.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
@@ -68,6 +69,7 @@
 		7D0E0003A1B2C3D4E5F60003 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7D0E0010A1B2C3D4E5F60010 /* RunActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunActivityAttributes.swift; sourceTree = "<group>"; };
 		7D0E0012A1B2C3D4E5F60012 /* RunLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunLiveActivityPlugin.swift; sourceTree = "<group>"; };
+		7D0E0022A1B2C3D4E5F60022 /* RunPedometerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunPedometerPlugin.swift; sourceTree = "<group>"; };
 		7D0E0014A1B2C3D4E5F60014 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		822043F2C271A620498D67E7 /* Pods-App.dev-freeteam.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.dev-freeteam.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.dev-freeteam.xcconfig"; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -154,6 +156,7 @@
 				7D0E0030A1B2C3D4E5F60030 /* PrivacyInfo.xcprivacy */,
 				7D0E0020A1B2C3D4E5F60020 /* SceneDelegate.swift */,
 				7D0E0012A1B2C3D4E5F60012 /* RunLiveActivityPlugin.swift */,
+				7D0E0022A1B2C3D4E5F60022 /* RunPedometerPlugin.swift */,
 				7D0E0010A1B2C3D4E5F60010 /* RunActivityAttributes.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -329,6 +332,7 @@
 				7D0E0015A1B2C3D4E5F60015 /* MainViewController.swift in Sources */,
 				7D0E0021A1B2C3D4E5F60021 /* SceneDelegate.swift in Sources */,
 				7D0E0013A1B2C3D4E5F60013 /* RunLiveActivityPlugin.swift in Sources */,
+				7D0E0023A1B2C3D4E5F60023 /* RunPedometerPlugin.swift in Sources */,
 				7D0E0011A1B2C3D4E5F60011 /* RunActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

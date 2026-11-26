@@ -1,15 +1,15 @@
 // What the app says right after a run is submitted - ONE place, keyed by run
 // mode, so a non-territory mode can never show a territory message.
 //
-//   Training   -> "Run saved!"           (never checks territory)
+//   Training   -> "Run submitted!"       (never checks territory)
 //   Conquer    -> "Run submitted!" + "Checking your territory..." while the
 //                 server evaluates the loop, then the real result
 //   PvP        -> "Run submitted!" + waiting-for-rival / result note
 //   Club War   -> "Run submitted!" + war points note
 //
-// Note (backend): a Training run is sent exactly like a Conquer run (no mode
-// flag in the payload), so the server still processes it as territory. The
-// app just never presents it as one.
+// A Training run is sent with mode "TRAINING" (utils/runPayload.js); the
+// server scores it on pace + effort only and never attempts territory. The
+// app agrees: isTerritoryMode() below is the ONE check every screen uses.
 
 import {
   SERVER_REJECTED_COPY,
@@ -32,9 +32,17 @@ export function postRunModeOf(run) {
   return POST_RUN_MODE.CONQUER
 }
 
-// Only a plain Conquer run is ever evaluated for territory.
-export function checksTerritory(mode) {
-  return mode === POST_RUN_MODE.CONQUER
+// THE shared check: does this mode have anything to do with territory (loop
+// detection, loop HUD / preview, "Checking your territory...", the territory
+// result, territory wording)? Only a plain Conquer run does. Accepts the
+// app's mode strings ('conquer' / 'territory') and the server's
+// 'TERRITORY_CAPTURE'. Training / PvP / Club War / Boss / unknown -> false.
+export function isTerritoryMode(mode) {
+  return (
+    mode === POST_RUN_MODE.CONQUER ||
+    mode === 'territory' ||
+    mode === 'TERRITORY_CAPTURE'
+  )
 }
 
 // Title + note of the single, terminal "submitted" popup for the modes that
@@ -43,7 +51,10 @@ export function checksTerritory(mode) {
 export function submittedCopy(mode, { warPoints = null } = {}) {
   switch (mode) {
     case POST_RUN_MODE.TRAINING:
-      return { title: 'Run saved!', note: null }
+      return {
+        title: 'Run submitted!',
+        note: "Training run logged. Nothing is at stake - it's just practice, and it still earns XP.",
+      }
     case POST_RUN_MODE.PVP:
       return {
         title: 'Run submitted!',
@@ -70,7 +81,7 @@ export const TERRITORY_CHECKING = 'Checking your territory…'
 // closed", "too small", "not live here"...) but still shows a cheat flag,
 // which is about the run itself.
 export function showsRejection(mode, outcome) {
-  if (checksTerritory(mode)) return true
+  if (isTerritoryMode(mode)) return true
   return outcome?.outcome === 'CHEAT_DETECTED'
 }
 

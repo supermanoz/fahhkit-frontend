@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   IconCheck,
-  IconChevronRight,
   IconClock,
   IconClose,
   IconHelmet,
@@ -402,18 +401,15 @@ export default function ClubWarPanel({
   // the live war keeps ticking in the background and is exactly where it
   // was when the player comes back (see the historyOpen branch up top).
   const historyButton = (
-    <button
-      type="button"
+    <GameButton
+      variant="neutral"
+      fullWidth
       className="club-war-history-btn"
+      icon={<IconClock aria-hidden="true" />}
       onClick={() => setHistoryOpen(true)}
     >
-      <IconClock className="club-war-history-btn-icon" aria-hidden="true" />
-      <span className="club-war-history-btn-label">War History</span>
-      <IconChevronRight
-        className="club-war-history-btn-chevron"
-        aria-hidden="true"
-      />
-    </button>
+      War History
+    </GameButton>
   )
 
   // --- A war is on (or just finished) ---
@@ -877,19 +873,24 @@ export default function ClubWarPanel({
         <section className="game-card game-card-dark">
           <h3 className="game-card-title">Start a Club War</h3>
           <p className="game-menu-section-title">Squad Size</p>
-          <div className="game-menu-subtabs">
+          <div
+            className="club-size-tabs"
+            role="tablist"
+            aria-label="Squad size"
+          >
             {eligibleSizes.map((n) => (
-              <button
+              <GameButton
                 key={n}
-                type="button"
-                className={`game-menu-subtab ${size === n ? 'active' : ''}`}
+                variant="tab"
+                size="sm"
+                selected={size === n}
                 onClick={() => {
                   setSquadSize(n)
                   setSelected((prev) => prev.slice(0, n))
                 }}
               >
                 {n}
-              </button>
+              </GameButton>
             ))}
           </div>
           <p className="game-row-meta">

@@ -1,4 +1,4 @@
-import { getJson, postJson } from './client'
+import { deleteJson, getJson, postJson } from './client'
 
 // Logged-in user's own profile (UserController in the FahhKit backend).
 
@@ -6,6 +6,13 @@ import { getJson, postJson } from './client'
 // underscores, unique (case-insensitive). Mirrored here for instant
 // feedback; the server still has the final say (e.g. "already taken").
 export const NICKNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/
+
+// Self-service account deletion (App Store guideline 5.1.1(v)):
+// DELETE /v1/user/me deletes the CALLER's own account - no id in the request.
+// The caller clears the session and returns to sign-in afterwards.
+export function deleteMyAccount() {
+  return deleteJson('/v1/user/me')
+}
 
 // edit-profile is a partial update - only the fields sent change.
 // Returns the updated UserResponse.

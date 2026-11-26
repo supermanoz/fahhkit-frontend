@@ -13,7 +13,14 @@ import { MAIL_ICONS } from './mailIcons'
 import { useToast } from '../game/ui/Toast'
 import Badge from '../game/ui/Badge'
 import MailDetail from './MailDetail'
-import { MailEmpty, MailError, MailSkeleton } from './MailStates'
+import {
+  MailDetailSkeleton,
+  MailEmpty,
+  MailError,
+  MailSkeleton,
+} from './MailStates'
+import { useLoadTimeout } from '../hooks/useLoadTimeout'
+import { MAIL_TIMEOUT } from '../constants/mailCopy'
 // The Leaderboard's own row/skeleton recipe (.lb-row) is reused for mail rows.
 import './LeaderboardPodium.css'
 import './MailPanel.css'
@@ -227,6 +234,15 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
   }
 
   const showingInbox = view === 'inbox'
+  // Never a skeleton forever: if the first load hangs, show the error + Retry.
+  const mailTimedOut = useLoadTimeout(!loaded && !error)
+  // Opened (e.g. from a notification) before the message is in the list yet.
+  const detailLoading =
+    openId != null &&
+    !openMailItem &&
+    !openNewsItem &&
+    (!loaded || loadingMail) &&
+    !error
   const mailTabs = [
     {
       id: 'inbox',
@@ -307,6 +323,8 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
 
         {error ? (
           <MailError message={error} onRetry={refresh} />
+        ) : !loaded && mailTimedOut ? (
+          <MailError message={MAIL_TIMEOUT} onRetry={refresh} />
         ) : !loaded ? (
           <MailSkeleton kind={view} />
         ) : showingInbox ? (
@@ -450,6 +468,7 @@ export default function MailPanel({ mailbox, onClaimed, resolveStoreItem }) {
           onDelete={(item) => setConfirmDelete({ kind: 'single', item })}
         />
       )}
+      {detailLoading && <MailDetailSkeleton onClose={() => setOpenId(null)} />}
       {openNewsItem && (
         <MailDetail
           kind="news"

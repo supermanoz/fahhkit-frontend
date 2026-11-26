@@ -105,7 +105,7 @@ test('wording per mode: Training saves, only Conquer checks territory', async ({
 }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await result(page, { runResult: { phase: 'submitted' }, run: training })
-  await expect(page.locator('.gm-ribbon')).toHaveText('Run saved!')
+  await expect(page.locator('.gm-ribbon')).toHaveText('Run submitted!')
   expect(await text(page)).not.toMatch(/territor|loop|checking/i)
   await page.screenshot({ path: `${OUT}/1-training-saved-360.png` })
 

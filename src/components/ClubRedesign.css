@@ -168,21 +168,6 @@
   color: var(--text-muted-dark);
   font-style: italic;
 }
-.club-page .club-desc-edit-btn {
-  min-height: 44px;
-  padding: 0 14px;
-  border-radius: 12px;
-  border: 2px solid var(--border-soft);
-  background: var(--white);
-  color: var(--text-body-dark);
-  font-weight: 800;
-  font-size: 14px;
-}
-.game-root .club-page .club-desc-edit-btn {
-  font-family: var(--font-body);
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
-}
 
 /* Role chips: calm, distinct, never relying on colour alone (text inside). */
 .game-root .club-role {
@@ -287,21 +272,6 @@
   gap: 8px;
   padding-bottom: 12px;
 }
-.club-leave-btn {
-  min-height: 48px;
-  border: 2px solid var(--red-700);
-  border-radius: 14px;
-  background: var(--white);
-  color: var(--red-text);
-  font-size: 16px;
-  font-weight: 800;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.club-leave-btn:active {
-  background: var(--red-tint);
-}
-.game-root .club-leave-btn,
 .game-root .club-confirm-text,
 .game-root .club-counter,
 .game-root .club-hint {
@@ -509,9 +479,6 @@
   text-shadow: none;
   paint-order: normal;
 }
-.club-page .club-war-history-btn {
-  min-height: 56px;
-}
 
 /* History cards. */
 .game-root .club-page .club-war-history-name,
@@ -534,4 +501,40 @@
   .club-page .club-war-score-bar-fill {
     transition: none;
   }
+}
+
+/* --- Club buttons (all GameButton; only layout lives here) ---------------- */
+.club-page .club-section-tabs {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+/* Three tabs share one row down to 320px: label never wraps or ellipsises. */
+.club-page .club-section-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+.club-page .club-size-tabs {
+  display: flex;
+  gap: 6px;
+}
+/* Submit buttons beside an input are as tall as the input. */
+.club-page .club-donate .club-form-btn,
+.club-page .club-search .club-form-btn {
+  --b-h: 48px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+.club-page .club-desc-row .club-desc-edit-btn {
+  flex-shrink: 0;
+}
+.club-page .club-war-history-btn {
+  margin-top: 24px;
+}
+/* Display font is fine for the big numbers, but solid dark and crisp. */
+.game-root .club-page .club-stat-value {
+  color: var(--text-title-dark);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
 }

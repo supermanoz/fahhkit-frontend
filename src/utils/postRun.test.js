@@ -3,7 +3,7 @@ import {
   CHEAT_COPY_NEUTRAL,
   POST_RUN_MODE,
   TERRITORY_CHECKING,
-  checksTerritory,
+  isTerritoryMode,
   postRunModeOf,
   shouldShowRunRewards,
   showsRejection,
@@ -29,14 +29,30 @@ describe('postRunModeOf', () => {
 
 describe('territory text is Conquer only', () => {
   it('only Conquer checks territory', () => {
-    expect(checksTerritory(POST_RUN_MODE.CONQUER)).toBe(true)
+    expect(isTerritoryMode(POST_RUN_MODE.CONQUER)).toBe(true)
     for (const m of [
       POST_RUN_MODE.TRAINING,
       POST_RUN_MODE.PVP,
       POST_RUN_MODE.CLUB_WAR,
     ]) {
-      expect(checksTerritory(m)).toBe(false)
+      expect(isTerritoryMode(m)).toBe(false)
     }
+  })
+  it('accepts the server and UI spellings; unknown is never territory', () => {
+    for (const m of ['conquer', 'territory', 'TERRITORY_CAPTURE'])
+      expect(isTerritoryMode(m)).toBe(true)
+    for (const m of [
+      'TRAINING',
+      'training',
+      'PVP',
+      'CLUB_WAR',
+      'BOSS_FIGHT',
+      'boss',
+      '',
+      null,
+      undefined,
+    ])
+      expect(isTerritoryMode(m)).toBe(false)
   })
   it('no non-territory mode ever shows a territory message', () => {
     for (const m of [
@@ -54,11 +70,11 @@ describe('territory text is Conquer only', () => {
 })
 
 describe('submittedCopy', () => {
-  it('Training: "Run saved!", nothing else', () => {
-    expect(submittedCopy('training')).toEqual({
-      title: 'Run saved!',
-      note: null,
-    })
+  it('Training: says plainly that nothing is at stake (and never mentions territory)', () => {
+    const c = submittedCopy('training')
+    expect(c.title).toBe('Run submitted!')
+    expect(c.note).toMatch(/Nothing is at stake/)
+    expect(c.note).not.toMatch(/territor|loop|claim/i)
   })
   it('PvP: waiting for the rival', () => {
     const c = submittedCopy('pvp')

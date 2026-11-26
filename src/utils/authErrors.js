@@ -34,6 +34,7 @@ export const REASON = Object.freeze({
   NETWORK: 'network',
   PROVIDER: 'provider',
   UNAVAILABLE: 'unavailable',
+  NO_ACCOUNT: 'noAccount',
   CONFLICT: 'conflict',
   CREDENTIALS: 'credentials',
   OLD_PASSWORD: 'oldPassword',
@@ -53,6 +54,13 @@ export const MESSAGES = Object.freeze({
   network: "Can't reach the game. Check your connection and try again.",
   provider: (provider) =>
     `${provider} sign-in isn't working right now. Try email sign-in or try again later.`,
+  // Google/Apple setup problem on our side (Play Services 10 DEVELOPER_ERROR,
+  // 12500 SIGN_IN_FAILED, 8 INTERNAL_ERROR): nothing the player can fix.
+  signInUnavailable:
+    'Sign-in is temporarily unavailable. Please try again later or use email sign-in.',
+  noGoogleAccount:
+    'No Google account found on this device. Add one in your phone settings, or use email sign-in.',
+  appleFailed: 'Apple sign-in failed. Try again or use another sign-in method.',
   appleUnavailable:
     "Apple sign-in isn't available right now. Please use another method.",
   conflict: 'This email already has an account. Sign in with email instead.',
@@ -92,6 +100,31 @@ export const FIELD_MESSAGES = Object.freeze({
 // web popup being closed.
 const CANCEL_CODES = new Set([-5, 12501, 12502, 1001])
 
+// Play Services / Google Sign-In codes the native plugin hands back as
+// err.code (a string like "10"). Names are for the dev log only - the player
+// never sees them.
+const NATIVE_CODE_NAMES = Object.freeze({
+  7: 'NETWORK_ERROR',
+  8: 'INTERNAL_ERROR',
+  10: 'DEVELOPER_ERROR',
+  15: 'TIMEOUT',
+  16: 'NO_ACCOUNTS',
+  12500: 'SIGN_IN_FAILED',
+  12501: 'SIGN_IN_CANCELLED',
+  12502: 'SIGN_IN_CURRENTLY_IN_PROGRESS',
+  [-5]: 'GID_CANCELED',
+  1001: 'ASAUTH_CANCELED',
+})
+// Our-side configuration/setup failures: wrong SHA-1 / client id / consent
+// screen. Retrying never helps and the player can't fix it.
+const GOOGLE_CONFIG_CODES = new Set([8, 10, 12500])
+const GOOGLE_NO_ACCOUNT_CODES = new Set([16])
+
+export function nativeCodeName(err) {
+  const n = codeOf(err)
+  return n == null ? null : (NATIVE_CODE_NAMES[n] ?? null)
+}
+
 function codeOf(err) {
   const raw = err?.code ?? err?.status
   const n = Number.parseInt(String(raw ?? '').trim(), 10)
@@ -128,7 +161,7 @@ function isNetwork(err) {
 // Apple client id / provider isn't configured.
 const APPLE_UNAVAILABLE_STATUS = new Set([404, 405, 501, 503])
 const APPLE_NOT_CONFIGURED =
-  /(apple|client[ _-]?id|provider|oauth)[^\n]{0,60}(not (been )?(set|configured|enabled)|missing|unavailable|disabled)|(not (set|configured)|missing)[^\n]{0,40}(apple|client[ _-]?id|provider)/i
+  /(apple|client[ _-]?id|provider|oauth)[^\n]{0,60}(not (been )?(set|configured|enabled)|missing|unavailable|disabled|(not )?supported)|(not (set|configured)|missing)[^\n]{0,40}(apple|client[ _-]?id|provider)/i
 function appleUnavailable(err) {
   if (!(err instanceof ApiError)) return false
   return (
@@ -136,6 +169,15 @@ function appleUnavailable(err) {
     APPLE_NOT_CONFIGURED.test(err.message)
   )
 }
+
+// Backend OAuth codes (errorCode) for an Apple token that was refused: bad
+// nonce, wrong audience, expired or malformed. One friendly line for all.
+const APPLE_TOKEN_CODES = new Set([
+  'NONCE_MISMATCH',
+  'AUDIENCE_MISMATCH',
+  'TOKEN_EXPIRED',
+  'MALFORMED_TOKEN',
+])
 
 const text = (err) => (err instanceof ApiError ? err.message : '')
 
@@ -156,6 +198,16 @@ export function describeAuthError(err, { flow = AUTH_FLOW.SIGN_IN } = {}) {
   }
   if (isNetwork(err)) return result(REASON.NETWORK, MESSAGES.network)
 
+  // Native Google plugin failures (never an ApiError): setup problems and
+  // "no account on the device" get their own calm line.
+  if (flow === AUTH_FLOW.GOOGLE && err && !(err instanceof ApiError)) {
+    const n = codeOf(err)
+    if (n != null && GOOGLE_CONFIG_CODES.has(n))
+      return result(REASON.UNAVAILABLE, MESSAGES.signInUnavailable)
+    if (n != null && GOOGLE_NO_ACCOUNT_CODES.has(n))
+      return result(REASON.NO_ACCOUNT, MESSAGES.noGoogleAccount)
+  }
+
   // Google / Apple: anything that isn't a conflict is "the provider isn't
   // working" - a bad/expired token, a setup mistake, a plugin failure.
   if (provider) {
@@ -171,7 +223,10 @@ export function describeAuthError(err, { flow = AUTH_FLOW.SIGN_IN } = {}) {
       if (appleUnavailable(err)) {
         return result(REASON.UNAVAILABLE, MESSAGES.appleUnavailable)
       }
-      // Anything else (bad token, plugin failure, 500...): never raw text.
+      if (err instanceof ApiError && APPLE_TOKEN_CODES.has(err.errorCode)) {
+        return result(REASON.PROVIDER, MESSAGES.appleFailed)
+      }
+      // Anything else (plugin failure, 500...): never raw text.
       return result(REASON.UNKNOWN, MESSAGES.unknown)
     }
     return result(REASON.PROVIDER, MESSAGES.provider(provider))
@@ -219,12 +274,23 @@ const TOKEN_LIKE = /eyJ[\w-]+\.[\w-]+\.[\w-]*/g
 // Technical detail for developers: console only, never shown. Codes and a
 // short message with anything token-shaped stripped; never the raw object
 // (plugin results can carry ID tokens / emails).
+function nativeLabel(err) {
+  const n = codeOf(err)
+  if (n == null || err instanceof ApiError) return null
+  const name = NATIVE_CODE_NAMES[n]
+  return name ? `${n} ${name}` : String(n)
+}
+
 export function logAuthError(flow, err) {
   const detail = {
     flow,
     name: err?.name,
     code: err?.code ?? null,
+    // e.g. "10 DEVELOPER_ERROR" - the first thing to read in logcat / the
+    // Safari inspector when "can't sign in" is reported.
+    native: nativeLabel(err),
     status: err instanceof ApiError ? err.status : null,
+    errorCode: err instanceof ApiError ? err.errorCode : null,
     message: textOf(err).replace(TOKEN_LIKE, '[token]').slice(0, 200),
   }
   console.warn('[auth]', detail)

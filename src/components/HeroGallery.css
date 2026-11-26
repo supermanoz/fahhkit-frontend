@@ -152,6 +152,8 @@
 /* The stage background AND the (static) sprite shade together. */
 .hero-card.is-hero-locked .hero-card-stage {
   filter: var(--hero-locked-filter);
+  transform: var(--hero-locked-layer);
+  will-change: transform;
 }
 /* Just unlocked: the shade eases away (above) and the hero pops once. */
 .hero-card-stage.is-unlocking {

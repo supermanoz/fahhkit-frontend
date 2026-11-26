@@ -11,26 +11,8 @@ import { formatNumber } from './format'
 // so the default map view lines up with where the club actually runs.
 export const DEFAULT_CENTER = { lat: 27.7166, lng: 85.3247 }
 
-// Mirrors TerritoryLoopProperties' defaults on the backend (closureThresholdMeters,
-// minEnclosedAreaSqMeters, minPoints) — these are client-side hints only, shown
-// while a run is in progress so a loop that's obviously too small doesn't
-// surprise the runner later. The server's own values are the ones that actually
-// decide whether a run turns into territory.
-export const LOOP_MIN_POINTS = 10
-export const LOOP_MIN_AREA_SQ_METERS = 2000
-export const LOOP_CLOSURE_THRESHOLD_METERS = 25
-
-// True while the path hasn't come back within LOOP_CLOSURE_THRESHOLD_METERS of
-// where it started (also true for fewer than 2 points: nothing to close yet).
-// Used live (End during a Conquer run) and on the finished draft.
-export function isLoopOpen(points) {
-  return (
-    !points ||
-    points.length < 2 ||
-    haversineDistance(points[0], points[points.length - 1]) >
-      LOOP_CLOSURE_THRESHOLD_METERS
-  )
-}
+// Loop-closure / minimum-area / minimum-points rules now live in ONE place:
+// src/game/territoryRules.js (server values + the server's own algorithms).
 
 // Radius around the player that findParcelsNear queries for territory to
 // show on the map. The view itself isn't fenced to this (see
@@ -244,9 +226,9 @@ export function pointInPolygon(point, polygonPoints) {
 
 // Shoelace formula on a local equirectangular projection (meters, scaled by
 // cos(latitude)) — accurate enough for loops a few hundred meters across,
-// which is the entire range this game deals in. Used only for the live
-// in-progress loop preview; the backend recomputes this properly (with
-// simplification/reprojection) once a run is submitted.
+// which is the entire range this game deals in. Display math for merged
+// parcels only - a run's loop area comes from game/territoryRules.js, which
+// follows the server's simplify/repair algorithm.
 export function polygonAreaSqMeters(points) {
   if (!points || points.length < 3) return 0
   const R = 6371000
@@ -329,7 +311,7 @@ export function loopPerimeterMeters(points) {
 }
 
 // Always km² (never raw m²) so area reads consistently everywhere it's shown. Precision scales
-// with magnitude so a just-claimed small parcel (LOOP_MIN_AREA_SQ_METERS = 2000 m² = 0.002 km²)
+// with magnitude so a just-claimed small parcel (the 2000 m² minimum = 0.002 km²)
 // still shows a nonzero number instead of rounding away to "0.00 km²".
 export function formatArea(sqMeters) {
   if (!sqMeters) return '0 km²'

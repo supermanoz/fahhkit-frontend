@@ -27,6 +27,16 @@ const DEFAULT_ROUTES = () => ({
   'POST /v1/authenticate': ok({ tokenId: 'mock-token' }),
   'GET /v1/user/find/logged-in': ok(VETERAN.user),
   'GET /v1/territory/profile': ok(VETERAN.territoryProfile),
+  // The game stays locked until the area is confirmed live (useRolloutStatus),
+  // so every mocked player starts in a rolled-out city; rollout specs override.
+  'GET /v1/rollout-request/status': ok({
+    rolledOut: true,
+    alreadyRequested: false,
+    cityId: 79726,
+    cityName: 'Kathmandu',
+    countryName: 'Nepal',
+    requestCount: 0,
+  }),
   'POST /v1/store/catalog/find': ok({
     content: STORE_CATALOG,
     totalElements: STORE_CATALOG.length,

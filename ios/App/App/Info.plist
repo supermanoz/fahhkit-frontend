@@ -53,7 +53,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Run Conquest saves the run images you choose to download into your Photos. It only adds images - it never reads your library.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>FahhKit uses motion and compass data to point the run view in the direction you're facing and detect real movement during a run.</string>
+	<string>Run Conquest uses motion data to count your steps and distance during a run, and to point the run view in the direction you're facing.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

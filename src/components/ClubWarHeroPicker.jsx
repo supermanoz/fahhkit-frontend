@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
+import { centerCardInTrack } from '../utils/scrollTrack'
 import { useEffect, useRef, useState } from 'react'
 import {
   IconCheck,
@@ -79,12 +80,8 @@ export default function ClubWarHeroPicker({
   // picked up by handleScroll below instead, so both paths keep `index`
   // (which card is centred) in sync with what's actually on screen.
   useEffect(() => {
-    const card = trackRef.current?.children[index]
-    card?.scrollIntoView({
-      behavior: 'smooth',
-      inline: 'center',
-      block: 'nearest',
-    })
+    const track = trackRef.current
+    centerCardInTrack(track, track?.children[index])
   }, [index])
 
   useEffect(() => {
@@ -206,7 +203,6 @@ export default function ClubWarHeroPicker({
                         hero={{ name: item.name }}
                         pose="idle"
                         height={160}
-                        locked={!owned}
                       />
                     ) : item.assetUrl ? (
                       <img
@@ -224,7 +220,6 @@ export default function ClubWarHeroPicker({
                           hero={{ name: item.name }}
                           pose="idle"
                           height={160}
-                          locked={!owned}
                         />
                       )
                     )}

@@ -21,8 +21,8 @@ describe('HeroFigure', () => {
     render(<HeroFigure hero={{ name: 'Blaze' }} />)
     expect(seen.at(-1)).toBe(true)
   })
-  it('locked: static first frame only (sprite never active)', () => {
+  it('a locked hero still animates (the locked look is CSS only)', () => {
     render(<HeroFigure hero={{ name: 'Blaze' }} locked />)
-    expect(seen.at(-1)).toBe(false)
+    expect(seen.at(-1)).toBe(true)
   })
 })

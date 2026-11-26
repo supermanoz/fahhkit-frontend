@@ -59,7 +59,7 @@ export function Modal({
     <div className="g-modal-scrim" role="presentation" onClick={onClose}>
       <div
         ref={dialogRef}
-        className={`g-panel g-modal ${className}`}
+        className={`g-panel g-modal${onClose ? ' has-close' : ''} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

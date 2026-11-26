@@ -253,3 +253,38 @@ describe('token refresh (POST /v1/auth/refresh, Bearer = current token)', () => 
     expect(client.getToken()).toBe(other)
   })
 })
+
+describe('error body and self-service delete', () => {
+  const body = (status, errorCode, errorMessage) => ({
+    ok: false,
+    status,
+    json: async () => ({ status, errorCode, errorMessage }),
+  })
+  it('ApiError carries the backend errorCode', async () => {
+    routes['/v1/auth/apple'] = body(400, 'NONCE_MISMATCH', 'bad nonce')
+    const err = await client
+      .postJson('/v1/auth/apple', { identityToken: 'x' })
+      .catch((e) => e)
+    expect(err).toBeInstanceOf(client.ApiError)
+    expect(err.status).toBe(400)
+    expect(err.errorCode).toBe('NONCE_MISMATCH')
+  })
+  it('errorCode is null when the body has none', async () => {
+    routes['/v1/x'] = res(500)
+    const err = await client.getJson('/v1/x').catch((e) => e)
+    expect(err.errorCode).toBeNull()
+  })
+  it('deleteMyAccount sends DELETE /v1/user/me with the Bearer token and no body', async () => {
+    const { deleteMyAccount } = await import('./user')
+    const token = client.getToken()
+    let seen
+    routes['/v1/user/me'] = (opts) => {
+      seen = opts
+      return res(200, null)
+    }
+    await deleteMyAccount()
+    expect(seen.method).toBe('DELETE')
+    expect(seen.headers.Authorization).toBe(`Bearer ${token}`)
+    expect(seen.body).toBeUndefined()
+  })
+})

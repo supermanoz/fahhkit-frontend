@@ -7,6 +7,7 @@ import {
   getOutboxRun,
   listOutbox,
   retryOutboxRun,
+  updateOutboxRun,
 } from './runOutbox'
 import {
   BACKOFF_BASE_MS,
@@ -160,6 +161,7 @@ describe('flushOutbox', () => {
     expect(a.error).toEqual({
       message: 'Run rejected: speed too high',
       status: 422,
+      errorCode: null,
     })
     expect((await getOutboxRun('run-b')).status).toBe(RUN_STATUS.DONE)
     expect(out).toMatchObject({ sent: 1, failed: 1 })
@@ -220,5 +222,85 @@ describe('flushOutbox', () => {
       now: () => t0 + DONE_KEEP_MS + 1,
     })
     expect(await getOutboxRun('run-a')).toBeUndefined()
+  })
+})
+
+describe('offline queue + retry without duplicates (Training and Conquer)', () => {
+  it('queued offline, retried after failures, uploaded exactly once with the same key and body', async () => {
+    const payload = {
+      clientRunId: 'run-t',
+      mode: 'TRAINING',
+      offline: true,
+      points: [],
+      distance: 0,
+      steps: 1200,
+    }
+    await enqueueRun({
+      clientRunId: 'run-t',
+      userId: 'u1',
+      createdAt: 1,
+      payload,
+      summary: { distance: 0, mode: 'training' },
+    })
+    const sent = []
+    const send = vi
+      .fn()
+      .mockImplementationOnce(async (p) => {
+        sent.push(p)
+        throw err(0) // still offline
+      })
+      .mockImplementationOnce(async (p) => {
+        sent.push(p)
+        throw err(0) // reached the server, answer lost
+      })
+      .mockImplementation(async (p) => {
+        sent.push(p)
+        return { id: 'srv-1', steps: 1200 }
+      })
+    await flushOutbox({ userId: 'u1', send })
+    await flushOutbox({ userId: 'u1', send })
+    await flushOutbox({ userId: 'u1', send })
+    await flushOutbox({ userId: 'u1', send }) // already done: no 4th send
+    expect(send).toHaveBeenCalledTimes(3)
+    expect(new Set(sent.map((p) => p.clientRunId))).toEqual(new Set(['run-t']))
+    expect(sent.every((p) => p.offline === true && p.mode === 'TRAINING')).toBe(
+      true
+    )
+    expect((await getOutboxRun('run-t')).status).toBe(RUN_STATUS.DONE)
+  })
+
+  it('a run the server refuses is kept (failed, friendly reason) - never silently dropped', async () => {
+    await enqueueRun(rec('run-old', 1))
+    const refuse = Object.assign(new Error('RUN_TOO_OLD'), {
+      status: 400,
+      errorCode: 'RUN_TOO_OLD',
+    })
+    await flushOutbox({ userId: 'u1', send: vi.fn().mockRejectedValue(refuse) })
+    const r = await getOutboxRun('run-old')
+    expect(r.status).toBe(RUN_STATUS.FAILED)
+    expect(r.error.message).toMatch(/14 days/)
+    expect(r.error.errorCode).toBe('RUN_TOO_OLD')
+    expect(await listOutbox('u1')).toHaveLength(1)
+  })
+})
+
+describe('interrupted and repeated syncs', () => {
+  it('a run left "uploading" by an app kill is sent again with the same key', async () => {
+    await enqueueRun(rec('run-k', 1))
+    await updateOutboxRun('run-k', { status: RUN_STATUS.UPLOADING })
+    const send = vi.fn(async () => ({ id: 'srv' }))
+    await flushOutbox({ userId: 'u1', send })
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(send.mock.calls[0][1]).toBe('run-k')
+    expect((await getOutboxRun('run-k')).status).toBe(RUN_STATUS.DONE)
+  })
+  it('hammering Sync now (many taps at once) uploads each run once', async () => {
+    await enqueueRun(rec('run-a', 1))
+    await enqueueRun(rec('run-b', 2))
+    const send = vi.fn(async (p) => ({ id: p.clientRunId }))
+    await Promise.all(
+      Array.from({ length: 6 }, () => flushOutbox({ userId: 'u1', send }))
+    )
+    expect(send).toHaveBeenCalledTimes(2)
   })
 })

@@ -42,7 +42,6 @@ import { findNearbyPlayers } from '../api/pvp'
 import { findClubRoutes } from '../api/routes'
 import { resolveFileUrl } from '../api/client'
 import { formatDistance } from '../utils/run'
-import Tabs from '../game/ui/Tabs'
 import Avatar from '../game/ui/Avatar'
 import { GameActions, GameModal } from '../game/ui/GameModal'
 import ClubWarPanel from './ClubWarPanel'
@@ -618,18 +617,28 @@ export default function ClubPanel({
 
     return (
       <div className="game-cards club-page">
-        <Tabs
-          accent="shop"
+        <div
           className="club-section-tabs"
-          ariaLabel="Club sections"
-          value={clubSection}
-          onChange={setClubSection}
-          tabs={[
+          role="tablist"
+          aria-label="Club sections"
+        >
+          {[
             { id: 'mine', label: 'My Club' },
             { id: 'wars', label: 'Club Wars' },
             { id: 'routes', label: 'Shared Routes' },
-          ]}
-        />
+          ].map((tab) => (
+            <GameButton
+              key={tab.id}
+              variant="tab"
+              size="compact"
+              className="club-section-tab"
+              selected={clubSection === tab.id}
+              onClick={() => setClubSection(tab.id)}
+            >
+              {tab.label}
+            </GameButton>
+          ))}
+        </div>
 
         {clubSection === 'routes' ? (
           <section className="game-card club-card">
@@ -791,14 +800,15 @@ export default function ClubPanel({
                         'No motto yet - give your crew a battle cry!'}
                     </p>
                     {canManage && (
-                      <button
-                        type="button"
+                      <GameButton
+                        variant="neutral"
+                        size="sm"
                         className="club-desc-edit-btn"
                         onClick={() => setDescDraft(myClub.description ?? '')}
                         aria-label="Edit club description"
                       >
                         ✎ Edit
-                      </button>
+                      </GameButton>
                     )}
                   </div>
                 )
@@ -834,7 +844,8 @@ export default function ClubPanel({
                   />
                   <GameButton
                     type="submit"
-
+                    variant="primary"
+                    className="club-form-btn"
                     disabled={
                       donating ||
                       !donateValue ||
@@ -957,6 +968,7 @@ export default function ClubPanel({
                   <GameButton
                     type="submit"
                     variant="accent"
+                    className="club-form-btn"
                     disabled={inviteSearching || !inviteQuery.trim()}
                   >
                     Search
@@ -1143,13 +1155,14 @@ export default function ClubPanel({
                   leaving.
                 </p>
               ) : (
-                <button
-                  type="button"
+                <GameButton
+                  variant="danger"
+                  fullWidth
                   className="club-leave-btn"
                   onClick={() => setConfirmingLeave(true)}
                 >
                   Leave Club
-                </button>
+                </GameButton>
               )}
               {leaveError && !confirmingLeave && (
                 <p className="game-controls-hint game-controls-hint-error">

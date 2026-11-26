@@ -7,12 +7,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import { getRunMode, getRunModeLabel } from '../utils/runModeLabel'
 import RunResultCard from '../components/RunResultCard'
 import {
   CHEAT_COPY_NEUTRAL,
-  checksTerritory,
+  isTerritoryMode,
   postRunModeOf,
   shouldShowRunRewards,
   showsRejection,
@@ -81,8 +82,11 @@ import { useMailbox } from '../hooks/useMailbox'
 import { mySide, partyOf, usePvp } from '../hooks/usePvp'
 import { useClubWarWatch } from '../hooks/useClubWarWatch'
 import { ApiError, isNetworkError, resolveFileUrl } from '../api/client'
-import { createRun, getRun, getRuns } from '../api/runs'
+import { createRun, getRun, getRuns, getRunScore } from '../api/runs'
+import { runErrorMessage } from '../utils/runErrors'
+import { LATE_TERRITORY_COPY, isLateForTerritory } from '../utils/runLate'
 import {
+  fetchTerritoryRules,
   findClubLeaderboard,
   findIndividualLeaderboard,
   findMyParcels,
@@ -107,6 +111,14 @@ import {
 import EmoteGlyph from '../components/EmoteGlyph'
 import { ToastProvider, useToast } from '../game/ui/Toast'
 import ProfileAvatar from '../components/ProfileAvatar'
+import {
+  LoadFailed,
+  ColorShelfSkeleton,
+  MeSkeleton,
+  WalletSkeleton,
+} from '../components/ScreenSkeletons'
+import { useLoadTimeout } from '../hooks/useLoadTimeout'
+import { GATE, meGate, shopGate } from '../utils/loadGate'
 import { getPvpModeByMeters } from '../api/pvp'
 import {
   equipStoreItem,
@@ -128,9 +140,6 @@ import {
 import { snapSegment } from '../utils/routeSnapping'
 import {
   DEFAULT_CENTER,
-  isLoopOpen,
-  LOOP_MIN_AREA_SQ_METERS,
-  LOOP_MIN_POINTS,
   VIEW_RADIUS_METERS,
   PLAYER_COLOR,
   bearingBetween,
@@ -144,6 +153,16 @@ import {
   smoothAngle,
   toDisplayParcel,
 } from '../utils/territoryGame'
+import {
+  closureHint,
+  evaluateTrack,
+  getTerritoryRules,
+  initTerritoryRules,
+  isLoopOpen,
+  LoopRejection,
+  minAreaHint,
+  subscribeTerritoryRules,
+} from '../game/territoryRules'
 import {
   MIN_DISTANCE_FOR_PACE_METERS,
   MIN_VALID_RUN_DISTANCE_METERS,
@@ -310,9 +329,25 @@ import {
   buildRunMeta,
   buildRunPayload,
   buildRunSummary,
+  stepsForPayload,
 } from '../utils/runPayload'
 import OfflineRunSavedModal from '../components/OfflineRunSavedModal'
+import IndoorRunScreen from '../components/IndoorRunScreen'
+import TrainingStartSheet from '../components/TrainingStartSheet'
+import StepsPermissionPrompt from '../components/StepsPermissionPrompt'
+import { useIndoorRun } from '../hooks/useIndoorRun'
+import { TRAINING_KIND } from '../utils/trainingKind'
+import { isIndoorSummary, rememberIndoorRun } from '../utils/indoorRuns'
+import {
+  getPedometerStatus,
+  requestPedometerPermission,
+} from '../utils/pedometer'
+import {
+  markAskedForSteps,
+  shouldShowStepsPrePrompt,
+} from '../utils/stepsPermission'
 import PendingRunsList from '../components/PendingRunsList'
+import { exportGpxFile } from '../utils/exportGpx'
 import { OFFLINE_BLOCKED_TABS } from '../utils/offlineFeatures'
 import {
   formatLastUpdated,
@@ -438,30 +473,33 @@ const RESULT_POLL_DELAY_MS = 2500
 // socket - see useGameSocket). SUCCESS still goes through the territory-event
 // summary below; these are the "no territory, here's why" cases, which used
 // to just look like a silent timeout.
-const RUN_REJECTION_COPY = {
-  CHEAT_DETECTED: {
-    title: SERVER_REJECTED_TITLE,
-    message: SERVER_REJECTED_TERRITORY_COPY,
-  },
-  NOT_ENOUGH_POINTS: {
-    title: 'GPS lost the plot 📡',
-    message:
-      'Not enough location fixes came through to draw your loop. Keep the game open while you run and try again.',
-  },
-  LOOP_NOT_CLOSED: {
-    title: 'So close, loop-wise 🔁',
-    message:
-      'Your route never made it back near the start. Finish where you began to seal the territory.',
-  },
-  AREA_TOO_SMALL: {
-    title: 'Cozy, but tiny 🏠',
-    message: `That loop didn't enclose enough ground. Territory needs at least ${formatNumber(LOOP_MIN_AREA_SQ_METERS)} m² inside it, so go bigger.`,
-  },
-  INVALID_GEOMETRY_AFTER_REPAIR: {
-    title: 'That shape broke geometry 🥨',
-    message:
-      'Your route crossed itself too many times to make a valid territory. A cleaner loop will do it.',
-  },
+// Built per call so every number comes from the shared rules (server values).
+function runRejectionCopy(key) {
+  const rules = getTerritoryRules()
+  const copy = {
+    CHEAT_DETECTED: {
+      title: SERVER_REJECTED_TITLE,
+      message: SERVER_REJECTED_TERRITORY_COPY,
+    },
+    NOT_ENOUGH_POINTS: {
+      title: 'GPS lost the plot 📡',
+      message: `Not enough location fixes came through to draw your loop (at least ${rules.minPoints} are needed). Keep the game open while you run and try again.`,
+    },
+    LOOP_NOT_CLOSED: {
+      title: 'So close, loop-wise 🔁',
+      message: `Your route never made it back near the start. ${closureHint(rules)} That seals the territory.`,
+    },
+    AREA_TOO_SMALL: {
+      title: 'Cozy, but tiny 🏠',
+      message: `That loop didn't enclose enough ground. ${minAreaHint(rules)} Go bigger.`,
+    },
+    INVALID_GEOMETRY_AFTER_REPAIR: {
+      title: 'That shape broke geometry 🥨',
+      message:
+        'Your route crossed itself too many times to make a valid territory. A cleaner loop will do it.',
+    },
+  }
+  return copy[key]
 }
 
 function describeRunRejection(outcome) {
@@ -475,7 +513,7 @@ function describeRunRejection(outcome) {
   // No loop was ever attempted here - same as a Club War/Boss Fight run,
   // scored on pace + base effort alone - but unlike that case, the player
   // can ask for it (see handleRequestRollout below). Surfaced via its own
-  // flag rather than RUN_REJECTION_COPY since the result toast needs to
+  // flag rather than runRejectionCopy since the result toast needs to
   // render a live Request Rollout button here, not just static copy.
   if (outcome.outcome === 'TERRITORY_NOT_ROLLED_OUT') {
     return {
@@ -485,12 +523,19 @@ function describeRunRejection(outcome) {
       isRolloutRejection: true,
     }
   }
+  // Uploaded 48 h+ after it ended: XP and score count, territory never does.
+  if (outcome.outcome === 'LATE_NO_TERRITORY') {
+    return {
+      title: LATE_TERRITORY_COPY.title,
+      message: LATE_TERRITORY_COPY.message,
+    }
+  }
   const key =
     outcome.outcome === 'CHEAT_DETECTED'
       ? 'CHEAT_DETECTED'
       : outcome.rejectionReason || 'LOOP_NOT_CLOSED'
   return (
-    RUN_REJECTION_COPY[key] || {
+    runRejectionCopy(key) || {
       title: 'No territory this time',
       message: outcome.message || 'This run did not count as territory.',
     }
@@ -651,6 +696,12 @@ function GamePageInner() {
   userIdRef.current = user?.id ?? null
   useDailyNudge({ isAuthed, loading: userLoading })
   const tracker = useRunTracker()
+  // Indoor (treadmill) Training: no GPS, no map - see hooks/useIndoorRun.js.
+  const indoor = useIndoorRun()
+  const [trainingSheetOpen, setTrainingSheetOpen] = useState(false)
+  const [stepsPromptOpen, setStepsPromptOpen] = useState(false)
+  const stepsPromptNextRef = useRef(null)
+  const [indoorBusy, setIndoorBusy] = useState(false)
   perf.render('GamePage')
   // A full reload (not just clearing the token + re-rendering) is
   // deliberate here - this page holds dozens of pieces of React state tied
@@ -738,7 +789,12 @@ function GamePageInner() {
   // Positively outside a rolled-out area -> the whole game is halted and
   // greyed out. Settings/Profile(Me)/Shop stay usable. Never applies mid-run
   // (a run already underway is never yanked away).
-  const gameLocked = rolloutStatus.blocked && tracker.status !== 'tracking'
+  // After a login the game stays locked until the server has CONFIRMED the
+  // area is live (`pending`: not checked yet / checking / check failed) or
+  // has said it isn't (`blocked`). Never mid-run.
+  const rolloutPending = isAuthed && rolloutStatus.pending
+  const gameLocked =
+    (rolloutStatus.blocked || rolloutPending) && tracker.status !== 'tracking'
   // Gates the "Preparing your run…" loading screen - true only once the
   // basemap has actually finished loading tiles (see TerritoryMap.jsx's
   // PokemonStyleBaseLayer, which fires this on MapLibre's "idle" event), not
@@ -758,6 +814,8 @@ function GamePageInner() {
   useEffect(() => startResumeRefresh(), [])
   // Set while `profile` is the on-device copy (offline) rather than fresh.
   const [profileCachedAt, setProfileCachedAt] = useState(null)
+  // First profile load failed with nothing to show (the Me tab's error state).
+  const [profileError, setProfileError] = useState(false)
   const [myParcels, setMyParcels] = useState([])
   // The backend still lists one row per claimed loop, so two adjacent runs
   // show up as two separate parcels there - merged the same way
@@ -899,6 +957,10 @@ function GamePageInner() {
   // background (stale-while-revalidate).
   const [heroes, setHeroes] = useState(readCachedHeroes)
   const [heroesLoading, setHeroesLoading] = useState(false)
+  // The roster fetch has finished once (ok or not) / failed with nothing to
+  // show: drives the Shop's skeleton -> content / error switch.
+  const [heroesSettled, setHeroesSettled] = useState(false)
+  const [heroesError, setHeroesError] = useState(false)
   // True once /v1/store/owned has answered at least once (see loadStore).
   const [ownedLoaded, setOwnedLoaded] = useState(false)
   // Id, not the object, so the modal picks up the refreshed hero after an
@@ -1044,6 +1106,7 @@ function GamePageInner() {
   const pvpAutoSubmitRef = useRef(null)
   // Uploads queued runs whenever it can (online again, app foreground, app
   // start, right after login) and exposes them for the Pending runs list.
+  const syncedBatchRef = useRef({ items: [], timer: null })
   const runSync = useRunSync({
     userId: user?.id ?? null,
     send: (payload) => createRun(payload),
@@ -1209,22 +1272,30 @@ function GamePageInner() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [confirmAction])
   // Conquer only (Training / PvP / Club War never capture territory - see
-  // postRun.checksTerritory). Ending one of those never shows the loop warning.
-  const liveRunIsConquer = checksTerritory(
+  // postRun.isTerritoryMode). Ending one of those never shows the loop warning.
+  const liveRunIsConquer = isTerritoryMode(
     postRunModeOf({
       isTraining: tracker.isTraining,
       challengeId: tracker.challengeId,
       clubWarId: tracker.clubWarId,
     })
   )
-  const liveLoopOpen = isLoopOpen(tracker.path)
+  // Server-equivalent "loop not closed" check (territoryRules.js). It can scan
+  // the whole trace for a sub-loop, so it only runs on End and while the
+  // popup is open - never on every GPS render.
+  const liveLoopOpen = useMemo(
+    () => (confirmAction === 'loop' ? isLoopOpen(tracker.path) : false),
+    [confirmAction, tracker.path]
+  )
   const endClickedRef = useRef(false)
   // End: a Conquer run whose loop isn't closed gets the "Loop not closed yet"
   // popup INSTEAD of "End this run?" (one popup, never two).
   function handleRequestEnd() {
     endClickedRef.current = false
     setConfirmAction(
-      tracker.status === 'tracking' && liveRunIsConquer && liveLoopOpen
+      tracker.status === 'tracking' &&
+        liveRunIsConquer &&
+        isLoopOpen(tracker.path)
         ? 'loop'
         : 'end'
     )
@@ -1266,11 +1337,71 @@ function GamePageInner() {
     setMapMode('follow')
   }
 
+  // The step-counter permission is asked ONLY when a run starts (or Indoor is
+  // picked), once, after our own short explanation. Any answer - including
+  // "Not now" and a system "Don't allow" - carries on with the run.
+  async function askStepsThen(next) {
+    const status = await getPedometerStatus()
+    if (!shouldShowStepsPrePrompt(status)) {
+      next()
+      return
+    }
+    stepsPromptNextRef.current = next
+    setStepsPromptOpen(true)
+  }
+
+  async function answerStepsPrompt(allow) {
+    setStepsPromptOpen(false)
+    markAskedForSteps()
+    const next = stepsPromptNextRef.current
+    stepsPromptNextRef.current = null
+    if (allow) await requestPedometerPermission()
+    next?.()
+  }
+
   function beginCountdownThenStart(startFn) {
     if (gameLocked) return
     resetForRunStart()
-    pendingStartRef.current = startFn
-    setStartCountdown(3)
+    askStepsThen(() => {
+      pendingStartRef.current = startFn
+      setStartCountdown(3)
+    })
+  }
+
+  // Indoor Training: no countdown, no GPS - straight to the timer.
+  function startIndoorTraining() {
+    setMenuOpen(false)
+    if (gameLocked) return
+    if (tracker.status !== 'idle' || pendingRun || indoor.active) return
+    askStepsThen(() => indoor.start())
+  }
+
+  // Training's start screen (Outdoor | Indoor).
+  function openTrainingSheet() {
+    if (gameLocked) return
+    if (tracker.status !== 'idle' || pendingRun || indoor.active) return
+    setTrainingSheetOpen(true)
+  }
+
+  function startTrainingOfKind(kind) {
+    setTrainingSheetOpen(false)
+    if (kind === TRAINING_KIND.INDOOR) startIndoorTraining()
+    else handleStartTraining()
+  }
+
+  // The confirm screen's "Save run": the run joins the normal pending-run
+  // path (same submit, same offline outbox, same retry card), then the
+  // indoor screen is done.
+  async function handleIndoorSubmit(result) {
+    if (!result?.run) return
+    setIndoorBusy(true)
+    try {
+      tracker.adoptRun(result.run)
+      await attemptSubmit(result.run)
+    } finally {
+      setIndoorBusy(false)
+      indoor.clear()
+    }
   }
 
   // Tap the countdown to back out - nothing starts (the queued start
@@ -1472,7 +1603,7 @@ function GamePageInner() {
   // comment for why this is never called from a background
   // location-watching effect. Two triggers instead:
   //   1. Reactive: a plain territory run actually comes back
-  //      TERRITORY_NOT_ROLLED_OUT (see RUN_REJECTION_COPY/
+  //      TERRITORY_NOT_ROLLED_OUT (see runRejectionCopy/
   //      describeRunRejection above) - the result toast gets its own
   //      "Request Rollout" button right there.
   //   2. A standing "Request Territory Capture For My Area" row in
@@ -1640,7 +1771,7 @@ function GamePageInner() {
     settledRunIdRef.current = outcome.runId
     setRunResult({
       phase: 'rejected',
-      ...(checksTerritory(mode) ? rejection : CHEAT_COPY_NEUTRAL),
+      ...(isTerritoryMode(mode) ? rejection : CHEAT_COPY_NEUTRAL),
     })
     // Still worth checking for XP - a rejected loop (didn't close, or a
     // rival contested it) still earns the run's effort-based distance XP;
@@ -2098,12 +2229,22 @@ function GamePageInner() {
     setIntroStarted(true)
   }, [gameReady, introStarted])
 
+  // A Training run has no territory side: the weather pop-up (whose lines
+  // mention territory / claiming) never shows during one.
+  const trainingLive = tracker.isTraining && tracker.status !== 'idle'
+  const trainingLiveRef = useRef(false)
+  trainingLiveRef.current = trainingLive
+  useEffect(() => {
+    if (trainingLive) setWeatherHype(null)
+  }, [trainingLive])
   useEffect(() => {
     if (!gameReady || introPlaying || weatherHypeShownRef.current) return
     // Marked shown inside the timeout, not before it - StrictMode's dev-only
     // effect double-run would otherwise clear the timer and never show it.
     const show = setTimeout(() => {
       weatherHypeShownRef.current = true
+      // Its lines talk about territory/claiming: never during a Training run.
+      if (trainingLiveRef.current) return
       setWeatherHype(pickWeatherHype(mapAmbience))
     }, 600)
     return () => clearTimeout(show)
@@ -2449,6 +2590,7 @@ function GamePageInner() {
       // Offline (or the server is down): keep showing the last known profile.
       if (userIdRef.current) {
         const cached = loadCachedProfile(userIdRef.current)
+        if (!cached) setProfileError(true)
         if (cached) {
           setProfile((p) => p || cached.profile)
           setProfileCachedAt(cached.at)
@@ -2462,6 +2604,7 @@ function GamePageInner() {
       return null
     }
     setProfile(profileResult.value)
+    setProfileError(false)
     setCoinsIfCurrent(
       balanceSeq,
       profileResult.value?.fahhcoinBalance,
@@ -2898,6 +3041,7 @@ function GamePageInner() {
   // leaves the Heroes tab empty.
   async function loadHeroes() {
     setHeroesLoading(true)
+    setHeroesError(false)
     try {
       const page = await findHeroes(1, 20)
       const roster = (page?.content || []).filter((h) => h.active !== false)
@@ -2909,8 +3053,10 @@ function GamePageInner() {
     } catch {
       // Keep showing the cached roster (if any) when a refresh fails.
       setHeroes((prev) => prev)
+      setHeroesError(true)
     } finally {
       setHeroesLoading(false)
+      setHeroesSettled(true)
     }
   }
 
@@ -3353,6 +3499,43 @@ function GamePageInner() {
     }
   }
 
+  // Seed the profile from the on-device copy (if any) so the Me tab and HUD
+  // paint instantly instead of showing a skeleton; refreshProfile revalidates.
+  useEffect(() => {
+    if (!user?.id || profile) return
+    const cached = loadCachedProfile(user.id)
+    if (cached?.profile) setProfile((p) => p || cached.profile)
+  }, [user?.id, profile])
+
+  // Me tab: skeleton until the profile arrives, error + Retry if it fails
+  // or takes longer than SKELETON_TIMEOUT_MS (utils/loadGate.js).
+  const meWaiting = isAuthed && !profile && !profileError
+  const meTimedOut = useLoadTimeout(meWaiting)
+  const meState = meGate({
+    isAuthed,
+    profile,
+    profileError,
+    timedOut: meTimedOut,
+  })
+  const meGateView =
+    meState === GATE.CONTENT ? null : meState === GATE.LOADING ? (
+      <MeSkeleton />
+    ) : (
+      <LoadFailed
+        testId="me-error"
+        message={
+          meState === GATE.TIMEOUT
+            ? 'Your profile is taking too long.'
+            : "Couldn't load your profile."
+        }
+        onRetry={retryProfile}
+      />
+    )
+  function retryProfile() {
+    setProfileError(false)
+    refreshProfile()
+  }
+
   function switchTab(nextTab) {
     // Section pickers that list PvP route through the same entry function.
     if (nextTab === 'race' && !pvpBypassRef.current) {
@@ -3704,6 +3887,7 @@ function GamePageInner() {
       return
     }
     const isWar = Boolean(run.clubWarId)
+    if (run.isIndoor) rememberIndoorRun(created.id)
     // Watched from here, not just inside pollForTerritoryResult below -
     // a Club War/Boss Fight run also gets a score push (just never a
     // territory-event poll), so this needs to be set for every mode, not
@@ -3716,10 +3900,16 @@ function GamePageInner() {
       isRace,
       isWar,
       isTraining: Boolean(run.isTraining),
+      isIndoor: Boolean(run.isIndoor),
       points: run.points,
       distance: run.distance,
       duration: run.duration,
       avgPace: created.avgPace,
+      // Server-measured extras (null when unknown -> hidden everywhere). The
+      // phone's own count fills in until the server returns steps.
+      steps: created.steps ?? stepsForPayload(run) ?? null,
+      elevationGainMeters: created.elevationGainMeters ?? null,
+      elevationLossMeters: created.elevationLossMeters ?? null,
       startedAt: run.startedAt,
       // Hero Poster share card: the hero chosen at run start (local), and
       // the server's loadout when the response carries one.
@@ -3734,7 +3924,7 @@ function GamePageInner() {
     // race, Club War entry or Training run skips the territory poll
     // entirely instead of showing "Checking your territory…" for a check
     // that was never going to happen (Training: "Run saved!").
-    if (!checksTerritory(postRunModeOf(run))) {
+    if (!isTerritoryMode(postRunModeOf(run))) {
       setRunResult({ phase: 'submitted' })
       // Club War/Boss Fight runs DO get a score push (pace + base effort
       // only, no territory - see TerritoryProcessingServiceImpl); a PvP
@@ -3751,6 +3941,17 @@ function GamePageInner() {
       // poll loop for it. If it's not there yet, the reward just quietly
       // doesn't show (same as today) rather than showing a wrong number.
       setTimeout(refreshProfileAfterRun, 3000)
+    } else if (isLateForTerritory(run.endedAt)) {
+      // Recorded 48 h+ ago (offline for a long time): the server gives such a
+      // run XP and score but no territory - say so instead of waiting for a
+      // territory result that will never come.
+      settledRunIdRef.current = created.id
+      setRunResult({
+        phase: 'rejected',
+        title: LATE_TERRITORY_COPY.title,
+        message: LATE_TERRITORY_COPY.message,
+      })
+      setTimeout(refreshProfileAfterRun, 3000)
     } else {
       pollForTerritoryResult(submittedAt, created.id)
     }
@@ -3761,7 +3962,8 @@ function GamePageInner() {
   // saved" popup. Nothing is lost and nothing is submitted twice.
   async function queueRunForUpload(run) {
     if (!user?.id) return
-    const payload = buildRunPayload(run)
+    // offline: true - queued because the upload could not go out now.
+    const payload = buildRunPayload(run, { offline: true })
     const record = await enqueueRun({
       clientRunId: payload.clientRunId,
       userId: user.id,
@@ -3792,11 +3994,39 @@ function GamePageInner() {
   }
 
   // An outbox run was accepted by the server (it uploaded in the background).
+  // Several queued runs finishing together (back online after a long trip)
+  // would each pop a toast and fight over the result card: they are collected
+  // for a moment, then ONE summary toast is shown and only the newest run gets
+  // the full result flow.
   function handleSyncedRun(record, created) {
-    toast.push('Your offline run was submitted', {
-      type: 'success',
-      duration: 4500,
-    })
+    const batch = syncedBatchRef.current
+    batch.items.push({ record, created })
+    clearTimeout(batch.timer)
+    batch.timer = setTimeout(() => {
+      const items = batch.items
+      batch.items = []
+      if (items.length > 1) {
+        toast.push(`${items.length} offline runs submitted`, {
+          type: 'success',
+          duration: 4500,
+        })
+      }
+      const newest = items.reduce((a, b) =>
+        (b.record.summary?.endedAt ?? '') >= (a.record.summary?.endedAt ?? '')
+          ? b
+          : a
+      )
+      presentSyncedRun(newest.record, newest.created, items.length === 1)
+    }, 700)
+  }
+
+  function presentSyncedRun(record, created, single) {
+    if (single) {
+      toast.push('Your offline run was submitted', {
+        type: 'success',
+        duration: 4500,
+      })
+    }
     resetMyRunsPagination()
     if (tracker.status === 'tracking') {
       // Mid-run: just refresh the numbers, no popups over the run.
@@ -3812,9 +4042,12 @@ function GamePageInner() {
         distance: record.payload.distance,
         duration: record.payload.duration,
         startedAt: record.summary.startedAt,
+        endedAt: record.summary.endedAt,
         challengeId: record.payload.challengeId,
         clubWarId: record.payload.clubWarId,
         isTraining: record.summary.isTraining,
+        isIndoor: record.summary.isIndoor,
+        stepCount: record.payload.steps,
       },
       created,
       new Date(),
@@ -3912,7 +4145,7 @@ function GamePageInner() {
         title: "Couldn't save that run",
         message:
           err instanceof ApiError
-            ? err.message
+            ? runErrorMessage(err)
             : 'Could not save this run. Please try again.',
       })
       setSaving(false)
@@ -3934,6 +4167,23 @@ function GamePageInner() {
       await new Promise((resolve) => setTimeout(resolve, RESULT_POLL_DELAY_MS))
       // The socket already told us it's a no-territory run - stop polling.
       if (settledRunIdRef.current === runId) return
+      // The run's OWN result first (no device-vs-server clock comparison): a
+      // finished rejection or a FAILED processing settles it right away.
+      try {
+        const score = await getRunScore(runId)
+        if (settledRunIdRef.current === runId) return
+        if (score?.status === 'FAILED') {
+          settledRunIdRef.current = runId
+          setRunResult({ phase: 'failed' })
+          return
+        }
+        if (score?.status === 'READY' && score.breakdown) {
+          setRunScoreBreakdown(score.breakdown)
+          if (showRunOutcome(score.breakdown)) return
+        }
+      } catch {
+        // fall back to the territory-event check below
+      }
       try {
         const page = await findMyTerritoryEvents(1, 5)
         // A single run can produce more than one event in the same pass —
@@ -3955,6 +4205,24 @@ function GamePageInner() {
       }
     }
     if (settledRunIdRef.current === runId) return
+    // No territory event and no push: ask the server how scoring went. FAILED
+    // = processing gave up after its retries; READY = it did finish (the push
+    // was missed) and carries the outcome.
+    try {
+      const score = await getRunScore(runId)
+      if (settledRunIdRef.current === runId) return
+      if (score?.status === 'FAILED') {
+        settledRunIdRef.current = runId
+        setRunResult({ phase: 'failed' })
+        return
+      }
+      if (score?.status === 'READY' && score.breakdown) {
+        setRunScoreBreakdown(score.breakdown)
+        if (showRunOutcome(score.breakdown)) return
+      }
+    } catch {
+      // Unreachable now: fall through to the plain "still checking" state.
+    }
     setRunResult({ phase: 'timeout' })
     refreshProfileAfterRun()
     refreshNearbyParcels()
@@ -4089,6 +4357,29 @@ function GamePageInner() {
     () => heroesWithLevels.filter((h) => !isPlaceholderHero(h.name)),
     [heroesWithLevels]
   )
+  // Shop: the open section's content is a skeleton until it arrives; failure
+  // or a timeout shows an error with Retry (never a skeleton forever).
+  const shopHeroesSection = shopSection === 'heroes'
+  const shopWaiting = shopGate({
+    section: shopSection,
+    heroCount: galleryHeroes.length,
+    heroesSettled,
+    heroesLoading,
+    heroesError,
+    catalogLoaded: ownedLoaded,
+    storeError,
+    timedOut: false,
+  })
+  const shopTimedOut = useLoadTimeout(
+    menuTab === 'shop' && shopWaiting === GATE.LOADING
+  )
+  const shopState =
+    shopWaiting === GATE.LOADING && shopTimedOut ? GATE.TIMEOUT : shopWaiting
+  function retryShop() {
+    setHeroesError(false)
+    loadStore()
+  }
+
   // Shop shelves: heroes live in the hero gallery; the two colour
   // categories get their own preview shelves (ColorShelf). The old
   // catch-all Items list is gone - other categories (borders, profile
@@ -4199,20 +4490,64 @@ function GamePageInner() {
   const showGpsError = Boolean(gpsStatusMessage) && !gpsErrorDismissed
 
   const pendingRun = tracker.pendingRun
-  const draftArea = pendingRun ? polygonAreaSqMeters(pendingRun.points) : 0
-  const draftPerimeter = pendingRun ? loopPerimeterMeters(pendingRun.points) : 0
-  const draftLooksThin =
-    pendingRun &&
-    (pendingRun.points.length < LOOP_MIN_POINTS ||
-      draftArea < LOOP_MIN_AREA_SQ_METERS)
-  // Mirrors the backend's own closure-gap check (see
-  // LOOP_CLOSURE_THRESHOLD_METERS) - a real GPS run only closes itself if the
-  // runner physically ends up back near where they started. Flagging a wide
-  // gap here immediately, right when the loop is ended, is more actionable
-  // than only discovering it after the server silently doesn't count the run
-  // as territory.
-  const draftLoopOpen =
-    pendingRun && pendingRun.points.length >= 2 && isLoopOpen(pendingRun.points)
+  // What the server will decide for this exact track (same filters, loop
+  // builder and area math - game/territoryRules.js). Re-evaluated when the
+  // server's rule constants change.
+  const territoryRules = useSyncExternalStore(
+    subscribeTerritoryRules,
+    getTerritoryRules
+  )
+  // Server rule constants at startup (cached, built-in fallback on failure).
+  useEffect(() => {
+    initTerritoryRules(fetchTerritoryRules)
+  }, [])
+  const draftEval = useMemo(
+    () =>
+      pendingRun
+        ? {
+            result: evaluateTrack(pendingRun.points, {
+              // the server derives avg pace from the submitted distance/duration
+              avgPaceMinutesPerKm:
+                pendingRun.distance > 0 && pendingRun.duration
+                  ? pendingRun.duration / 60 / (pendingRun.distance / 1000)
+                  : null,
+              rules: territoryRules,
+            }),
+            open:
+              pendingRun.points.length >= 2 &&
+              isLoopOpen(pendingRun.points, territoryRules),
+          }
+        : null,
+    [pendingRun, territoryRules]
+  )
+  // Area / perimeter the server will store when the loop is valid; otherwise
+  // a plain estimate of the drawn shape.
+  const draftArea =
+    draftEval?.result.areaSqMeters ??
+    (pendingRun ? polygonAreaSqMeters(pendingRun.points) : 0)
+  const draftPerimeter =
+    draftEval?.result.perimeterMeters ??
+    (pendingRun ? loopPerimeterMeters(pendingRun.points) : 0)
+  // Server would refuse this loop for size/shape even though it closes.
+  const draftThinReason =
+    draftEval && !draftEval.open
+      ? [
+          LoopRejection.NOT_ENOUGH_POINTS,
+          LoopRejection.AREA_TOO_SMALL,
+          LoopRejection.INVALID_GEOMETRY_AFTER_REPAIR,
+        ].includes(draftEval.result.outcome)
+        ? draftEval.result.outcome
+        : null
+      : null
+  const draftLooksThin = Boolean(draftThinReason)
+  // Same rule the server applies (closure distance, or a closing sub-loop) -
+  // flagged right when the run ends rather than discovered after the server
+  // quietly doesn't count it as territory.
+  const draftLoopOpen = Boolean(draftEval?.open)
+  // Territory UI for the finished-but-unsubmitted run: Conquer only.
+  const pendingIsTerritory = pendingRun
+    ? isTerritoryMode(postRunModeOf(pendingRun))
+    : false
 
   const allMenuTabs = [
     { id: 'leaderboard', label: 'Leaderboard', Icon: IconTrophy, tone: 'gold' },
@@ -4285,7 +4620,7 @@ function GamePageInner() {
       label: 'Elapsed',
       value: formatDuration(tracker.elapsedSeconds),
     })
-    if (tracker.isTraining) {
+    if (!liveRunIsConquer && tracker.isTraining) {
       runDetailTiles.push({
         label: 'Paused',
         value: formatDuration(
@@ -4656,7 +4991,7 @@ function GamePageInner() {
           isTracking={tracker.status === 'tracking'}
           onUserPan={handleUserPan}
           onRequestFollow={() => setMapMode('follow')}
-          isLoopRun={!tracker.challengeId && !tracker.clubWarId}
+          isLoopRun={liveRunIsConquer}
           drawActive={routeDraftMode}
           onDrawPoint={handleDrawMapClick}
           drawPoints={routeDraftPoints}
@@ -4782,9 +5117,36 @@ function GamePageInner() {
       {gameReady && gameLocked && (
         <>
           <div className="game-rollout-tint" aria-hidden="true" />
-          <div className="game-rollout-banner" role="status">
-            <strong>Territory not rolled out here</strong>
-            <span>Run Conquest isn&rsquo;t live in your area yet.</span>
+          <div
+            className={`game-rollout-banner${rolloutPending && locationDenied ? ' is-denied' : ''}`}
+            role="status"
+          >
+            {!rolloutPending ? (
+              <>
+                <strong>Territory not rolled out here</strong>
+                <span>Run Conquest isn&rsquo;t live in your area yet.</span>
+              </>
+            ) : locationDenied ? (
+              <>
+                <strong>Location is off</strong>
+                <span>
+                  Enable location so we can confirm Run Conquest is live in your
+                  area.
+                </span>
+              </>
+            ) : rolloutStatus.state.phase === 'failed' ? (
+              <>
+                <strong>Couldn&rsquo;t check your area</strong>
+                <span>Check your connection - we&rsquo;ll try again.</span>
+              </>
+            ) : (
+              <>
+                <strong>Checking your area…</strong>
+                <span>
+                  Play unlocks once we confirm Run Conquest is live here.
+                </span>
+              </>
+            )}
           </div>
         </>
       )}
@@ -4797,6 +5159,27 @@ function GamePageInner() {
 
       {gameReady && !introPlaying && rolloutStatus.showModal && (
         <RolloutRequestModal onDismiss={rolloutStatus.dismiss} />
+      )}
+
+      {trainingSheetOpen && (
+        <TrainingStartSheet
+          onStart={startTrainingOfKind}
+          onClose={() => setTrainingSheetOpen(false)}
+        />
+      )}
+      {stepsPromptOpen && (
+        <StepsPermissionPrompt
+          onAllow={() => answerStepsPrompt(true)}
+          onSkip={() => answerStepsPrompt(false)}
+        />
+      )}
+      {indoor.active && (
+        <IndoorRunScreen
+          run={indoor}
+          busy={indoorBusy}
+          onSubmit={handleIndoorSubmit}
+          onOpenSettings={() => openAppSettings().catch(() => {})}
+        />
       )}
 
       {profile?.level != null && (
@@ -5006,7 +5389,15 @@ function GamePageInner() {
       {legalDoc && (
         <GameLegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
       )}
-      <ConnectionBanner enabled={gameReady && !introPlaying} />
+      <ConnectionBanner
+        enabled={gameReady && !introPlaying}
+        waiting={pendingCount(runSync.runs)}
+        onOpen={() => {
+          // Tap the pill: straight to the pending-runs list in the Me tab.
+          setMenuTab('me')
+          setMenuOpen(true)
+        }}
+      />
       <OfflineRunSavedModal
         run={offlineSavedRun}
         onClose={() => setOfflineSavedRun(null)}
@@ -5174,7 +5565,7 @@ function GamePageInner() {
                           }
                           if (item.tab === 'training') {
                             setRadialOpen(false)
-                            handleStartTraining()
+                            openTrainingSheet()
                             return
                           }
                           openMenu(item.tab)
@@ -5479,16 +5870,37 @@ function GamePageInner() {
         {pendingRun && (
           <>
             <div className="game-controls-stats">
-              <span className="game-stat">
-                <span className="game-stat-value">{formatArea(draftArea)}</span>
-                <span className="game-stat-label">Loop Area</span>
-              </span>
-              <span className="game-stat">
-                <span className="game-stat-value">
-                  {formatMeters(draftPerimeter)}
-                </span>
-                <span className="game-stat-label">Perimeter</span>
-              </span>
+              {pendingIsTerritory ? (
+                <>
+                  <span className="game-stat">
+                    <span className="game-stat-value">
+                      {formatArea(draftArea)}
+                    </span>
+                    <span className="game-stat-label">Loop Area</span>
+                  </span>
+                  <span className="game-stat">
+                    <span className="game-stat-value">
+                      {formatMeters(draftPerimeter)}
+                    </span>
+                    <span className="game-stat-label">Perimeter</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="game-stat">
+                    <span className="game-stat-value">
+                      {formatMeters(pendingRun.distance)}
+                    </span>
+                    <span className="game-stat-label">Distance</span>
+                  </span>
+                  <span className="game-stat">
+                    <span className="game-stat-value">
+                      {formatDuration(pendingRun.duration)}
+                    </span>
+                    <span className="game-stat-label">Time</span>
+                  </span>
+                </>
+              )}
             </div>
             {confirmAction === 'discard' ? (
               <div className="game-controls-confirm">
@@ -5534,16 +5946,21 @@ function GamePageInner() {
                 </GameButton>
               </div>
             )}
-            {draftLoopOpen ? (
+            {!pendingIsTerritory ? null : draftLoopOpen ? (
               <p className="game-controls-hint game-controls-hint-warn">
-                This loop isn&apos;t closed — your capture might not be complete
-                since you didn&apos;t finish back where you started.
+                This loop isn&apos;t closed — {closureHint(territoryRules)} Your
+                capture might not count otherwise.
               </p>
             ) : (
               draftLooksThin && (
                 <p className="game-controls-hint game-controls-hint-warn">
-                  This loop looks short or small — the server may not count it
-                  as closed territory. Bigger, cleanly closed loops score best.
+                  {draftThinReason === LoopRejection.AREA_TOO_SMALL &&
+                    `This loop only encloses about ${Math.round(draftArea).toLocaleString('en-US')} m² — ${minAreaHint(territoryRules)}`}
+                  {draftThinReason === LoopRejection.NOT_ENOUGH_POINTS &&
+                    `Only ${pendingRun.points.length} GPS fixes were recorded — the server needs at least ${territoryRules.minPoints} to draw a loop.`}
+                  {draftThinReason ===
+                    LoopRejection.INVALID_GEOMETRY_AFTER_REPAIR &&
+                    'This route crosses itself too much to make a valid territory. A cleaner loop will do it.'}
                 </p>
               )
             )}
@@ -5641,8 +6058,8 @@ function GamePageInner() {
           {formatDuration(tracker.elapsedSeconds)}
         </p>
         <p className="game-end-run-summary">
-          Close your loop to capture territory. If you end now, no territory
-          will be claimed.
+          Close your loop to capture territory. {closureHint(territoryRules)} If
+          you end now, no territory will be claimed.
         </p>
         <GameActions>
           <GameButton onClick={() => setConfirmAction(null)}>
@@ -6482,344 +6899,372 @@ function GamePageInner() {
                     {formatLastUpdated(profileCachedAt)})
                   </p>
                 )}
-                <div className="game-menu-hero">
-                  {showHeroTurntable ? (
-                    // Plays the equipped emote in place of the idle
-                    // turntable when one's equipped and its art actually
-                    // resolves (see equippedEmoteItem/equippedEmoteAsset
-                    // above) - same spot, same size, just a different
-                    // sprite/pace (EmoteGlyph plays through the same
-                    // shared pace as HeroSprite's idle turntable now - see
-                    // utils/spriteTiming.js). Falls
-                    // back to the idle turntable otherwise, same as before.
-                    // No stage behind the flat avatar-picture fallback below
-                    // - that's not a hero playing anything, just a profile
-                    // photo/local avatar icon.
-                    <HeroStage
-                      hero={activeHeroName}
-                      className="game-menu-hero-stage"
-                    >
-                      {(h) =>
-                        equippedEmoteItem && equippedEmoteAsset ? (
-                          <EmoteGlyph
-                            heroName={activeHeroName}
-                            emoteName={equippedEmoteItem.name}
-                            size={h || 260}
-                            active
-                          />
-                        ) : (
-                          <HeroSprite size={h || 260} hero={activeHeroName} />
-                        )
-                      }
-                    </HeroStage>
-                  ) : (
-                    <img
-                      loading="lazy"
-                      decoding="async"
-                      className="game-menu-hero-img"
-                      src={avatarSrc}
-                      alt=""
-                      onError={(e) => {
-                        // avatarSrc can point at a server-hosted asset
-                        // (equipped Hero / profile picture) that can fail to
-                        // load - fall back to a bundled local image that
-                        // can't 404 instead of leaving a broken-image glyph.
-                        e.currentTarget.onerror = null
-                        e.currentTarget.src =
-                          currentAvatar?.src || defaultAvatarImage
-                      }}
-                    />
-                  )}
-                </div>
-                {/* XP bar, then the profile picture, then name and stats -
+                {meGateView || (
+                  <>
+                    <div className="game-menu-hero">
+                      {showHeroTurntable ? (
+                        // Plays the equipped emote in place of the idle
+                        // turntable when one's equipped and its art actually
+                        // resolves (see equippedEmoteItem/equippedEmoteAsset
+                        // above) - same spot, same size, just a different
+                        // sprite/pace (EmoteGlyph plays through the same
+                        // shared pace as HeroSprite's idle turntable now - see
+                        // utils/spriteTiming.js). Falls
+                        // back to the idle turntable otherwise, same as before.
+                        // No stage behind the flat avatar-picture fallback below
+                        // - that's not a hero playing anything, just a profile
+                        // photo/local avatar icon.
+                        <HeroStage
+                          hero={activeHeroName}
+                          className="game-menu-hero-stage"
+                        >
+                          {(h) =>
+                            equippedEmoteItem && equippedEmoteAsset ? (
+                              <EmoteGlyph
+                                heroName={activeHeroName}
+                                emoteName={equippedEmoteItem.name}
+                                size={h || 260}
+                                active
+                              />
+                            ) : (
+                              <HeroSprite
+                                size={h || 260}
+                                hero={activeHeroName}
+                              />
+                            )
+                          }
+                        </HeroStage>
+                      ) : (
+                        <img
+                          loading="lazy"
+                          decoding="async"
+                          className="game-menu-hero-img"
+                          src={avatarSrc}
+                          alt=""
+                          onError={(e) => {
+                            // avatarSrc can point at a server-hosted asset
+                            // (equipped Hero / profile picture) that can fail to
+                            // load - fall back to a bundled local image that
+                            // can't 404 instead of leaving a broken-image glyph.
+                            e.currentTarget.onerror = null
+                            e.currentTarget.src =
+                              currentAvatar?.src || defaultAvatarImage
+                          }}
+                        />
+                      )}
+                    </div>
+                    {/* XP bar, then the profile picture, then name and stats -
                     same order as another player's profile. */}
-                {profile?.level != null && (
-                  <div className="game-level-hud">
-                    <LevelBar level={profile.level} xp={profile.xp} showXp />
-                  </div>
-                )}
-                <ProfileAvatar
-                  src={resolveFileUrl(user?.profilePictureUrl)}
-                  name={playerNameOf(user)}
-                  level={profile?.level}
-                  loading={userLoading || !profile}
-                />
-                {playerNameOf(user) && (
-                  <p className="game-menu-player-name">{playerNameOf(user)}</p>
-                )}
-                {user && !user.nickname?.trim() && (
-                  <NicknameCard onSaved={replaceUser} />
-                )}
-                {equippedPhrase && (
-                  <p className="game-menu-phrase">
-                    “{equippedPhrase.storeItem.name}”
-                  </p>
-                )}
-                <div className="game-menu-summary">
-                  <span className="game-menu-summary-value">
-                    {formatArea(profile?.totalAreaSqMeters)}
-                  </span>
-                  {profile?.clubName && (
-                    <span className="game-menu-summary-label game-menu-summary-club">
-                      <ClubBadge name={profile.clubName} size={24} />
-                      {profile.clubName}
-                    </span>
-                  )}
-                </div>
-                <div className="game-cards">
-                  <MedalGrid
-                    catalog={storeCatalog}
-                    ownedItems={ownedItems}
-                    seasonMedals={profile?.medals}
-                    loading={storeCatalog.length === 0 && !storeError}
-                  />
-                  <section className="game-me-section">
-                    <p className="game-menu-section-title">My Territories</p>
-                    {myTerritories.length === 0 ? (
-                      <p className="game-menu-empty">
-                        Finish a GPS run that closes a loop to see territory
-                        here.
-                      </p>
-                    ) : (
-                      <>
-                        <ul className="game-menu-list">
-                          {visibleMyTerritories.map((t) => (
-                            <li key={t.id}>
-                              <button
-                                type="button"
-                                className="game-menu-list-row"
-                                onClick={() => handleViewMyParcel(t)}
-                              >
-                                <span className="game-menu-list-area">
-                                  {formatArea(t.area)}
-                                </span>
-                                <span className="game-menu-list-meta">
-                                  score {formatNumber(t.currentScore || 0)}
-                                </span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                        {myTerritoriesTotalPages > 1 && (
-                          <div className="game-route-pager">
-                            <GameButton
-                              variant="neutral"
-                              size="sm"
-                              aria-label="Show previous territories"
-                              disabled={myTerritoriesPage <= 1}
-                              onClick={() => setMyTerritoriesPage((p) => p - 1)}
-                            >
-                              ◀
-                            </GameButton>
-                            <span className="game-route-pager-label">
-                              Page {myTerritoriesPage} of{' '}
-                              {myTerritoriesTotalPages}
-                            </span>
-                            <GameButton
-                              variant="neutral"
-                              size="sm"
-                              aria-label="Show more territories"
-                              disabled={
-                                myTerritoriesPage >= myTerritoriesTotalPages
-                              }
-                              onClick={() => setMyTerritoriesPage((p) => p + 1)}
-                            >
-                              ▶
-                            </GameButton>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </section>
-
-                  <section className="game-me-section">
-                    <p className="game-menu-section-title">My Routes</p>
-                    <GameButton
-                      size="sm"
-                      className="game-me-draw-route-btn"
-                      onClick={handleStartDrawRoute}
-                    >
-                      + Draw New Route
-                    </GameButton>
-                    {myRoutesError && (
-                      <p className="game-controls-hint game-controls-hint-error">
-                        {myRoutesError}
-                      </p>
-                    )}
-                    {myRoutes.length === 0 ? (
-                      <p className="game-menu-empty">
-                        Draw a route on the map to see it here.
-                      </p>
-                    ) : (
-                      <>
-                        <ul className="game-menu-list">
-                          {myRoutes.map((r) => (
-                            <li key={r.id} className="game-route-list-item">
-                              <button
-                                type="button"
-                                className="game-menu-list-row game-route-view-btn"
-                                onClick={() => handleViewRoute(r.id)}
-                                disabled={loadingRouteId === r.id}
-                              >
-                                <span className="game-menu-list-area">
-                                  {r.name}
-                                </span>
-                                <span className="game-menu-list-meta">
-                                  {loadingRouteId === r.id
-                                    ? 'Loading…'
-                                    : formatDistance(r.distanceMeters)}
-                                </span>
-                              </button>
-                              <button
-                                type="button"
-                                className={`game-route-visibility-btn ${
-                                  r.visibility === 'CLUB' ? 'is-shared' : ''
-                                }`}
-                                disabled={
-                                  routeVisibilityBusyId === r.id ||
-                                  (r.visibility !== 'CLUB' &&
-                                    !profile?.clubName)
-                                }
-                                title={
-                                  r.visibility !== 'CLUB' && !profile?.clubName
-                                    ? 'Join a club to share routes with it'
-                                    : undefined
-                                }
-                                onClick={() => handleToggleRouteVisibility(r)}
-                              >
-                                {routeVisibilityBusyId === r.id
-                                  ? '…'
-                                  : r.visibility === 'CLUB'
-                                    ? 'Shared with Club'
-                                    : 'Private'}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                        {myRoutesTotalPages > 1 && (
-                          <div className="game-route-pager">
-                            <GameButton
-                              variant="neutral"
-                              size="sm"
-                              disabled={myRoutesPage <= 1}
-                              onClick={() => loadMyRoutes(myRoutesPage - 1)}
-                            >
-                              Prev
-                            </GameButton>
-                            <span className="game-route-pager-label">
-                              Page {myRoutesPage} of {myRoutesTotalPages}
-                            </span>
-                            <GameButton
-                              variant="neutral"
-                              size="sm"
-                              disabled={myRoutesPage >= myRoutesTotalPages}
-                              onClick={() => loadMyRoutes(myRoutesPage + 1)}
-                            >
-                              Next
-                            </GameButton>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </section>
-
-                  <PendingRunsList
-                    runs={runSync.runs}
-                    onRetry={async (id) => {
-                      await retryOutboxRun(id)
-                      runSync.flush()
-                    }}
-                    onDelete={(id) => removeOutboxRun(id)}
-                  />
-
-                  <section className="game-me-section" ref={myRunsListRef}>
-                    <p className="game-menu-section-title">History</p>
-                    {myRunsError ? (
-                      <div className="game-me-history-error">
-                        <p className="game-controls-hint game-controls-hint-error">
-                          {myRunsError}
-                        </p>
-                        <GameButton
-                          variant="neutral"
-                          size="sm"
-                          onClick={() => loadMyRunsPage(myRunsPage)}
-                        >
-                          Retry
-                        </GameButton>
+                    {profile?.level != null && (
+                      <div className="game-level-hud">
+                        <LevelBar
+                          level={profile.level}
+                          xp={profile.xp}
+                          showXp
+                        />
                       </div>
-                    ) : myRunsLoading && myRuns.length === 0 ? (
-                      <ul className="game-me-history-list" aria-hidden="true">
-                        {Array.from({ length: MY_RUNS_PAGE_SIZE }).map(
-                          (_, i) => (
-                            <li
-                              key={i}
-                              className="game-me-history-row game-me-history-skeleton"
-                            />
-                          )
-                        )}
-                      </ul>
-                    ) : myRuns.length === 0 ? (
-                      <p className="game-menu-empty">
-                        Finish a GPS run to see its map here.
-                      </p>
-                    ) : (
-                      <>
-                        <ul
-                          className="game-me-history-list"
-                          aria-busy={myRunsLoading}
-                        >
-                          {myRuns.map((r) => (
-                            <li key={r.id}>
-                              <button
-                                type="button"
-                                className="game-me-history-row"
-                                onClick={() => handleViewRun(r.id)}
-                                disabled={loadingRunId === r.id}
-                              >
-                                <span className="game-me-history-area">
-                                  {formatDistance(r.distance)} ·{' '}
-                                  {formatDuration(r.duration)}
-                                </span>
-                                <span className="game-me-history-meta">
-                                  {loadingRunId === r.id
-                                    ? 'Loading…'
-                                    : formatRunDate(r.startedAt)}
-                                </span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                        {myRunsTotalPages > 1 && (
-                          <div className="game-me-history-pager">
-                            <button
-                              type="button"
-                              className="game-me-history-pager-btn"
-                              aria-label="Previous page"
-                              disabled={myRunsPage <= 1 || myRunsLoading}
-                              onClick={() => goToMyRunsPage(myRunsPage - 1)}
-                            >
-                              Prev
-                            </button>
-                            <span className="game-me-history-pager-label">
-                              Page {myRunsPage} of {myRunsTotalPages}
-                            </span>
-                            <button
-                              type="button"
-                              className="game-me-history-pager-btn"
-                              aria-label="Next page"
-                              disabled={
-                                myRunsPage >= myRunsTotalPages || myRunsLoading
-                              }
-                              onClick={() => goToMyRunsPage(myRunsPage + 1)}
-                            >
-                              Next
-                            </button>
-                          </div>
-                        )}
-                      </>
                     )}
-                  </section>
-                </div>
+                    <ProfileAvatar
+                      src={resolveFileUrl(user?.profilePictureUrl)}
+                      name={playerNameOf(user)}
+                      level={profile?.level}
+                      loading={userLoading || !profile}
+                    />
+                    {playerNameOf(user) && (
+                      <p className="game-menu-player-name">
+                        {playerNameOf(user)}
+                      </p>
+                    )}
+                    {user && !user.nickname?.trim() && (
+                      <NicknameCard onSaved={replaceUser} />
+                    )}
+                    {equippedPhrase && (
+                      <p className="game-menu-phrase">
+                        “{equippedPhrase.storeItem.name}”
+                      </p>
+                    )}
+                    <div className="game-menu-summary">
+                      <span className="game-menu-summary-value">
+                        {formatArea(profile?.totalAreaSqMeters)}
+                      </span>
+                      {profile?.clubName && (
+                        <span className="game-menu-summary-label game-menu-summary-club">
+                          <ClubBadge name={profile.clubName} size={24} />
+                          {profile.clubName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="game-cards">
+                      <MedalGrid
+                        catalog={storeCatalog}
+                        ownedItems={ownedItems}
+                        seasonMedals={profile?.medals}
+                        loading={storeCatalog.length === 0 && !storeError}
+                      />
+                      <section className="game-me-section">
+                        <p className="game-menu-section-title">
+                          My Territories
+                        </p>
+                        {myTerritories.length === 0 ? (
+                          <p className="game-menu-empty">
+                            Finish a GPS run that closes a loop to see territory
+                            here.
+                          </p>
+                        ) : (
+                          <>
+                            <ul className="game-menu-list">
+                              {visibleMyTerritories.map((t) => (
+                                <li key={t.id}>
+                                  <button
+                                    type="button"
+                                    className="game-menu-list-row"
+                                    onClick={() => handleViewMyParcel(t)}
+                                  >
+                                    <span className="game-menu-list-area">
+                                      {formatArea(t.area)}
+                                    </span>
+                                    <span className="game-menu-list-meta">
+                                      score {formatNumber(t.currentScore || 0)}
+                                    </span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            {myTerritoriesTotalPages > 1 && (
+                              <div className="game-route-pager">
+                                <GameButton
+                                  variant="neutral"
+                                  size="sm"
+                                  aria-label="Show previous territories"
+                                  disabled={myTerritoriesPage <= 1}
+                                  onClick={() =>
+                                    setMyTerritoriesPage((p) => p - 1)
+                                  }
+                                >
+                                  ◀
+                                </GameButton>
+                                <span className="game-route-pager-label">
+                                  Page {myTerritoriesPage} of{' '}
+                                  {myTerritoriesTotalPages}
+                                </span>
+                                <GameButton
+                                  variant="neutral"
+                                  size="sm"
+                                  aria-label="Show more territories"
+                                  disabled={
+                                    myTerritoriesPage >= myTerritoriesTotalPages
+                                  }
+                                  onClick={() =>
+                                    setMyTerritoriesPage((p) => p + 1)
+                                  }
+                                >
+                                  ▶
+                                </GameButton>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </section>
+
+                      <section className="game-me-section">
+                        <p className="game-menu-section-title">My Routes</p>
+                        <GameButton
+                          size="sm"
+                          className="game-me-draw-route-btn"
+                          onClick={handleStartDrawRoute}
+                        >
+                          + Draw New Route
+                        </GameButton>
+                        {myRoutesError && (
+                          <p className="game-controls-hint game-controls-hint-error">
+                            {myRoutesError}
+                          </p>
+                        )}
+                        {myRoutes.length === 0 ? (
+                          <p className="game-menu-empty">
+                            Draw a route on the map to see it here.
+                          </p>
+                        ) : (
+                          <>
+                            <ul className="game-menu-list">
+                              {myRoutes.map((r) => (
+                                <li key={r.id} className="game-route-list-item">
+                                  <button
+                                    type="button"
+                                    className="game-menu-list-row game-route-view-btn"
+                                    onClick={() => handleViewRoute(r.id)}
+                                    disabled={loadingRouteId === r.id}
+                                  >
+                                    <span className="game-menu-list-area">
+                                      {r.name}
+                                    </span>
+                                    <span className="game-menu-list-meta">
+                                      {loadingRouteId === r.id
+                                        ? 'Loading…'
+                                        : formatDistance(r.distanceMeters)}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`game-route-visibility-btn ${
+                                      r.visibility === 'CLUB' ? 'is-shared' : ''
+                                    }`}
+                                    disabled={
+                                      routeVisibilityBusyId === r.id ||
+                                      (r.visibility !== 'CLUB' &&
+                                        !profile?.clubName)
+                                    }
+                                    title={
+                                      r.visibility !== 'CLUB' &&
+                                      !profile?.clubName
+                                        ? 'Join a club to share routes with it'
+                                        : undefined
+                                    }
+                                    onClick={() =>
+                                      handleToggleRouteVisibility(r)
+                                    }
+                                  >
+                                    {routeVisibilityBusyId === r.id
+                                      ? '…'
+                                      : r.visibility === 'CLUB'
+                                        ? 'Shared with Club'
+                                        : 'Private'}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            {myRoutesTotalPages > 1 && (
+                              <div className="game-route-pager">
+                                <GameButton
+                                  variant="neutral"
+                                  size="sm"
+                                  disabled={myRoutesPage <= 1}
+                                  onClick={() => loadMyRoutes(myRoutesPage - 1)}
+                                >
+                                  Prev
+                                </GameButton>
+                                <span className="game-route-pager-label">
+                                  Page {myRoutesPage} of {myRoutesTotalPages}
+                                </span>
+                                <GameButton
+                                  variant="neutral"
+                                  size="sm"
+                                  disabled={myRoutesPage >= myRoutesTotalPages}
+                                  onClick={() => loadMyRoutes(myRoutesPage + 1)}
+                                >
+                                  Next
+                                </GameButton>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </section>
+
+                      <PendingRunsList
+                        runs={runSync.runs}
+                        onRetry={async (id) => {
+                          await retryOutboxRun(id)
+                          runSync.flush()
+                        }}
+                        onDelete={(id) => removeOutboxRun(id)}
+                        onSync={() => runSync.flush()}
+                        onExport={exportGpxFile}
+                      />
+
+                      <section className="game-me-section" ref={myRunsListRef}>
+                        <p className="game-menu-section-title">History</p>
+                        {myRunsError ? (
+                          <div className="game-me-history-error">
+                            <p className="game-controls-hint game-controls-hint-error">
+                              {myRunsError}
+                            </p>
+                            <GameButton
+                              variant="neutral"
+                              size="sm"
+                              onClick={() => loadMyRunsPage(myRunsPage)}
+                            >
+                              Retry
+                            </GameButton>
+                          </div>
+                        ) : myRunsLoading && myRuns.length === 0 ? (
+                          <ul
+                            className="game-me-history-list"
+                            aria-hidden="true"
+                          >
+                            {Array.from({ length: MY_RUNS_PAGE_SIZE }).map(
+                              (_, i) => (
+                                <li
+                                  key={i}
+                                  className="game-me-history-row game-me-history-skeleton"
+                                />
+                              )
+                            )}
+                          </ul>
+                        ) : myRuns.length === 0 ? (
+                          <p className="game-menu-empty">
+                            Finish a GPS run to see its map here.
+                          </p>
+                        ) : (
+                          <>
+                            <ul
+                              className="game-me-history-list"
+                              aria-busy={myRunsLoading}
+                            >
+                              {myRuns.map((r) => (
+                                <li key={r.id}>
+                                  <button
+                                    type="button"
+                                    className="game-me-history-row"
+                                    onClick={() => handleViewRun(r.id)}
+                                    disabled={loadingRunId === r.id}
+                                  >
+                                    <span className="game-me-history-area">
+                                      {formatDistance(r.distance)} ·{' '}
+                                      {formatDuration(r.duration)}
+                                    </span>
+                                    <span className="game-me-history-meta">
+                                      {loadingRunId === r.id
+                                        ? 'Loading…'
+                                        : `${isIndoorSummary(r) ? 'Indoor · ' : ''}${formatRunDate(r.startedAt)}`}
+                                    </span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            {myRunsTotalPages > 1 && (
+                              <div className="game-me-history-pager">
+                                <button
+                                  type="button"
+                                  className="game-me-history-pager-btn"
+                                  aria-label="Previous page"
+                                  disabled={myRunsPage <= 1 || myRunsLoading}
+                                  onClick={() => goToMyRunsPage(myRunsPage - 1)}
+                                >
+                                  Prev
+                                </button>
+                                <span className="game-me-history-pager-label">
+                                  Page {myRunsPage} of {myRunsTotalPages}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="game-me-history-pager-btn"
+                                  aria-label="Next page"
+                                  disabled={
+                                    myRunsPage >= myRunsTotalPages ||
+                                    myRunsLoading
+                                  }
+                                  onClick={() => goToMyRunsPage(myRunsPage + 1)}
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </section>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -6843,6 +7288,7 @@ function GamePageInner() {
                 }}
                 onOpenLegal={setLegalDoc}
                 onLogout={handleLogout}
+                onAccountDeleted={() => window.location.reload()}
               />
             )}
 
@@ -6850,17 +7296,22 @@ function GamePageInner() {
               <div className="game-menu-panel game-menu-shop game-cards">
                 <div className="game-shop-wallet">
                   <span className="game-hud-icon game-hud-icon-coin" />
-                  <span className="game-shop-wallet-value">
-                    {formatCoins(fahhcoin ?? 0)}
-                  </span>
+                  {fahhcoin == null && shopState !== GATE.TIMEOUT ? (
+                    <WalletSkeleton />
+                  ) : (
+                    <span className="game-shop-wallet-value">
+                      {formatCoins(fahhcoin ?? 0)}
+                    </span>
+                  )}
                   <GameButton variant="gold" size="sm" onClick={openCoinShop}>
                     + Get more
                   </GameButton>
                 </div>
-                {(storeError ||
+                {((storeError && storeCatalog.length > 0) ||
                   (storeActionError && !isNotOwnedError(storeActionError))) && (
                   <p className="game-controls-hint game-controls-hint-error">
-                    {storeError || storeActionError}
+                    {(storeCatalog.length > 0 && storeError) ||
+                      storeActionError}
                   </p>
                 )}
 
@@ -6879,19 +7330,37 @@ function GamePageInner() {
                   ))}
                 </div>
 
-                {shopSection === 'heroes' && (
-                  <HeroGallery
-                    heroes={galleryHeroes}
-                    ownedItems={ownedItems}
-                    activeHeroId={activeHeroId}
-                    level={profile?.level}
-                    loading={heroesLoading}
-                    onSelect={handleSelectGalleryHero}
-                    onEquip={handleEquip}
+                {(shopState === GATE.FAILED || shopState === GATE.TIMEOUT) && (
+                  <LoadFailed
+                    testId="shop-error"
+                    message={
+                      shopState === GATE.TIMEOUT
+                        ? 'The shop is taking too long.'
+                        : "Couldn't load the shop."
+                    }
+                    onRetry={retryShop}
                   />
                 )}
 
-                {shopSection === 'territory' && (
+                {shopState === GATE.LOADING && !shopHeroesSection && (
+                  <ColorShelfSkeleton />
+                )}
+
+                {shopSection === 'heroes' &&
+                  (shopState === GATE.CONTENT ||
+                    shopState === GATE.LOADING) && (
+                    <HeroGallery
+                      heroes={galleryHeroes}
+                      ownedItems={ownedItems}
+                      activeHeroId={activeHeroId}
+                      level={profile?.level}
+                      loading={shopState === GATE.LOADING}
+                      onSelect={handleSelectGalleryHero}
+                      onEquip={handleEquip}
+                    />
+                  )}
+
+                {shopSection === 'territory' && shopState === GATE.CONTENT && (
                   <ColorShelf
                     kind="territory"
                     title="Territory"
@@ -6904,7 +7373,7 @@ function GamePageInner() {
                   />
                 )}
 
-                {shopSection === 'trail' && (
+                {shopSection === 'trail' && shopState === GATE.CONTENT && (
                   <ColorShelf
                     kind="trail"
                     title="Trail"
@@ -7186,38 +7655,42 @@ function GamePageInner() {
           the run still saves to history either way (see
           game-claim-toast-saved below). */}
       <AnimatePresence>
-        {pendingRun && draftLoopOpen && !loopWarningDismissed && (
-          <motion.div
-            className="game-confirm-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setLoopWarningDismissed(true)}
-          >
+        {pendingRun &&
+          pendingIsTerritory &&
+          draftLoopOpen &&
+          !loopWarningDismissed && (
             <motion.div
-              className="game-confirm-card"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              onClick={(e) => e.stopPropagation()}
+              className="game-confirm-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setLoopWarningDismissed(true)}
             >
-              <p>
-                <strong>Heads up — your loop&apos;s still open</strong>
-              </p>
-              <p>
-                You finished away from where you started, so this run might not
-                close out as territory. It&apos;ll still be saved to your run
-                history either way - submit now, or head back out and close the
-                loop first.
-              </p>
-              <div className="game-confirm-actions">
-                <GameButton onClick={() => setLoopWarningDismissed(true)}>
-                  Got it
-                </GameButton>
-              </div>
+              <motion.div
+                className="game-confirm-card"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p>
+                  <strong>Heads up — your loop&apos;s still open</strong>
+                </p>
+                <p>
+                  You finished away from where you started —{' '}
+                  {closureHint(territoryRules)} Otherwise this run might not
+                  close out as territory. It&apos;ll still be saved to your run
+                  history either way - submit now, or head back out and close
+                  the loop first.
+                </p>
+                <div className="game-confirm-actions">
+                  <GameButton onClick={() => setLoopWarningDismissed(true)}>
+                    Got it
+                  </GameButton>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          )}
       </AnimatePresence>
 
       <AnimatePresence>

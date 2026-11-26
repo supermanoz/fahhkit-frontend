@@ -145,6 +145,8 @@
 .hero-modal-stage.is-hero-locked .hero-stage-bg,
 .hero-modal-stage.is-hero-locked .hero-emote-slide-figure {
   filter: var(--hero-locked-filter);
+  transform: var(--hero-locked-layer);
+  will-change: transform;
 }
 
 .hero-emote-lock-badge {

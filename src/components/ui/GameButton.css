@@ -4,6 +4,11 @@
    white display-font label with a dark stroke. Colours come from the game tokens
    each context already uses (--game-green/-red/-gold, --lb-accent, the cream
    panel family) - set per variant through --b-a/--b-b/--b-c. */
+:root {
+  /* Room a clipping container must leave under a GameButton: its drop shadow
+     paints OUTSIDE the box (up to 4px on lg). Use as padding-bottom. */
+  --gbtn-lip: 6px;
+}
 .gbtn {
   --b-a: var(--game-green-light);
   --b-b: var(--game-green);
@@ -55,15 +60,20 @@
     box-shadow 0.08s ease,
     filter 0.12s ease;
 }
-/* The label never wraps or overflows: it shrinks/ellipsises instead. It sets its
-   own text-shadow (higher specificity) so a screen-wide "text-shadow: none" rule
-   on its children can't strip the outline. */
+/* The label is NEVER cut off: no ellipsis, no clipping. If it does not fit on
+   one line it wraps onto a second (balanced) line and the button grows taller.
+   (A group of buttons that does not fit side by side stacks instead - see
+   .gm-actions in game/ui/gameSkin.css.) It sets its own text-shadow (higher
+   specificity) so a screen-wide "text-shadow: none" rule on its children can't
+   strip the outline. */
 .gbtn .gbtn-label {
   text-shadow: var(--b-shadow);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 .gbtn-icon {
   display: inline-flex;

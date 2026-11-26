@@ -1,6 +1,22 @@
+# Which backend a deploy talks to follows the deploy context (see
+# scripts/check-backend-target.mjs, which also fails a mismatched build):
+#   production context (the production branch, main) -> PRODUCTION API
+#   everything else (RUN_CONQUER, other branch deploys, PR previews) -> TEST API
+# Netlify > Site configuration > Build & deploy: production branch MUST be
+# main, and no VITE_API_* env vars may be set there (they would override the
+# .env.production / .env.staging files).
 [build]
-  command = "npm run build"
+  command = "npm run build:test"
   publish = "dist"
+
+[context.production]
+  command = "npm run build:prod"
+
+[context.branch-deploy]
+  command = "npm run build:test"
+
+[context.deploy-preview]
+  command = "npm run build:test"
 
 # React Router client-side routing — let the app handle all paths
 [[redirects]]

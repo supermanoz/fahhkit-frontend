@@ -99,6 +99,7 @@ describe('outlined text convention', () => {
       '.dr-panel',
       '.pvp-pr-panel',
       '.set-card',
+      '.club-page',
     ]) {
       expect(
         optOut.has(face),

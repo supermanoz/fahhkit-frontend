@@ -52,7 +52,7 @@ const APPLE_LOGO_PATH =
 // Native iOS sheet (ASAuthorizationAppleIDProvider). Hands the backend the
 // identity token, authorization code, the RAW nonce (Apple got its SHA-256)
 // and - first authorization only - the name/email.
-function AppleSignInButtonNative({ onCredential, onError }) {
+function AppleSignInButtonNative({ onCredential, onError, variant = 'black' }) {
   const [busy, setBusy] = useState(false)
 
   async function handleClick() {
@@ -80,7 +80,7 @@ function AppleSignInButtonNative({ onCredential, onError }) {
   return (
     <button
       type="button"
-      className="apple-signin-button"
+      className={`apple-signin-button is-${variant}`}
       onClick={handleClick}
       disabled={busy}
     >
@@ -89,9 +89,9 @@ function AppleSignInButtonNative({ onCredential, onError }) {
         aria-hidden="true"
         className="apple-signin-icon"
       >
-        <path fill="#fff" d={APPLE_LOGO_PATH} />
+        <path fill="currentColor" d={APPLE_LOGO_PATH} />
       </svg>
-      Continue with Apple
+      Sign in with Apple
     </button>
   )
 }
@@ -168,7 +168,7 @@ function AppleSignInButtonWeb({ onCredential, onError }) {
           d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-163.9-39.5c-76.7 0-104 39.5-166.5 39.5s-105.9-57-150.5-121.9C50.1 823.6 1.4 683.2 1.4 550.3c0-203.1 132-310.8 262.1-310.8 70.2 0 128.8 41.6 169.2 41.6 38.4 0 101.3-44.1 174.1-44.1 28.1 0 129.1 2.3 180.6 136.9zm-257-266.5c17.7-22.4 32.4-55.2 32.4-88.2 0-4.8-.4-9.6-1.3-13.6-26 1.1-56.4 17.4-78.6 41.4-20.3 22.4-37.8 54.7-37.8 87.7 0 5.1.9 10.1 1.3 11.6 2 .3 5.2.6 8.6.6 22.3 0 50.4-15.3 75.4-39.5z"
         />
       </svg>
-      {busy ? 'Signing in…' : 'Continue with Apple'}
+      {busy ? 'Signing in…' : 'Sign in with Apple'}
     </button>
   )
 }

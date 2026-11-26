@@ -16,6 +16,7 @@ import { PriceLabel } from './Price'
 import { useUnlockReveal } from '../hooks/useUnlockReveal'
 import './heroLocked.css'
 import './HeroGallery.css'
+import { HeroGallerySkeleton } from './ScreenSkeletons'
 
 // A swipe distance/velocity past either of these commits to the next/prev
 // hero - same thresholds ShareRunCarousel.jsx uses for its drag-to-advance
@@ -107,7 +108,7 @@ function HeroGallery({
   }
 
   if (loading && heroes.length === 0) {
-    return <p className="game-menu-empty">Summoning the heroes…</p>
+    return <HeroGallerySkeleton />
   }
   if (heroes.length === 0) {
     return (
@@ -201,7 +202,6 @@ function HeroGallery({
                       pose="idle"
                       height={h || 240}
                       releaseGraceMs={0}
-                      locked={locked}
                     />
                   )}
                 </HeroStage>

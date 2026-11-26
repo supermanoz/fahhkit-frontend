@@ -303,6 +303,54 @@
   color: var(--text-body-dark);
 }
 
+/* The Delete account dialog: plain readable UI text (body font, solid dark
+   ink, no outline / shadow - the display font is for the title banner only),
+   left-aligned, real bullets with a hanging indent, and a smaller muted note. */
+.game-root .set-delete-intro,
+.game-root .set-delete-list,
+.game-root .set-delete-list li,
+.game-root .set-confirm-note {
+  font-family: var(--font-body);
+  color: var(--ink-navy, #1b2347);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
+  paint-order: normal;
+  text-align: left;
+}
+.game-root .set-delete-intro {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.game-root .set-delete-list {
+  margin: 0 0 12px;
+  padding: 0 0 0 1.35em;
+  list-style: disc outside;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.game-root .set-delete-list li {
+  margin: 0 0 5px;
+  padding-left: 0.2em;
+  overflow-wrap: anywhere;
+}
+.game-root .set-delete-list li::marker {
+  color: var(--ink-navy-soft, #4a5378);
+}
+.game-root .set-confirm-note {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink-navy-soft, #4a5378);
+}
+.game-root .set-confirm-error,
+.game-root .set-delete-error {
+  text-align: left;
+}
+
 /* --- About --------------------------------------------------------------- */
 .set-static-value {
   flex-shrink: 0;
@@ -327,4 +375,22 @@
 .set-error {
   margin: 0;
   padding: 8px 16px 12px;
+}
+
+.set-delete-btn {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--red-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.game-root .set-delete-btn {
+  font-family: var(--font-body);
+  -webkit-text-stroke-width: 0;
+  text-shadow: none;
 }

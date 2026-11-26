@@ -46,10 +46,10 @@ function loadGsiScript() {
 //
 // The web GSI flow (an iframe/popup to accounts.google.com) is blocked by
 // Google inside a WebView - see GoogleSignInButtonNative below for the
-// native-app path, which uses the OS account picker instead and produces an
-// ID token audienced the same way (serverClientId in capacitor.config.json
-// is set to this same GOOGLE_CLIENT_ID), so the backend's verification is
-// unchanged either way.
+// native-app path, which uses the OS account picker instead. Its ID token is
+// audienced to the WEB client in capacitor.config.json (serverClientId, also
+// android strings.xml server_client_id), which must be in the backend's
+// google.oauth.client.ids - see src/config/authConfig.test.js.
 function GoogleSignInButtonWeb({ onCredential, onError, appearance }) {
   const containerRef = useRef(null)
   const handlersRef = useRef({ onCredential, onError })
@@ -155,9 +155,9 @@ export default function GoogleSignInButton({
   appearance,
 }) {
   if (!GOOGLE_CLIENT_ID) return null
-  // No iOS OAuth client id exists yet (capacitor.config.json only has the
-  // Android one), so native Google sign-in can't work on iOS: hide it there
-  // until VITE_IOS_GOOGLE=true is set alongside a real iosClientId.
+  // iOS: native Google sign-in needs the iOS OAuth client (iosClientId in
+  // capacitor.config.json + GoogleService-Info.plist). It is switched on per
+  // build with VITE_IOS_GOOGLE=true (set in .env.production / .env.staging).
   if (
     isNative &&
     platform === 'ios' &&

@@ -1087,6 +1087,10 @@
   gap: 12px;
   overflow: hidden;
   width: 100%;
+  /* overflow:hidden is needed for the height animation, but it clips the
+     GameButton's drop shadow (it paints below the button's box). Reserve it:
+     --gbtn-lip = the tallest drop + the pressed offset, see GameButton.css. */
+  padding-bottom: var(--gbtn-lip);
 }
 
 /* --- In-run status/stats card, styled after the iOS Live Activity (see the
@@ -1409,6 +1413,7 @@
 
 .game-end-run-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 6px;
 }
@@ -2099,6 +2104,7 @@
 
 .game-confirm-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
 }
@@ -4397,16 +4403,6 @@
   .game-menu-subtab-label
   span {
   font-weight: 800;
-  -webkit-text-stroke-width: 0;
-  text-shadow: none;
-}
-
-/* My Club / Club Wars / Shared Routes: the inactive tab inherited white text
-   with the global dark stroke on the light fill - plain dark text instead. */
-.club-section-tabs .game-menu-subtab:not(.active) {
-  color: #2b2b2b;
-  font-weight: 800;
-  letter-spacing: 0.03em;
   -webkit-text-stroke-width: 0;
   text-shadow: none;
 }

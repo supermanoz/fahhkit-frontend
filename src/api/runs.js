@@ -25,9 +25,12 @@ const SEND_IDEMPOTENCY_HEADER =
   import.meta.env.VITE_IDEMPOTENCY_HEADER === 'true'
 
 export function createRun(data) {
+  // Stamped on EVERY attempt (an offline run is retried later): the server
+  // compares it with its own clock to see how long the phone held the run.
+  const body = { ...data, clientSentAtEpochMs: Date.now() }
   return postJson(
     '/v1/run',
-    data,
+    body,
     SEND_IDEMPOTENCY_HEADER && data?.clientRunId
       ? { 'Idempotency-Key': data.clientRunId }
       : {}

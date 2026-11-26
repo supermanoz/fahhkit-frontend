@@ -244,21 +244,72 @@
 }
 
 /* ---------- Actions ---------- */
+/* A button group sits on ONE row when every button fits at its natural width,
+   and otherwise STACKS (each button full width, in DOM order: put the safe /
+   neutral choice first). No label is ever cut off. min-width is the button's
+   natural width, capped at the row - so a single long label that cannot fit
+   even alone gets the whole row and wraps inside its button. */
 .gm-actions,
 .game-confirm-card .game-confirm-actions,
 .game-end-run-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
 }
 .gm-actions.is-stacked {
   flex-direction: column;
+  flex-wrap: nowrap;
 }
 .gm-actions > *,
 .game-confirm-actions > *,
 .game-end-run-actions > * {
   flex: 1 1 0;
+  min-width: min(100%, max-content);
+}
+.gm-actions.is-stacked > * {
   min-width: 0;
+}
+/* Legacy .btn buttons inside popups: same rule - wrap, never ellipsise. */
+.game-confirm-card .btn,
+.gm-panel .btn,
+.g-modal .btn {
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* Tall dialog: the panel never outgrows the screen (safe areas respected);
+   its body scrolls and the button row stays pinned at the bottom of it. */
+.gm-dialog:not(.is-sheet) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(
+    100dvh - 36px - 18px - env(safe-area-inset-top, 0px) -
+      env(safe-area-inset-bottom, 0px) - 22px
+  );
+}
+.gm-dialog:not(.is-sheet) > .gm-panel-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.gm-dialog:not(.is-sheet) .gm-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: 10px 0 8px;
+  margin-bottom: -4px;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 240, 220, 0) 0,
+    var(--cream-100) 10px
+  );
 }
 
 /* ---------- Readable text on light cards (shared) ----------
@@ -604,10 +655,22 @@
   z-index: 1400;
   background: rgba(10, 14, 36, 0.66);
 }
+/* The shared popup's close (X): the same floating top-right corner badge the
+   other popups use, ABOVE the title banner and the cream body (z-index), and
+   never clipped (the panel is overflow: visible; the scrim's padding leaves
+   room for the overhang). 44px touch target (.game-close-btn). */
 .g-panel.g-modal .g-modal-close {
-  top: -12px;
-  right: -8px;
-  z-index: 3;
+  position: absolute;
+  top: -14px;
+  right: -10px;
+  z-index: 5;
+}
+/* The title banner stops 8px+ short of the X (X's left edge is 34px inside
+   the panel's right edge; the banner is centred, so the same room is kept on
+   the left): the two never touch, even on a 360px phone. */
+.g-panel.g-modal.has-close .g-modal-ribbon {
+  max-width: calc(100% - 92px);
+  min-width: min(62%, calc(100% - 92px));
 }
 
 /* ---------- Broadcast popup: same layered panel + chunky buttons ------- */

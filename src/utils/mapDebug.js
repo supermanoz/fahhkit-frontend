@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { DEBUG_INFO } from '../config/debugInfo'
 
 // Hidden on-screen panel for the heading-up map (components/MapDebugPanel).
 // Off in normal use. On with VITE_DEBUG_MAP=1 at build time, or at runtime by
@@ -25,6 +26,7 @@ try {
 }
 
 export function isMapDebugEnabled() {
+  if (!DEBUG_INFO) return false // never in release/staging builds
   if (import.meta.env?.VITE_DEBUG_MAP === '1') return true
   return memory !== null ? memory : stored()
 }

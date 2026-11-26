@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // A live message that arrives while the player is scrolled down the list must
 // not move what they are reading: the sheet's scrollTop grows by exactly the
@@ -12,6 +12,8 @@ vi.mock('../api/client', () => ({
 }))
 
 import MailPanel from './MailPanel'
+import { MailDetailSkeleton, MAIL_SKELETON_ROWS } from './MailStates'
+import { SKELETON_TIMEOUT_MS } from '../hooks/useLoadTimeout'
 
 const base = {
   loaded: true,
@@ -89,5 +91,60 @@ describe('a live message does not jump the scroll position', () => {
     const { sheet, update } = setup(['c'], 500, 1000)
     update(['a', 'b', 'c'], 1210)
     expect(sheet.scrollTop).toBe(710)
+  })
+})
+
+describe('loading states', () => {
+  const show = (over = {}) =>
+    render(<MailPanel mailbox={{ ...base, mail: [], ...over }} />)
+
+  it('first paint: skeleton rows (icon, lines, time) for Inbox and News, no blank', () => {
+    const { container } = show({ loaded: false })
+    expect(screen.getByTestId('mail-skeleton')).toBeInTheDocument()
+    expect(container.querySelectorAll('.mail-skel-row').length).toBe(
+      MAIL_SKELETON_ROWS
+    )
+    expect(MAIL_SKELETON_ROWS).toBeGreaterThanOrEqual(5)
+    expect(MAIL_SKELETON_ROWS).toBeLessThanOrEqual(6)
+    expect(container.querySelectorAll('.mail-skel-time').length).toBe(
+      MAIL_SKELETON_ROWS
+    )
+    fireEvent.click(screen.getByRole('tab', { name: /news/i }))
+    expect(container.querySelectorAll('.mail-skel-news').length).toBe(
+      MAIL_SKELETON_ROWS
+    )
+  })
+
+  it('data arrived (or already cached in the mailbox): no skeleton', () => {
+    show({ loaded: true, mail: [item('a')] })
+    expect(screen.queryByTestId('mail-skeleton')).toBeNull()
+    expect(screen.getByText('Mail a')).toBeInTheDocument()
+  })
+
+  it('a failed load shows the error with Retry', () => {
+    const refresh = vi.fn()
+    show({ loaded: true, error: 'Nope', refresh })
+    expect(screen.queryByTestId('mail-skeleton')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it('a skeleton never stays forever: after the timeout it turns into the error + Retry', () => {
+    vi.useFakeTimers()
+    const refresh = vi.fn()
+    show({ loaded: false, refresh })
+    expect(screen.getByTestId('mail-skeleton')).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(SKELETON_TIMEOUT_MS + 50))
+    expect(screen.queryByTestId('mail-skeleton')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refresh).toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('the message popup has a skeleton (chips, body lines, action) while it loads', () => {
+    render(<MailDetailSkeleton onClose={() => {}} />)
+    expect(screen.getByTestId('mail-detail-skeleton')).toBeInTheDocument()
+    expect(document.querySelectorAll('.mail-skel-line').length).toBe(3)
+    expect(document.querySelector('.mail-skel-action')).not.toBeNull()
   })
 })

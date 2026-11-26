@@ -153,8 +153,16 @@
    it differently: a floating corner badge, an inline header button,
    etc.) - see GamePage.css's own comment at .game-menu-close for the
    rule each of those per-context classes now keeps vs. drops. --- */
-.game-close-btn {
+/* The reset is wrapped in :where() so it has ZERO specificity: it used to
+   share .game-close-btn's own (0,1,0) and, being the same rule, wiped the
+   `position` / `top` / `right` / `z-index` of any per-context class that was
+   loaded earlier (the Training chooser's X fell back to a static flex item at
+   the top-left, underneath the panel). Now a per-context class always wins,
+   whatever the CSS load order. */
+:where(.game-close-btn) {
   all: unset;
+}
+.game-close-btn {
   box-sizing: border-box;
   flex-shrink: 0;
   display: flex;

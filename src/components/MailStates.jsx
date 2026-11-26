@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import GameButton from '../game/ui/GameButton'
+import { GameModal } from '../game/ui/GameModal'
 import mailInboxIcon from '../assets/ui/mail_inbox.png'
 import {
   MAIL_EMPTY,
@@ -25,7 +26,10 @@ export function MailIllustration() {
 }
 
 // Rows shaped like the real ones, so nothing jumps when mail arrives.
-export function MailSkeleton({ kind = 'inbox', rows = 4 }) {
+// 6 rows fill a phone screen under the tabs; each mirrors .mail-item-row
+// (icon badge | title + preview | time).
+export const MAIL_SKELETON_ROWS = 6
+export function MailSkeleton({ kind = 'inbox', rows = MAIL_SKELETON_ROWS }) {
   return (
     <div
       className="mail-skeleton"
@@ -48,10 +52,45 @@ export function MailSkeleton({ kind = 'inbox', rows = 4 }) {
               <span className="mail-skel-block mail-skel-line" />
               <span className="mail-skel-block mail-skel-line is-short" />
             </span>
+            <span className="mail-skel-block mail-skel-time" />
           </div>
         )
       )}
     </div>
+  )
+}
+
+// The mail popup while its message is still being fetched: title ribbon,
+// chips, body lines and the action button, in the real popup's order.
+export function MailDetailSkeleton({ onClose }) {
+  return (
+    <GameModal
+      open
+      onClose={onClose}
+      tone="info"
+      title=" "
+      className="mail-detail"
+      overlayClassName="mail-detail-overlay"
+    >
+      <div
+        className="mail-detail-skeleton"
+        role="status"
+        aria-live="polite"
+        aria-label={MAIL_LOADING}
+        data-testid="mail-detail-skeleton"
+      >
+        <div className="mail-detail-chips">
+          <span className="mail-skel-block mail-skel-chip" />
+          <span className="mail-skel-block mail-skel-chip" />
+        </div>
+        <div className="mail-detail-body">
+          <span className="mail-skel-block mail-skel-line" />
+          <span className="mail-skel-block mail-skel-line" />
+          <span className="mail-skel-block mail-skel-line is-short" />
+        </div>
+        <span className="mail-skel-block mail-skel-action" />
+      </div>
+    </GameModal>
   )
 }
 
