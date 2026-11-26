@@ -2138,6 +2138,7 @@ function GamePageInner() {
       setTerritoryEntryBanner({
         name: getDisplayName(
           {
+            id: standingIn.ownerId,
             nickname: standingIn.ownerNickname,
             fullName: standingIn.ownerName,
           },

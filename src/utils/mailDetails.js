@@ -113,6 +113,7 @@ export function mailFacts(item) {
       add(
         'Opponent',
         getDisplayName({
+          id: d.opponentId,
           nickname: d.opponentNickname,
           fullName: text(d.opponentName),
         })

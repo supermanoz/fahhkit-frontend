@@ -78,7 +78,11 @@ export default function MailDetail({
   const sender = isNews
     ? NEWS_AUTHOR
     : getDisplayName(
-        { nickname: item.senderNickname, fullName: item.senderName },
+        {
+          id: item.senderId,
+          nickname: item.senderNickname,
+          fullName: item.senderName,
+        },
         MAIL_DEFAULT_SENDER
       )
   const when = formatMailDateTime(isNews ? item.publishedAt : item.createdDate)

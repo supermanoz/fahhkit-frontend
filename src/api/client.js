@@ -1,5 +1,9 @@
 import { dedupe } from '../utils/requestCache'
 import {
+  harvestNicknames,
+  clearNicknameDirectory,
+} from '../utils/nicknameDirectory'
+import {
   MAX_UPLOAD_BYTES,
   compressFormDataImages,
   formDataFileBytes,
@@ -177,6 +181,7 @@ export function setToken(token) {
 }
 
 export function clearToken() {
+  clearNicknameDirectory()
   localStorage.removeItem(TOKEN_KEY)
   mirrorRemove(TOKEN_KEY)
   notifyAuthChanged()
@@ -491,6 +496,7 @@ async function parseResponse(response) {
       response.status
     )
   }
+  harvestNicknames(body?.data)
   return body?.data
 }
 

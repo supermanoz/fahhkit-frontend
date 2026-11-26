@@ -705,6 +705,7 @@ export default function ClubPanel({
                   <p className="game-row-meta">
                     Captain{' '}
                     {getDisplayName({
+                      id: myClub.leaderId,
                       nickname: myClub.leaderNickname,
                       fullName: myClub.leaderName,
                     })}
@@ -875,6 +876,7 @@ export default function ClubPanel({
                           role="button"
                           tabIndex={0}
                           aria-label={`View ${getDisplayName({
+                            id: req.requesterId,
                             nickname: req.requesterNickname,
                             fullName: req.requesterName,
                           })}'s profile`}
@@ -888,6 +890,7 @@ export default function ClubPanel({
                         >
                           <span className="game-row-name">
                             {getDisplayName({
+                              id: req.requesterId,
                               nickname: req.requesterNickname,
                               fullName: req.requesterName,
                             })}
@@ -1219,6 +1222,7 @@ export default function ClubPanel({
                 <p className="game-row-meta">
                   Captain{' '}
                   {getDisplayName({
+                    id: viewingClub.leaderId,
                     nickname: viewingClub.leaderNickname,
                     fullName: viewingClub.leaderName,
                   })}

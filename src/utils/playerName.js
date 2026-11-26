@@ -28,6 +28,8 @@ export function playerName(nickname, fullName) {
 // are accepted too. The player's own record works the same.
 export const DEFAULT_NAME = 'Runner'
 
+import { lookupNickname } from './nicknameDirectory'
+
 const text = (v) => (typeof v === 'string' ? v.trim() : '')
 
 // Objects that wrap the actual person: { user: {...} }, { player: {...} } ...
@@ -50,6 +52,9 @@ export function getDisplayName(person, fallback = '') {
   if (typeof person === 'string') return playerName(null, person) || fallback
   if (!person || typeof person !== 'object') return fallback
   let { nick, real } = pick(person)
+  if (nick) return nick
+  // No nickname in this row: another response may have told us this player's.
+  nick = lookupNickname(person.userId ?? person.id)
   if (nick) return nick
   // Nested person (the wrapper has no name of its own).
   if (!real) {
@@ -75,6 +80,7 @@ export function getRoleDisplayName(obj, role, fallback = '') {
   if (!obj || typeof obj !== 'object') return fallback
   return getDisplayName(
     {
+      id: obj[`${role}Id`],
       nickname: obj[`${role}Nickname`],
       fullName: obj[`${role}Name`] ?? obj[`${role}FullName`],
     },
