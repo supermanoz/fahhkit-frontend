@@ -321,7 +321,12 @@ export default function ClubPanel({
         if (!result || result.last !== false) break
       }
       const nameMatches = entries
-        .filter((entry) => entry.fullName?.toLowerCase().includes(text))
+        .filter((entry) =>
+          [entry.fullName, entry.nickname]
+            .join(' ')
+            .toLowerCase()
+            .includes(text)
+        )
         .map((entry) => ({
           userId: entry.userId,
           fullName: entry.fullName,

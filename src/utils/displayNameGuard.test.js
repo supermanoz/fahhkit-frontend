@@ -10,8 +10,9 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const RAW =
-  /\.(fullName|realName|firstName|lastName|ownerName|senderName|requesterName|leaderName|authorName)\b/
-const HELPERS = /getDisplayName|playerNameOf|playerName\(|<DisplayName/
+  /\.(fullName|realName|firstName|lastName|ownerName|senderName|requesterName|leaderName|authorName|userFullName)\b/
+const HELPERS =
+  /getDisplayName|getRoleDisplayName|playerNameOf|displayName\(|playerName\(|<DisplayName/
 
 // Website / admin screens show real names on purpose (staff identify people),
 // and a few game spots list the real name next to the @nickname by design.

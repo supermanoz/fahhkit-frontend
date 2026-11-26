@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- no prop-types dependency in this project */
 import { useState } from 'react'
+import { initialsOfName } from '../../utils/playerName'
 import { useImageStatus } from '../../hooks/useImageStatus'
 import './components.css'
 
@@ -63,7 +64,7 @@ export default function Avatar({
       role="img"
       aria-label={name || 'Player'}
     >
-      {name.trim() ? initialsOf(name, initials) : <SilhouetteIcon />}
+      {name.trim() ? initialsOfName(name, initials) : <SilhouetteIcon />}
     </span>
   )
 
@@ -76,15 +77,6 @@ export default function Avatar({
       </span>
     </span>
   )
-}
-
-function initialsOf(name, count) {
-  const parts = name.trim().split(/\s+/)
-  const letters =
-    count > 1 && parts.length > 1
-      ? parts[0][0] + parts[parts.length - 1][0]
-      : parts[0][0]
-  return letters.toUpperCase()
 }
 
 function SilhouetteIcon() {

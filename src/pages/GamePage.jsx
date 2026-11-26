@@ -6317,7 +6317,16 @@ function GamePageInner() {
                         entries={lb.rows.map((entry) => ({
                           key: entry.userId,
                           rank: entry.rank,
-                          name: playerNameOf(entry),
+                          // My own row: the leaderboard payload has no nickname,
+                          // but I know mine.
+                          name: playerNameOf(
+                            isMyEntry(entry)
+                              ? {
+                                  ...entry,
+                                  nickname: entry.nickname || user?.nickname,
+                                }
+                              : entry
+                          ),
                           // Same "icon + stat" treatment as the Club board's
                           // trophy count - territory is this board's score.
                           area: (
